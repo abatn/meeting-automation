@@ -1,0 +1,1 @@
+# TODO: Dockerfile für Mistral-Service

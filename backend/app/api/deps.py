@@ -1,0 +1,1 @@
+# TODO: Abhängigkeiten für API-Endpunkte (z.B. get_current_user)

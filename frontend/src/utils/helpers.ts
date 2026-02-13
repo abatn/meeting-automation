@@ -1,0 +1,1 @@
+// TODO: Hilfsfunktionen implementieren

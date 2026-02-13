@@ -1,0 +1,1 @@
+# TODO: Pydantic Schema für transcription definieren

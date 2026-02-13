@@ -1,0 +1,1 @@
+# TODO: Dockerfile für Whisper-Service

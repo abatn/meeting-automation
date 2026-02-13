@@ -1,0 +1,1 @@
+// TODO: MeetingDetail Komponente implementieren
