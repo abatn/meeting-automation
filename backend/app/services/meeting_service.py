@@ -1,1 +1,129 @@
-# TODO: Business-Logik für meeting_service implementieren
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, and_, or_
+from sqlalchemy.orm import selectinload
+from typing import Optional, List
+from datetime import datetime, timedelta
+from app.models.meeting import Meeting, MeetingStatus
+from app.schemas.meeting import MeetingCreate, MeetingUpdate
+from app.models.user import User # Added import for User model
+
+async def get_meeting_by_id(db: AsyncSession, meeting_id: int) -> Optional[Meeting]:
+    """Holt ein Meeting anhand der ID."""
+    result = await db.execute(
+        select(Meeting)
+        .where(Meeting.id == meeting_id)
+        .options(selectinload(Meeting.organizer))
+    )
+    return result.scalar_one_or_none()
+
+async def get_meetings(
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[MeetingStatus] = None,
+    user_id: Optional[int] = None,
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None
+) -> List[Meeting]:
+    """Holt eine Liste von Meetings mit optionalen Filtern."""
+    query = select(Meeting).options(selectinload(Meeting.organizer))
+    
+    filters = []
+    if status:
+        filters.append(Meeting.status == status)
+    if user_id:
+        filters.append(Meeting.organizer_id == user_id)
+    if from_date:
+        filters.append(Meeting.date >= from_date)
+    if to_date:
+        filters.append(Meeting.date <= to_date)
+    
+    if filters:
+        query = query.where(and_(*filters))
+    
+    query = query.order_by(Meeting.date.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+async def create_meeting(
+    db: AsyncSession,
+    meeting_data: MeetingCreate,
+    organizer_id: int
+) -> Meeting:
+    """Erstellt ein neues Meeting."""
+    db_meeting = Meeting(
+        **meeting_data.dict(),
+        organizer_id=organizer_id,
+        status=MeetingStatus.PLANNED
+    )
+    db.add(db_meeting)
+    await db.commit()
+    await db.refresh(db_meeting)
+    db.expunge(db_meeting) # Detach the object from the session
+    return db_meeting
+
+async def update_meeting(
+    db: AsyncSession,
+    meeting_id: int,
+    meeting_data: MeetingUpdate,
+    user_id: int
+) -> Optional[Meeting]:
+    """Aktualisiert ein Meeting (nur Organizer oder Admin)."""
+    meeting = await get_meeting_by_id(db, meeting_id)
+    if not meeting:
+        return None
+    
+    # Prüfe Berechtigung
+    from app.models.user import UserRole
+    if meeting.organizer_id != user_id:
+        # Prüfe ob User Admin ist
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if not user or user.role != UserRole.ADMIN:
+            return None
+    
+    update_data = meeting_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(meeting, field, value)
+    
+    await db.commit()
+    await db.refresh(meeting)
+    return meeting
+
+async def delete_meeting(db: AsyncSession, meeting_id: int, user_id: int) -> bool:
+    """Löscht ein Meeting (nur Organizer oder Admin)."""
+    meeting = await get_meeting_by_id(db, meeting_id)
+    if not meeting:
+        return False
+    
+    # Prüfe Berechtigung
+    from app.models.user import UserRole
+    if meeting.organizer_id != user_id:
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if not user or user.role != UserRole.ADMIN:
+            return False
+    
+    await db.delete(meeting)
+    await db.commit()
+    return True
+
+async def change_meeting_status(
+    db: AsyncSession,
+    meeting_id: int,
+    status: MeetingStatus,
+    user_id: int
+) -> Optional[Meeting]:
+    """Ändert den Status eines Meetings."""
+    meeting = await get_meeting_by_id(db, meeting_id)
+    if not meeting:
+        return None
+    
+    # Prüfe Berechtigung
+    if meeting.organizer_id != user_id:
+        return None
+    
+    meeting.status = status
+    await db.commit()
+    await db.refresh(meeting)
+    return meeting
