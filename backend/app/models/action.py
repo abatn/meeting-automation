@@ -2,7 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
-from app.core.database import Base
+from ..core.database import Base
 
 class ActionPriority(str, enum.Enum):
     LOW = "low"

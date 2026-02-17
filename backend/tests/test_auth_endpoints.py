@@ -1,11 +1,11 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.main import app
-from app.core.config import settings
-from app.models.user import User, UserRole
-from app.schemas.user import UserCreate, UserResponse
-from app.core.security import get_password_hash
+from backend.app.main import app
+from backend.app.core.config import settings
+from backend.app.models.user import User, UserRole
+from backend.app.schemas.user import UserCreate, UserResponse
+from backend.app.core.security import get_password_hash
 from sqlalchemy import select
 
 @pytest.mark.asyncio
@@ -55,9 +55,19 @@ async def test_login_user(test_client: AsyncClient, db_session):
     assert response.json()["token_type"] == "bearer"
 
 @pytest.mark.asyncio
-async def test_login_user_incorrect_password(test_client: AsyncClient, db_session):
+async def test_login_user_incorrect_password(test_client: AsyncClient):
+    # First, register a user
+    user_data = {
+        "email": "login_fail@example.com",
+        "username": "loginfailuser",
+        "password": "loginfailpassword",
+        "full_name": "Login Fail User",
+            "role": "participant"
+    }
+    await test_client.post("/api/v1/auth/register", json=user_data)
+    
     form_data = {
-        "username": "loginuser",
+        "username": "loginfailuser",
         "password": "wrongpassword"
     }
     response = await test_client.post("/api/v1/auth/login", data=form_data)

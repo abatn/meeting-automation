@@ -4,19 +4,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated
 from datetime import timedelta
 
-from app.api import deps
-from app.core.database import get_db
-from app.core.security import create_access_token, create_refresh_token, verify_token
-from app.models.user import User # Import the User model
-from app.schemas.user import UserCreate, UserResponse, TokenResponse, MFASetupResponse, MFACode
-from app.services.security_service import (
-    create_user, authenticate_user, get_user_by_id,
-    generate_mfa_secret, get_mfa_provisioning_uri, generate_qr_code_base64,
-    verify_mfa_code
-)
-from app.services.audit_service import log_action
+from backend.app.api import deps
+from backend.app.core.database import get_db
+from backend.app.core.security import create_access_token, create_refresh_token, verify_token
+from backend.app.models.user import User # Import the User model
+from backend.app.schemas.user import UserCreate, UserResponse, TokenResponse, MFASetupResponse, MFACode
+from backend.app.services.security_service import security_service
+from backend.app.services.audit_service import AuditService
+from backend.app.schemas.audit import AuditLogCreate
 
 router = APIRouter()
+audit_service = AuditService()
 
 @router.post("/register", response_model=UserResponse)
 async def register(
@@ -26,34 +24,36 @@ async def register(
 ):
     """Registriert einen neuen Benutzer."""
     # Prüfen ob Email bereits existiert
-    from app.services.security_service import get_user_by_email, get_user_by_username
-    
-    if await get_user_by_email(db, user_data.email):
+    if await security_service.get_user_by_email(db, user_data.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
-    if await get_user_by_username(db, user_data.username):
+
+    if await security_service.get_user_by_username(db, user_data.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken"
         )
-    
-    user = await create_user(db, user_data)
-    
+
+    user = await security_service.create_user(db, user_data)
+
     # Audit-Log
-    await log_action(
+    await audit_service.log_action(
         db=db,
-        user_id=user.id,
-        action="REGISTER",
-        resource_type="user",
-        resource_id=user.id,
-        details={"email": user.email},
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        log_data=AuditLogCreate(
+            user_id=user.id,
+            action="REGISTER",
+            method=request.method,
+            path=request.url.path,
+            entity_type="user",
+            entity_id=user.id,
+            details={"email": user.email},
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
     )
-    
+
     return user
 
 @router.post("/login", response_model=TokenResponse)
@@ -63,17 +63,21 @@ async def login(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Authentifiziert einen Benutzer und gibt Tokens zurück."""
-    user = await authenticate_user(db, form_data.username, form_data.password)
+    user = await security_service.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         # Audit-Log für fehlgeschlagenen Login
-        await log_action(
+        await audit_service.log_action(
             db=db,
-            user_id=None,
-            action="LOGIN_FAILED",
-            resource_type="auth",
-            details={"username": form_data.username},
-            ip_address=request.client.host,
-            user_agent=request.headers.get("user-agent")
+            log_data=AuditLogCreate(
+                user_id=None,
+                action="LOGIN_FAILED",
+                method=request.method,
+                path=request.url.path,
+                entity_type="auth",
+                details={"username": form_data.username},
+                ip_address=request.client.host,
+                user_agent=request.headers.get("user-agent")
+            )
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -102,13 +106,17 @@ async def login(
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
     
     # Audit-Log
-    await log_action(
+    await audit_service.log_action(
         db=db,
-        user_id=user.id,
-        action="LOGIN",
-        resource_type="auth",
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        log_data=AuditLogCreate(
+            user_id=user.id,
+            action="LOGIN",
+            method=request.method,
+            path=request.url.path,
+            entity_type="auth",
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
     )
     
     return TokenResponse(
@@ -133,23 +141,26 @@ async def setup_mfa(
         )
     
     # MFA-Secret generieren
-    secret = generate_mfa_secret()
+    secret = security_service.generate_mfa_secret()
     current_user.mfa_secret = secret
     await db.commit()
     
     # QR-Code generieren
-    uri = get_mfa_provisioning_uri(secret, current_user.email)
-    qr_code = generate_qr_code_base64(uri)
+    uri = security_service.get_mfa_provisioning_uri(secret, current_user.email)
+    qr_code = security_service.generate_qr_code_base64(uri)
     
     # Audit-Log
-    await log_action(
+    await audit_service.log_action(
         db=db,
-        user_id=current_user.id,
-        action="MFA_SETUP",
-        resource_type="user",
-        resource_id=current_user.id,
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        log_data=AuditLogCreate(
+            user_id=current_user.id,
+            action="MFA_SETUP",
+            method=request.method,
+            entity_type="user",
+            entity_id=current_user.id,
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
     )
     
     return MFASetupResponse(
@@ -165,42 +176,50 @@ async def verify_mfa(
     db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """Verifiziert einen MFA-Code und gibt Tokens zurück."""
-    user = await get_user_by_id(db, mfa_data.user_id)
+    user = await security_service.get_user_by_id(db, mfa_data.user_id)
     if not user or not user.is_mfa_enabled or not user.mfa_secret:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="MFA not enabled for this user"
         )
-    
-    if not verify_mfa_code(user.mfa_secret, mfa_data.code):
+
+    if not security_service.verify_mfa_code(user.mfa_secret, mfa_data.code):
         # Audit-Log für fehlgeschlagenen MFA
-        await log_action(
+        await audit_service.log_action(
             db=db,
-            user_id=user.id,
-            action="MFA_FAILED",
-            resource_type="auth",
-            ip_address=request.client.host,
-            user_agent=request.headers.get("user-agent")
+            log_data=AuditLogCreate(
+                user_id=user.id,
+                action="MFA_FAILED",
+                method=request.method,
+                path=request.url.path,
+                entity_type="auth",
+                ip_address=request.client.host,
+                user_agent=request.headers.get("user-agent")
+            )
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid MFA code"
         )
-    
+
     # Tokens erstellen
     access_token = create_access_token(data={"sub": str(user.id)})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
-    
+
     # Audit-Log
-    await log_action(
+    await audit_service.log_action(
         db=db,
-        user_id=user.id,
-        action="MFA_VERIFIED",
-        resource_type="auth",
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        log_data=AuditLogCreate(
+            user_id=user.id,
+            action="MFA_VERIFIED",
+            method=request.method,
+            path=request.url.path,
+            entity_type="auth",
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
     )
-    
+
     return TokenResponse(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -224,7 +243,7 @@ async def refresh_token(
         )
     
     user_id = int(payload.get("sub"))
-    user = await get_user_by_id(db, user_id)
+    user = await security_service.get_user_by_id(db, user_id)
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -251,13 +270,17 @@ async def logout(
 ):
     """Meldet den Benutzer ab."""
     # Audit-Log
-    await log_action(
+    await audit_service.log_action(
         db=db,
-        user_id=current_user.id,
-        action="LOGOUT",
-        resource_type="auth",
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        log_data=AuditLogCreate(
+            user_id=current_user.id,
+            action="LOGOUT",
+            method=request.method,
+            path=request.url.path,
+            entity_type="auth",
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
     )
-    
+
     return {"message": "Successfully logged out"}

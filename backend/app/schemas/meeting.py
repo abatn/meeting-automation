@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-from app.models.meeting import MeetingStatus
+from backend.app.models.meeting import MeetingStatus
 
 class MeetingBase(BaseModel):
     title: str
@@ -29,4 +29,4 @@ class MeetingResponse(MeetingBase):
     updated_at: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True

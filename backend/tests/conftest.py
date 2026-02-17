@@ -3,10 +3,11 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from app.main import app
-from app.core.config import settings
-from app.core.database import Base, get_db
-
+import sys
+sys.path.insert(0, ".")
+from backend.app.main import app
+from backend.app.core.config import settings
+from backend.app.core.database import Base, get_db, SessionLocal
 pytest_plugins = ["pytest_asyncio"]
 
 # Use an in-memory SQLite database for testing
@@ -18,39 +19,25 @@ engine = create_async_engine(
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=AsyncSession)
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def setup_database():
-    """
-    Set up and tear down the database for tests.
-    """
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
 @pytest_asyncio.fixture(scope="function")
 async def db_session():
     """
-    Create a new database session for each test.
+    Create a new database session for each test and handle table creation/dropping.
     """
-    async with engine.connect() as connection:
-        async with connection.begin() as transaction:
-            session = TestingSessionLocal(bind=connection)
-            yield session
-            await transaction.rollback()
-            await session.close()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    async with TestingSessionLocal(bind=engine) as session:
+        yield session
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
-
-@pytest_asyncio.fixture(scope="module")
-async def test_client():
+@pytest_asyncio.fixture(scope="function")
+async def test_client(db_session: AsyncSession):
     """
     Create an asynchronous test client for the FastAPI application.
     """
     async def override_get_db():
-        async with TestingSessionLocal() as db:
-            yield db
+        yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

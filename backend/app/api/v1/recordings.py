@@ -2,78 +2,94 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, U
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated, List, Optional
 from datetime import datetime
-import shutil
+import shutil # Not needed anymore for direct file handling
 
-from app.api import deps
-from app.core.database import get_db
-from app.models.user import User
-from app.schemas.recording import RecordingCreate, RecordingUpdate, RecordingResponse
-from app.services.recording_service import (
-    get_recordings, get_recording_by_id, create_recording,
-    update_recording, delete_recording
+from backend.app.api import deps
+from backend.app.core.database import get_db
+from backend.app.models.user import User
+from backend.app.models.recording import RecordingStatus # Import RecordingStatus
+from backend.app.schemas.recording import RecordingCreate, RecordingUpdate, RecordingResponse, RecordingUploadResponse
+from backend.app.services.recording_service import (
+    get_recording_by_id,
+    get_recordings_by_meeting, # Use this for meeting-specific listings
+    upload_recording, # New upload function
+    update_recording_status, # New status update function
+    delete_recording,
+    get_recording_download_url
 )
-from app.services.audit_service import log_action
+from backend.app.services.audit_service import AuditService
 
 router = APIRouter()
+audit_service = AuditService()
 
-@router.get("/", response_model=List[RecordingResponse])
-async def read_recordings(
+@router.post("/upload", response_model=RecordingUploadResponse, status_code=status.HTTP_201_CREATED)
+async def upload_new_recording(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(deps.get_current_active_user)],
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=100),
-    meeting_id: Optional[int] = None,
-    uploader_id: Optional[int] = None
+    meeting_id: int = Query(..., description="The ID of the meeting this recording belongs to."),
+    file: UploadFile = File(..., description="The audio file to upload (max 500MB, audio/*).")
 ):
-    """Listet alle Aufnahmen auf (mit Filtern)."""
-    recordings = await get_recordings(
-        db, skip=skip, limit=limit,
-        meeting_id=meeting_id, uploader_id=uploader_id
-    )
-    return recordings
+    """
+    Uploads a new audio recording for a specific meeting.
+    The file will be validated, stored in S3/MinIO, and a database entry created.
+    """
+    try:
+        recording = await upload_recording(
+            db=db,
+            meeting_id=meeting_id,
+            uploader_id=current_user.id,
+            file=file
+        )
+        
+        # Audit-Log
+        await audit_service.log_action(
+            db=db,
+            user_id=current_user.id,
+            action="UPLOAD",
+            resource_type="recording",
+            resource_id=recording.id,
+            details={"meeting_id": meeting_id, "file_name": file.filename, "file_size": file.size},
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
+        )
+        
+        return RecordingUploadResponse(
+            id=recording.id,
+            status=recording.status,
+            message="Recording upload initiated successfully."
+        )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during upload: {e}"
+        )
 
-@router.post("/", response_model=RecordingResponse, status_code=status.HTTP_201_CREATED)
-async def create_new_recording(
+@router.get("/meeting/{meeting_id}", response_model=List[RecordingResponse])
+async def get_all_recordings_for_meeting(
     request: Request,
     meeting_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(deps.get_current_active_user)],
-    file: UploadFile = File(...)
+    current_user: Annotated[User, Depends(deps.get_current_active_user)]
 ):
-    """Erstellt eine neue Aufnahme."""
-    # Hier müsste die Datei in einem Speicherdienst (z.B. S3, Azure Blob) gespeichert werden.
-    # Für dieses Beispiel speichern wir sie temporär und simulieren eine URL.
-    file_location = f"temp_uploads/{file.filename}"
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    """Listet alle Aufnahmen für ein bestimmtes Meeting auf."""
+    recordings = await get_recordings_by_meeting(db, meeting_id)
     
-    # Simulierte URL und Dateigröße
-    simulated_file_url = f"http://example.com/recordings/{file.filename}"
-    file_size = file.size if file.size else 0 # Fallback if size is not provided by UploadFile
-    
-    recording_data = RecordingCreate(
-        meeting_id=meeting_id,
-        file_url=simulated_file_url,
-        duration=0, # Dauer müsste extrahiert werden
-        file_size=file_size
-    )
-    
-    recording = await create_recording(db, recording_data, current_user.id)
-    
-    # Audit-Log
-    await log_action(
+    # Audit-Log (optional, kann bei häufigen Abfragen zu viel werden)
+    await audit_service.log_action(
         db=db,
         user_id=current_user.id,
-        action="CREATE",
+        action="READ_ALL_FOR_MEETING",
         resource_type="recording",
-        resource_id=recording.id,
-        details={"meeting_id": meeting_id, "file_name": file.filename},
+        resource_id=None, # No specific recording ID
+        details={"meeting_id": meeting_id},
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent")
     )
     
-    return recording
+    return recordings
 
 @router.get("/{recording_id}", response_model=RecordingResponse)
 async def read_recording(
@@ -91,7 +107,7 @@ async def read_recording(
         )
     
     # Audit-Log
-    await log_action(
+    await audit_service.log_action(
         db=db,
         user_id=current_user.id,
         action="READ",
@@ -103,16 +119,44 @@ async def read_recording(
     
     return recording
 
-@router.put("/{recording_id}", response_model=RecordingResponse)
-async def update_existing_recording(
+@router.get("/{recording_id}/download")
+async def download_recording(
     request: Request,
     recording_id: int,
-    recording_data: RecordingUpdate,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(deps.get_current_active_user)]
 ):
-    """Aktualisiert eine Aufnahme."""
-    recording = await update_recording(db, recording_id, recording_data, current_user.id)
+    """Generiert einen signierten Download-Link für eine Aufnahme."""
+    download_url = await get_recording_download_url(db, recording_id, current_user.id)
+    if not download_url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recording not found or not available for download."
+        )
+    
+    # Audit-Log
+    await audit_service.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="DOWNLOAD",
+        resource_type="recording",
+        resource_id=recording_id,
+        ip_address=request.client.host,
+        user_agent=request.headers.get("user-agent")
+    )
+    
+    return {"download_url": download_url}
+
+@router.patch("/{recording_id}/status", response_model=RecordingResponse)
+async def update_recording_status_endpoint(
+    request: Request,
+    recording_id: int,
+    new_status: RecordingStatus,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(deps.get_current_active_user)]
+):
+    """Aktualisiert den Status einer Aufnahme."""
+    recording = await update_recording_status(db, recording_id, new_status, current_user.id)
     if not recording:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -120,13 +164,13 @@ async def update_existing_recording(
         )
     
     # Audit-Log
-    await log_action(
+    await audit_service.log_action(
         db=db,
         user_id=current_user.id,
-        action="UPDATE",
+        action="UPDATE_STATUS",
         resource_type="recording",
         resource_id=recording_id,
-        details={"changes": recording_data.dict(exclude_unset=True)},
+        details={"new_status": new_status.value},
         ip_address=request.client.host,
         user_agent=request.headers.get("user-agent")
     )
@@ -141,20 +185,32 @@ async def delete_existing_recording(
     current_user: Annotated[User, Depends(deps.get_current_active_user)]
 ):
     """Löscht eine Aufnahme."""
-    deleted = await delete_recording(db, recording_id, current_user.id)
-    if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Recording not found or insufficient permissions"
+    try:
+        deleted = await delete_recording(db, recording_id, current_user.id)
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Recording not found or insufficient permissions"
+            )
+        
+        # Audit-Log
+        await audit_service.log_action(
+            db=db,
+            user_id=current_user.id,
+            action="DELETE",
+            resource_type="recording",
+            resource_id=recording_id,
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent")
         )
-    
-    # Audit-Log
-    await log_action(
-        db=db,
-        user_id=current_user.id,
-        action="DELETE",
-        resource_type="recording",
-        resource_id=recording_id,
-        ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
-    )
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during deletion: {e}"
+        )
+
+# Remove the old / and /{recording_id} endpoints if they are no longer needed
+# The task specifies specific endpoints, so I'm replacing the generic ones.
+# If a generic GET / is still desired, it needs to be re-implemented with proper filtering.
