@@ -128,7 +128,7 @@ async def test_validate_pv_as_dg(client: AsyncClient, dg_headers: dict, test_pv:
     # The computed field `isValidated` should be True
     assert actual_data["isValidated"] is True
     assert actual_data["status"] == PVStatus.VALIDATED
-    assert actual_data["validationComment"] == "LGTM"
+    assert actual_data["validation_comment"] == "LGTM"
 
 @pytest.mark.asyncio
 async def test_validate_pv_as_non_dg(client: AsyncClient, auth_headers: dict, test_pv: PV):

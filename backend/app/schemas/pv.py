@@ -53,7 +53,7 @@ class PVResponse(BaseModel):
 from backend.app.models.pv import PVStatus
 
 class PVValidationResponse(BaseModel):
-    validationComment: Optional[str] = None
+    validation_comment: Optional[str] = None
     status: PVStatus
     validated_at: Optional[datetime] = None
     validator: Optional[UserResponse] = None

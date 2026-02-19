@@ -105,33 +105,36 @@ class PVService:
         return pv
 
     async def validate_pv(self, pv_id: int, user: User, comment: Optional[str]) -> PV:
-        user = await self.db.merge(user)
-        query = select(PV).where(PV.id == pv_id)
-        result = await self.db.execute(query)
+        # First, get the PV to update
+        result = await self.db.execute(select(PV).where(PV.id == pv_id))
         pv = result.scalar_one_or_none()
-        
+
         if not pv:
             raise HTTPException(status_code=404, detail="PV not found")
-
+        
         if user.role != UserRole.DG:
             raise HTTPException(status_code=403, detail="Only DGs can validate PVs")
 
         if pv.status == PVStatus.VALIDATED:
             raise HTTPException(status_code=400, detail="PV is already validated.")
 
+        # Update attributes
         pv.validated_at = datetime.now(timezone.utc)
         pv.validator_id = user.id
         pv.validation_comment = comment
         pv.status = PVStatus.VALIDATED
+
+        # Add to session and commit
         self.db.add(pv)
         await self.db.commit()
-        await self.db.refresh(pv)
         
-        # Eagerly load the validator relationship
-        result = await self.db.execute(
-            select(PV).options(selectinload(PV.validator)).filter(PV.id == pv_id)
+        # Re-fetch the object completely to ensure we have the committed state for serialization
+        final_result = await self.db.execute(
+            select(PV).options(selectinload(PV.validator)).where(PV.id == pv_id)
         )
-        return result.scalar_one()
+        validated_pv = final_result.scalar_one()
+        
+        return validated_pv
 
     async def delete_pv(self, pv_id: int, current_user: User):
         if current_user.role != UserRole.ADMIN:
