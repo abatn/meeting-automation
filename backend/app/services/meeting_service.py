@@ -4,8 +4,10 @@ from sqlalchemy.orm import selectinload
 from typing import Optional, List
 from datetime import datetime, timedelta
 from backend.app.models.meeting import Meeting, MeetingStatus
+from backend.app.models.recording import Recording
 from backend.app.schemas.meeting import MeetingCreate, MeetingUpdate
-from backend.app.models.user import User # Added import for User model
+from backend.app.models.user import User, UserRole # Added import for UserRole model
+from fastapi import HTTPException, status as http_status # Add imports for HTTPException and http_status
 
 class MeetingService:
     async def get_meeting_by_id(self, db: AsyncSession, meeting_id: int) -> Optional[Meeting]:
@@ -15,9 +17,9 @@ class MeetingService:
             .where(Meeting.id == meeting_id)
             .options(
                 selectinload(Meeting.organizer),
-                selectinload(Meeting.recordings),
+                selectinload(Meeting.recordings).selectinload(Recording.transcription),
                 selectinload(Meeting.transcriptions),
-                selectinload(Meeting.pvs),
+                selectinload(Meeting.pv),
                 selectinload(Meeting.actions)
             )
         )
@@ -29,24 +31,24 @@ class MeetingService:
         skip: int = 0,
         limit: int = 100,
         status: Optional[MeetingStatus] = None,
-        user_id: Optional[int] = None,
+        organizer_id: Optional[int] = None, # Renamed from user_id
         from_date: Optional[datetime] = None,
         to_date: Optional[datetime] = None
     ) -> List[Meeting]:
         """Holt eine Liste von Meetings mit optionalen Filtern."""
         query = select(Meeting).options(
             selectinload(Meeting.organizer),
-            selectinload(Meeting.recordings),
+            selectinload(Meeting.recordings).selectinload(Recording.transcription),
             selectinload(Meeting.transcriptions),
-            selectinload(Meeting.pvs),
+            selectinload(Meeting.pv),
             selectinload(Meeting.actions)
         )
         
         filters = []
         if status:
             filters.append(Meeting.status == status)
-        if user_id:
-            filters.append(Meeting.organizer_id == user_id)
+        if organizer_id: # Use new parameter name
+            filters.append(Meeting.organizer_id == organizer_id)
         if from_date:
             filters.append(Meeting.date >= from_date)
         if to_date:
@@ -68,14 +70,13 @@ class MeetingService:
         """Erstellt ein neues Meeting."""
         try:
             db_meeting = Meeting(
-                **meeting_data.model_dump(),
+                **meeting_data.dict(),
                 organizer_id=organizer_id,
                 status=MeetingStatus.PLANNED
             )
             db.add(db_meeting)
             await db.commit()
             await db.refresh(db_meeting)
-            db.expunge(db_meeting) # Detach the object from the session
             return db_meeting
         except Exception as e:
             await db.rollback()
@@ -100,9 +101,12 @@ class MeetingService:
             user_result = await db.execute(select(User).where(User.id == user_id))
             user = user_result.scalar_one_or_none()
             if not user or user.role != UserRole.ADMIN:
-                return None
+                raise HTTPException(
+                    status_code=http_status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to update this meeting"
+                )
         
-        update_data = meeting_data.model_dump(exclude_unset=True)
+        update_data = meeting_data.dict(exclude_unset=True)
         try:
             for field, value in update_data.items():
                 setattr(meeting, field, value)
@@ -126,7 +130,10 @@ class MeetingService:
             user_result = await db.execute(select(User).where(User.id == user_id))
             user = user_result.scalar_one_or_none()
             if not user or user.role != UserRole.ADMIN:
-                return False
+                raise HTTPException(
+                    status_code=http_status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to delete this meeting"
+                )
         
         try:
             await db.delete(meeting)
@@ -149,8 +156,20 @@ class MeetingService:
             return None
         
         # Prüfe Berechtigung
+        # The API already checks for Organizer/Admin permissions for status change.
+        # This service method should primarily focus on the status change itself,
+        # assuming the caller (API endpoint) has already done the necessary permission checks.
+        # However, if this method can be called directly, a more robust check might be needed.
+        # For now, align with the existing pattern for update/delete.
+        from backend.app.models.user import UserRole
         if meeting.organizer_id != user_id:
-            return None
+            user_result = await db.execute(select(User).where(User.id == user_id))
+            user = user_result.scalar_one_or_none()
+            if not user or user.role != UserRole.ADMIN: # Admins can also change status
+                raise HTTPException(
+                    status_code=http_status.HTTP_403_FORBIDDEN,
+                    detail="Not authorized to change the status of this meeting"
+                )
         
         try:
             meeting.status = status

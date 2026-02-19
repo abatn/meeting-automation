@@ -15,6 +15,7 @@ class Recording(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
+    uploader_id = Column(Integer, ForeignKey("users.id"), nullable=False) # Add uploader_id
     file_path = Column(String, nullable=False)
     file_size = Column(Integer, nullable=False)  # in Bytes
     duration = Column(Float, nullable=True)  # in Sekunden
@@ -24,4 +25,5 @@ class Recording(Base):
     
     # Beziehungen
     meeting = relationship("Meeting", back_populates="recordings")
+    uploader = relationship("User", back_populates="recordings") # Add uploader relationship
     transcription = relationship("Transcription", back_populates="recording", uselist=False, cascade="all, delete-orphan")

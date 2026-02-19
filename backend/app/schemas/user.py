@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
@@ -24,11 +24,12 @@ class UserResponse(UserBase):
     id: int
     role: str
     is_active: bool
+    is_superuser: bool
     is_mfa_enabled: bool
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = {'from_attributes': True}
 
 class TokenResponse(BaseModel):
     access_token: str

@@ -53,7 +53,7 @@ class TranscriptionUpdate(BaseModel):
 class TranscriptionResponse(TranscriptionBase):
     id: int = Field(..., description="Unique ID of the transcription")
     created_at: datetime = Field(..., description="Timestamp when the transcription entry was created")
-    updated_at: datetime = Field(..., description="Timestamp when the transcription entry was last updated")
+    updated_at: Optional[datetime] = Field(None, description="Timestamp when the transcription entry was last updated")
 
     class Config:
         orm_mode = True

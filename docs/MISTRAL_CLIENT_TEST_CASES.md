@@ -33,7 +33,7 @@ This document outlines test cases for validating the Mistral Client integration.
 2. Exponential Backoff beobachten.
 3. Nach max Retries Fehler werfen.
 
-**Erwartet:** Korrekte Backoff-Zeiten, finaler Fehler.
+**Erwartet:** Korrekte Backoff-Zeiten, finaler Success nach Retries.
 
 ## TESTFALL_MC04: Prompt-Template Validierung
 -------------------------------------------

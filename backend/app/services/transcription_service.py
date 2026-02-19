@@ -22,7 +22,7 @@ from backend.app.services.whisper_client import whisper_client
 from backend.app.utils.storage import storage_service
 import logging
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import datetime as dt # Alias datetime for timedelta usage
 
 logger = logging.getLogger(__name__)
@@ -50,17 +50,18 @@ class TranscriptionService:
         if not meeting or not await self.user_can_access_meeting(db, current_user_id, meeting):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this recording's meeting")
 
-        # Ensure the recording has a file_url
-        if not recording.file_url:
+        # Ensure the recording has a file_path
+        if not recording.file_path:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Recording has no associated file for transcription")
 
         # Create a new transcription entry in PENDING status
         db_transcription = Transcription(
+            meeting_id=meeting.id,  # Add meeting_id
             recording_id=recording_id,
             language=language,
             status=TranscriptionStatus.PENDING,
             created_by_id=current_user_id,
-            started_at=datetime.utcnow()
+            started_at=datetime.now(timezone.utc)
         )
         try:
             db.add(db_transcription)
@@ -70,7 +71,7 @@ class TranscriptionService:
             # Asynchronously call the Whisper API
             try:
                 # Get a signed URL for the audio file
-                audio_file_url = await storage_service.get_s3_download_url(recording.file_url)
+                audio_file_url = await storage_service.get_s3_download_url(recording.file_path)
                 
                 whisper_result = await whisper_client.call_whisper_api(
                     audio_file_url=audio_file_url,
@@ -85,7 +86,7 @@ class TranscriptionService:
                 logger.error(f"Failed to start transcription for recording {recording_id}: {e}")
                 db_transcription.status = TranscriptionStatus.FAILED
                 db_transcription.failed_reason = str(e)
-                db_transcription.completed_at = datetime.utcnow()
+                db_transcription.completed_at = datetime.now(timezone.utc)
                 db.add(db_transcription)
                 await db.commit()
                 await db.refresh(db_transcription)
@@ -154,7 +155,7 @@ class TranscriptionService:
             else:
                 setattr(db_transcription, key, value)
         
-        db_transcription.updated_at = datetime.utcnow()
+        db_transcription.updated_at = datetime.now(timezone.utc)
         if db_transcription.status != TranscriptionStatus.FAILED:
             db_transcription.status = TranscriptionStatus.EDITED # Mark as edited if manually updated
 
@@ -194,7 +195,7 @@ class TranscriptionService:
 
         db_transcription.transcribed_text = whisper_result.get("text")
         db_transcription.language = whisper_result.get("language", db_transcription.language)
-        db_transcription.duration = whisper_result.get("duration", db_transcription.duration)
+        # db_transcription.duration = whisper_result.get("duration", db_transcription.duration) # Transcription model has no duration field
         
         if "segments" in whisper_result:
             db_transcription.speaker_segments = [
@@ -217,7 +218,7 @@ class TranscriptionService:
             ]
 
         db_transcription.status = TranscriptionStatus.COMPLETED
-        db_transcription.completed_at = datetime.utcnow()
+        db_transcription.completed_at = datetime.now(timezone.utc)
         try:
             db.add(db_transcription)
             await db.commit()
@@ -268,7 +269,7 @@ class TranscriptionService:
         if not transcription.transcribed_text:
             return "No transcribed text available."
 
-        if format_type == "text":
+        if format_type == "text" or format_type == "txt":
             return transcription.transcribed_text
         elif format_type == "srt":
             return self._format_to_srt(transcription)

@@ -1,0 +1,1210 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0 -- /home/batnini/meeting-automation/backend/venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/batnini/meeting-automation
+plugins: asyncio-1.3.0, cov-7.0.0, anyio-3.7.1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 11 items
+
+backend/tests/test_meetings.py::test_create_meeting ERROR                [  9%]
+backend/tests/test_meetings.py::test_meeting_eager_loading ERROR         [ 18%]
+backend/tests/test_meetings.py::test_list_meetings ERROR                 [ 27%]
+backend/tests/test_meetings.py::test_get_meeting ERROR                   [ 36%]
+backend/tests/test_meetings.py::test_update_meeting_as_organizer ERROR   [ 45%]
+backend/tests/test_meetings.py::test_update_meeting_as_other_user_403 ERROR [ 54%]
+backend/tests/test_meetings.py::test_delete_meeting_as_organizer ERROR   [ 63%]
+backend/tests/test_meetings.py::test_delete_meeting_as_admin ERROR       [ 72%]
+backend/tests/test_meetings.py::test_delete_meeting_as_other_user_403 ERROR [ 81%]
+backend/tests/test_meetings.py::test_change_meeting_status ERROR         [ 90%]
+backend/tests/test_meetings.py::test_list_meetings_pagination ERROR      [100%]
+
+==================================== ERRORS ====================================
+____________________ ERROR at setup of test_create_meeting _____________________
+
+self = <Coroutine test_create_meeting>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:109: in auth_headers
+    user_id = test_user.id
+              ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d26d2ced0>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+_________________ ERROR at setup of test_meeting_eager_loading _________________
+
+self = <Coroutine test_meeting_eager_loading>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:109: in auth_headers
+    user_id = test_user.id
+              ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d24784050>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+_____________________ ERROR at setup of test_list_meetings _____________________
+
+self = <Coroutine test_list_meetings>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:109: in auth_headers
+    user_id = test_user.id
+              ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d24cd8b50>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+______________________ ERROR at setup of test_get_meeting ______________________
+
+self = <Coroutine test_get_meeting>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:109: in auth_headers
+    user_id = test_user.id
+              ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d24b4c290>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+______________ ERROR at setup of test_update_meeting_as_organizer ______________
+
+self = <Coroutine test_update_meeting_as_organizer>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:109: in auth_headers
+    user_id = test_user.id
+              ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d25de4150>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+___________ ERROR at setup of test_update_meeting_as_other_user_403 ____________
+
+self = <Coroutine test_update_meeting_as_other_user_403>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:134: in test_meeting
+    organizer_id=test_user.id,
+                 ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d24a3ad90>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+______________ ERROR at setup of test_delete_meeting_as_organizer ______________
+
+self = <Coroutine test_delete_meeting_as_organizer>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:109: in auth_headers
+    user_id = test_user.id
+              ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d25391890>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+________________ ERROR at setup of test_delete_meeting_as_admin ________________
+
+self = <Coroutine test_delete_meeting_as_admin>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:134: in test_meeting
+    organizer_id=test_user.id,
+                 ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d24dfb910>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+___________ ERROR at setup of test_delete_meeting_as_other_user_403 ____________
+
+self = <Coroutine test_delete_meeting_as_other_user_403>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:134: in test_meeting
+    organizer_id=test_user.id,
+                 ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d256e48d0>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+_________________ ERROR at setup of test_change_meeting_status _________________
+
+self = <Coroutine test_change_meeting_status>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:109: in auth_headers
+    user_id = test_user.id
+              ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d247ec890>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+_______________ ERROR at setup of test_list_meetings_pagination ________________
+
+self = <Coroutine test_list_meetings_pagination>
+
+    def setup(self) -> None:
+        runner_fixture_id = f"_{self._loop_scope}_scoped_runner"
+        if runner_fixture_id not in self.fixturenames:
+            self.fixturenames.append(runner_fixture_id)
+>       return super().setup()
+               ^^^^^^^^^^^^^^^
+
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:458: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:743: in pytest_fixture_setup
+    hook_result = yield
+                  ^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:361: in _async_fixture_wrapper
+    result = runner.run(setup(), context=context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.12/asyncio/base_events.py:687: in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/pytest_asyncio/plugin.py:357: in setup
+    res = await fixture_function(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/tests/conftest.py:109: in auth_headers
+    user_id = test_user.id
+              ^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:566: in __get__
+    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1086: in get
+    value = self._fire_loader_callables(state, key, passive)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/attributes.py:1116: in _fire_loader_callables
+    return state._load_expired(state, passive)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/state.py:798: in _load_expired
+    self.manager.expired_attribute_loader(self, toload, passive)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:1649: in load_scalar_attributes
+    result = load_on_ident(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:505: in load_on_ident
+    return load_on_pk_identity(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/loading.py:690: in load_on_pk_identity
+    session.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2308: in execute
+    return self._execute_internal(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py:2190: in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/orm/context.py:293: in orm_execute_statement
+    result = conn.execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1416: in execute
+    return meth(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py:516: in _execute_on_connection
+    return connection._execute_clauseelement(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1639: in _execute_clauseelement
+    ret = self._execute_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1848: in _execute_context
+    return self._exec_single_context(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:2346: in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+backend/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py:922: in do_execute
+    cursor.execute(statement, parameters)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:146: in execute
+    self._adapt_connection._handle_exception(error)
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:298: in _handle_exception
+    raise error
+backend/venv/lib/python3.12/site-packages/sqlalchemy/dialects/sqlite/aiosqlite.py:123: in execute
+    _cursor = self.await_(self._connection.cursor())
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+awaitable = <aiosqlite.context.Result object at 0x751d26163ad0>
+
+    def await_only(awaitable: Awaitable[_T]) -> _T:
+        """Awaits an async function in a sync method.
+    
+        The sync method must be inside a :func:`greenlet_spawn` context.
+        :func:`await_only` calls cannot be nested.
+    
+        :param awaitable: The coroutine to call.
+    
+        """
+        # this is called in the context greenlet while running fn
+        current = getcurrent()
+        if not isinstance(current, _AsyncIoGreenlet):
+            _safe_cancel_awaitable(awaitable)
+    
+>           raise exc.MissingGreenlet(
+                "greenlet_spawn has not been called; can't call await_only() "
+                "here. Was IO attempted in an unexpected place?"
+            )
+E           sqlalchemy.exc.MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)
+
+backend/venv/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py:116: MissingGreenlet
+---------------------------- Captured stdout setup -----------------------------
+Setting up db_session fixture...
+Setting up client fixture...
+=============================== warnings summary ===============================
+backend/venv/lib/python3.12/site-packages/pydub/utils.py:14
+  /home/batnini/meeting-automation/backend/venv/lib/python3.12/site-packages/pydub/utils.py:14: DeprecationWarning: 'audioop' is deprecated and slated for removal in Python 3.13
+    import audioop
+
+backend/venv/lib/python3.12/site-packages/pydub/utils.py:170
+  /home/batnini/meeting-automation/backend/venv/lib/python3.12/site-packages/pydub/utils.py:170: RuntimeWarning: Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work
+    warn("Couldn't find ffmpeg or avconv - defaulting to ffmpeg, but may not work", RuntimeWarning)
+
+<frozen importlib._bootstrap>:530
+  <frozen importlib._bootstrap>:530: DeprecationWarning: the load_module() method is deprecated and slated for removal in Python 3.12; use exec_module() instead
+
+backend/venv/lib/python3.12/site-packages/reportlab/lib/rl_safe_eval.py:11
+  /home/batnini/meeting-automation/backend/venv/lib/python3.12/site-packages/reportlab/lib/rl_safe_eval.py:11: DeprecationWarning: ast.NameConstant is deprecated and will be removed in Python 3.14; use ast.Constant instead
+    haveNameConstant = hasattr(ast,'NameConstant')
+
+backend/tests/test_meetings.py::test_delete_meeting_as_admin
+  /home/batnini/meeting-automation/backend/app/core/security.py:32: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expire = datetime.utcnow() + expires_delta
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR backend/tests/test_meetings.py::test_create_meeting - sqlalchemy.exc.Mi...
+ERROR backend/tests/test_meetings.py::test_meeting_eager_loading - sqlalchemy...
+ERROR backend/tests/test_meetings.py::test_list_meetings - sqlalchemy.exc.Mis...
+ERROR backend/tests/test_meetings.py::test_get_meeting - sqlalchemy.exc.Missi...
+ERROR backend/tests/test_meetings.py::test_update_meeting_as_organizer - sqla...
+ERROR backend/tests/test_meetings.py::test_update_meeting_as_other_user_403
+ERROR backend/tests/test_meetings.py::test_delete_meeting_as_organizer - sqla...
+ERROR backend/tests/test_meetings.py::test_delete_meeting_as_admin - sqlalche...
+ERROR backend/tests/test_meetings.py::test_delete_meeting_as_other_user_403
+ERROR backend/tests/test_meetings.py::test_change_meeting_status - sqlalchemy...
+ERROR backend/tests/test_meetings.py::test_list_meetings_pagination - sqlalch...
+======================= 5 warnings, 11 errors in 18.76s ========================

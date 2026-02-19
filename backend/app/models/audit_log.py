@@ -11,7 +11,7 @@ class AuditLog(Base):
     action = Column(String, nullable=False)  # CREATE, READ, UPDATE, DELETE, LOGIN, etc.
     method = Column(String, nullable=False)  # GET, POST, PUT, DELETE
     path = Column(String, nullable=False)
-    status_code = Column(Integer, nullable=False)
+    status_code = Column(Integer, nullable=True)
     duration = Column(Float, nullable=True) # Dauer der Anfrage in Sekunden
     resource_type = Column(String, nullable=False, index=True)  # meeting, user, action, etc.
     resource_id = Column(Integer, nullable=True)

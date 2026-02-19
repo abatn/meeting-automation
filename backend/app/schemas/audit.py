@@ -24,4 +24,16 @@ class AuditLog(AuditLogBase):
     id: int
 
     class Config:
-        from_attributes = True
+        orm_mode = True
+
+class AuditLogFilter(BaseModel):
+    user_id: Optional[int] = None
+    action: Optional[str] = None
+    method: Optional[str] = None
+    path: Optional[str] = None
+    resource_type: Optional[str] = None
+    resource_id: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    ip_address: Optional[str] = None
+    status_code: Optional[int] = None

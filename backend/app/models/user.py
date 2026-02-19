@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 import enum
 from ..core.database import Base
 from .pv import PV # Import PV model
+from .recording import Recording # Import Recording model
 
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
@@ -33,3 +34,5 @@ class User(Base):
     audit_logs = relationship("AuditLog", back_populates="user")
     pvs = relationship("PV", back_populates="validator", foreign_keys=[PV.validated_by_id])
     generated_pvs = relationship("PV", back_populates="generator", foreign_keys=[PV.generated_by_id])
+    recordings = relationship("Recording", back_populates="uploader") # Add recordings relationship
+    transcriptions = relationship("Transcription", back_populates="created_by") # Add transcriptions relationship

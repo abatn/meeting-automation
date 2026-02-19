@@ -1,14 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
-from backend.app.models.action import ActionStatus
+from backend.app.models.action import ActionStatus, ActionPriority
 
 class ActionBase(BaseModel):
     description: str
     meeting_id: int
     assigned_to: int
     due_date: datetime
-    priority: Optional[int] = Field(None, ge=1, le=5) # 1 (highest) to 5 (lowest)
+    priority: Optional[ActionPriority] = ActionPriority.MEDIUM
 
 class ActionCreate(ActionBase):
     pass
@@ -18,7 +18,7 @@ class ActionUpdate(BaseModel):
     assigned_to: Optional[int] = None
     due_date: Optional[datetime] = None
     status: Optional[ActionStatus] = None
-    priority: Optional[int] = Field(None, ge=1, le=5)
+    priority: Optional[ActionPriority] = None
 
 class ActionResponse(ActionBase):
     id: int
@@ -28,3 +28,12 @@ class ActionResponse(ActionBase):
 
     class Config:
         orm_mode = True
+
+class ActionComplete(BaseModel):
+    comment: Optional[str] = None
+
+class ActionReminderResponse(BaseModel):
+    message: str
+    action_id: int
+    user_id: int
+    timestamp: datetime

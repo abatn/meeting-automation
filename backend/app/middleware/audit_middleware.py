@@ -1,5 +1,6 @@
 import time
 import json
+import io
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import Response
@@ -38,17 +39,24 @@ class AuditMiddleware(BaseHTTPMiddleware):
         except Exception:
             user_id = None # No authenticated user or token validation failed
 
-        # Mask sensitive data from request body if present and path is sensitive
+        # Read the request body once
+        request_body = await request.body()
         request_body_masked: Optional[Dict[str, Any]] = None
+
+        # If the path is sensitive and the body is JSON, mask it
         if request.method in ["POST", "PUT"] and request.url.path in self.SENSITIVE_PATHS:
             try:
-                # Read request body once, then reconstruct it for the next middleware/endpoint
-                body = await request.json()
-                request_body_masked = self._mask_sensitive_data(body)
-                # Reconstruct the request body for the actual endpoint
-                request._body = json.dumps(body).encode('utf-8')
+                body_json = json.loads(request_body.decode('utf-8'))
+                request_body_masked = self._mask_sensitive_data(body_json)
             except json.JSONDecodeError:
                 pass # Not a JSON body, or empty
+
+        # Create a new receive function that returns the stored body
+        async def receive() -> Dict[str, Any]:
+            return {"type": "http.request", "body": request_body}
+
+        # Replace the request's receive function with the new one
+        request._receive = receive
 
         try:
             response = await call_next(request)
@@ -93,6 +101,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
             }
         )
 
+        try:
+            async with SessionLocal() as db_session:
+                await self.audit_service.log_action(db_session, log_data)
+        except Exception as e:
+            # Log error but don't fail the request
+            print(f"Failed to create audit log: {e}")
 
         return response
 
@@ -134,10 +148,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 if v1_index + 1 < len(parts):
                     resource_candidate = parts[v1_index + 1]
                     # Basic check to see if it's likely a resource name (not an ID)
-                    if not resource_candidate.isdigit() and resource_candidate not in ["auth", "docs", "openapi.json"]:
+                    if not resource_candidate.isdigit() and resource_candidate not in ["docs", "openapi.json"]:
                         return resource_candidate.capitalize()
             except ValueError:
                 pass
+        
+        if "auth" in parts:
+            return "Auth"
+            
         return None
 
     def _extract_resource_id(self, path: str) -> Optional[int]:

@@ -2,11 +2,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
-from datetime import datetime
-
-from backend.app.schemas.user import UserResponse # Import UserResponse
+from pydantic import BaseModel, Field, ConfigDict, computed_field
+from backend.app.schemas.user import UserResponse
 
 class PVCreate(BaseModel):
     title: str
@@ -32,6 +29,7 @@ class PVValidate(BaseModel):
 
 class PVResponse(BaseModel):
     id: int
+    title: str
     meeting_id: int
     generated_by_id: int
     content: str
@@ -44,18 +42,26 @@ class PVResponse(BaseModel):
     validation_comment: Optional[str] = None
     status: str
     created_at: datetime
-    updated_at: datetime
-    validator: Optional[UserResponse] = None
-    generator: Optional[UserResponse] = None
+    updated_at: Optional[datetime] = None
+    validator: Optional[UserResponse] = Field(default=None, alias='validator_user')
+    generator: Optional[UserResponse] = Field(default=None, alias='generator_user')
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
+
+
+from backend.app.models.pv import PVStatus
 
 class PVValidationResponse(BaseModel):
-    id: int
-    is_validated: bool
+    validationComment: Optional[str] = None
+    status: PVStatus
     validated_at: Optional[datetime] = None
-    validated_by_id: Optional[int] = None
-    validation_comment: Optional[str] = None
+    validator: Optional[UserResponse] = None
+
+    @computed_field
+    @property
+    def isValidated(self) -> bool:
+        return self.status == PVStatus.VALIDATED
 
     model_config = ConfigDict(from_attributes=True)
+

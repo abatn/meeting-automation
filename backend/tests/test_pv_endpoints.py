@@ -100,7 +100,7 @@ async def create_test_pv(db_session: AsyncSession, meeting: Meeting, generator: 
     return pv
 
 @pytest.mark.asyncio
-async def test_generate_pv(test_client: AsyncClient, db_session: AsyncSession):
+async def test_generate_pv(client: AsyncClient, db_session: AsyncSession):
     user = await create_test_user(db_session, "testuser", "test@example.com", UserRole.PARTICIPANT)
     token = await get_user_token(user)
     meeting = await create_test_meeting(db_session, user)
@@ -108,7 +108,7 @@ async def test_generate_pv(test_client: AsyncClient, db_session: AsyncSession):
     transcription_content = transcription.content  # Load content before session closes
 
     pv_generate_data = PVGenerate(transcription_id=transcription.id, template="default")
-    response = await test_client.post(
+    response = await client.post(
         f"/api/v1/pv/{meeting.id}/generate",
         json=pv_generate_data.dict(),
         headers={"Authorization": f"Bearer {token}"}
@@ -121,7 +121,7 @@ async def test_generate_pv(test_client: AsyncClient, db_session: AsyncSession):
 
 @pytest.mark.asyncio
 @patch("backend.app.services.pv_service.mistral_client.generate_pv", new_callable=AsyncMock)
-async def test_generate_pv_with_mock(mock_generate_pv, test_client: AsyncClient, db_session: AsyncSession):
+async def test_generate_pv_with_mock(mock_generate_pv, client: AsyncClient, db_session: AsyncSession):
     mock_generate_pv.return_value = "This is a mocked PV content."
     
     user = await create_test_user(db_session, "mockuser", "mock@example.com", UserRole.PARTICIPANT)
@@ -131,7 +131,7 @@ async def test_generate_pv_with_mock(mock_generate_pv, test_client: AsyncClient,
     transcription_content = transcription.content  # Load content before session closes
 
     pv_generate_data = PVGenerate(transcription_id=transcription.id, template="default")
-    response = await test_client.post(
+    response = await client.post(
         f"/api/v1/pv/{meeting.id}/generate",
         json=pv_generate_data.dict(),
         headers={"Authorization": f"Bearer {token}"}
@@ -143,7 +143,7 @@ async def test_generate_pv_with_mock(mock_generate_pv, test_client: AsyncClient,
     mock_generate_pv.assert_called_once_with(transcription_content)
 
 @pytest.mark.asyncio
-async def test_validate_pv_as_dg(test_client: AsyncClient, db_session: AsyncSession):
+async def test_validate_pv_as_dg(client: AsyncClient, db_session: AsyncSession):
     dg_user = await create_test_user(db_session, "dguser", "dg@example.com", UserRole.DG)
     normal_user = await create_test_user(db_session, "normaluser", "normal@example.com", UserRole.PARTICIPANT)
     
@@ -153,7 +153,7 @@ async def test_validate_pv_as_dg(test_client: AsyncClient, db_session: AsyncSess
     pv = await create_test_pv(db_session, meeting, normal_user, validator=dg_user)
 
     pv_validate_data = PVValidate(comment="Looks good!")
-    response = await test_client.post(
+    response = await client.post(
         f"/api/v1/pv/{pv.id}/validate",
         json=pv_validate_data.model_dump(),
         headers={"Authorization": f"Bearer {dg_token}"}
@@ -166,7 +166,7 @@ async def test_validate_pv_as_dg(test_client: AsyncClient, db_session: AsyncSess
     assert validated_pv["is_validated"] is True
 
 @pytest.mark.asyncio
-async def test_validate_pv_as_normal_user_403(test_client: AsyncClient, db_session: AsyncSession):
+async def test_validate_pv_as_normal_user_403(client: AsyncClient, db_session: AsyncSession):
     normal_user = await create_test_user(db_session, "normaluser2", "normal2@example.com", UserRole.PARTICIPANT)
     admin_user = await create_test_user(db_session, "adminuser", "admin@example.com", UserRole.ADMIN)
     
@@ -176,7 +176,7 @@ async def test_validate_pv_as_normal_user_403(test_client: AsyncClient, db_sessi
     pv = await create_test_pv(db_session, meeting, admin_user)
 
     pv_validate_data = PVValidate(comment="I want to validate!")
-    response = await test_client.post(
+    response = await client.post(
         f"/api/v1/pv/{pv.id}/validate",
         json=pv_validate_data.dict(),
         headers={"Authorization": f"Bearer {normal_token}"}
@@ -185,7 +185,7 @@ async def test_validate_pv_as_normal_user_403(test_client: AsyncClient, db_sessi
     assert "Only DGs can validate PVs" in response.json()["detail"]
 
 @pytest.mark.asyncio
-async def test_extract_decisions_from_pv(test_client: AsyncClient, db_session: AsyncSession):
+async def test_extract_decisions_from_pv(client: AsyncClient, db_session: AsyncSession):
     user = await create_test_user(db_session, "user_decisions", "decisions@example.com", UserRole.PARTICIPANT)
     token = await get_user_token(user)
     meeting = await create_test_meeting(db_session, user)
@@ -193,7 +193,7 @@ async def test_extract_decisions_from_pv(test_client: AsyncClient, db_session: A
     pv = await create_test_pv(db_session, meeting, user, content=pv_content)
     pv_id = pv.id
 
-    response = await test_client.post(
+    response = await client.post(
         f"/api/v1/pv/{pv_id}/extract-decisions",
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -203,7 +203,7 @@ async def test_extract_decisions_from_pv(test_client: AsyncClient, db_session: A
     assert "decisions" in result
     assert isinstance(result["decisions"], list)
     assert len(result["decisions"]) > 0
-    updated_pv_response = await test_client.get(
+    updated_pv_response = await client.get(
         f"/api/v1/pv/{pv_id}",
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -212,13 +212,13 @@ async def test_extract_decisions_from_pv(test_client: AsyncClient, db_session: A
     assert updated_pv_data["decisions"] == result["decisions"]
 
 @pytest.mark.asyncio
-async def test_generate_pv_pdf(test_client: AsyncClient, db_session: AsyncSession):
+async def test_generate_pv_pdf(client: AsyncClient, db_session: AsyncSession):
     user = await create_test_user(db_session, "user_pdf", "pdf@example.com", UserRole.PARTICIPANT)
     token = await get_user_token(user)
     meeting = await create_test_meeting(db_session, user)
     pv = await create_test_pv(db_session, meeting, user)
 
-    response = await test_client.get(
+    response = await client.get(
         f"/api/v1/pv/{pv.id}/export/pdf",
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -228,13 +228,13 @@ async def test_generate_pv_pdf(test_client: AsyncClient, db_session: AsyncSessio
     assert len(response.content) > 0
 
 @pytest.mark.asyncio
-async def test_generate_pv_docx(test_client: AsyncClient, db_session: AsyncSession):
+async def test_generate_pv_docx(client: AsyncClient, db_session: AsyncSession):
     user = await create_test_user(db_session, "user_docx", "docx@example.com", UserRole.PARTICIPANT)
     token = await get_user_token(user)
     meeting = await create_test_meeting(db_session, user)
     pv = await create_test_pv(db_session, meeting, user)
 
-    response = await test_client.get(
+    response = await client.get(
         f"/api/v1/pv/{pv.id}/export/docx",
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -245,7 +245,7 @@ async def test_generate_pv_docx(test_client: AsyncClient, db_session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_extract_action_points_from_pv(test_client: AsyncClient, db_session: AsyncSession):
+async def test_extract_action_points_from_pv(client: AsyncClient, db_session: AsyncSession):
     user = await create_test_user(db_session, "user_actions", "actions@example.com", UserRole.PARTICIPANT)
     token = await get_user_token(user)
     meeting = await create_test_meeting(db_session, user)
@@ -253,7 +253,7 @@ async def test_extract_action_points_from_pv(test_client: AsyncClient, db_sessio
     pv = await create_test_pv(db_session, meeting, user, content=pv_content)
     pv_id = pv.id
 
-    response = await test_client.post(
+    response = await client.post(
         f"/api/v1/pv/{pv_id}/extract-action-points",
         headers={"Authorization": f"Bearer {token}"}
     )
@@ -263,7 +263,7 @@ async def test_extract_action_points_from_pv(test_client: AsyncClient, db_sessio
     assert "action_points" in result
     assert isinstance(result["action_points"], list)
     assert len(result["action_points"]) > 0
-    updated_pv_response = await test_client.get(
+    updated_pv_response = await client.get(
         f"/api/v1/pv/{pv_id}",
         headers={"Authorization": f"Bearer {token}"}
     )

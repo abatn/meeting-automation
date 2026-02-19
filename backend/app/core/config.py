@@ -19,21 +19,26 @@ class Settings:
     S3_REGION_NAME: str = os.getenv("S3_REGION_NAME", "us-east-1")
     S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "meeting-recordings")
 
-    # Mistral AI API Configuration
-    MISTRAL_API_KEY: str = os.getenv("MISTRAL_API_KEY", "your-mistral-api-key")
-    MISTRAL_API_BASE_URL: str = os.getenv("MISTRAL_API_BASE_URL", "https://api.mistral.ai/v1")
-    MISTRAL_API_MODEL: str = os.getenv("MISTRAL_API_MODEL", "mistral-tiny")
-    MISTRAL_API_TEMPERATURE: float = float(os.getenv("MISTRAL_API_TEMPERATURE", "0.7"))
-    MISTRAL_API_MAX_TOKENS: int = int(os.getenv("MISTRAL_API_MAX_TOKENS", "1000"))
+    # Mistral Settings
+    MISTRAL_API_KEY: str = os.getenv("MISTRAL_API_KEY", "")
+    MISTRAL_API_URL: str = os.getenv("MISTRAL_API_URL", "https://api.mistral.ai/v1")
+    MISTRAL_MODEL_NAME: str = os.getenv("MISTRAL_MODEL_NAME", "mistral-large-latest")
+    MISTRAL_TEMPERATURE: float = float(os.getenv("MISTRAL_TEMPERATURE", "0.7"))
+    MISTRAL_MAX_TOKENS: int = int(os.getenv("MISTRAL_MAX_TOKENS", "2000"))
+    MISTRAL_API_TIMEOUT: int = int(os.getenv("MISTRAL_API_TIMEOUT", "60"))
     MISTRAL_API_MAX_RETRIES: int = int(os.getenv("MISTRAL_API_MAX_RETRIES", "3"))
     MISTRAL_API_RETRY_DELAY: int = int(os.getenv("MISTRAL_API_RETRY_DELAY", "2"))
-    MISTRAL_API_TIMEOUT: int = int(os.getenv("MISTRAL_API_TIMEOUT", "10"))
-    MOCK_MISTRAL_API: bool = os.getenv("MOCK_MISTRAL_API", "True").lower() == "true"
 
     # Whisper API Configuration
     WHISPER_API_RETRIES: int = int(os.getenv("WHISPER_API_RETRIES", "3"))
     WHISPER_API_RETRY_DELAY_SECONDS: int = int(os.getenv("WHISPER_API_RETRY_DELAY_SECONDS", "2"))
     WHISPER_API_URL: str = os.getenv("WHISPER_API_URL", "http://localhost:9001/transcribe")
     WHISPER_API_TIMEOUT_SECONDS: int = int(os.getenv("WHISPER_API_TIMEOUT_SECONDS", "30"))
+
+    # Celery Configuration
+    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+    CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+    CELERY_TASK_MAX_RETRIES: int = int(os.getenv("CELERY_TASK_MAX_RETRIES", "3"))
+    CELERY_TASK_DEFAULT_RETRY_DELAY: int = int(os.getenv("CELERY_TASK_DEFAULT_RETRY_DELAY", "2"))
 
 settings = Settings()

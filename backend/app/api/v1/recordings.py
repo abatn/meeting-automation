@@ -9,6 +9,7 @@ from backend.app.core.database import get_db
 from backend.app.models.user import User
 from backend.app.models.recording import RecordingStatus # Import RecordingStatus
 from backend.app.schemas.recording import RecordingCreate, RecordingUpdate, RecordingResponse, RecordingUploadResponse
+from backend.app.schemas.audit import AuditLogCreate
 from backend.app.services.recording_service import (
     get_recording_by_id,
     get_recordings_by_meeting, # Use this for meeting-specific listings
@@ -43,16 +44,18 @@ async def upload_new_recording(
         )
         
         # Audit-Log
-        await audit_service.log_action(
-            db=db,
+        log_data = AuditLogCreate(
             user_id=current_user.id,
             action="UPLOAD",
             resource_type="recording",
             resource_id=recording.id,
             details={"meeting_id": meeting_id, "file_name": file.filename, "file_size": file.size},
             ip_address=request.client.host,
-            user_agent=request.headers.get("user-agent")
+            user_agent=request.headers.get("user-agent"),
+            method=request.method,
+            path=request.url.path
         )
+        await audit_service.log_action(db=db, log_data=log_data)
         
         return RecordingUploadResponse(
             id=recording.id,
@@ -78,16 +81,18 @@ async def get_all_recordings_for_meeting(
     recordings = await get_recordings_by_meeting(db, meeting_id)
     
     # Audit-Log (optional, kann bei häufigen Abfragen zu viel werden)
-    await audit_service.log_action(
-        db=db,
+    log_data = AuditLogCreate(
         user_id=current_user.id,
         action="READ_ALL_FOR_MEETING",
         resource_type="recording",
-        resource_id=None, # No specific recording ID
+        resource_id=0, # No specific recording ID
         details={"meeting_id": meeting_id},
         ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        user_agent=request.headers.get("user-agent"),
+        method=request.method,
+        path=request.url.path
     )
+    await audit_service.log_action(db=db, log_data=log_data)
     
     return recordings
 
@@ -107,15 +112,17 @@ async def read_recording(
         )
     
     # Audit-Log
-    await audit_service.log_action(
-        db=db,
+    log_data = AuditLogCreate(
         user_id=current_user.id,
         action="READ",
         resource_type="recording",
         resource_id=recording_id,
         ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        user_agent=request.headers.get("user-agent"),
+        method=request.method,
+        path=request.url.path
     )
+    await audit_service.log_action(db=db, log_data=log_data)
     
     return recording
 
@@ -135,15 +142,17 @@ async def download_recording(
         )
     
     # Audit-Log
-    await audit_service.log_action(
-        db=db,
+    log_data = AuditLogCreate(
         user_id=current_user.id,
         action="DOWNLOAD",
         resource_type="recording",
         resource_id=recording_id,
         ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        user_agent=request.headers.get("user-agent"),
+        method=request.method,
+        path=request.url.path
     )
+    await audit_service.log_action(db=db, log_data=log_data)
     
     return {"download_url": download_url}
 
@@ -164,16 +173,18 @@ async def update_recording_status_endpoint(
         )
     
     # Audit-Log
-    await audit_service.log_action(
-        db=db,
+    log_data = AuditLogCreate(
         user_id=current_user.id,
         action="UPDATE_STATUS",
         resource_type="recording",
         resource_id=recording_id,
         details={"new_status": new_status.value},
         ip_address=request.client.host,
-        user_agent=request.headers.get("user-agent")
+        user_agent=request.headers.get("user-agent"),
+        method=request.method,
+        path=request.url.path
     )
+    await audit_service.log_action(db=db, log_data=log_data)
     
     return recording
 
@@ -194,15 +205,17 @@ async def delete_existing_recording(
             )
         
         # Audit-Log
-        await audit_service.log_action(
-            db=db,
+        log_data = AuditLogCreate(
             user_id=current_user.id,
             action="DELETE",
             resource_type="recording",
             resource_id=recording_id,
             ip_address=request.client.host,
-            user_agent=request.headers.get("user-agent")
+            user_agent=request.headers.get("user-agent"),
+            method=request.method,
+            path=request.url.path
         )
+        await audit_service.log_action(db=db, log_data=log_data)
     except HTTPException as e:
         raise e
     except Exception as e:

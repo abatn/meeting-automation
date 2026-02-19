@@ -46,8 +46,8 @@ async def register(
             action="REGISTER",
             method=request.method,
             path=request.url.path,
-            entity_type="user",
-            entity_id=user.id,
+            resource_type="user",
+            resource_id=user.id,
             details={"email": user.email},
             ip_address=request.client.host,
             user_agent=request.headers.get("user-agent")
@@ -73,7 +73,7 @@ async def login(
                 action="LOGIN_FAILED",
                 method=request.method,
                 path=request.url.path,
-                entity_type="auth",
+                resource_type="auth",
                 details={"username": form_data.username},
                 ip_address=request.client.host,
                 user_agent=request.headers.get("user-agent")
@@ -113,7 +113,7 @@ async def login(
             action="LOGIN",
             method=request.method,
             path=request.url.path,
-            entity_type="auth",
+            resource_type="auth",
             ip_address=request.client.host,
             user_agent=request.headers.get("user-agent")
         )
@@ -156,8 +156,9 @@ async def setup_mfa(
             user_id=current_user.id,
             action="MFA_SETUP",
             method=request.method,
-            entity_type="user",
-            entity_id=current_user.id,
+            path=request.url.path,
+            resource_type="user",
+            resource_id=current_user.id,
             ip_address=request.client.host,
             user_agent=request.headers.get("user-agent")
         )
@@ -192,7 +193,7 @@ async def verify_mfa(
                 action="MFA_FAILED",
                 method=request.method,
                 path=request.url.path,
-                entity_type="auth",
+                resource_type="auth",
                 ip_address=request.client.host,
                 user_agent=request.headers.get("user-agent")
             )
@@ -214,7 +215,7 @@ async def verify_mfa(
             action="MFA_VERIFIED",
             method=request.method,
             path=request.url.path,
-            entity_type="auth",
+            resource_type="auth",
             ip_address=request.client.host,
             user_agent=request.headers.get("user-agent")
         )
@@ -277,7 +278,7 @@ async def logout(
             action="LOGOUT",
             method=request.method,
             path=request.url.path,
-            entity_type="auth",
+            resource_type="auth",
             ip_address=request.client.host,
             user_agent=request.headers.get("user-agent")
         )

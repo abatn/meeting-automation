@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, status as http_status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Annotated, List, Optional
 from datetime import datetime
@@ -24,16 +24,18 @@ async def read_meetings(
     limit: int = Query(100, ge=1, le=100),
     status: Optional[MeetingStatus] = None,
     from_date: Optional[datetime] = None,
-    to_date: Optional[datetime] = None
+    to_date: Optional[datetime] = None,
+    organizer_id: Optional[int] = None # Add organizer_id filter
 ):
     """Listet alle Meetings auf (mit Filtern)."""
     meetings = await meeting_service.get_meetings(
         db, skip=skip, limit=limit,
-        status=status, from_date=from_date, to_date=to_date
+        status=status, from_date=from_date, to_date=to_date,
+        organizer_id=organizer_id # Pass new filter to service
     )
     return meetings
 
-@router.post("/", response_model=MeetingResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=MeetingResponse, status_code=http_status.HTTP_201_CREATED)
 async def create_new_meeting(
     request: Request,
     meeting_data: MeetingCreate,
@@ -44,16 +46,19 @@ async def create_new_meeting(
     meeting = await meeting_service.create_meeting(db, meeting_data, current_user.id)
     
     # Audit-Log
-    audit_service.log_action(
+    await audit_service.log_action(
         db=db,
         log_data=AuditLogCreate(
             user_id=current_user.id,
             action="CREATE",
-            entity_type="meeting",
-            entity_id=meeting.id,
+            method=request.method,
+            path=request.url.path,
+            resource_type="meeting",
+            resource_id=meeting.id,
             details={"title": meeting.title, "date": str(meeting.date)},
             ip_address=request.client.host,
-            user_agent=request.headers.get("user-agent")
+            user_agent=request.headers.get("user-agent"),
+            status_code=http_status.HTTP_201_CREATED
         )
     )
     
@@ -70,20 +75,23 @@ async def read_meeting(
     meeting = await meeting_service.get_meeting_by_id(db, meeting_id)
     if not meeting:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Meeting not found"
         )
     
     # Audit-Log
-    audit_service.log_action(
+    await audit_service.log_action(
         db=db,
         log_data=AuditLogCreate(
             user_id=current_user.id,
             action="READ",
-            entity_type="meeting",
-            entity_id=meeting_id,
+            method=request.method,
+            path=request.url.path,
+            resource_type="meeting",
+            resource_id=meeting_id,
             ip_address=request.client.host,
-            user_agent=request.headers.get("user-agent")
+            user_agent=request.headers.get("user-agent"),
+            status_code=http_status.HTTP_200_OK
         )
     )
     
@@ -101,27 +109,30 @@ async def update_existing_meeting(
     meeting = await meeting_service.update_meeting(db, meeting_id, meeting_data, current_user.id)
     if not meeting:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Meeting not found or insufficient permissions"
         )
     
     # Audit-Log
-    audit_service.log_action(
+    await audit_service.log_action(
         db=db,
         log_data=AuditLogCreate(
             user_id=current_user.id,
             action="UPDATE",
-            entity_type="meeting",
-            entity_id=meeting_id,
-            details={"changes": meeting_data.model_dump(exclude_unset=True)},
+            method=request.method,
+            path=request.url.path,
+            resource_type="meeting",
+            resource_id=meeting_id,
+            details={"changes": meeting_data.dict(exclude_unset=True)},
             ip_address=request.client.host,
-            user_agent=request.headers.get("user-agent")
+            user_agent=request.headers.get("user-agent"),
+            status_code=http_status.HTTP_200_OK
         )
     )
     
     return meeting
 
-@router.delete("/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{meeting_id}", status_code=http_status.HTTP_204_NO_CONTENT)
 async def delete_existing_meeting(
     request: Request,
     meeting_id: int,
@@ -132,20 +143,23 @@ async def delete_existing_meeting(
     deleted = await meeting_service.delete_meeting(db, meeting_id, current_user.id)
     if not deleted:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Meeting not found or insufficient permissions"
         )
     
     # Audit-Log
-    audit_service.log_action(
+    await audit_service.log_action(
         db=db,
         log_data=AuditLogCreate(
             user_id=current_user.id,
             action="DELETE",
-            entity_type="meeting",
-            entity_id=meeting_id,
+            method=request.method,
+            path=request.url.path,
+            resource_type="meeting",
+            resource_id=meeting_id,
             ip_address=request.client.host,
-            user_agent=request.headers.get("user-agent")
+            user_agent=request.headers.get("user-agent"),
+            status_code=http_status.HTTP_204_NO_CONTENT
         )
     )
 
@@ -161,21 +175,24 @@ async def update_meeting_status(
     meeting = await meeting_service.change_meeting_status(db, meeting_id, status, current_user.id)
     if not meeting:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Meeting not found or insufficient permissions"
         )
     
     # Audit-Log
-    audit_service.log_action(
+    await audit_service.log_action(
         db=db,
         log_data=AuditLogCreate(
             user_id=current_user.id,
             action="STATUS_CHANGE",
-            entity_type="meeting",
-            entity_id=meeting_id,
+            method=request.method,
+            path=request.url.path,
+            resource_type="meeting",
+            resource_id=meeting_id,
             details={"new_status": status.value},
             ip_address=request.client.host,
-            user_agent=request.headers.get("user-agent")
+            user_agent=request.headers.get("user-agent"),
+            status_code=http_status.HTTP_200_OK
         )
     )
     

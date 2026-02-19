@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, asc, delete
+from sqlalchemy import desc, asc, delete, select
 import csv
 import json
 from enum import Enum
@@ -20,6 +20,11 @@ class AuditAction(str, Enum):
     EXTRACT_DECISIONS = "EXTRACT_DECISIONS"
     EXTRACT_ACTION_POINTS = "EXTRACT_ACTION_POINTS"
     GET_PV = "GET_PV"
+    UPDATE_PV = "UPDATE_PV"
+    DELETE_PV = "DELETE_PV"
+    GET_PV_BY_MEETING = "GET_PV_BY_MEETING"
+    GENERATE_PV_PDF = "GENERATE_PV_PDF"
+    GENERATE_PV_DOCX = "GENERATE_PV_DOCX"
     # Add other actions as needed
 
 
@@ -33,6 +38,23 @@ class AuditService:
         await db.commit()
         await db.refresh(db_audit_log)
         return db_audit_log
+    
+    async def create_audit_log(self, db: AsyncSession, user_id: Optional[int], event_type: str, resource_type: str, resource_id: int, details: str) -> AuditLog:
+        """
+        Helper method to create an audit log entry.
+        """
+        log_data = AuditLogCreate(
+            user_id=user_id,
+            action=event_type,
+            method="SYSTEM",
+            path="N/A",
+            resource_type=resource_type,
+            resource_id=resource_id,
+            details={"message": details},
+            ip_address="127.0.0.1", # Default for system actions
+            user_agent="System"
+        )
+        return await self.log_action(db, log_data)
 
     async def get_audit_logs(
         self,
@@ -139,7 +161,7 @@ class AuditService:
         if file_format == "csv":
             output = []
             # Get field names from the Pydantic schema for consistent headers
-            fieldnames = [field_name for field_name in AuditLogSchema.model_fields.keys() if field_name != 'id']
+            fieldnames = [field_name for field_name in AuditLogSchema.__fields__.keys() if field_name != 'id']
             output.append(",".join(fieldnames)) # Header row
 
             for log in logs:
@@ -157,6 +179,8 @@ class AuditService:
         elif file_format == "json":
             # Convert AuditLog objects to AuditLogSchema Pydantic models for serialization
             # Then convert Pydantic models to dictionaries and dump to JSON
-            return json.dumps([AuditLogSchema.model_validate(log).model_dump() for log in logs], indent=4)
+            return json.dumps([AuditLogSchema.from_orm(log).dict() for log in logs], indent=4)
         else:
             raise ValueError("Unsupported file format. Choose 'csv' or 'json'.")
+
+audit_service = AuditService()

@@ -43,21 +43,14 @@ async def get_recordings_by_meeting(db: AsyncSession, meeting_id: int) -> List[R
 
 async def create_recording(
     db: AsyncSession,
-    recording_data: RecordingCreate,
-    uploader_id: int,
-    file_path: str,
-    file_size: int,
-    duration: Optional[float] = None,
-    status: RecordingStatus = RecordingStatus.UPLOADING
+    recording_data: RecordingCreate
 ) -> Recording:
     """Erstellt einen neuen Aufnahme-Eintrag in der Datenbank."""
+    # All necessary fields are in recording_data now
+    recording_dict = recording_data.dict()
+    recording_dict.pop("transcription_id", None) # Remove transcription_id as it's a relationship, not a direct column
     db_recording = Recording(
-        **recording_data.dict(),
-        uploader_id=uploader_id,
-        file_path=file_path,
-        file_size=file_size,
-        duration=duration,
-        status=status
+        **recording_dict
     )
     db.add(db_recording)
     await db.commit()
@@ -84,14 +77,17 @@ async def upload_recording(
     object_name = f"recordings/{meeting_id}/{uuid.uuid4()}{file_extension}"
 
     # 3. Create initial DB entry with UPLOADING status
-    initial_recording_data = RecordingCreate(meeting_id=meeting_id)
-    db_recording = await create_recording(
-        db=db,
-        recording_data=initial_recording_data,
+    initial_recording_data = RecordingCreate(
+        meeting_id=meeting_id,
         uploader_id=uploader_id,
         file_path=object_name,
-        file_size=file.size, # file.size is available after file is read
-        status=RecordingStatus.UPLOADING
+        file_size=file.size,
+        status=RecordingStatus.UPLOADING,
+        duration=0.0 # Temporary duration, will be updated after extraction
+    )
+    db_recording = await create_recording(
+        db=db,
+        recording_data=initial_recording_data
     )
 
     # 4. Upload to S3/MinIO

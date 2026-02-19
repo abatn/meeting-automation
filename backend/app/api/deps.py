@@ -74,6 +74,8 @@ require_admin = require_role("admin")
 require_dg = require_role("dg")
 require_manager = require_role("manager")
 
+get_current_active_superuser = require_admin
+
 # Synchronous version for middleware
 def get_current_user_from_token_sync(db_session: AsyncSession, token: str) -> Optional[User]:
     """
