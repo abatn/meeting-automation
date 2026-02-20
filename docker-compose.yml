@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: meeting_db
+      POSTGRES_USER: meeting_user
+      POSTGRES_PASSWORD: meeting_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meeting_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass redis_password
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbit_user
+      RABBITMQ_DEFAULT_PASS: rabbit_password
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  n8n:
+    image: n8nio/n8n:latest
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin_password
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n_db
+      - DB_POSTGRESDB_USER=meeting_user
+      - DB_POSTGRESDB_PASSWORD=meeting_password
+      - GENERIC_TIMEZONE=Africa/Tunis
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/workflows
+    depends_on:
+      - postgres
+
+  backend:
+    build: ./backend
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
+      - REDIS_URL=redis://default:redis_password@redis:6379/0
+      - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
+      - S3_ENDPOINT=http://minio:9000
+      - WHISPER_API_URL=http://whisper:8001
+      - MISTRAL_API_URL=http://mistral:8002
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+      - minio
+
+  celery-worker:
+    build: ./backend
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
+      - REDIS_URL=redis://default:redis_password@redis:6379/0
+      - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+
+  celery-beat:
+    build: ./backend
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
+      - REDIS_URL=redis://default:redis_password@redis:6379/0
+      - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+  n8n_data:
