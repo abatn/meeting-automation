@@ -1,7 +1,17 @@
 import api from './api';
 
-// TODO: Implement login, logout, refresh token, MFA setup
-export const login = async (credentials: any) => {
-  const response = await api.post('/auth/token', credentials);
-  return response.data;
+export const authService = {
+  login: async (email: string, password: string) => {
+    const response = await api.post('/auth/login', { email, password });
+    return response.data;
+  },
+  logout: async () => {
+    await api.post('/auth/logout');
+  },
+  getMe: async () => {
+    const response = await api.get('/auth/me');
+    return response.data;
+  },
 };
+
+export default authService;

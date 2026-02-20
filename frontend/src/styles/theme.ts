@@ -1,9 +1,8 @@
-import { createTheme } from '@mui/material/styles';
-import { Direction } from '@mui/material';
+import { createTheme, Direction } from '@mui/material/styles';
 
 export const createAppTheme = (direction: Direction) => {
   return createTheme({
-    direction: direction,
+    direction,
     palette: {
       primary: {
         main: '#1976d2',
@@ -11,7 +10,21 @@ export const createAppTheme = (direction: Direction) => {
       secondary: {
         main: '#dc004e',
       },
+      background: {
+        default: '#f5f5f5',
+      },
     },
-    // TODO: Add custom typography for Arabic fonts if needed
+    typography: {
+      fontFamily: direction === 'rtl' ? 'Roboto, Cairo, Arial' : 'Roboto, Arial',
+    },
+    components: {
+      MuiButton: {
+        styleOverrides: {
+          root: {
+            textTransform: 'none',
+          },
+        },
+      },
+    },
   });
 };

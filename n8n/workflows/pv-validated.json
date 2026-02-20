@@ -1,16 +1,135 @@
 {
-  "name": "PV Validated",
+  "name": "PV Validated Automation",
   "nodes": [
     {
-      "parameters": {},
-      "name": "Start",
-      "type": "n8n-nodes-base.start",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pv-validated",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        250,
+        100,
         300
       ]
+    },
+    {
+      "parameters": {
+        "url": "http://mistral:8002/analyze",
+        "method": "POST",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{$node[\"Webhook\"].json[\"body\"][\"content\"]}}"
+            },
+            {
+              "name": "task",
+              "value": "extract_actions"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Mistral AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "actions",
+        "options": {}
+      },
+      "name": "Split Actions",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v18.0/{{$env[\"WHATSAPP_PHONE_ID\"]}}/messages",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messaging_product",
+              "value": "whatsapp"
+            },
+            {
+              "name": "to",
+              "value": "={{$json[\"assignee_phone\"]}}"
+            },
+            {
+              "name": "type",
+              "value": "text"
+            },
+            {
+              "name": "text",
+              "value": "={ \"body\": \"New Action Item assigned to you: \" + {{$json[\"description\"]}} }"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "WhatsApp Notify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        700,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3",
+          "name": "WhatsApp Token"
+        }
+      }
     }
   ],
-  "connections": {}
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Mistral AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral AI": {
+      "main": [
+        [
+          {
+            "node": "Split Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Actions": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Notify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
 }

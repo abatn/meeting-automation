@@ -1,27 +1,166 @@
 {
-  "name": "Daily Action Reminders",
+  "name": "Daily Reminders Automation",
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
+        "triggerTimes": {
+          "item": [
             {
-              "field": {
-                "unit": "days",
-                "number": 1
-              }
+              "hour": 8
             }
           ]
         }
       },
-      "name": "Schedule Trigger",
-      "type": "n8n-nodes-base.scheduleTrigger",
+      "name": "Cron Trigger",
+      "type": "n8n-nodes-base.cron",
       "typeVersion": 1,
       "position": [
-        250,
+        100,
         300
       ]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/api/v1/actions/pending",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "name": "Get Pending Actions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        300,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4",
+          "name": "Backend API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "dateTime": [
+            {
+              "value1": "={{$json[\"due_date\"]}}",
+              "value2": "={{$now}}"
+            }
+          ]
+        }
+      },
+      "name": "Is Due Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v18.0/{{$env[\"WHATSAPP_PHONE_ID\"]}}/messages",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messaging_product",
+              "value": "whatsapp"
+            },
+            {
+              "name": "to",
+              "value": "={{$json[\"assignee_phone\"]}}"
+            },
+            {
+              "name": "text",
+              "value": "={ \"body\": \"Reminder: Your action item '\" + {{$json[\"title\"]}} + \"' is due today!\" }"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "WhatsApp Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        750,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3",
+          "name": "WhatsApp Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "escalations@meeting-automation.tn",
+        "toEmail": "={{$json[\"manager_email\"]}}",
+        "subject": "Action Item Escalation: {{$json[\"title\"]}}",
+        "text": "The following action item is overdue: {{$json[\"title\"]}}. Assigned to: {{$json[\"assignee_name\"]}}.",
+        "options": {}
+      },
+      "name": "Escalate to Manager",
+      "type": "n8n-nodes-base.emailSendGrid",
+      "typeVersion": 1,
+      "position": [
+        750,
+        400
+      ],
+      "credentials": {
+        "sendGridApi": {
+          "id": "2",
+          "name": "SendGrid"
+        }
+      }
     }
   ],
-  "connections": {}
+  "connections": {
+    "Cron Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Actions": {
+      "main": [
+        [
+          {
+            "node": "Is Due Today?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Due Today?": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Reminder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escalate to Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
 }

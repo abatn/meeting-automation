@@ -1,50 +1,39 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
+from typing import List, Optional
 from pydantic import BaseModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-import logging
+import os
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+app = FastAPI(title="Mistral NLP Service")
 
-app = FastAPI()
-
-# Load model and tokenizer
-try:
-    model_name = "mistralai/Mistral-7B-v0.1"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name)
-    logger.info("Mistral model loaded successfully.")
-except Exception as e:
-    logger.error(f"Error loading Mistral model: {e}")
-    # Exit if model fails to load
-    exit()
-
-class Prompt(BaseModel):
+class AnalysisRequest(BaseModel):
     text: str
-    max_length: int = 200
+    task: str  # e.g., "extract_actions", "summarize", "validate_pv"
+    context: Optional[dict] = None
 
-@app.post("/generate")
-async def generate_text(prompt: Prompt):
-    """
-    Generates text from a prompt using the Mistral model.
-    """
-    try:
-        inputs = tokenizer(prompt.text, return_tensors="pt")
-        outputs = model.generate(**inputs, max_new_tokens=prompt.max_length)
-        generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        logger.info("Text generation successful.")
-        return {"generated_text": generated_text}
-
-    except Exception as e:
-        logger.error(f"Text generation failed: {e}", exc_info=True)
-        return {"error": "Failed to generate text."}, 500
+@app.post("/analyze")
+async def analyze(request: AnalysisRequest):
+    # In production, this would call a local Mistral 7B model or an API
+    if request.task == "extract_actions":
+        return {
+            "actions": [
+                {
+                    "description": "Finaliser le rapport de transformation digitale",
+                    "assignee_name": "Karim",
+                    "assignee_phone": "+21699000000",
+                    "due_date": "2026-02-27"
+                }
+            ],
+            "summary": "La réunion a porté sur la transformation digitale."
+        }
+    
+    return {
+        "result": "Analysis completed",
+        "task": request.task
+    }
 
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+async def health():
+    return {"status": "healthy", "model": "mistral-7b-arabic-mock"}
 
 if __name__ == "__main__":
     import uvicorn

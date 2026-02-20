@@ -1,16 +1,84 @@
 {
-  "name": "Audio Uploaded",
+  "name": "Audio Uploaded Automation",
   "nodes": [
     {
-      "parameters": {},
-      "name": "Start",
-      "type": "n8n-nodes-base.start",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "audio-uploaded",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        250,
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://whisper:8001/transcribe",
+        "method": "POST",
+        "sendBinaryData": true,
+        "options": {}
+      },
+      "name": "Whisper API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/api/v1/transcriptions/callback",
+        "method": "POST",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "meeting_id",
+              "value": "={{$node[\"Webhook\"].json[\"body\"][\"meeting_id\"]}}"
+            },
+            {
+              "name": "transcript",
+              "value": "={{$json[\"text\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Backend Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        500,
         300
       ]
     }
   ],
-  "connections": {}
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Whisper API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Whisper API": {
+      "main": [
+        [
+          {
+            "node": "Backend Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
 }

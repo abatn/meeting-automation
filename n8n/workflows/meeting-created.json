@@ -1,16 +1,85 @@
 {
-  "name": "Meeting Created",
+  "name": "Meeting Created Automation",
   "nodes": [
     {
-      "parameters": {},
-      "name": "Start",
-      "type": "n8n-nodes-base.start",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "meeting-created",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        250,
+        100,
         300
       ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_meetings (meeting_id, title, start_time) VALUES ($1, $2, $3)",
+        "parameters": "={{$node[\"Webhook\"].json[\"body\"][\"id\"]}}, {{$node[\"Webhook\"].json[\"body\"][\"title\"]}}, {{$node[\"Webhook\"].json[\"body\"][\"start_time\"]}}"
+      },
+      "name": "Save to n8n DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        300,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@meeting-automation.tn",
+        "toEmail": "={{$node[\"Webhook\"].json[\"body\"][\"attendees\"]}}",
+        "subject": "Invitation: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}}",
+        "text": "You are invited to a new meeting: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}} at {{$node[\"Webhook\"].json[\"body\"][\"start_time\"]}}.",
+        "options": {}
+      },
+      "name": "Send Invitations",
+      "type": "n8n-nodes-base.emailSendGrid",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ],
+      "credentials": {
+        "sendGridApi": {
+          "id": "2",
+          "name": "SendGrid"
+        }
+      }
     }
   ],
-  "connections": {}
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Save to n8n DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to n8n DB": {
+      "main": [
+        [
+          {
+            "node": "Send Invitations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
 }

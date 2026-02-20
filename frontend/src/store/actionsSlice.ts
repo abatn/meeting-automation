@@ -1,24 +1,46 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+interface ActionItem {
+  id: number;
+  description: string;
+  assignee_name: string;
+  due_date: string;
+  status: 'pending' | 'completed' | 'overdue';
+}
+
 interface ActionsState {
-  actions: any[]; // TODO: Define action type
-  isLoading: boolean;
+  list: ActionItem[];
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: ActionsState = {
-  actions: [],
-  isLoading: false,
+  list: [],
+  loading: false,
+  error: null,
 };
 
 const actionsSlice = createSlice({
   name: 'actions',
   initialState,
   reducers: {
-    setActions(state, action: PayloadAction<any[]>) {
-      state.actions = action.payload;
+    setActions: (state, action: PayloadAction<ActionItem[]>) => {
+      state.list = action.payload;
+    },
+    updateActionStatus: (state, action: PayloadAction<{ id: number; status: ActionItem['status'] }>) => {
+      const index = state.list.findIndex((a) => a.id === action.payload.id);
+      if (index !== -1) {
+        state.list[index].status = action.payload.status;
+      }
+    },
+    setLoading: (state, action: PayloadAction<boolean>) => {
+      state.loading = action.payload;
+    },
+    setError: (state, action: PayloadAction<string | null>) => {
+      state.error = action.payload;
     },
   },
 });
 
-export const { setActions } = actionsSlice.actions;
+export const { setActions, updateActionStatus, setLoading, setError } = actionsSlice.actions;
 export default actionsSlice.reducer;

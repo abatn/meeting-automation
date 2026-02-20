@@ -1,57 +1,42 @@
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-import logging
+from sqlalchemy.orm import Session
+import time
+import json
+import uuid
+from typing import Callable
+
+from app.api import deps
 from app.models.audit_log import AuditLog
 from app.core.database import SessionLocal
-import json
-from datetime import datetime
-
-logger = logging.getLogger(__name__)
 
 class AuditMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Callable):
+        # Only audit state-changing requests
+        if request.method not in ["POST", "PUT", "PATCH", "DELETE"]:
+            return await call_next(request)
+
+        # Process request
         response = await call_next(request)
 
-        # Skip logging for non-API routes
-        if not request.url.path.startswith("/api"):
-            return response
-
-        # Get user from request state if available (set by auth dependency)
-        user_id = getattr(request.state, "user_id", None)
-
-        # Read request body
-        request_body = await request.body()
+        # Log after response (simplified for now)
+        # In a real scenario, we would extract user_id from token
+        # and more details from request body/response
         
-        # Read response body
-        response_body = b""
-        async for chunk in response.body_iterator:
-            response_body += chunk
-        
-        # Log to database
         db = SessionLocal()
         try:
-            audit_log = AuditLog(
-                user_id=user_id,
-                method=request.method,
-                path=request.url.path,
-                query_params=str(request.query_params),
-                request_body=request_body.decode('utf-8', errors='ignore'),
-                status_code=response.status_code,
-                response_body=response_body.decode('utf-8', errors='ignore'),
-                timestamp=datetime.utcnow()
+            audit_entry = AuditLog(
+                id=str(uuid.uuid4()),
+                action=request.method,
+                table_name=request.url.path.split("/")[-1],
+                ip_address=request.client.host if request.client else "unknown",
+                user_agent=request.headers.get("user-agent", "unknown")
             )
-            db.add(audit_log)
+            db.add(audit_entry)
             db.commit()
-        except Exception as e:
-            logger.error(f"Failed to log audit trail: {e}")
+        except Exception:
             db.rollback()
         finally:
             db.close()
-        
-        # Re-create response so it can be returned
-        return response.__class__(
-            content=response_body,
-            status_code=response.status_code,
-            headers=dict(response.headers),
-            media_type=response.media_type,
-        )
+
+        return response

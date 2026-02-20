@@ -66,11 +66,17 @@ services:
       - DB_POSTGRESDB_USER=meeting_user
       - DB_POSTGRESDB_PASSWORD=meeting_password
       - GENERIC_TIMEZONE=Africa/Tunis
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-secret_key}
+      - N8N_USER_FOLDER=/home/node/.n8n
+      - EXTERNAL_HOOK_FILES=/workflows
+      - N8N_METRICS=true
+      - N8N_METRICS_INCLUDE_DEFAULT_METRICS=true
     ports:
       - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n/workflows:/workflows
+      - ./n8n/credentials:/home/node/.n8n/credentials
     depends_on:
       - postgres
 
