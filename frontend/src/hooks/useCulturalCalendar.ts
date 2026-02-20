@@ -1,27 +1,33 @@
-import { useTranslation } from 'react-i18next';
-import { useMemo } from 'react';
+import { useCallback } from 'react';
 import dayjs from 'dayjs';
-import 'dayjs/locale/ar-tn';
-import 'dayjs/locale/fr';
 
-// TODO: Add more cultural calendar logic (e.g., Islamic Hijri calendar)
 export const useCulturalCalendar = () => {
-  const { i18n } = useTranslation();
-
-  const locale = useMemo(() => {
-    switch (i18n.language) {
-      case 'ar-TN':
-        return 'ar-tn';
-      case 'fr-TN':
-        return 'fr';
-      default:
-        return 'en';
-    }
-  }, [i18n.language]);
-
-  const formatDate = (date: Date) => {
-    return dayjs(date).locale(locale).format('LL');
+  const holidays: Record<string, string> = {
+    '2026-03-20': 'Independence Day (Tunisia)',
+    '2026-04-09': 'Martyrs\' Day (Tunisia)',
+    '2026-05-01': 'Labour Day',
+    '2026-07-25': 'Republic Day (Tunisia)',
+    '2026-08-13': 'Women\'s Day (Tunisia)',
+    '2026-10-15': 'Evacuation Day (Tunisia)',
   };
 
-  return { formatDate };
+  const isHoliday = useCallback((date: string | Date) => {
+    const dateStr = dayjs(date).format('YYYY-MM-DD');
+    return !!holidays[dateStr];
+  }, []);
+
+  const getHolidayName = useCallback((date: string | Date) => {
+    const dateStr = dayjs(date).format('YYYY-MM-DD');
+    return holidays[dateStr] || null;
+  }, []);
+
+  const formatDate = useCallback((date: Date) => {
+    return dayjs(date).format('DD/MM/YYYY');
+  }, []);
+
+  return {
+    isHoliday,
+    getHolidayName,
+    formatDate,
+  };
 };
