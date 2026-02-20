@@ -1,1 +1,0 @@
-# Skript zum Füllen der Datenbank mit Initialdaten

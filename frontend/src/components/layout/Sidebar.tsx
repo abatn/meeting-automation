@@ -1,1 +1,0 @@
-// TODO: Sidebar Komponente implementieren

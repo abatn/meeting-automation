@@ -1,1 +1,0 @@
-// TODO: ActionDetail Komponente implementieren

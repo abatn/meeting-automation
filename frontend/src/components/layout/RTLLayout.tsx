@@ -1,1 +1,0 @@
-// TODO: RTL-fähiges Layout implementieren

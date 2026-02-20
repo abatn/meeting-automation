@@ -1,1 +1,0 @@
-# TODO: Python-Abhängigkeiten für Whisper

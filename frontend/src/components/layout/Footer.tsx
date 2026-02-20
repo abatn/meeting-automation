@@ -1,1 +1,0 @@
-// TODO: Footer Komponente implementieren

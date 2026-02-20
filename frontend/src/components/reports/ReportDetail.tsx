@@ -1,1 +1,0 @@
-// TODO: ReportDetail Komponente implementieren

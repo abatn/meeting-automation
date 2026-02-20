@@ -1,1 +1,0 @@
-// TODO: Header Komponente implementieren

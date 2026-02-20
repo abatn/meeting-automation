@@ -1,1 +1,0 @@
-# TODO: Skript zum Fein-Tuning von Whisper

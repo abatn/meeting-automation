@@ -1,1 +1,0 @@
-// TODO: MeetingList Komponente implementieren

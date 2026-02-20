@@ -1,1 +1,0 @@
-# TODO: FastAPI-App für Mistral-Service
