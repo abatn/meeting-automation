@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, DateTime, Text, Enum as SQLEnum
+from sqlalchemy import Column, String, ForeignKey, DateTime, Text, Integer, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
@@ -52,10 +52,10 @@ class Participant(Base):
 class Agenda(Base):
     __tablename__ = "agendas"
 
-    id = Column(String, primary_key=True, index=True)
-    meeting_id = Column(String, ForeignKey("meetings.id", ondelete="CASCADE"))
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    order = Column(Column(String).type_filter(int), default=0)
+    id = Column(Integer, primary_key=True, index=True)
+    meeting_id = Column(String, ForeignKey("meetings.id"))
+    title = Column(String)
+    description = Column(String, nullable=True)
+    order = Column(Integer, default=0)
 
     meeting = relationship("Meeting", back_populates="agendas")

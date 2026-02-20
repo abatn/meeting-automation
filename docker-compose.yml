@@ -68,14 +68,13 @@ services:
       - GENERIC_TIMEZONE=Africa/Tunis
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-secret_key}
       - N8N_USER_FOLDER=/home/node/.n8n
-      - EXTERNAL_HOOK_FILES=/workflows
       - N8N_METRICS=true
       - N8N_METRICS_INCLUDE_DEFAULT_METRICS=true
     ports:
       - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./n8n/workflows:/workflows
+      - ./n8n/workflows:/home/node/workflows
       - ./n8n/credentials:/home/node/.n8n/credentials
     depends_on:
       - postgres
@@ -83,6 +82,7 @@ services:
   backend:
     build: ./backend
     environment:
+      - PYTHONPATH=/app
       - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
       - REDIS_URL=redis://default:redis_password@redis:6379/0
       - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
@@ -104,6 +104,7 @@ services:
     build: ./backend
     command: celery -A app.tasks.celery_app worker --loglevel=info
     environment:
+      - PYTHONPATH=/app
       - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
       - REDIS_URL=redis://default:redis_password@redis:6379/0
       - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
@@ -118,6 +119,7 @@ services:
     build: ./backend
     command: celery -A app.tasks.celery_app beat --loglevel=info
     environment:
+      - PYTHONPATH=/app
       - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
       - REDIS_URL=redis://default:redis_password@redis:6379/0
       - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/

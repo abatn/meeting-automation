@@ -17,6 +17,7 @@
 - [x] **QA & Testing** (Integration Tests, Security Tests, Frontend Component Tests, Testing Guide)
 
 ## Nächste Schritte
+0. **System-Validierung**: Durchführung umfassender Systemtests der Container-Infrastruktur.
 1. **Frontend E2E Tests**: Implementierung von Cypress Tests für kritische User Journeys (DG, Manager).
 2. **Performance Testing**: Aufsetzen von Locust für Lasttests der AI-Services.
 3. **CI/CD Pipeline Finalisierung**: Integration aller Testsuiten in GitHub Actions.

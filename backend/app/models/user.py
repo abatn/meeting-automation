@@ -1,7 +1,14 @@
 from sqlalchemy import Column, String, Boolean, Table, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+import enum
 from app.core.database import Base
+
+class UserRole(str, enum.Enum):
+    ADMIN = "admin"
+    MANAGER = "manager"
+    PARTICIPANT = "participant"
+    DG = "dg"
 
 # Association table for User-Role (Many-to-Many)
 user_roles = Table(
