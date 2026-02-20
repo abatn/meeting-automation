@@ -7,7 +7,7 @@ import logging
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.middleware.audit_middleware import AuditMiddleware
-from app.api.v1 import auth, meetings, recordings, transcriptions, pv, actions, reports
+from app.api.v1 import auth, meetings, recordings, transcriptions, pv, actions, reports, webhooks
 
 # Configure logging
 logging.basicConfig(
@@ -70,6 +70,7 @@ app.include_router(transcriptions.router, prefix="/api/v1/transcriptions", tags=
 app.include_router(pv.router, prefix="/api/v1/pv", tags=["Procès-Verbaux"])
 app.include_router(actions.router, prefix="/api/v1/actions", tags=["Actions"])
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
+app.include_router(webhooks.router, prefix="/api/v1/webhooks", tags=["Webhooks"])
 
 if __name__ == "__main__":
     import uvicorn

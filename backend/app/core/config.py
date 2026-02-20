@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     
     # n8n
     N8N_WEBHOOK_URL: str = "http://localhost:5678/webhook"
+    N8N_WEBHOOK_MEETING_CREATED: str = "http://n8n:5678/webhook/meeting-created"
+    N8N_WEBHOOK_AUDIO_UPLOADED: str = "http://n8n:5678/webhook/audio-uploaded"
+    N8N_WEBHOOK_PV_VALIDATED: str = "http://n8n:5678/webhook/pv-validated"
+    N8N_WEBHOOK_DAILY_REMINDER: str = "http://n8n:5678/webhook/daily-reminders"
+    BACKEND_CALLBACK_URL: str = "http://backend:8000/api/v1/webhooks"
     
     # Celery
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"

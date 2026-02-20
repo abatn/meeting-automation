@@ -30,6 +30,10 @@ Date: 20.02.2026
    - Material-UI Theme with RTL support
    - Core Layout (RTLLayout, Navbar, Sidebar)
    - Authentication (LoginForm)
+8. **Prompt #8: Core Services & n8n Integration**
+   - Meeting, Recording, PV & Action Services
+   - n8n Webhook Integration & Callbacks
+   - Celery tasks for automated reminders
 
 ## 🛠 Next Steps
 - Implement remaining frontend components (MeetingPlanner, RecordingControls, Dashboards)
