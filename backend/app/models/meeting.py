@@ -52,7 +52,7 @@ class Participant(Base):
 class Agenda(Base):
     __tablename__ = "agendas"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(String, primary_key=True, index=True)
     meeting_id = Column(String, ForeignKey("meetings.id"))
     title = Column(String)
     description = Column(String, nullable=True)
