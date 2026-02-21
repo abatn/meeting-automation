@@ -102,21 +102,21 @@
       "parameters": {
         "fromEmail": "escalations@meeting-automation.tn",
         "toEmail": "={{$json[\"manager_email\"]}}",
-        "subject": "Action Item Escalation: {{$json[\"title\"]}}",
-        "text": "The following action item is overdue: {{$json[\"title\"]}}. Assigned to: {{$json[\"assignee_name\"]}}.",
+        "subject": "=Action Item Escalation: {{$json[\"title\"]}}",
+        "text": "=The following action item is overdue: {{$json[\"title\"]}}. Assigned to: {{$json[\"assignee_name\"]}}.",
         "options": {}
       },
       "name": "Escalate to Manager",
-      "type": "n8n-nodes-base.emailSendGrid",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
       "position": [
         750,
         400
       ],
       "credentials": {
-        "sendGridApi": {
-          "id": "2",
-          "name": "SendGrid"
+        "smtp": {
+          "id": "5",
+          "name": "SMTP Credentials"
         }
       }
     }
