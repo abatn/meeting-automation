@@ -22,6 +22,7 @@
 - [x] **Dokumentations-Review**: Alle Dokumente sind final geprüft und konsistent mit dem Code.
 - [x] **Audio-Recording & Transkription**: Volle Integration von Frontend-Recording, Backend-Upload und Celery-Transkriptions-Pipeline.
 - [x] **AI-API Transition**: Umstellung von lokalen Whisper/Mistral Containern auf OpenAI & Mistral Cloud APIs zur Ressourcenoptimierung.
+- [x] **Backend-Stabilisierung**: Startup-Fixes implementiert, Import-Fehler behoben und API Health verifiziert.
 
 
 ## Letzte Änderungen (22.02.2026)
@@ -33,3 +34,5 @@
 - n8n Workflow `daily-reminders.json` wurde von SendGrid-Knoten auf standardmäßigen Email (SMTP) Knoten umgestellt und Parameter angepasst.
 - Erstellung einer detaillierten Abschlussdokumentation und eines Diagramms zum Projektstatus.
 - Implementierung der Audio-Recording & Transkriptions-Features (Frontend Hook, UI-Komponenten, Backend-API, Celery-Tasks).
+- Behebung von Startup-Fehlern im Backend (PVService ImportError & IndentationError).
+- Durchführung eines finalen System-Checks: Alle 9 Container laufen, API ist gesund ("healthy").
