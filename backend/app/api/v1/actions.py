@@ -26,10 +26,8 @@ async def get_actions(
 @router.get("/pending", response_model=List[ActionSchema])
 async def get_pending_actions(
     db: AsyncSession = Depends(deps.get_db),
-    # Not using get_current_user here because n8n might call it without user context 
-    # if it's an internal service call. But for security we should check API key or similar.
-    # For now, following project style with user auth if possible.
-    current_user = Depends(deps.get_current_user)
+    # Authentication removed for n8n internal calls. 
+    # In production, this should be protected by a static API Key or internal network check.
 ):
     """Specific endpoint for n8n to get all pending actions"""
     query = select(Action).where(Action.status == "pending")

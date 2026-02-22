@@ -23,6 +23,7 @@
 - [x] **Audio-Recording & Transkription**: Volle Integration von Frontend-Recording, Backend-Upload und Celery-Transkriptions-Pipeline.
 - [x] **AI-API Transition**: Umstellung von lokalen Whisper/Mistral Containern auf OpenAI & Mistral Cloud APIs zur Ressourcenoptimierung.
 - [x] **Backend-Stabilisierung**: Startup-Fixes implementiert, Import-Fehler behoben und API Health verifiziert.
+- [x] **Security-Anpassung**: Authentifizierungs-Bypass für n8n-Automatisierungsendpunkte konfiguriert (Part 17).
 
 
 ## Letzte Änderungen (22.02.2026)
@@ -36,3 +37,4 @@
 - Implementierung der Audio-Recording & Transkriptions-Features (Frontend Hook, UI-Komponenten, Backend-API, Celery-Tasks).
 - Behebung von Startup-Fehlern im Backend (PVService ImportError & IndentationError).
 - Durchführung eines finalen System-Checks: Alle 9 Container laufen, API ist gesund ("healthy").
+- **Security Update**: Endpunkt `/api/v1/actions/pending` für n8n Automatisierung ohne Token zugänglich gemacht.
