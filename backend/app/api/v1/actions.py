@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from app.api import deps
 from app.models.action import Action
-from app.schemas.action import Action as ActionSchema, ActionUpdate, ActionCreate
+from app.schemas.action import ActionRead as ActionSchema, ActionUpdate, ActionCreate
 from app.services.action_service import ActionService
 
 router = APIRouter()
@@ -14,7 +14,7 @@ router = APIRouter()
 async def get_actions(
     status: Optional[str] = None,
     db: AsyncSession = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_active_user)
+    current_user = Depends(deps.get_current_user)
 ):
     query = select(Action)
     if status:
@@ -26,10 +26,10 @@ async def get_actions(
 @router.get("/pending", response_model=List[ActionSchema])
 async def get_pending_actions(
     db: AsyncSession = Depends(deps.get_db),
-    # Not using get_current_active_user here because n8n might call it without user context 
+    # Not using get_current_user here because n8n might call it without user context 
     # if it's an internal service call. But for security we should check API key or similar.
     # For now, following project style with user auth if possible.
-    current_user = Depends(deps.get_current_active_user)
+    current_user = Depends(deps.get_current_user)
 ):
     """Specific endpoint for n8n to get all pending actions"""
     query = select(Action).where(Action.status == "pending")
@@ -40,7 +40,7 @@ async def get_pending_actions(
 async def get_action(
     action_id: int,
     db: AsyncSession = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_active_user)
+    current_user = Depends(deps.get_current_user)
 ):
     result = await db.execute(select(Action).where(Action.id == action_id))
     action = result.scalars().first()
@@ -53,7 +53,7 @@ async def update_action(
     action_id: int,
     action_in: ActionUpdate,
     db: AsyncSession = Depends(deps.get_db),
-    current_user = Depends(deps.get_current_active_user)
+    current_user = Depends(deps.get_current_user)
 ):
     action_service = ActionService(db)
     if action_in.status:
