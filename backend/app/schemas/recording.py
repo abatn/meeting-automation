@@ -18,6 +18,7 @@ class Chunk(ChunkBase):
 class RecordingBase(BaseModel):
     meeting_id: str
     file_path: str
+    status: str = "uploaded"
     file_size: Optional[int] = None
     duration: Optional[float] = None
     format: Optional[str] = None

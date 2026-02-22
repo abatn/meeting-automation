@@ -39,21 +39,21 @@
       "parameters": {
         "fromEmail": "noreply@meeting-automation.tn",
         "toEmail": "={{$node[\"Webhook\"].json[\"body\"][\"attendees\"]}}",
-        "subject": "Invitation: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}}",
-        "text": "You are invited to a new meeting: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}} at {{$node[\"Webhook\"].json[\"body\"][\"start_time\"]}}.",
+        "subject": "=Invitation: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}}",
+        "text": "=You are invited to a new meeting: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}} at {{$node[\"Webhook\"].json[\"body\"][\"start_time\"]}}.",
         "options": {}
       },
       "name": "Send Invitations",
-      "type": "n8n-nodes-base.emailSendGrid",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
       "position": [
-        500,
+        550,
         300
       ],
       "credentials": {
-        "sendGridApi": {
-          "id": "2",
-          "name": "SendGrid"
+        "smtp": {
+          "id": "5",
+          "name": "SMTP Credentials"
         }
       }
     }

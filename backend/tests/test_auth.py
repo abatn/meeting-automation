@@ -1,27 +1,35 @@
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
+import pytest
+from httpx import AsyncClient
 
-def test_signup(client: TestClient) -> None:
-    data = {
-        "email": "test@example.com",
-        "password": "testpassword",
-        "full_name": "Test User",
-        "role": "participant",
-        "department": "IT"
-    }
-    response = client.post("/api/v1/auth/signup", json=data)
-    assert response.status_code == 200
-    content = response.json()
-    assert content["email"] == data["email"]
-    assert "id" in content
+@pytest.mark.asyncio
+async def test_register_user(client: AsyncClient, test_user_data):
+    response = await client.post("/api/v1/auth/register", json=test_user_data)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["email"] == test_user_data["email"]
+    assert "id" in data
 
-def test_login(client: TestClient) -> None:
-    login_data = {
-        "username": "test@example.com",
-        "password": "testpassword"
-    }
-    response = client.post("/api/v1/auth/login/access-token", data=login_data)
+@pytest.mark.asyncio
+async def test_login_success(client: AsyncClient, test_user_data):
+    # Erst registrieren
+    await client.post("/api/v1/auth/register", json=test_user_data)
+    
+    # Login
+    response = await client.post("/api/v1/auth/login", data={
+        "username": test_user_data["email"],
+        "password": test_user_data["password"]
+    })
     assert response.status_code == 200
-    content = response.json()
-    assert "access_token" in content
-    assert content["token_type"] == "bearer"
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+
+@pytest.mark.asyncio
+async def test_login_failed_wrong_password(client: AsyncClient, test_user_data):
+    await client.post("/api/v1/auth/register", json=test_user_data)
+    
+    response = await client.post("/api/v1/auth/login", data={
+        "username": test_user_data["email"],
+        "password": "wrongpassword"
+    })
+    assert response.status_code == 401

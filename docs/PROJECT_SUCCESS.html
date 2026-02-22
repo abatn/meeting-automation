@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROJEKT ABSCHLUSS: Meeting Automation System</title>
+    <style>
+        :root {
+            --primary: #4facfe;
+            --secondary: #00f2fe;
+            --bg-dark: #0a1a2f;
+            --glass: rgba(255, 255, 255, 0.05);
+            --neon-blue: #00f2fe;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            background-image: 
+                linear-gradient(rgba(0, 242, 254, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 242, 254, 0.05) 1px, transparent 1px);
+            background-size: 50px 50px;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .dashboard {
+            width: 90vw;
+            max-width: 1200px;
+            height: 80vh;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr auto;
+            gap: 30px;
+            position: relative;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5), 0 0 30px rgba(79, 172, 254, 0.2);
+            animation: fadeIn 1s ease-out;
+        }
+
+        header {
+            grid-column: 1 / span 2;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 2.8em;
+            margin: 0;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.5));
+        }
+
+        .chart-container {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Left Bar Chart */
+        .efficiency-card {
+            align-items: flex-start;
+        }
+
+        .efficiency-card h3 {
+            margin-top: 0;
+            color: var(--secondary);
+            font-size: 1.4em;
+        }
+
+        .bar-group {
+            width: 100%;
+            margin: 20px 0;
+        }
+
+        .bar-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .bar-bg {
+            width: 100%;
+            height: 35px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: 8px;
+            width: 0%;
+            transition: width 2s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+            position: relative;
+        }
+
+        .bar-fill::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shine 2s infinite;
+        }
+
+        /* Right Pie Chart */
+        .pie-chart {
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #4facfe 0% 45%, 
+                #00f2fe 45% 75%, 
+                #0a3a5f 75% 100%
+            );
+            position: relative;
+            box-shadow: 0 0 40px rgba(0, 242, 254, 0.2);
+        }
+
+        .pie-chart::before {
+            content: '';
+            position: absolute;
+            top: 25%; left: 25%;
+            width: 50%; height: 50%;
+            background: var(--bg-dark);
+            border-radius: 50%;
+            z-index: 2;
+        }
+
+        .pie-legend {
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .dot {
+            width: 12px; height: 12px;
+            border-radius: 3px;
+            margin-right: 10px;
+        }
+
+        /* Footer Progress */
+        footer {
+            grid-column: 1 / span 2;
+            padding-top: 20px;
+        }
+
+        .progress-box h4 {
+            margin: 0 0 10px 0;
+            color: var(--secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .main-progress {
+            width: 100%;
+            height: 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 242, 254, 0.3);
+        }
+
+        .main-progress-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            box-shadow: 0 0 15px var(--secondary);
+        }
+
+        /* Icons */
+        .icon {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: var(--glass);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            color: var(--secondary);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+        }
+
+        .ic-1 { top: 15%; left: 5%; }
+        .ic-2 { top: 15%; right: 5%; }
+        .ic-3 { bottom: 15%; left: 5%; }
+        .ic-4 { bottom: 15%; right: 5%; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes shine {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(100%); }
+        }
+
+        .glow-check {
+            color: #00ffcc;
+            font-size: 1.2em;
+            text-shadow: 0 0 10px #00ffcc;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="icon ic-1">🎙️</div>
+        <div class="icon ic-2">📅</div>
+        <div class="icon ic-3">🧠</div>
+        <div class="icon ic-4">☁️</div>
+
+        <header>
+            <h1>PROJEKT ABSCHLUSS: MEETING AUTOMATION</h1>
+        </header>
+
+        <div class="chart-container efficiency-card">
+            <h3>Meeting-Effizienz</h3>
+            <div class="bar-group">
+                <div class="bar-label"><span>Vorher</span><span>40%</span></div>
+                <div class="bar-bg">
+                    <div class="bar-fill" id="bar1"></div>
+                </div>
+            </div>
+            <div class="bar-group">
+                <div class="bar-label"><span>Nachher</span><span>92%</span></div>
+                <div class="bar-bg">
+                    <div class="bar-fill" id="bar2"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="pie-chart"></div>
+            <div class="pie-legend">
+                <div class="legend-item"><span class="dot" style="background:#4facfe"></span> KI-Transkription (45%)</div>
+                <div class="legend-item"><span class="dot" style="background:#00f2fe"></span> Spracherkennung (30%)</div>
+                <div class="legend-item"><span class="dot" style="background:#0a3a5f"></span> Auto-Zusammenfassung (25%)</div>
+            </div>
+        </div>
+
+        <footer>
+            <div class="progress-box">
+                <h4>SYSTEM-INTEGRATION: 100% <span class="glow-check">✔</span></h4>
+                <div class="main-progress">
+                    <div class="main-progress-fill"></div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        setTimeout(() => {
+            document.getElementById('bar1').style.width = '40%';
+            document.getElementById('bar2').style.width = '92%';
+        }, 500);
+    </script>
+</body>
+</html>

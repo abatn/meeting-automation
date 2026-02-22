@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = "meeting-recordings"
     
     # AI Services
-    WHISPER_API_URL: str = "http://localhost:8001"
-    MISTRAL_API_URL: str = "http://localhost:8002"
+    OPENAI_API_KEY: str = ""
+    MISTRAL_API_KEY: str = ""
     
     # Email
     SMTP_HOST: str = "smtp.sendgrid.net"

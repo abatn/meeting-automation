@@ -9,6 +9,7 @@ class Recording(Base):
     id = Column(String, primary_key=True, index=True)
     meeting_id = Column(String, ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False)
     file_path = Column(String, nullable=False)
+    status = Column(String, default="uploaded")  # uploaded, transcribing, analyzing, completed, failed
     file_size = Column(Integer)  # in bytes
     duration = Column(Float)     # in seconds
     format = Column(String)      # e.g., "wav", "mp3"

@@ -1,16 +1,12 @@
 import pytest
 from httpx import AsyncClient
 
-pytestmark = pytest.mark.asyncio
-
-async def test_create_action(client: AsyncClient):
-    # TODO: Implement test for creating an action
-    pass
-
+@pytest.mark.asyncio
 async def test_get_actions(client: AsyncClient):
-    # TODO: Implement test for getting actions
-    pass
+    response = await client.get("/api/v1/actions/")
+    assert response.status_code == 200
 
+@pytest.mark.asyncio
 async def test_update_action_status(client: AsyncClient):
-    # TODO: Implement test for updating an action's status
-    pass
+    response = await client.patch("/api/v1/actions/1", json={"status": "completed"})
+    assert response.status_code in [200, 404]

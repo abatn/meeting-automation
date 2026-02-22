@@ -66,6 +66,8 @@ services:
       - DB_POSTGRESDB_USER=meeting_user
       - DB_POSTGRESDB_PASSWORD=meeting_password
       - GENERIC_TIMEZONE=Africa/Tunis
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-secret_key}
       - N8N_USER_FOLDER=/home/node/.n8n
       - N8N_METRICS=true
@@ -87,8 +89,8 @@ services:
       - REDIS_URL=redis://default:redis_password@redis:6379/0
       - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
       - S3_ENDPOINT=http://minio:9000
-      - WHISPER_API_URL=http://whisper:8001
-      - MISTRAL_API_URL=http://mistral:8002
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook
     ports:
       - "8000:8000"

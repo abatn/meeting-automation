@@ -1,6 +1,7 @@
 import httpx
 import logging
 import boto3
+import uuid
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import UploadFile
@@ -20,9 +21,9 @@ class RecordingService:
             aws_secret_access_key=settings.S3_SECRET_KEY
         )
 
-    async def upload_recording(self, meeting_id: int, file: UploadFile) -> Recording:
+    async def upload_recording(self, meeting_id: str, file: UploadFile) -> Recording:
         """Audio zu Minio/S3 hochladen"""
-        file_key = f"meetings/{meeting_id}/{file.filename}"
+        file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_{file.filename}"
         
         # S3 Upload
         try:
@@ -38,9 +39,11 @@ class RecordingService:
 
         # Save to DB
         db_recording = Recording(
+            id=str(uuid.uuid4()),
             meeting_id=meeting_id,
             file_path=file_key,
-            status="uploaded"
+            status="uploaded",
+            format=file.content_type
         )
         self.db.add(db_recording)
         await self.db.commit()
@@ -48,6 +51,10 @@ class RecordingService:
 
         # Trigger n8n Webhook
         await self.after_upload(db_recording)
+
+        # Trigger Celery Pipeline
+        from app.tasks.transcription_tasks import process_recording
+        process_recording.delay(db_recording.id)
         
         return db_recording
 

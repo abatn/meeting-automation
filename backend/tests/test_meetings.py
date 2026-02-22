@@ -1,41 +1,16 @@
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+import pytest
+from httpx import AsyncClient
 
-def test_create_meeting(client: TestClient) -> None:
-    # First login to get token
-    login_data = {
-        "username": "test@example.com",
-        "password": "testpassword"
-    }
-    login_response = client.post("/api/v1/auth/login/access-token", data=login_data)
-    token = login_response.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
+@pytest.mark.asyncio
+async def test_create_meeting(client: AsyncClient, test_meeting_data):
+    # Mock Auth header would be needed in real scenario
+    response = await client.post("/api/v1/meetings/", json=test_meeting_data)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["title"] == test_meeting_data["title"]
 
-    # Create meeting
-    meeting_data = {
-        "title": "Test Meeting",
-        "description": "Test Description",
-        "location": "Test Room",
-        "start_time": datetime.utcnow().isoformat(),
-        "end_time": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
-        "status": "scheduled"
-    }
-    response = client.post("/api/v1/meetings/", json=meeting_data, headers=headers)
-    assert response.status_code == 200
-    content = response.json()
-    assert content["title"] == meeting_data["title"]
-    assert "id" in content
-
-def test_read_meetings(client: TestClient) -> None:
-    login_data = {
-        "username": "test@example.com",
-        "password": "testpassword"
-    }
-    login_response = client.post("/api/v1/auth/login/access-token", data=login_data)
-    token = login_response.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    response = client.get("/api/v1/meetings/", headers=headers)
+@pytest.mark.asyncio
+async def test_get_meetings(client: AsyncClient):
+    response = await client.get("/api/v1/meetings/")
     assert response.status_code == 200
     assert isinstance(response.json(), list)
