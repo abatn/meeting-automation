@@ -27,3 +27,6 @@ Ermöglicht dem n8n Workflow "Daily Reminders", fällige Aktionen automatisiert 
 
 📊 ERGEBNIS
 Der Endpunkt `/api/v1/actions/pending` ist nun öffentlich (oder für das interne Docker-Netzwerk) zugänglich. Für eine Produktionsumgebung wird empfohlen, diesen Zugriff über IP-Whitelisting oder einen statischen API-Key abzusichern.
+
+**Update n8n Workflows:**
+- Die Datei `n8n/workflows/daily-reminders.json` wurde aktualisiert: Die Authentifizierung im Node "Get Pending Actions" wurde auf `none` gesetzt, da das Backend nun keinen Token mehr für diesen Pfad benötigt.
