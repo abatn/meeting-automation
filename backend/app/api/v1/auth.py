@@ -102,3 +102,27 @@ async def read_user_me(
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     return current_user
+
+@router.post("/logout")
+async def logout(current_user: UserModel = Depends(deps.get_current_user)) -> Any:
+    """
+    Logout user. In a stateless JWT setup, the client discards the token.
+    For enhanced security, a token blacklist could be implemented here.
+    """
+    return {"msg": "Successfully logged out"}
+
+@router.post("/refresh", response_model=Token)
+async def refresh_token(current_user: UserModel = Depends(deps.get_current_user)) -> Any:
+    """
+    Refresh JWT token.
+    """
+    from app.core import security
+    from app.core.config import settings
+    from datetime import timedelta
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    return {
+        "access_token": security.create_access_token(
+            {"sub": str(current_user.id)}, expires_delta=access_token_expires
+        ),
+        "token_type": "bearer",
+    }

@@ -1,6 +1,8 @@
 from sqlalchemy import Column, String, ForeignKey, DateTime, Text, Float, Integer
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import JSON
 from app.core.database import Base
 
 class Transcription(Base):
@@ -15,13 +17,15 @@ class Transcription(Base):
     
     status = Column(String, default="pending") # pending, processing, completed, failed
     
+    # Store diarization segments as JSON
+    segments = Column(JSON, nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     meeting = relationship("Meeting", back_populates="transcriptions")
     recording = relationship("Recording", back_populates="transcriptions")
-    segments = relationship("Segment", back_populates="transcription", cascade="all, delete-orphan")
 
 class Segment(Base):
     __tablename__ = "transcription_segments"
@@ -38,7 +42,6 @@ class Segment(Base):
     # Metadata for code-switching (AR/FR/EN)
     language_code = Column(String)
 
-    transcription = relationship("Transcription", back_populates="segments")
     speaker = relationship("Speaker", back_populates="segments")
 
 class Speaker(Base):

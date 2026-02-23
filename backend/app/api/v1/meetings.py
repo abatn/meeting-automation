@@ -86,3 +86,21 @@ def update_meeting(
     db.commit()
     db.refresh(meeting)
     return meeting
+
+@router.delete("/{id}")
+def delete_meeting(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: str,
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Delete a meeting.
+    """
+    meeting = db.query(MeetingModel).filter(MeetingModel.id == id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    db.delete(meeting)
+    db.commit()
+    return {"status": "success", "message": "Meeting deleted successfully"}

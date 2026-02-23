@@ -20,6 +20,7 @@ import {
   Save as SaveIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import PDFDownloadButton from './PDFDownloadButton';
 
 const PVValidator: React.FC = () => {
   const { t } = useTranslation();
@@ -50,7 +51,7 @@ DG: On a le budget pour trois nouveaux profils backend.
         <Typography variant="h5">{t('pv.validator_title', 'PV Validation Workflow')}</Typography>
         <Stack direction="row" spacing={2}>
           <Button variant="outlined" startIcon={<HistoryIcon />}>{t('pv.versions', 'Versions')}</Button>
-          <Button variant="outlined" startIcon={<PdfIcon />}>{t('pv.preview', 'PDF Preview')}</Button>
+          <PDFDownloadButton pvId={1} variant="outlined" />
           <Button variant="contained" color="success" startIcon={<ApproveIcon />}>{t('pv.approve', 'Approve & Sign')}</Button>
         </Stack>
       </Box>

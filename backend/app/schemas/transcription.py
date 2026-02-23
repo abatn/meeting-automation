@@ -42,7 +42,7 @@ class Transcription(TranscriptionBase):
     id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
-    segments: List[Segment] = []
+    segments: Optional[List[dict]] = None
 
     class Config:
         from_attributes = True

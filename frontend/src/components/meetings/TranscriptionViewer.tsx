@@ -7,9 +7,11 @@ import {
   IconButton, 
   Tooltip,
   Divider,
-  Chip
+  Chip,
+  TextField,
+  Avatar
 } from '@mui/material';
-import { Refresh as RefreshIcon, Download as DownloadIcon } from '@mui/icons-material';
+import { Refresh as RefreshIcon, Download as DownloadIcon, Edit as EditIcon, Check as CheckIcon } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { meetingsApi } from '../../services/meetings';
 
@@ -17,11 +19,32 @@ interface TranscriptionViewerProps {
   meetingId: string;
 }
 
+const COLORS = ['#1976d2', '#388e3c', '#d32f2f', '#f57c00', '#7b1fa2', '#00796b'];
+
+const getSpeakerColor = (speaker: string) => {
+  let hash = 0;
+  for (let i = 0; i < speaker.length; i++) {
+    hash = speaker.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return COLORS[Math.abs(hash) % COLORS.length];
+};
+
+const formatTimestamp = (seconds: number) => {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+};
+
 const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) => {
   const { t } = useTranslation();
   const [transcription, setTranscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Local speaker mapping
+  const [speakerMapping, setSpeakerMapping] = useState<Record<string, string>>({});
+  const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
 
   const fetchTranscription = useCallback(async () => {
     try {
@@ -51,6 +74,14 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
     };
   }, [fetchTranscription, transcription?.status]);
 
+  const handleSpeakerRename = (originalSpeaker: string) => {
+    if (editValue.trim() !== '') {
+      setSpeakerMapping(prev => ({ ...prev, [originalSpeaker]: editValue.trim() }));
+    }
+    setEditingSpeaker(null);
+    setEditValue('');
+  };
+
   if (loading && !transcription) {
     return (
       <Box display="flex" justifyContent="center" p={4}>
@@ -76,6 +107,8 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
       </Paper>
     );
   }
+
+  const hasSegments = transcription.segments && Array.isArray(transcription.segments) && transcription.segments.length > 0;
 
   return (
     <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -115,26 +148,67 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
           </Box>
         )}
         
-        {transcription.content ? (
+        {hasSegments ? (
+          transcription.segments.map((segment: any, index: number) => {
+            const originalSpeaker = segment.speaker || 'Unknown Speaker';
+            const displaySpeaker = speakerMapping[originalSpeaker] || originalSpeaker;
+            const speakerColor = getSpeakerColor(originalSpeaker);
+            const isEditing = editingSpeaker === originalSpeaker;
+
+            return (
+              <Box key={index} mb={3} display="flex" gap={2}>
+                <Avatar sx={{ bgcolor: speakerColor, width: 40, height: 40, fontSize: '1rem' }}>
+                  {displaySpeaker.substring(0, 2).toUpperCase()}
+                </Avatar>
+                <Box flexGrow={1}>
+                  <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                    {isEditing ? (
+                      <Box display="flex" alignItems="center">
+                        <TextField 
+                          size="small" 
+                          variant="standard" 
+                          autoFocus
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSpeakerRename(originalSpeaker)}
+                        />
+                        <IconButton size="small" onClick={() => handleSpeakerRename(originalSpeaker)}>
+                          <CheckIcon fontSize="small" color="success" />
+                        </IconButton>
+                      </Box>
+                    ) : (
+                      <Typography 
+                        variant="subtitle2" 
+                        sx={{ color: speakerColor, fontWeight: 'bold', cursor: 'pointer' }}
+                        onClick={() => {
+                          setEditingSpeaker(originalSpeaker);
+                          setEditValue(displaySpeaker);
+                        }}
+                      >
+                        {displaySpeaker}
+                      </Typography>
+                    )}
+                    <Typography variant="caption" color="textSecondary">
+                      {formatTimestamp(segment.start)} - {formatTimestamp(segment.end)}
+                    </Typography>
+                  </Box>
+                  <Typography variant="body1" sx={{ bgcolor: 'action.hover', p: 1.5, borderRadius: 2 }}>
+                    {segment.text}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })
+        ) : transcription.full_text || transcription.content ? (
           <Box>
             <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-              {transcription.content}
+              {transcription.full_text || transcription.content}
             </Typography>
           </Box>
         ) : (
-          transcription.segments?.map((segment: any, index: number) => (
-            <Box key={index} mb={2}>
-              <Box display="flex" justifyContent="space-between" mb={0.5}>
-                <Typography variant="subtitle2" color="primary">
-                  {segment.speaker || 'Unknown Speaker'}
-                </Typography>
-                <Typography variant="caption" color="textSecondary">
-                  {segment.timestamp}
-                </Typography>
-              </Box>
-              <Typography variant="body1">{segment.text}</Typography>
-            </Box>
-          ))
+          <Typography variant="body2" color="textSecondary">
+            No text available.
+          </Typography>
         )}
       </Box>
     </Paper>

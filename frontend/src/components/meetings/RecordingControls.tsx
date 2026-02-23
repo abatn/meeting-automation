@@ -18,6 +18,7 @@ import {
   GraphicEq as WaveIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import TranscriptionProgress from './TranscriptionProgress';
 
 const RecordingControls: React.FC = () => {
   const { t } = useTranslation();
@@ -25,6 +26,7 @@ const RecordingControls: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
 
   useEffect(() => {
     let interval: any;
@@ -55,6 +57,8 @@ const RecordingControls: React.FC = () => {
       setUploadProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
+          // Set a mock recordingId to start WebSocket connection
+          setRecordingId("mock-rec-1234");
           return 100;
         }
         return prev + 20;
@@ -113,16 +117,22 @@ const RecordingControls: React.FC = () => {
         </Stack>
       </Box>
 
-      {uploadProgress > 0 && (
+      {uploadProgress > 0 && uploadProgress < 100 && (
         <Box sx={{ mt: 3 }}>
           <Typography variant="body2" color="textSecondary" gutterBottom>
-            {uploadProgress === 100 ? t('meetings.upload_complete', 'Upload Complete!') : t('meetings.uploading', 'Uploading Audio to Secure S3...')}
+            {t('meetings.uploading', 'Uploading Audio to Secure S3...')}
           </Typography>
           <LinearProgress variant="determinate" value={uploadProgress} sx={{ height: 10, borderRadius: 5 }} />
-          {uploadProgress === 100 && (
-            <Alert severity="success" sx={{ mt: 2 }}>
-              {t('meetings.transcription_started', 'Transcription service triggered successfully.')}
-            </Alert>
+        </Box>
+      )}
+
+      {uploadProgress === 100 && (
+        <Box sx={{ mt: 3 }}>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            {t('meetings.transcription_started', 'Transcription service triggered successfully.')}
+          </Alert>
+          {recordingId && (
+            <TranscriptionProgress recordingId={recordingId} />
           )}
         </Box>
       )}

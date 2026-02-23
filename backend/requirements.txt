@@ -30,4 +30,4 @@ email-validator>=2.0.0
 langdetect==1.0.9
 transformers==4.37.1
 torch==2.1.2
-pyannote.audio==3.1.1
+pyannote.audio==3.1.1pyannote.audio==3.1.1

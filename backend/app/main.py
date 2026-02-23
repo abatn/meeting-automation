@@ -7,7 +7,9 @@ import logging
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.middleware.audit_middleware import AuditMiddleware
-from app.api.v1 import auth, meetings, recordings, transcriptions, pv, actions, reports, webhooks
+from app.api.v1 import auth, meetings, recordings, transcriptions, pv, actions, reports, webhooks, websockets
+from app.core.websocket import manager
+import asyncio
 
 # Configure logging
 logging.basicConfig(
@@ -20,6 +22,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Meeting Automation System...")
+    
+    # Start Redis WebSocket Listener task
+    asyncio.create_task(manager.listen_to_redis())
+    
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database initialized")
@@ -71,6 +77,7 @@ app.include_router(pv.router, prefix="/api/v1/pv", tags=["Procès-Verbaux"])
 app.include_router(actions.router, prefix="/api/v1/actions", tags=["Actions"])
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 app.include_router(webhooks.router, prefix="/api/v1/webhooks", tags=["Webhooks"])
+app.include_router(websockets.router, prefix="/api/v1/websockets", tags=["WebSockets"])
 
 if __name__ == "__main__":
     import uvicorn

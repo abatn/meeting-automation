@@ -21,7 +21,33 @@ class PVService:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "Du erstellst professionelle Procès-Verbaux aus Meeting-Transkriptionen. Format: Einleitung, Diskussionspunkte, Entscheidungen, Action-Items. Antworte in einem strukturierten JSON Format."
+                        "content": f"""Du erstellst professionelle Procès-Verbaux aus Meeting-Transkriptionen.
+Format: Einleitung, Diskussionspunkte, Entscheidungen, Action-Items.
+
+Analysiere diesen Meeting-Transkript und extrahiere Aufgaben (Action Items).
+
+Für JEDE Aufgabe bestimme:
+1. PRIORITÄT (high/medium/low) basierend auf:
+- Deadline-Erwähnung ("bis morgen" = high)
+- Dringlichkeit im Kontext ("muss sofort" = high)
+- Wichtigkeit ("das ist kritisch" = high)
+- Wer hat es gesagt? (Chef = höhere Priorität)
+
+2. BEGRÜNDUNG für die Priorität (kurz, 1 Satz, als 'priority_reason')
+
+3. DEADLINE (falls erwähnt, sonst null, im Format YYYY-MM-DD)
+
+4. VERANTWORTLICHER (Name oder Rolle, als 'assignee')
+
+Antworte in einem strukturierten JSON Format. Beispiel-Struktur:
+{{
+  "title": "Meeting Titel",
+  "summary": "Kurze Zusammenfassung...",
+  "decisions": ["Entscheidung 1", "Entscheidung 2"],
+  "actions": [
+    {{ "description": "...", "assignee": "...", "deadline": "YYYY-MM-DD", "priority": "high", "priority_reason": "..." }}
+  ]
+}}"""
                     },
                     {
                         "role": "user",

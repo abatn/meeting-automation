@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>محضر اجتماع - {{ pv.title }}</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&family=Amiri:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Cairo', sans-serif;
+            margin: 40px;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        h1, h2, h3 {
+            color: #1a237e;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #1a237e;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            max-width: 150px;
+            margin-bottom: 10px;
+        }
+        
+        .meta-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            background-color: #e8eaf6;
+            padding: 10px;
+            border-right: 5px solid #1a237e;
+            margin-bottom: 15px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: right;
+        }
+        
+        th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .page-number:before {
+            content: "صفحة " counter(page);
+        }
+        
+        @page {
+            size: A4;
+            margin: 2cm;
+            @bottom-center {
+                content: "محضر اجتماع تم إنشاؤه آلياً | Meeting Automation System";
+                font-family: 'Cairo', sans-serif;
+                font-size: 10px;
+                color: #888;
+            }
+            @bottom-left {
+                content: counter(page);
+                font-family: 'Cairo', sans-serif;
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>محضر اجتماع</h1>
+        <h2>{{ pv.title }}</h2>
+    </div>
+    
+    <div class="meta-info">
+        <div>
+            <strong>التاريخ:</strong> {{ pv.date }}
+        </div>
+        <div>
+            <strong>المكان/الرابط:</strong> {{ pv.location }}
+        </div>
+        <div>
+            <strong>المدة:</strong> {{ pv.duration }} دقيقة
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3 class="section-title">المشاركون</h3>
+        <ul>
+            {% for participant in pv.participants %}
+            <li>{{ participant }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h3 class="section-title">جدول الأعمال (Agenda)</h3>
+        <p>{{ pv.agenda }}</p>
+    </div>
+    
+    <div class="section">
+        <h3 class="section-title">ملخص المناقشة</h3>
+        <div style="font-family: 'Amiri', serif;">
+            {{ pv.discussion | safe }}
+        </div>
+    </div>
+    
+    <div class="section">
+        <h3 class="section-title">القرارات المتخذة</h3>
+        <ul>
+            {% for decision in pv.decisions %}
+            <li>{{ decision }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h3 class="section-title">المهام (Action Items)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>المهمة</th>
+                    <th>المسؤول</th>
+                    <th>تاريخ التسليم</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for action in pv.actions %}
+                <tr>
+                    <td>{{ action.description }}</td>
+                    <td>{{ action.assignee }}</td>
+                    <td>{{ action.due_date }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top: 50px; text-align: left; padding-left: 50px;">
+        <p><strong>الاعتماد (التوقيع الإلكتروني):</strong></p>
+        <p>___________________________</p>
+        <p>المدير العام (DG)</p>
+    </div>
+</body>
+</html>

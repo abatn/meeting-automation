@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from . import auth, meetings, recordings, transcriptions, pv, actions, reports
+from . import auth, meetings, recordings, transcriptions, pv, actions, reports, websockets
 
 router = APIRouter()
 router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
@@ -10,3 +10,4 @@ router.include_router(transcriptions.router, prefix="/transcriptions", tags=["Tr
 router.include_router(pv.router, prefix="/pv", tags=["Procès-Verbaux"])
 router.include_router(actions.router, prefix="/actions", tags=["Actions"])
 router.include_router(reports.router, prefix="/reports", tags=["Reports"])
+router.include_router(websockets.router, prefix="/websockets", tags=["WebSockets"])
