@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # AI Services
     OPENAI_API_KEY: str = ""
     MISTRAL_API_KEY: str = ""
+    HUGGINGFACE_TOKEN: str = ""
     
     # Email
     SMTP_HOST: str = "smtp.sendgrid.net"
@@ -61,5 +62,6 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 settings = Settings()
