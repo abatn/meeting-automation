@@ -10,7 +10,7 @@ The system uses n8n to orchestrate complex business logic, AI processing pipelin
 - **Trigger**: Webhook from Backend when a new meeting is scheduled.
 - **Actions**:
     - Generates a calendar invite.
-    - Sends an email notification to all participants via SendGrid.
+    - Sends an email notification to all participants via SMTP.
 - **Webhook Path**: `meeting-created`
 
 ### 2. Audio Uploaded (`audio-uploaded.json`)
@@ -32,7 +32,7 @@ The system uses n8n to orchestrate complex business logic, AI processing pipelin
 - **Actions**:
     - Fetches pending actions from the Backend.
     - Sends WhatsApp reminders for items due today.
-    - Escalates overdue items to the manager via email.
+    - Escalates overdue items to the manager via email (SMTP).
 
 ## Setup Instructions
 
@@ -42,7 +42,10 @@ The system uses n8n to orchestrate complex business logic, AI processing pipelin
    - `N8N_BASIC_AUTH_PASSWORD`
    - `WHATSAPP_PHONE_ID`
    - `WHATSAPP_TOKEN`
-   - `SENDGRID_API_KEY`
+   - `SMTP_USER`
+   - `SMTP_PASSWORD`
+   - `SMTP_HOST`
+   - `SMTP_PORT`
 
 2. **Importing Workflows**:
    Workflows are located in `/n8n/workflows`. They can be manually imported into the n8n UI or are automatically loaded if the `EXTERNAL_HOOK_FILES` environment variable is correctly configured in Docker.
@@ -50,5 +53,5 @@ The system uses n8n to orchestrate complex business logic, AI processing pipelin
 3. **Credentials**:
    You must configure the following credentials in the n8n UI:
    - **WhatsApp Token**: Header Auth (`Authorization: Bearer <token>`)
-   - **SendGrid**: API Key
+   - **SMTP**: SMTP credentials
    - **Backend API Key**: Header Auth for internal requests.
