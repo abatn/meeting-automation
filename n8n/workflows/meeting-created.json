@@ -46,24 +46,15 @@
       },
       "name": "Send Invitations",
       "type": "n8n-nodes-base.emailSend",
-<<<<<<< HEAD
-      "typeVersion": 2.1,
-=======
       "typeVersion": 2,
->>>>>>> 4ad8bc5 (refactor(n8n): replace SendGrid with standard SMTP node in workflows)
       "position": [
         550,
         300
       ],
       "credentials": {
         "smtp": {
-<<<<<<< HEAD
-          "id": "5",
-          "name": "SMTP Credentials"
-=======
           "id": "2",
           "name": "SMTP Account"
->>>>>>> 4ad8bc5 (refactor(n8n): replace SendGrid with standard SMTP node in workflows)
         }
       }
     }

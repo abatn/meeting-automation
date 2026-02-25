@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.tasks.celery_app import celery_app
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.database import AsyncSessionLocal
 from app.models.recording import Recording
 from app.models.transcription import Transcription
 from app.models.action import Action
@@ -23,7 +23,7 @@ import boto3
 
 logger = logging.getLogger(__name__)
 
-redis_client = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+redis_client = redis.Redis.from_url(settings.REDIS_URL)
 
 def publish_status(recording_id: str, status: str, progress: int, message: str = ""):
     """Hilfsfunktion, um Status-Updates an Redis zu senden (für WebSockets)"""
@@ -91,7 +91,7 @@ def match_timestamps(words: List[Dict[str, Any]], segments: List[Dict[str, Any]]
 async def _process_recording_pipeline(recording_id: str):
     publish_status(recording_id, "uploaded", 0, "Audio hochgeladen, starte Verarbeitung...")
     
-    async with SessionLocal() as db:
+    async with AsyncSessionLocal() as db:
         result = await db.execute(select(Recording).where(Recording.id == recording_id))
         recording = result.scalar_one_or_none()
         

@@ -11,7 +11,7 @@ from fastapi import HTTPException
 try:
     from weasyprint import HTML, CSS
     WEASYPRINT_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError):
     logging.warning("WeasyPrint is not installed or missing system dependencies. PDF generation will mock if called.")
     WEASYPRINT_AVAILABLE = False
 
@@ -71,8 +71,8 @@ class PDFService:
             "location": "قاعة الاجتماعات الرئيسية / Microsoft Teams",
             "duration": "45",
             "participants": ["أحمد بن علي (المدير العام)", "سارة محمد (مديرة المشروع)", "يوسف عبد الله (مطور)"],
-            "agenda": "1. مراجعة ميزانية الربع الأول
-2. خطة التوظيف",
+            "agenda": """1. مراجعة ميزانية الربع الأول
+2. خطة التوظيف""",
             "discussion": "<p>تمت مناقشة الميزانية وتمت الموافقة على زيادة ميزانية التدريب بنسبة 15%.</p>",
             "decisions": ["الموافقة على ميزانية التدريب", "البدء في تعيين 3 مطورين جدد"],
             "actions": [
@@ -93,7 +93,7 @@ class PDFService:
         if not WEASYPRINT_AVAILABLE:
             # Erstelle ein Dummy-PDF, falls WeasyPrint nicht verfügbar ist
             with open(filepath, "wb") as f:
-                f.write(b"%PDF-1.4
+                f.write(b"""%PDF-1.4
 1 0 obj
 <<
 /Type /Catalog
@@ -154,7 +154,7 @@ trailer
 >>
 startxref
 402
-%%EOF")
+%%EOF""")
             return filepath
             
         try:

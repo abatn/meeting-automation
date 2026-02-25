@@ -2,7 +2,7 @@ import pytest
 from app.tasks.transcription_tasks import _process_recording_pipeline
 from app.models.recording import Recording
 from sqlalchemy import select
-from app.core.database import SessionLocal
+from app.core.database import AsyncSessionLocal
 from unittest.mock import patch, AsyncMock
 import uuid
 
@@ -21,7 +21,7 @@ async def test_fallback_when_diarization_fails(mock_diarize, mock_boto3):
     rec_id = str(uuid.uuid4())
     meet_id = str(uuid.uuid4())
     
-    async with SessionLocal() as db:
+    async with AsyncSessionLocal() as db:
         # Create mock meeting & recording
         # This requires actual DB connection in tests.
         # Here we just verify the logic mock behaves as expected.

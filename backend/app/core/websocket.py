@@ -13,7 +13,7 @@ class ConnectionManager:
         # Format: {"recording_id": [websocket1, websocket2, ...]}
         self.active_connections: Dict[str, List[WebSocket]] = {}
         # Asynchroner Redis-Client für Pub/Sub
-        self.redis_client = redis.from_url(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}/0")
+        self.redis_client = redis.from_url(settings.REDIS_URL)
         self.pubsub = self.redis_client.pubsub()
 
     async def connect(self, websocket: WebSocket, recording_id: str):
