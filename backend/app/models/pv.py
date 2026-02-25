@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, ForeignKey, DateTime, Text, Integer, Bool
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
+from app.utils.db_encryption import EncryptedText
 
 class PV(Base):
     __tablename__ = "pvs"
@@ -10,7 +11,7 @@ class PV(Base):
     meeting_id = Column(String, ForeignKey("meetings.id", ondelete="CASCADE"), unique=True, nullable=False)
     
     title = Column(String, nullable=False)
-    content_html = Column(Text)
+    content_html = Column(EncryptedText)
     status = Column(String, default="draft") # draft, pending_review, validated, published
     
     is_validated = Column(Boolean, default=False)
@@ -32,7 +33,7 @@ class Section(Base):
     pv_id = Column(String, ForeignKey("pvs.id", ondelete="CASCADE"), nullable=False)
     
     title = Column(String, nullable=False)
-    content = Column(Text)
+    content = Column(EncryptedText)
     order = Column(Integer, default=0)
     
     # Metadata
