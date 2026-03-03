@@ -26,18 +26,18 @@ jobs:
         
     - name: Build and push backend
       env:
-        DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+        DOCKER_USER: ${{ secrets.Batnini }}
       if: env.DOCKER_USER != ''
       uses: docker/build-push-action@v5
       with:
         context: ./backend
         file: ./backend/Dockerfile
         push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/meeting-automation-backend:latest
+        tags: ${{ secrets.Batnini }}/meeting-automation-backend:latest
 
     - name: Build and push frontend
       env:
-        DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+        DOCKER_USER: ${{ secrets.Batnini }}
       if: env.DOCKER_USER != ''
       uses: docker/build-push-action@v5
       with:
