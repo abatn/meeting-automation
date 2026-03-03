@@ -62,6 +62,20 @@ This is the recommended setup for development and testing.
     ```
     - `-v`: Removes named volumes declared in the `volumes` section of the Compose file and anonymous volumes attached to containers. This will clear database data, Redis data, etc.
 
+### 1.1. Resource Management (Feb 2026 Update)
+
+To ensure stability during development and production, the following resource limits are enforced via Docker Compose:
+
+| Service | CPU Limit | Memory Limit |
+| :--- | :--- | :--- |
+| `celery-worker` | 1.0 | 2.0 GB |
+| `backend` | 0.5 | 1.0 GB |
+| `n8n` | 0.5 | 1.0 GB |
+| `postgres` / `redis` / `rabbitmq` | 0.5 | 512 MB |
+| `frontend` | 0.5 | 512 MB |
+
+These limits prevent a single container from exhausting host resources, which previously led to system freezes.
+
 ## 2. Production Deployment (Kubernetes / Terraform)
 
 For production environments, the system is designed to be deployed on a cloud provider (e.g., AWS, GCP, Azure) using Kubernetes for orchestration and Terraform for infrastructure as code.

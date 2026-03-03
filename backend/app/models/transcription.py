@@ -4,6 +4,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import JSON
 from app.core.database import Base
+from app.utils.db_encryption import EncryptedText
 
 class Transcription(Base):
     __tablename__ = "transcriptions"
@@ -12,7 +13,7 @@ class Transcription(Base):
     meeting_id = Column(String, ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False)
     recording_id = Column(String, ForeignKey("recordings.id", ondelete="CASCADE"), nullable=False)
     
-    full_text = Column(Text)
+    full_text = Column(EncryptedText)
     language = Column(String) # Detected language
     
     status = Column(String, default="pending") # pending, processing, completed, failed
@@ -34,7 +35,7 @@ class Segment(Base):
     transcription_id = Column(String, ForeignKey("transcriptions.id", ondelete="CASCADE"), nullable=False)
     
     speaker_id = Column(String, ForeignKey("speakers.id"), nullable=True)
-    text = Column(Text, nullable=False)
+    text = Column(EncryptedText, nullable=False)
     start_time = Column(Float, nullable=False)
     end_time = Column(Float, nullable=False)
     confidence = Column(Float)

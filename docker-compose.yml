@@ -16,6 +16,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      default:
+        aliases:
+          - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
   redis:
     image: redis:7-alpine
@@ -29,6 +38,11 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -40,6 +54,17 @@ services:
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
   minio:
     image: minio/minio:latest
@@ -52,59 +77,84 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
-
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+  
   n8n:
     image: n8nio/n8n:latest
+    env_file: .env
     environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD=admin_password
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=meeting_db
       - DB_POSTGRESDB_USER=meeting_user
       - DB_POSTGRESDB_PASSWORD=meeting_password
-      - GENERIC_TIMEZONE=Africa/Tunis
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-secret_key}
-      - N8N_USER_FOLDER=/home/node/.n8n
-      - N8N_METRICS=true
-      - N8N_METRICS_INCLUDE_DEFAULT_METRICS=true
     ports:
       - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./n8n/workflows:/home/node/workflows
-      - ./n8n/credentials:/home/node/.n8n/credentials
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
 
   backend:
     build: ./backend
+    env_file: .env
     environment:
       - PYTHONPATH=/app
       - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
       - REDIS_URL=redis://default:redis_password@redis:6379/0
       - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
       - S3_ENDPOINT=http://minio:9000
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
-      - N8N_WEBHOOK_URL=http://n8n:5678/webhook
+      - S3_ACCESS_KEY=minio_user
+      - S3_SECRET_KEY=minio_password
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-      - minio
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
 
   celery-worker:
     build: ./backend
-    command: celery -A app.tasks.celery_app worker --loglevel=info
+    command: >
+      bash -c "
+      echo 'Waiting 10s for RabbitMQ...' &&
+      sleep 10 &&
+      celery -A app.tasks.celery_app worker --loglevel=info
+      "
+    env_file: .env
     environment:
       - PYTHONPATH=/app
       - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
@@ -113,13 +163,22 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
 
   celery-beat:
     build: ./backend
     command: celery -A app.tasks.celery_app beat --loglevel=info
+    env_file: .env
     environment:
       - PYTHONPATH=/app
       - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
@@ -128,16 +187,33 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: meeting-automation-frontend:v1.0.0
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
 volumes:
   postgres_data:

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -12,23 +13,32 @@ import {
   ListItemText,
   ListItemIcon,
   Chip,
-  IconButton,
   Alert,
+  Stack,
+  Select,
+  InputLabel,
+  FormControl,
+  OutlinedInput
 } from '@mui/material';
 import {
   CalendarMonth as CalendarIcon,
   EventNote as EventIcon,
   Add as AddIcon,
   Warning as WarningIcon,
-  Delete as DeleteIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useCulturalCalendar } from '../../hooks/useCulturalCalendar';
+import { meetingsApi } from '../../services/meetings';
 
 const MeetingPlanner: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { isHoliday, getHolidayName } = useCulturalCalendar();
-  const [meetingDate, setMeetingDate] = useState('2026-03-20'); // Example: Independence Day Tunisia
+  
+  const [title, setTitle] = useState('');
+  const [meetingDate, setMeetingDate] = useState('2026-03-03');
+  const [selectedParticipants, setSelectedParticipants] = useState<number[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const holidays = [
     { date: '2026-03-20', name: 'Independence Day' },
@@ -36,12 +46,44 @@ const MeetingPlanner: React.FC = () => {
   ];
 
   const participantOptions = [
-    { id: 1, name: 'Sami Ben Ali', role: 'DG' },
-    { id: 2, name: 'Amel Trabelsi', role: 'Manager' },
-    { id: 3, name: 'Mohamed Mahmoud', role: 'IT' },
+    { id: 1, name: 'Sami Ben Ali', email: 'dg@meeting.tn', role: 'DG' },
+    { id: 2, name: 'Amel Trabelsi', email: 'manager@meeting.tn', role: 'Manager' },
+    { id: 3, name: 'Mohamed Mahmoud', email: 'user@meeting.tn', role: 'Participant' },
   ];
 
   const holidayWarning = isHoliday(meetingDate) ? getHolidayName(meetingDate) : null;
+
+  const handleCreate = async () => {
+    if (!title || !!holidayWarning) return;
+    setIsSubmitting(true);
+    try {
+      const participants = selectedParticipants.map(id => {
+        const opt = participantOptions.find(p => p.id === id);
+        return { email: opt?.email || '', name: opt?.name, role: opt?.role };
+      });
+
+      const meetingData = {
+        title,
+        description: 'Scheduled via UI',
+        location: 'Virtual',
+        status: 'planned',
+        start_time: `${meetingDate}T10:00:00Z`,
+        end_time: `${meetingDate}T11:00:00Z`,
+        participants,
+        agendas: []
+      };
+
+      const newMeeting = await meetingsApi.createMeeting(meetingData);
+      // Redirect to the live meeting room
+      navigate(`/meetings/live/${newMeeting.id}`);
+    } catch (error: any) {
+      console.error('Failed to create meeting', error);
+      const errorMsg = error.response?.data?.detail || error.message || 'Unknown error';
+      alert(`Error creating meeting: ${errorMsg}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -50,7 +92,6 @@ const MeetingPlanner: React.FC = () => {
       </Typography>
 
       <Grid container spacing={3}>
-        {/* Left: Planning Form */}
         <Grid item xs={12} md={7}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
@@ -61,6 +102,8 @@ const MeetingPlanner: React.FC = () => {
                 fullWidth 
                 label={t('meetings.title', 'Meeting Title')} 
                 placeholder="e.g. Weekly Strategy"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
               />
               
               <Box>
@@ -79,19 +122,29 @@ const MeetingPlanner: React.FC = () => {
                 )}
               </Box>
 
-              <TextField select fullWidth label={t('meetings.participants', 'Add Participants')}>
-                {participantOptions.map((opt) => (
-                  <MenuItem key={opt.id} value={opt.id}>
-                    {opt.name} ({opt.role})
-                  </MenuItem>
-                ))}
-              </TextField>
+              <FormControl fullWidth>
+                <InputLabel id="participants-label">{t('meetings.participants', 'Add Participants')}</InputLabel>
+                <Select
+                  labelId="participants-label"
+                  multiple
+                  value={selectedParticipants}
+                  onChange={(e) => setSelectedParticipants(e.target.value as number[])}
+                  input={<OutlinedInput label={t('meetings.participants', 'Add Participants')} />}
+                >
+                  {participantOptions.map((opt) => (
+                    <MenuItem key={opt.id} value={opt.id}>
+                      {opt.name} ({opt.role})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
               <Button 
                 variant="contained" 
                 size="large" 
                 startIcon={<AddIcon />}
-                disabled={!!holidayWarning}
+                disabled={!!holidayWarning || !title || isSubmitting}
+                onClick={handleCreate}
               >
                 {t('meetings.create', 'Create Meeting')}
               </Button>
@@ -99,7 +152,6 @@ const MeetingPlanner: React.FC = () => {
           </Paper>
         </Grid>
 
-        {/* Right: Cultural Calendar Preview */}
         <Grid item xs={12} md={5}>
           <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
             <Typography variant="subtitle1" gutterBottom>
@@ -121,8 +173,5 @@ const MeetingPlanner: React.FC = () => {
     </Box>
   );
 };
-
-// Helper for layout
-import { Stack } from '@mui/material';
 
 export default MeetingPlanner;

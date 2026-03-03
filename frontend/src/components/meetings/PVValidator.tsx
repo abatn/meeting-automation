@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { 
   Box, 
   Grid, 
@@ -9,49 +10,80 @@ import {
   Divider,
   Stack,
   IconButton,
-  Tooltip
+  Tooltip,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import { 
   CheckCircle as ApproveIcon, 
   Edit as EditIcon, 
   History as HistoryIcon,
-  PictureAsPdf as PdfIcon,
-  Draw as SignatureIcon,
   Save as SaveIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import PDFDownloadButton from './PDFDownloadButton';
+import api from '../../services/api';
 
 const PVValidator: React.FC = () => {
+  const { id: meetingId } = useParams<{ id: string }>();
   const { t } = useTranslation();
-  const [pvContent, setPvContent] = useState(`
-# Procès-Verbal de Réunion - IT Strategy
-Date: 20/02/2026
+  const [pvContent, setPvContent] = useState('');
+  const [originalTranscript, setOriginalTranscript] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pvId, setPvId] = useState<string | null>(null);
 
-## Agenda
-1. Migration Cloud
-2. Recrutement Devs
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!meetingId) return;
+      
+      try {
+        // 1. Fetch transcription for this meeting
+        const transcriptRes = await api.get(`/transcriptions/meeting/${meetingId}`);
+        setOriginalTranscript(transcriptRes.data.full_text || transcriptRes.data.content);
 
-## Décisions
-- Migration vers Azure approuvée pour Q3.
-- Recrutement de 3 développeurs backend.
-  `);
+        // 2. Fetch PV for this meeting
+        const pvRes = await api.get(`/pv/meeting/${meetingId}`);
+        setPvContent(pvRes.data.content_html || pvRes.data.content);
+        setPvId(pvRes.data.id);
+        
+        setError(null);
+        setLoading(false);
+      } catch (err: any) {
+        console.error('Error fetching PV data:', err);
+        if (err.response?.status === 404) {
+          setError('AI is still processing your meeting. Please wait a few seconds...');
+        } else {
+          setError('Failed to load real-time AI results.');
+        }
+        // Don't stop loading if we expect data to arrive (polling)
+      }
+    };
 
-  const originalTranscript = `
-Sami: Alors, on passe au point suivant, le Cloud.
-Mohamed: Je propose Azure, c'est mieux pour notre stack actuelle.
-DG: Ok, c'est validé pour le troisième trimestre.
-Sami: Et pour les devs ?
-DG: On a le budget pour trois nouveaux profils backend.
-  `;
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
+
+    return () => clearInterval(interval);
+  }, [meetingId]);
+
+  if (loading && !pvContent) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px' }}>
+        <CircularProgress sx={{ mb: 2 }} />
+        <Typography variant="body1">AI Engine (Whisper & Mistral) is processing your recording...</Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3, height: 'calc(100vh - 100px)' }}>
+      {error && !pvContent && <Alert severity="info" sx={{ mb: 2 }}>{error}</Alert>}
+      
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Typography variant="h5">{t('pv.validator_title', 'PV Validation Workflow')}</Typography>
         <Stack direction="row" spacing={2}>
           <Button variant="outlined" startIcon={<HistoryIcon />}>{t('pv.versions', 'Versions')}</Button>
-          <PDFDownloadButton pvId={1} variant="outlined" />
+          {pvId && <PDFDownloadButton pvId={pvId} variant="outlined" />}
           <Button variant="contained" color="success" startIcon={<ApproveIcon />}>{t('pv.approve', 'Approve & Sign')}</Button>
         </Stack>
       </Box>
@@ -61,10 +93,10 @@ DG: On a le budget pour trois nouveaux profils backend.
         <Grid item xs={12} md={5} sx={{ height: '100%' }}>
           <Paper sx={{ p: 2, height: '100%', overflowY: 'auto', bgcolor: '#f8f9fa' }}>
             <Typography variant="subtitle2" gutterBottom color="textSecondary">
-              {t('pv.original_transcript', 'Original Transcription (AI)')}
+              {t('pv.original_transcript', 'Original Transcription (Whisper)')}
             </Typography>
             <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-              {originalTranscript}
+              {originalTranscript || 'No transcription available yet.'}
             </Typography>
           </Paper>
         </Grid>
@@ -74,7 +106,7 @@ DG: On a le budget pour trois nouveaux profils backend.
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography variant="subtitle2" color="primary">
-                {t('pv.ai_draft', 'AI-Generated PV Draft')}
+                {t('pv.ai_draft', 'AI-Generated PV Draft (Mistral)')}
               </Typography>
               <Tooltip title="Save Draft">
                 <IconButton size="small"><SaveIcon fontSize="small" /></IconButton>
@@ -91,6 +123,7 @@ DG: On a le budget pour trois nouveaux profils backend.
                 '& .MuiInputBase-root': { height: '100%', alignItems: 'flex-start' },
                 '& textarea': { height: '100% !important', fontFamily: 'serif', fontSize: '1.1rem' }
               }}
+              placeholder="Waiting for Mistral to generate the draft..."
             />
             <Box sx={{ mt: 2, p: 2, border: '1px dashed #ccc', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

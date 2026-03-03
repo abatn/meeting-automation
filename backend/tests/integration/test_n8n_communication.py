@@ -7,11 +7,13 @@ async def test_n8n_callback_processing(client: AsyncClient):
     # Simulieren eines Callbacks von n8n (Transkription fertig)
     payload = {
         "meeting_id": 1,
+        "recording_id": 1,
         "transcription_text": "Ceci est un test de transcription.",
         "language": "fr"
     }
     
-    response = await client.post("/api/v1/webhooks/n8n/transcription", json=payload)
+    headers = {"X-Internal-API-Key": "super-secret-automation-key-2026"}
+    response = await client.post("/api/v1/webhooks/n8n/transcription", json=payload, headers=headers)
     assert response.status_code == 200
 
 @pytest.mark.asyncio
@@ -25,15 +27,17 @@ async def test_n8n_callback_idempotency(client: AsyncClient):
     # Gleicher Callback zweimal gesendet
     payload = {
         "meeting_id": 1,
+        "recording_id": 1,
         "transcription_text": "Ceci est un test de transcription.",
         "language": "fr",
         "request_id": "unique-req-123"
     }
     
     # Erster Versuch
-    response1 = await client.post("/api/v1/webhooks/n8n/transcription", json=payload)
+    headers = {"X-Internal-API-Key": "super-secret-automation-key-2026"}
+    response1 = await client.post("/api/v1/webhooks/n8n/transcription", json=payload, headers=headers)
     assert response1.status_code == 200
     
     # Zweiter Versuch (sollte ignoriert werden oder Erfolg zurückgeben ohne Duplikate zu erzeugen)
-    response2 = await client.post("/api/v1/webhooks/n8n/transcription", json=payload)
+    response2 = await client.post("/api/v1/webhooks/n8n/transcription", json=payload, headers=headers)
     assert response2.status_code == 200

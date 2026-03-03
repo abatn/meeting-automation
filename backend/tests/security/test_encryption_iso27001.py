@@ -1,3 +1,4 @@
+from cryptography.fernet import Fernet
 import pytest
 from app.utils.encryption import encrypt_data, decrypt_data
 from app.core.config import settings
@@ -15,8 +16,8 @@ def test_sensitive_data_encryption():
 
 def test_encryption_key_rotation_readiness():
     # Testet ob das System mit verschiedenen Keys umgehen kann (Vorbereitung Key Rotation)
-    old_key = b'old_secret_key_32_chars_exactly!!'
-    new_key = b'new_secret_key_32_chars_exactly!!'
+    old_key = b"12345678901234567890123456789012"
+    new_key = b"09876543210987654321098765432109"
     
     data = "Rotating keys is important for ISO 27001"
     

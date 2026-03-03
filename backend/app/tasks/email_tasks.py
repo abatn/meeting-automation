@@ -1,14 +1,14 @@
 import httpx
 import logging
+import asyncio
 from app.tasks.celery_app import celery_app
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.database import AsyncSessionLocal
 from app.services.action_service import ActionService
 
 logger = logging.getLogger(__name__)
 
-@celery_app.task(name="send_reminder_via_n8n")
-async def send_reminder_via_n8n(payload: dict):
+async def _send_reminder_via_n8n(payload: dict):
     """Ruft n8n-Webhook auf"""
     try:
         async with httpx.AsyncClient() as client:
@@ -18,10 +18,18 @@ async def send_reminder_via_n8n(payload: dict):
     except Exception as e:
         logger.error(f"Failed to send reminder via n8n: {e}")
 
-@celery_app.task(name="daily_reminder_task")
-async def daily_reminder_task():
+@celery_app.task(name="send_reminder_via_n8n")
+def send_reminder_via_n8n(payload: dict):
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(_send_reminder_via_n8n(payload))
+
+async def _daily_reminder_task():
     """Cron-Job -> n8n 'daily-reminders' triggern"""
-    async with SessionLocal() as db:
+    async with AsyncSessionLocal() as db:
         action_service = ActionService(db)
         due_actions = await action_service.get_due_actions()
         
@@ -35,7 +43,7 @@ async def daily_reminder_task():
                     "id": a.id,
                     "title": a.title,
                     "assignee_id": a.assignee_id,
-                    "due_date": a.due_date.isoformat()
+                    "due_date": a.due_date.isoformat() if a.due_date else None
                 } for a in due_actions
             ]
         }
@@ -46,3 +54,12 @@ async def daily_reminder_task():
                 logger.info(f"Daily reminders triggered for {len(due_actions)} actions")
         except Exception as e:
             logger.error(f"Failed to trigger daily reminders: {e}")
+
+@celery_app.task(name="daily_reminder_task")
+def daily_reminder_task():
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(_daily_reminder_task())

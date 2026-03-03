@@ -1,8 +1,12 @@
 import api from './api';
 
-export const getManagerDashboard = async () => {
-  const response = await api.get('/reports/manager/dashboard');
+export const getDashboardData = async (role: string) => {
+  const response = await api.get(`/reports/dashboard/${role}`);
   return response.data;
+};
+
+export const getManagerDashboard = async () => {
+  return getDashboardData('manager');
 };
 
 export const getMeetingStats = async (period: string = 'month') => {

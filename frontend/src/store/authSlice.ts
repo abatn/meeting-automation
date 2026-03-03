@@ -1,28 +1,32 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface User {
-  id: number;
+  id: string;
   email: string;
   full_name: string;
   role: string;
 }
 
+export type AuthStateStatus = 'loading' | 'authenticated' | 'unauthenticated';
+
 interface AuthState {
   user: User | null;
   accessToken: string | null;
   refreshToken: string | null;
-  isAuthenticated: boolean;
+  authState: AuthStateStatus;
   loading: boolean;
   error: string | null;
+  isAuthenticated: boolean; // Hinzugefügt
 }
 
 const initialState: AuthState = {
   user: null,
   accessToken: localStorage.getItem('accessToken'),
   refreshToken: localStorage.getItem('refreshToken'),
-  isAuthenticated: !!localStorage.getItem('accessToken'),
+  authState: 'loading',
   loading: false,
   error: null,
+  isAuthenticated: !!localStorage.getItem('accessToken'), // Hinzugefügt: Basierend auf Token-Existenz
 };
 
 const authSlice = createSlice({
@@ -31,24 +35,34 @@ const authSlice = createSlice({
   reducers: {
     setCredentials: (
       state,
-      action: PayloadAction<{ user: User; accessToken: string; refreshToken: string }>
+      action: PayloadAction<{ user: User; access_token: string; refresh_token?: string }>
     ) => {
       state.user = action.payload.user;
-      state.accessToken = action.payload.accessToken;
-      state.refreshToken = action.payload.refreshToken;
-      state.isAuthenticated = true;
+      state.accessToken = action.payload.access_token;
+      state.refreshToken = action.payload.refresh_token || state.refreshToken; // Keep old refresh token if new one not provided
+      state.authState = 'authenticated';
       state.error = null;
-      localStorage.setItem('accessToken', action.payload.accessToken);
-      localStorage.setItem('refreshToken', action.payload.refreshToken);
+      state.isAuthenticated = true; // Hinzugefügt
+      localStorage.setItem('accessToken', action.payload.access_token);
+      if (action.payload.refresh_token) {
+        localStorage.setItem('refreshToken', action.payload.refresh_token);
+      }
+    },
+    setAuthenticatedUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload;
+      state.authState = 'authenticated';
+      state.error = null;
+      state.isAuthenticated = true; // Hinzugefügt
     },
     logout: (state) => {
       state.user = null;
       state.accessToken = null;
       state.refreshToken = null;
-      state.isAuthenticated = false;
+      state.authState = 'unauthenticated';
       state.error = null;
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      state.isAuthenticated = false; // Hinzugefügt
+      localStorage.clear();
+      sessionStorage.clear();
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.loading = action.payload;
@@ -59,5 +73,11 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, logout, setLoading, setError } = authSlice.actions;
+export const { 
+  setCredentials, 
+  setAuthenticatedUser, 
+  logout, 
+  setLoading, 
+  setError 
+} = authSlice.actions;
 export default authSlice.reducer;

@@ -5,8 +5,9 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, delete
+import uuid
 
-from app.models.meeting import Meeting
+from app.models.meeting import Meeting, Participant, Agenda
 from app.schemas.meeting import MeetingCreate, MeetingUpdate
 from app.core.config import settings
 
@@ -16,17 +17,46 @@ class MeetingService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_meeting(self, meeting_in: MeetingCreate, owner_id: int) -> Meeting:
+    async def create_meeting(self, meeting_in: MeetingCreate, owner_id: str) -> Meeting:
         """Meeting anlegen + n8n-Webhook triggern"""
         db_meeting = Meeting(
-            **meeting_in.model_dump(exclude={"participants"}),
-            owner_id=owner_id,
-            status="scheduled"
+            id=str(uuid.uuid4()),
+            title=meeting_in.title,
+            description=meeting_in.description,
+            location=meeting_in.location,
+            start_time=meeting_in.start_time,
+            end_time=meeting_in.end_time,
+            status=meeting_in.status,
+            creator_id=owner_id,
+            created_at=datetime.utcnow()
         )
-        # Add participants logic here (simplified for now)
         self.db.add(db_meeting)
+        await self.db.flush()
+
+        # Add participants
+        for participant_data in meeting_in.participants:
+            participant = Participant(
+                id=str(uuid.uuid4()),
+                meeting_id=db_meeting.id,
+                email=participant_data.email,
+                name=participant_data.name,
+                role=participant_data.role
+            )
+            self.db.add(participant)
+
+        # Add agendas
+        for agenda_data in meeting_in.agendas:
+            agenda = Agenda(
+                id=str(uuid.uuid4()), # Korrektur
+                meeting_id=db_meeting.id,
+                title=agenda_data.title,
+                description=agenda_data.description,
+                order=agenda_data.order
+            )
+            self.db.add(agenda)
+
         await self.db.commit()
-        await self.db.refresh(db_meeting)
+        await self.db.refresh(db_meeting, attribute_names=["participants", "agendas"])
 
         # n8n Webhook triggern
         await self._trigger_n8n_meeting_created(db_meeting)
@@ -78,12 +108,25 @@ class MeetingService:
 
     async def _trigger_n8n_meeting_created(self, meeting: Meeting):
         """Triggert n8n Webhook: meeting-created"""
+        participants_payload = [
+            {"id": p.id, "user_id": p.user_id, "email": p.user_id}
+            for p in meeting.participants
+        ]
+
         payload = {
             "event": "meeting.created",
-            "meeting_id": meeting.id,
-            "title": meeting.title,
-            "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
-            "owner_id": meeting.owner_id
+            "meeting": {
+                "id": meeting.id,
+                "title": meeting.title,
+                "description": meeting.description,
+                "location": meeting.location,
+                "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
+                "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
+                "status": meeting.status,
+                "creator_id": meeting.creator_id,
+                "created_at": meeting.created_at.isoformat() if meeting.created_at else None,
+                "participants": participants_payload
+            }
         }
         try:
             async with httpx.AsyncClient() as client:

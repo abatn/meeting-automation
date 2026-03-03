@@ -1,4 +1,5 @@
 {
+  "id": "2",
   "name": "Meeting Created Automation",
   "nodes": [
     {
@@ -45,15 +46,15 @@
       },
       "name": "Send Invitations",
       "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
+      "typeVersion": 2,
       "position": [
         550,
         300
       ],
       "credentials": {
         "smtp": {
-          "id": "5",
-          "name": "SMTP Credentials"
+          "id": "2",
+          "name": "SMTP Account"
         }
       }
     }

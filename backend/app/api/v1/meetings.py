@@ -1,18 +1,23 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import uuid
+from datetime import datetime
 
 from app.api import deps
 from app.schemas.meeting import Meeting, MeetingCreate, MeetingUpdate
-from app.models.meeting import Meeting as MeetingModel
-from app.models.user import User as UserModel
+from app.models.meeting import Meeting as MeetingModel, Participant as ParticipantModel, Agenda as AgendaModel
+from app.models.user import User as UserModel, UserRole
+from app.services.meeting_service import MeetingService
+
+from sqlalchemy.orm import selectinload, join
 
 router = APIRouter()
 
 @router.get("/", response_model=List[Meeting])
-def read_meetings(
-    db: Session = Depends(deps.get_db),
+async def read_meetings(
+    db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 100,
     current_user: UserModel = Depends(deps.get_current_user),
@@ -20,87 +25,81 @@ def read_meetings(
     """
     Retrieve meetings.
     """
-    meetings = db.query(MeetingModel).offset(skip).limit(limit).all()
+    result = await db.execute(
+        select(MeetingModel).options(
+            selectinload(MeetingModel.participants),
+            selectinload(MeetingModel.agendas)
+        ).offset(skip).limit(limit)
+    )
+    meetings = result.scalars().all()
     return meetings
 
-@router.post("/", response_model=Meeting)
-def create_meeting(
+@router.get("/my-meetings", response_model=List[Meeting])
+async def list_my_meetings(
+    db: AsyncSession = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Retrieve a list of meetings the current user is a participant in.
+    """
+    result = await db.execute(
+        select(MeetingModel).options(
+            selectinload(MeetingModel.participants),
+            selectinload(MeetingModel.agendas)
+        )
+        .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
+        .where(ParticipantModel.user_id == current_user.id)
+        .offset(skip).limit(limit)
+    )
+    meetings = result.scalars().all()
+    return meetings
+
+@router.get("/team-meetings", response_model=List[Meeting])
+async def list_team_meetings(
+    db: AsyncSession = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Retrieve a list of meetings where users managed by the current user are participants.
+    Accessible only by managers.
+    """
+    if current_user.role != UserRole.MANAGER and current_user.role != UserRole.DG:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough privileges to access team meetings"
+        )
+
+    managed_user_ids = [report.id for report in current_user.reports]
+
+    if not managed_user_ids:
+        return [] # No reports, no team meetings
+
+    result = await db.execute(
+        select(MeetingModel).options(
+            selectinload(MeetingModel.participants),
+            selectinload(MeetingModel.agendas)
+        )
+        .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
+        .where(ParticipantModel.user_id.in_(managed_user_ids))
+        .offset(skip).limit(limit)
+    )
+    meetings = result.scalars().all()
+    return meetings
+
+@router.post("/", response_model=Meeting, status_code=status.HTTP_201_CREATED)
+async def create_meeting(
     *,
-    db: Session = Depends(deps.get_db),
+    db: AsyncSession = Depends(deps.get_db),
     meeting_in: MeetingCreate,
     current_user: UserModel = Depends(deps.get_current_user),
+    meeting_service: MeetingService = Depends(deps.get_meeting_service)
 ) -> Any:
     """
     Create new meeting.
     """
-    meeting = MeetingModel(
-        id=str(uuid.uuid4()),
-        title=meeting_in.title,
-        description=meeting_in.description,
-        location=meeting_in.location,
-        start_time=meeting_in.start_time,
-        end_time=meeting_in.end_time,
-        status=meeting_in.status,
-        creator_id=current_user.id
-    )
-    db.add(meeting)
-    db.commit()
-    db.refresh(meeting)
+    meeting = await meeting_service.create_meeting(meeting_in=meeting_in, owner_id=current_user.id)
     return meeting
-
-@router.get("/{id}", response_model=Meeting)
-def read_meeting(
-    *,
-    db: Session = Depends(deps.get_db),
-    id: str,
-    current_user: UserModel = Depends(deps.get_current_user),
-) -> Any:
-    """
-    Get meeting by ID.
-    """
-    meeting = db.query(MeetingModel).filter(MeetingModel.id == id).first()
-    if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
-    return meeting
-
-@router.put("/{id}", response_model=Meeting)
-def update_meeting(
-    *,
-    db: Session = Depends(deps.get_db),
-    id: str,
-    meeting_in: MeetingUpdate,
-    current_user: UserModel = Depends(deps.get_current_user),
-) -> Any:
-    """
-    Update a meeting.
-    """
-    meeting = db.query(MeetingModel).filter(MeetingModel.id == id).first()
-    if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
-    
-    update_data = meeting_in.dict(exclude_unset=True)
-    for field in update_data:
-        setattr(meeting, field, update_data[field])
-    
-    db.add(meeting)
-    db.commit()
-    db.refresh(meeting)
-    return meeting
-
-@router.delete("/{id}")
-def delete_meeting(
-    *,
-    db: Session = Depends(deps.get_db),
-    id: str,
-    current_user: UserModel = Depends(deps.get_current_user),
-) -> Any:
-    """
-    Delete a meeting.
-    """
-    meeting = db.query(MeetingModel).filter(MeetingModel.id == id).first()
-    if not meeting:
-        raise HTTPException(status_code=404, detail="Meeting not found")
-    
-    db.delete(meeting)
-    db.commit()
-    return {"status": "success", "message": "Meeting deleted successfully"}

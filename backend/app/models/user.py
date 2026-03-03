@@ -3,6 +3,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import enum
 from app.core.database import Base
+from sqlalchemy_utils import EncryptedType
+from app.core.config import settings
 
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
@@ -37,11 +39,15 @@ class User(Base):
     is_superuser = Column(Boolean, default=False)
     
     # MFA
-    totp_secret = Column(String, nullable=True)
+    totp_secret = Column(EncryptedType(String, settings.SECRET_KEY), nullable=True)
     is_mfa_enabled = Column(Boolean, default=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # New: Manager relationship for team structure
+    manager_id = Column(String, ForeignKey('users.id'), nullable=True)
+    reports = relationship('User', backref='manager', remote_side=[id])
 
     # Relationships
     roles = relationship("Role", secondary=user_roles, back_populates="users")

@@ -24,6 +24,15 @@
         "url": "http://backend:8000/api/v1/actions/pending",
         "method": "GET",
         "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-API-Key",
+              "value": "super-secret-automation-key-2026"
+            }
+          ]
+        },
         "options": {}
       },
       "name": "Get Pending Actions",

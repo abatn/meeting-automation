@@ -1,117 +1,144 @@
-import React from 'react';
-import { 
-  Grid, 
-  Paper, 
-  Typography, 
-  Box, 
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  Avatar,
-  Divider,
-  LinearProgress,
-  Chip
-} from '@mui/material';
-import { 
-  Group as GroupIcon, 
-  CalendarMonth, 
-  AssignmentLate, 
-  PriorityHigh,
-  WhatsApp
-} from '@mui/icons-material';
+import React, { useEffect } from 'react';
+import { Box, Typography, Paper, Grid, CircularProgress, Alert } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState, AppDispatch } from '../../store';
+import { fetchManagerDashboardData } from '../../store/dashboardSlice';
+import MeetingsPieChart from './MeetingsPieChart';
+import ActionsBarChart from './ActionsBarChart';
+import KPICard from '../common/KPICard';
+
+// Material UI Icons
+import EventIcon from '@mui/icons-material/Event';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import GroupsIcon from '@mui/icons-material/Groups';
+
+interface MeetingStats {
+  total: number;
+  completed: number;
+  scheduled: number;
+}
+
+interface ActionStats {
+  pending: number;
+  completed: number;
+}
+
+interface ManagerDashboardData {
+  meeting_stats: MeetingStats;
+  action_stats: ActionStats;
+  team_members_count: number;
+}
 
 const DashboardManager: React.FC = () => {
   const { t } = useTranslation();
+  const dispatch = useDispatch<AppDispatch>();
+  const { data, loading, error } = useSelector(
+    (state: RootState) => state.dashboard.managerDashboard
+  );
 
-  const teamActions = [
-    { name: 'Sami Ben Ali', count: 12, completed: 8, overdue: 2 },
-    { name: 'Amel Trabelsi', count: 8, completed: 7, overdue: 0 },
-    { name: 'Mohamed Mahmoud', count: 15, completed: 5, overdue: 5 },
-  ];
+  useEffect(() => {
+    dispatch(fetchManagerDashboardData());
+  }, [dispatch]);
 
-  const upcomingMeetings = [
-    { title: 'Project Sync', time: '14:00', date: 'Today', countdown: '2h 15m' },
-    { title: 'Budget Review', time: '09:00', date: 'Tomorrow', countdown: '21h 15m' },
-  ];
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">{t('dashboard.error_loading_data', 'Error loading dashboard data:')} {error}</Alert>
+      </Box>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="info">{t('dashboard.no_data_available', 'No dashboard data available.')}</Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" sx={{ mb: 3 }}>{t('dashboard.manager_title', 'Department Manager Dashboard')}</Typography>
-      
-      <Grid container spacing={3}>
-        {/* Team Actions Overview */}
+      <Typography variant="h4" gutterBottom>
+        {t('dashboard.manager_title', 'Department Manager Dashboard')}
+      </Typography>
+
+      <Grid container spacing={3} sx={{ mt: 2 }}>
+        {/* KPI Cards */}
+        <Grid item xs={12} sm={6} md={3}>
+          <KPICard 
+            title={t('dashboard.total_team_meetings', 'Total Team Meetings')} 
+            value={data.meeting_stats.total} 
+            icon={<EventIcon color="primary" fontSize="large" />} 
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <KPICard 
+            title={t('dashboard.completed_team_meetings', 'Completed Team Meetings')} 
+            value={data.meeting_stats.completed} 
+            icon={<EventAvailableIcon color="success" fontSize="large" />} 
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <KPICard 
+            title={t('dashboard.pending_team_actions', 'Pending Team Actions')} 
+            value={data.action_stats.pending} 
+            icon={<AssignmentIcon color="warning" fontSize="large" />} 
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <KPICard 
+            title={t('dashboard.team_members', 'Team Members')} 
+            value={data.team_members_count} 
+            icon={<GroupsIcon color="info" fontSize="large" />} 
+          />
+        </Grid>
+
+        {/* Charts */}
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom>
-              <GroupIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-              {t('dashboard.team_overview', 'Team Overview: Pending Actions')}
-            </Typography>
-            <List>
-              {teamActions.map((member, index) => (
-                <Box key={index} sx={{ mb: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">{member.name}</Typography>
-                    <Typography variant="caption">{member.completed}/{member.count} Done</Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={(member.completed / member.count) * 100} 
-                    color={member.overdue > 0 ? "error" : "primary"}
-                    sx={{ height: 8, borderRadius: 4 }}
-                  />
-                </Box>
-              ))}
-            </List>
+          <Paper sx={{ p: 2, height: 350 }}>
+            <Typography variant="h6" gutterBottom>{t('dashboard.meeting_status_distribution', 'Team Meeting Status')}</Typography>
+            <Box sx={{ height: '90%' }}>
+              <MeetingsPieChart 
+                data={{
+                  completed: data.meeting_stats.completed,
+                  scheduled: data.meeting_stats.scheduled,
+                  cancelled: 0 // Annahme, da backend noch keine cancels liefert
+                }}
+              />
+            </Box>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper sx={{ p: 2, height: 350 }}>
+            <Typography variant="h6" gutterBottom>{t('dashboard.action_status_distribution', 'Team Action Status')}</Typography>
+            <Box sx={{ height: '90%' }}>
+              <ActionsBarChart 
+                data={{
+                  completed: data.action_stats.completed,
+                  pending: data.action_stats.pending,
+                  overdue: 0 // Annahme
+                }}
+              />
+            </Box>
           </Paper>
         </Grid>
 
-        {/* Meeting Calendar */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2, height: '100%' }}>
-            <Typography variant="h6" gutterBottom>
-              <CalendarMonth sx={{ mr: 1, verticalAlign: 'middle' }} />
-              {t('dashboard.upcoming_meetings', 'Next Meetings')}
-            </Typography>
-            <List>
-              {upcomingMeetings.map((meeting, index) => (
-                <ListItem key={index}>
-                  <ListItemText 
-                    primary={meeting.title} 
-                    secondary={`${meeting.date} at ${meeting.time}`} 
-                  />
-                  <Chip label={meeting.countdown} size="small" color="secondary" />
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
-        </Grid>
-
-        {/* PV Approvals */}
-        <Grid item xs={12} md={6}>
+        {/* Placeholder for Data Table */}
+        <Grid item xs={12}>
           <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              <AssignmentLate sx={{ mr: 1, verticalAlign: 'middle' }} />
-              {t('dashboard.pv_pending', 'PVs Awaiting Validation')}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              3 PVs pending your team's input.
-            </Typography>
-          </Paper>
-        </Grid>
-
-        {/* WhatsApp Notification Status */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              <WhatsApp sx={{ mr: 1, verticalAlign: 'middle' }} />
-              {t('dashboard.whatsapp_status', 'WhatsApp Reminders')}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Chip label="Sent: 12" color="success" variant="outlined" />
-              <Chip label="Read: 10" color="primary" variant="outlined" />
-              <Chip label="Failed: 0" color="error" variant="outlined" />
+            <Typography variant="h6" gutterBottom>{t('dashboard.team_tasks', 'Team Tasks')}</Typography>
+            <Box sx={{ height: 300, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
+              <Typography color="text.secondary">{t('dashboard.team_tasks_placeholder', 'Team task list with pagination/virtualization will go here.')}</Typography>
             </Box>
           </Paper>
         </Grid>

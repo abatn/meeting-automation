@@ -29,7 +29,22 @@ class RecordingCreate(RecordingBase):
 class Recording(RecordingBase):
     id: str
     created_at: datetime
-    chunks: List[Chunk] = []
 
     class Config:
         from_attributes = True
+
+class StreamStartResponse(BaseModel):
+    recording_id: str
+    upload_id: str
+    file_key: str
+
+class StreamChunkResponse(BaseModel):
+    part_number: int
+    etag: str
+
+class StreamPart(BaseModel):
+    PartNumber: int
+    ETag: str
+
+class StreamStopRequest(BaseModel):
+    parts: List[StreamPart]

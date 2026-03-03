@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 interface Meeting {
-  id: number;
+  id: string; // Corrected to string
   title: string;
   description: string;
   status: 'planned' | 'in_progress' | 'completed';

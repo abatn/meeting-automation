@@ -148,17 +148,19 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
 ## 3. Recordings (`/api/v1/recordings`)
 
 ### 3.1. Upload Recording
-- **Endpoint**: `/api/v1/recordings/upload`
+- **Endpoint**: `/api/v1/recordings/upload/{meeting_id}`
 - **Method**: `POST`
 - **Description**: Uploads an audio/video recording file for a specific meeting.
-- **Request Body**: `multipart/form-data` with `file` (audio/video file) and `meeting_id`.
-- **Response (201 Created)**:
+- **Request Body**: `multipart/form-data` with `file` (audio/video file).
+- **Response (200 OK)**:
     ```json
     {
         "id": "uuid",
         "meeting_id": "uuid",
-        "file_url": "s3_file_url",
-        "status": "uploaded"
+        "file_path": "s3_file_key",
+        "status": "uploaded",
+        "created_at": "timestamp",
+        "chunks": []
     }
     ```
 

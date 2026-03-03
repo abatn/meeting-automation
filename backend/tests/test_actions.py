@@ -8,5 +8,5 @@ async def test_get_actions(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_update_action_status(client: AsyncClient):
-    response = await client.patch("/api/v1/actions/1", json={"status": "completed"})
+    response = await client.patch("/api/v1/actions/1/status", json={"status": "completed"})
     assert response.status_code in [200, 404]

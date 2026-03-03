@@ -28,30 +28,49 @@ const Sidebar: React.FC = () => {
       sx={{
         width: drawerWidth,
         flexShrink: 0,
-        [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box' },
+        [`& .MuiDrawer-paper`]: { 
+          width: drawerWidth, 
+          boxSizing: 'border-box',
+          bgcolor: 'background.paper',
+          borderRight: '1px solid rgba(0, 0, 0, 0.12)'
+        },
       }}
     >
       <Toolbar />
       <Box sx={{ overflow: 'auto' }}>
-        <List>
+        <List sx={{ pt: 2 }}>
           {menuItems.map((item) => (
-            <ListItem key={item.text} disablePadding>
+            <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
               <ListItemButton 
                 selected={location.pathname === item.path}
                 onClick={() => navigate(item.path)}
+                sx={{
+                  mx: 1,
+                  borderRadius: 2,
+                  '&.Mui-selected': {
+                    bgcolor: 'primary.light',
+                    color: 'primary.main',
+                    '& .MuiListItemIcon-root': {
+                      color: 'primary.main'
+                    }
+                  }
+                }}
               >
                 <ListItemIcon>
                   {item.icon}
                 </ListItemIcon>
-                <ListItemText primary={item.text} />
+                <ListItemText primary={item.text} primaryTypographyProps={{ fontWeight: location.pathname === item.path ? 'bold' : 'normal' }} />
               </ListItemButton>
             </ListItem>
           ))}
         </List>
-        <Divider />
+        <Divider sx={{ my: 2 }} />
         <List>
-          <ListItem disablePadding>
-            <ListItemButton onClick={() => navigate('/settings')}>
+          <ListItem disablePadding sx={{ mx: 1 }}>
+            <ListItemButton 
+              onClick={() => navigate('/settings')}
+              sx={{ borderRadius: 2 }}
+            >
               <ListItemIcon>
                 <SecurityIcon />
               </ListItemIcon>

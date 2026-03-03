@@ -16,7 +16,7 @@ async def test_full_meeting_flow(client: AsyncClient, test_user_data, test_meeti
         f"/api/v1/recordings/upload/{meeting_id}",
         files={"file": ("test.wav", b"content", "audio/wav")}
     )
-    assert r_resp.status_code in [201, 202]
+    assert r_resp.status_code in [200, 201, 202]
     
     # 4. Check Status (Integrated Mock)
     s_resp = await client.get(f"/api/v1/meetings/{meeting_id}")

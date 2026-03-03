@@ -7,23 +7,27 @@ import uuid
 from typing import Dict, Any, List
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+import tempfile # Neu hinzugefügt
+import os # Neu hinzugefügt
 
 from app.tasks.celery_app import celery_app
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core.database import AsyncSessionLocal
 from app.models.recording import Recording
 from app.models.transcription import Transcription
 from app.models.action import Action
 from app.models.meeting import Meeting
+from app.models.pv import PV
 from app.services.transcription_service import transcribe_audio
 from app.services.pv_service import PVService
 from app.services.diarization_service import DiarizationService
 from app.services.pdf_service import PDFService
 import boto3
+from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
-redis_client = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+redis_client = redis.Redis.from_url(settings.REDIS_URL)
 
 def publish_status(recording_id: str, status: str, progress: int, message: str = ""):
     """Hilfsfunktion, um Status-Updates an Redis zu senden (für WebSockets)"""
@@ -91,7 +95,7 @@ def match_timestamps(words: List[Dict[str, Any]], segments: List[Dict[str, Any]]
 async def _process_recording_pipeline(recording_id: str):
     publish_status(recording_id, "uploaded", 0, "Audio hochgeladen, starte Verarbeitung...")
     
-    async with SessionLocal() as db:
+    async with AsyncSessionLocal() as db:
         result = await db.execute(select(Recording).where(Recording.id == recording_id))
         recording = result.scalar_one_or_none()
         
@@ -108,55 +112,44 @@ async def _process_recording_pipeline(recording_id: str):
             publish_status(recording_id, "transcribing", 10, "Lade Audio-Datei herunter...")
             s3_client = boto3.client(
                 's3',
-                endpoint_url=getattr(settings, 'MINIO_URL', 'http://localhost:9000'),
-                aws_access_key_id=getattr(settings, 'MINIO_USER', 'minioadmin'),
-                aws_secret_access_key=getattr(settings, 'MINIO_PASSWORD', 'minioadmin')
+                endpoint_url=getattr(settings, 'S3_ENDPOINT', 'http://minio:9000'),
+                aws_access_key_id=getattr(settings, 'S3_ACCESS_KEY', 'minio_user'),
+                aws_secret_access_key=getattr(settings, 'S3_SECRET_KEY', 'minio_password')
             )
             bucket = getattr(settings, 'S3_BUCKET_NAME', 'meeting-recordings')
-            file_key = recording.file_key
+            file_key = recording.file_path
             
-            # Use placeholder for tests if not available
-            audio_content = b"fake audio" 
             try:
                 response = s3_client.get_object(Bucket=bucket, Key=file_key)
-                audio_content = response['Body'].read()
-            except Exception as e:
-                logger.warning(f"S3 Download failed: {e}. Using fallback audio.")
+                # Schreibe den Stream direkt in eine temporäre Datei
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio_file:
+                    for chunk in response['Body'].iter_chunks(chunk_size=1024 * 1024): # 1MB chunks
+                        temp_audio_file.write(chunk)
+                    temp_audio_file_path = temp_audio_file.name
+            except ClientError as e:
+                error_msg = f"S3-Download fehlgeschlagen für {file_key}: {e}"
+                logger.critical(error_msg)
+                recording.status = "failed"
+                await db.commit()
+                publish_status(recording_id, "failed", 0, error_msg)
+                return
 
             # 2. Speaker Diarization (Pyannote)
             publish_status(recording_id, "transcribing", 25, "Sprechererkennung läuft...")
             logger.info("Running Diarization...")
-            speaker_segments = await DiarizationService.diarize(audio_content, file_key)
+            speaker_segments = await DiarizationService.diarize(temp_audio_file_path)
 
             # 3. Whisper Transcription with word timestamps
             publish_status(recording_id, "transcribing", 50, "Audio wird in Text umgewandelt...")
             logger.info("Running Whisper...")
             
-            # Optional: Simulate for tests or call real API
-            # transcription_result = await transcribe_audio(audio_content, file_key, word_timestamps=True)
-            # Simulated Response:
-            await asyncio.sleep(2)
-            transcription_result = {
-                "text": "Dies ist ein Test-Protokoll der Sitzung. Herr Schmidt kontaktiert die Bank bis Freitag.",
-                "words": [
-                    {"word": "Dies", "start": 0.0, "end": 0.5},
-                    {"word": "ist", "start": 0.6, "end": 1.0},
-                    {"word": "ein", "start": 1.1, "end": 1.5},
-                    {"word": "Test-Protokoll", "start": 1.6, "end": 2.5},
-                    {"word": "der", "start": 2.6, "end": 3.0},
-                    {"word": "Sitzung.", "start": 3.1, "end": 4.0},
-                    {"word": "Herr", "start": 4.5, "end": 5.0},
-                    {"word": "Schmidt", "start": 5.1, "end": 5.5},
-                    {"word": "kontaktiert", "start": 5.6, "end": 6.5},
-                    {"word": "die", "start": 6.6, "end": 7.0},
-                    {"word": "Bank", "start": 7.1, "end": 7.5},
-                    {"word": "bis", "start": 7.6, "end": 8.0},
-                    {"word": "Freitag.", "start": 8.1, "end": 8.5},
-                ]
-            }
+            transcription_result = await transcribe_audio(temp_audio_file_path, word_timestamps=True)
 
             if not speaker_segments:
-                speaker_segments = [{"speaker": "SPEAKER_00", "start": 0.0, "end": 10.0}]
+                words = transcription_result.get("words", [])
+                end_time = words[-1].get("end", 0.0) if words else 0.0
+                speaker_segments = [{"speaker": "SPEAKER_00", "start": 0.0, "end": end_time}]
+                logger.warning(f"Diarization returned no segments. Using fallback single speaker up to {end_time}s.")
 
             publish_status(recording_id, "transcribing", 75, "Kombiniere Text und Sprecher...")
             
@@ -190,18 +183,23 @@ async def _process_recording_pipeline(recording_id: str):
             publish_status(recording_id, "analyzing", 90, "KI analysiert das Protokoll (Mistral)...")
             logger.info(f"Starting analysis for transcription {db_transcription.id}")
             
-            # Real call or simulate
-            # pv_data = await PVService.generate_pv(mistral_input_text)
-            await asyncio.sleep(1)
-            actions_data = [
-                {
-                    "description": "Bank kontaktieren",
-                    "assignee_name": "Schmidt",
-                    "due_date": "2024-03-01",
-                    "priority": "high",
-                    "priority_reason": "Wurde bis Freitag als Deadline gesetzt"
-                }
-            ]
+            pv_data = await PVService.generate_pv(mistral_input_text)
+            
+            # Format PV content as HTML and save to DB
+            summary = pv_data.get('summary', '')
+            decisions = '<br/>'.join([f'- {d}' for d in pv_data.get('decisions', [])])
+            html_content = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><p>{decisions}</p>"
+
+            db_pv = PV(
+                id=str(uuid.uuid4()),
+                meeting_id=recording.meeting_id,
+                title=pv_data.get('title', 'Meeting PV'),
+                content_html=html_content,
+                status='draft'
+            )
+            db.add(db_pv)
+            
+            actions_data = pv_data.get("actions", [])
 
             # Save Actions
             for action_item in actions_data:
@@ -228,6 +226,11 @@ async def _process_recording_pipeline(recording_id: str):
             recording.status = "failed"
             await db.commit()
             publish_status(recording_id, "failed", 0, f"Fehler aufgetreten: {str(e)}")
+        finally:
+            # Clean up temporary audio file
+            if 'temp_audio_file_path' in locals() and os.path.exists(temp_audio_file_path):
+                os.remove(temp_audio_file_path)
+                logger.info(f"Temporäre Datei gelöscht: {temp_audio_file_path}")
 
 async def _notify_n8n_completion(recording_id: str, meeting_id: str):
     payload = {
@@ -237,7 +240,7 @@ async def _notify_n8n_completion(recording_id: str, meeting_id: str):
     }
     try:
         async with httpx.AsyncClient() as client:
-            await client.post(settings.N8N_WEBHOOK_URL, json=payload)
+            await client.post(settings.N8N_WEBHOOK_TRANSCRIPTION_COMPLETED, json=payload)
     except Exception as e:
         logger.error(f"Failed to notify n8n: {e}")
 

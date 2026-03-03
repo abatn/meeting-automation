@@ -33,14 +33,28 @@ async def login(
         raise HTTPException(status_code=400, detail="Inactive user")
     
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    
+    # Load roles for the user
+    from sqlalchemy.orm import selectinload
+    user_stmt = select(UserModel).options(selectinload(UserModel.roles)).where(UserModel.id == user.id)
+    user_with_roles = (await db.execute(user_stmt)).scalar_one()
+    role_name = user_with_roles.roles[0].name if user_with_roles.roles else "participant"
+
     return {
         "access_token": security.create_access_token(
             {"sub": str(user.id)}, expires_delta=access_token_expires
         ),
         "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": role_name,
+            "created_at": user.created_at
+        }
     }
 
-@router.post("/register", response_model=User)
+@router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 async def register(
     *,
     db: AsyncSession = Depends(deps.get_db),
@@ -103,12 +117,44 @@ async def read_user_me(
 ) -> Any:
     return current_user
 
+@router.get("/validate")
+async def validate_token(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Validate the current JWT token and return user details.
+    Used for initial App load to prevent redirect loops.
+    """
+    # Load roles for the user
+    from sqlalchemy.orm import selectinload
+    user_stmt = select(UserModel).options(selectinload(UserModel.roles)).where(UserModel.id == current_user.id)
+    user_with_roles = (await db.execute(user_stmt)).scalar_one()
+    role_name = user_with_roles.roles[0].name if user_with_roles.roles else "participant"
+
+    return {
+        "authenticated": True,
+        "user": {
+            "id": current_user.id,
+            "email": current_user.email,
+            "full_name": current_user.full_name,
+            "role": role_name
+        }
+    }
+
+from app.services.auth_service import AuthService
+
 @router.post("/logout")
-async def logout(current_user: UserModel = Depends(deps.get_current_user)) -> Any:
+async def logout(
+    current_user: UserModel = Depends(deps.get_current_user),
+    auth_service: AuthService = Depends(deps.get_auth_service),
+    token: str = Depends(deps.reusable_oauth2)
+) -> Any:
     """
     Logout user. In a stateless JWT setup, the client discards the token.
     For enhanced security, a token blacklist could be implemented here.
     """
+    await auth_service.add_token_to_blacklist(token)
     return {"msg": "Successfully logged out"}
 
 @router.post("/refresh", response_model=Token)
