@@ -86,4 +86,4 @@ MIT License - see [LICENSE](LICENSE)
 
 ## Support
 
-For issues and questions, please open a GitHub issue or contact support@example.com
+For issues and questions, please open a GitHub issue or contact support@example.com 
