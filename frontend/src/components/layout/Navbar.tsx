@@ -13,12 +13,19 @@ const Navbar: React.FC = () => {
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
 
   const toggleLanguage = () => {
-    const nextLang = i18n.language === 'fr-TN' ? 'ar-TN' : 'fr-TN';
-    i18n.changeLanguage(nextLang);
+    const langs = ['en', 'fr-TN', 'ar-TN'];
+    const currentIndex = langs.indexOf(i18n.language);
+    const nextIndex = (currentIndex + 1) % langs.length;
+    i18n.changeLanguage(langs[nextIndex]);
   };
 
   return (
-    <AppBar position="static" color="primary" elevation={0}>
+    <AppBar 
+      position="fixed" 
+      color="primary" 
+      elevation={0}
+      sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}
+    >
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           {t('common.appName', 'Meeting Automation')}

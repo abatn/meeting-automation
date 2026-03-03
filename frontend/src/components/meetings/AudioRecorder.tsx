@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Box, 
   Button, 
@@ -13,12 +13,9 @@ import {
   Mic as MicIcon,
   Stop as StopIcon,
   Pause as PauseIcon,
-  PlayArrow as PlayArrowIcon,
-  CloudUpload as UploadIcon,
-  Delete as DeleteIcon
+  PlayArrow as PlayArrowIcon
 } from '@mui/icons-material';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
-import { meetingsApi } from '../../services/meetings';
 
 interface AudioRecorderProps {
   meetingId: string;
@@ -37,8 +34,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
     error: recorderError
   } = useAudioRecorder();
 
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const formatDuration = (seconds: number) => {
@@ -47,41 +43,31 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleStart = async () => {
+    setUploadError(null);
+    await startRecording(meetingId);
+  };
+
   const handleStop = async () => {
-    const blob = await stopRecording();
-    if (blob) {
-      setAudioBlob(blob);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!audioBlob) return;
-
-    setIsUploading(true);
-    setUploadError(null);
+    setIsFinishing(true);
     try {
-      const file = new File([audioBlob], `recording-${meetingId}.wav`, { type: 'audio/wav' });
-      const response = await meetingsApi.uploadRecording(meetingId, file);
-      if (onUploadSuccess) {
-        onUploadSuccess(response.data);
+      const recordingResponse = await stopRecording(meetingId);
+      if (recordingResponse && onUploadSuccess) {
+        onUploadSuccess(recordingResponse);
+      } else if (!recordingResponse) {
+        setUploadError('Failed to save the recording.');
       }
-      setAudioBlob(null);
     } catch (err: any) {
-      setUploadError(err.response?.data?.detail || 'Failed to upload recording');
+      setUploadError(err.message || 'An error occurred while finishing recording.');
     } finally {
-      setIsUploading(false);
+      setIsFinishing(false);
     }
-  };
-
-  const handleDiscard = () => {
-    setAudioBlob(null);
-    setUploadError(null);
   };
 
   return (
     <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'background.default' }}>
       <Typography variant="h6" gutterBottom>
-        Meeting Recording
+        Live Meeting Assistant
       </Typography>
 
       {(recorderError || uploadError) && (
@@ -95,26 +81,33 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
           {formatDuration(duration)}
         </Typography>
         
-        {isRecording && (
+        {isRecording && !isFinishing && (
           <Box sx={{ width: '100%', mb: 2 }}>
             <LinearProgress color="secondary" />
           </Box>
         )}
+        
+        {isFinishing && (
+           <Box sx={{ width: '100%', mb: 2 }}>
+             <Typography variant="body2" sx={{ mb: 1 }}>Finalizing Protocol...</Typography>
+             <LinearProgress color="primary" />
+           </Box>
+        )}
 
         <Box sx={{ display: 'flex', gap: 2 }}>
-          {!isRecording && !audioBlob && (
+          {!isRecording && !isFinishing && (
             <Button
               variant="contained"
               color="primary"
               startIcon={<MicIcon />}
-              onClick={startRecording}
+              onClick={handleStart}
               size="large"
             >
-              Start Recording
+              Start Meeting
             </Button>
           )}
 
-          {isRecording && (
+          {isRecording && !isFinishing && (
             <>
               <IconButton 
                 color="secondary" 
@@ -132,34 +125,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
               </IconButton>
             </>
           )}
-
-          {audioBlob && !isUploading && (
-            <>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<UploadIcon />}
-                onClick={handleUpload}
-              >
-                Upload & Process
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteIcon />}
-                onClick={handleDiscard}
-              >
-                Discard
-              </Button>
-            </>
-          )}
-
-          {isUploading && <CircularProgress />}
         </Box>
       </Box>
 
       <Typography variant="caption" color="textSecondary">
-        {isRecording ? 'Recording in progress...' : audioBlob ? 'Recording captured' : 'Ready to record'}
+        {isFinishing ? 'Saving recording to server...' : isRecording ? 'Recording in progress (Streaming)...' : 'Ready to record live'}
       </Typography>
     </Paper>
   );

@@ -35,6 +35,31 @@ async def initiate_transcription(
         "status": "in_progress"
     }
 
+
+@router.get("/meeting/{meeting_id}")
+async def get_transcription_by_meeting(
+    meeting_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Retrieves the transcription associated with a specific meeting.
+    """
+    stmt = select(TranscriptionModel).where(TranscriptionModel.meeting_id == meeting_id)
+    result = await db.execute(stmt)
+    transcription = result.scalars().first()
+    if not transcription:
+        raise HTTPException(status_code=404, detail="Transcription for meeting not found")
+    return {
+        "id": transcription.id,
+        "recording_id": transcription.recording_id,
+        "meeting_id": transcription.meeting_id,
+        "language": transcription.language or "unknown",
+        "full_text": transcription.full_text,
+        "segments": transcription.segments,
+        "status": transcription.status
+    }
+
 @router.get("/{transcription_id}")
 async def get_transcription(
     transcription_id: str,
@@ -44,9 +69,7 @@ async def get_transcription(
     """
     Retrieves the full transcription text for a recording.
     """
-    stmt = select(TranscriptionModel).options(
-        selectinload(TranscriptionModel.segments)
-    ).where(TranscriptionModel.id == transcription_id)
+    stmt = select(TranscriptionModel).where(TranscriptionModel.id == transcription_id)
     
     result = await db.execute(stmt)
     transcription = result.scalars().first()
@@ -59,5 +82,16 @@ async def get_transcription(
         "recording_id": transcription.recording_id,
         "language": transcription.language or "unknown",
         "text": transcription.full_text,
+        "segments": transcription.segments, # Hinzugefügt
         "status": transcription.status
     }
+@router.post("/webhook")
+async def transcription_webhook(
+    payload: dict,
+    db: AsyncSession = Depends(deps.get_db),
+) -> Any:
+    """
+    Callback endpoint for AI services (e.g. Whisper) to post results.
+    """
+    # Mock processing
+    return {"status": "success", "message": "Transcription results received"}

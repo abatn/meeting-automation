@@ -25,24 +25,25 @@ const ActionsBarChart: React.FC<Props> = ({ data }) => {
   ];
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height="100%">
       <BarChart
         data={chartData}
         margin={{
           top: 20,
           right: 30,
-          left: 20,
-          bottom: 5,
+          left: 0,
+          bottom: 20,
         }}
+        barSize={60}
       >
-        <CartesianGrid strokeDasharray="3 3" />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="name" />
         <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="completed" stackId="a" fill="#4caf50" name={t('Completed')} />
+        <Tooltip cursor={{fill: 'transparent'}} />
+        <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '20px' }} />
+        <Bar dataKey="completed" stackId="a" fill="#4caf50" name={t('Completed')} radius={[0, 0, 0, 0]} />
         <Bar dataKey="pending" stackId="a" fill="#ff9800" name={t('Pending')} />
-        <Bar dataKey="overdue" stackId="a" fill="#f44336" name={t('Overdue')} />
+        <Bar dataKey="overdue" stackId="a" fill="#f44336" name={t('Overdue')} radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

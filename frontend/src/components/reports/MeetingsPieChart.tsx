@@ -24,15 +24,15 @@ const MeetingsPieChart: React.FC<Props> = ({ data }) => {
   ];
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
-      <PieChart>
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart margin={{ top: 0, right: 0, bottom: 20, left: 0 }}>
         <Pie
           data={chartData}
           cx="50%"
-          cy="50%"
-          labelLine={false}
-          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-          outerRadius={100}
+          cy="45%"
+          labelLine={true}
+          label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+          outerRadius={80}
           fill="#8884d8"
           dataKey="value"
         >
@@ -41,7 +41,7 @@ const MeetingsPieChart: React.FC<Props> = ({ data }) => {
           ))}
         </Pie>
         <Tooltip />
-        <Legend />
+        <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '20px' }} />
       </PieChart>
     </ResponsiveContainer>
   );

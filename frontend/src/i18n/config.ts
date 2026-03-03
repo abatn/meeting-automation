@@ -1,26 +1,25 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
 
-// TODO: Load translations from JSON files
-import en from '../../public/locales/en.json';
-import fr from '../../public/locales/fr-TN.json';
-import ar from '../../public/locales/ar-TN.json';
-
+// Import translations from src to satisfy Vite's security/import rules
+import en from './locales/en.json';
+import fr from './locales/fr-TN.json';
+import ar from './locales/ar-TN.json';
 
 i18n
-  .use(LanguageDetector)
   .use(initReactI18next)
   .init({
+    lng: 'en', // Force English as the starting language
     fallbackLng: 'en',
-    debug: true,
+    supportedLngs: ['en', 'fr-TN', 'ar-TN'],
+    debug: false,
     resources: {
       en: { translation: en },
       'fr-TN': { translation: fr },
       'ar-TN': { translation: ar },
     },
     interpolation: {
-      escapeValue: false, // not needed for react as it escapes by default
+      escapeValue: false,
     },
   });
 

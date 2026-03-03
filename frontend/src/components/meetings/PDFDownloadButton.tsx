@@ -39,7 +39,7 @@ const PDFDownloadButton: React.FC<Props> = ({ pvId, fileName, variant = 'contain
       
     } catch (err: any) {
       console.error('Download failed', err);
-      setError(t('pv.download_error', 'Fehler beim Herunterladen des PDFs'));
+      setError(t('pv.download_error', 'Error downloading PDF'));
     } finally {
       setDownloading(false);
     }

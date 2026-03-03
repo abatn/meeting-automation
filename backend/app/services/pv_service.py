@@ -21,29 +21,24 @@ class PVService:
                 "messages": [
                     {
                         "role": "system",
-                        "content": f"""Du erstellst professionelle Procès-Verbaux aus Meeting-Transkriptionen.
+                        "content": f"""Du erstellst professionelle Procès-Verbaux (PV) aus Meeting-Transkriptionen.
+Kontext: Maghreb/Tunesien (Sprachen: Arabisch, Französisch, Englisch Mix/Code-Switching).
+
+Analysiere den Transkript (der in mehreren Sprachen vorliegen kann) und erstelle eine strukturierte Zusammenfassung in FRANZÖSISCH (Hauptsprache für geschäftliche Protokolle in Tunesien) oder ARABISCH, wobei wichtige Begriffe in ihrer Originalsprache beibehalten werden.
+
 Format: Einleitung, Diskussionspunkte, Entscheidungen, Action-Items.
 
-Analysiere diesen Meeting-Transkript und extrahiere Aufgaben (Action Items).
+Für JEDE Aufgabe (Action Item) bestimme:
+1. PRIORITÄT (high/medium/low) basierend auf Dringlichkeit und Wichtigkeit.
+2. BEGRÜNDUNG für die Priorität (kurz, 1 Satz, als 'priority_reason').
+3. DEADLINE (im Format YYYY-MM-DD, falls erwähnt, sonst null).
+4. VERANTWORTLICHER (Name oder Rolle, als 'assignee').
 
-Für JEDE Aufgabe bestimme:
-1. PRIORITÄT (high/medium/low) basierend auf:
-- Deadline-Erwähnung ("bis morgen" = high)
-- Dringlichkeit im Kontext ("muss sofort" = high)
-- Wichtigkeit ("das ist kritisch" = high)
-- Wer hat es gesagt? (Chef = höhere Priorität)
-
-2. BEGRÜNDUNG für die Priorität (kurz, 1 Satz, als 'priority_reason')
-
-3. DEADLINE (falls erwähnt, sonst null, im Format YYYY-MM-DD)
-
-4. VERANTWORTLICHER (Name oder Rolle, als 'assignee')
-
-Antworte in einem strukturierten JSON Format. Beispiel-Struktur:
+Antworte EXKLUSIV im strukturierten JSON Format. Beispiel:
 {{
-  "title": "Meeting Titel",
-  "summary": "Kurze Zusammenfassung...",
-  "decisions": ["Entscheidung 1", "Entscheidung 2"],
+  "title": "Titre de la réunion",
+  "summary": "Résumé (multilingual aware)...",
+  "decisions": ["Décision 1", "Décision 2"],
   "actions": [
     {{ "description": "...", "assignee": "...", "deadline": "YYYY-MM-DD", "priority": "high", "priority_reason": "..." }}
   ]
@@ -73,9 +68,4 @@ Antworte in einem strukturierten JSON Format. Beispiel-Struktur:
                 
         except Exception as e:
             logger.error(f"PV generation error: {e}")
-            # Return a fallback structure in case of error
-            return {
-                "title": "Automatisches Protokoll",
-                "summary": "Fehler bei der automatischen Generierung.",
-                "raw_transcription_preview": transcription_text[:200]
-            }
+            raise RuntimeError(f"Mistral API error during PV generation: {e}")

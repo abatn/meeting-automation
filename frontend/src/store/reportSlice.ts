@@ -15,9 +15,9 @@ const initialState: ReportState = {
 
 export const fetchDashboardData = createAsyncThunk(
   'reports/fetchDashboardData',
-  async (_, { rejectWithValue }) => {
+  async (role: string, { rejectWithValue }) => {
     try {
-      const data = await reportAPI.getManagerDashboard();
+      const data = await reportAPI.getDashboardData(role);
       return data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.detail || 'Failed to fetch reports');

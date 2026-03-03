@@ -76,7 +76,7 @@ class DiarizationService:
             return False
 
     @classmethod
-    async def diarize(cls, audio_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
+    async def diarize(cls, audio_file_path: str) -> List[Dict[str, Any]]:
         """
         Runs speaker diarization on audio bytes.
         Returns a list of segments: [{"speaker": "SPEAKER_00", "start": 12.3, "end": 15.7}, ...]
@@ -87,10 +87,7 @@ class DiarizationService:
             logger.warning("Pipeline is not initialized. Skipping diarization.")
             return []
             
-        # We need a temporary file because pyannote.audio works with paths
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(filename)[1]) as temp_input:
-            temp_input.write(audio_bytes)
-            input_path = temp_input.name
+        input_path = audio_file_path
             
         resampled_path = f"{input_path}_16k.wav"
         
@@ -128,12 +125,10 @@ class DiarizationService:
             logger.error(f"Unexpected error during diarization: {e}")
             return []
         finally:
-            # Cleanup temp files
-            if os.path.exists(input_path):
-                os.remove(input_path)
+            # Cleanup temp files (only internally created resampled_path)
             if os.path.exists(resampled_path):
                 os.remove(resampled_path)
             
             # Clean up GPU memory
-            if torch.cuda.is_available():
+            if PYANNOTE_AVAILABLE and torch.cuda.is_available():
                 torch.cuda.empty_cache()

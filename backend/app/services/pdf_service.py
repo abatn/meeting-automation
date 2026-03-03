@@ -1,6 +1,7 @@
 import os
 import uuid
 import logging
+import traceback
 from typing import Optional
 import jinja2
 import boto3
@@ -16,7 +17,11 @@ except (ImportError, OSError):
     WEASYPRINT_AVAILABLE = False
 
 from app.core.config import settings
-from app.models.pv import PV
+from app.models.pv import PV, Section
+from app.models.meeting import Meeting, Participant, Agenda
+from app.models.action import Action
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +32,9 @@ class PDFService:
         try:
             self.s3 = s3_client or boto3.client(
                 's3',
-                endpoint_url=settings.MINIO_URL if hasattr(settings, 'MINIO_URL') else 'http://localhost:9000',
-                aws_access_key_id=settings.MINIO_USER if hasattr(settings, 'MINIO_USER') else 'minioadmin',
-                aws_secret_access_key=settings.MINIO_PASSWORD if hasattr(settings, 'MINIO_PASSWORD') else 'minioadmin'
+                endpoint_url=getattr(settings, 'S3_ENDPOINT', 'http://localhost:9000'),
+                aws_access_key_id=getattr(settings, 'S3_ACCESS_KEY', 'minioadmin'),
+                aws_secret_access_key=getattr(settings, 'S3_SECRET_KEY', 'minioadmin')
             )
         except Exception as e:
             logger.warning(f"Could not initialize S3 client: {e}")
@@ -41,52 +46,65 @@ class PDFService:
             loader=jinja2.FileSystemLoader(template_dir),
             autoescape=True
         )
-        self.bucket_name = getattr(settings, 'MINIO_PDF_BUCKET', 'meeting-pdfs')
+        self.bucket_name = getattr(settings, 'S3_BUCKET_NAME', 'meeting-pdfs')
 
-    async def generate_pv_pdf(self, pv_id: int) -> str:
+    async def generate_pv_pdf(self, pv_id: str) -> str:
         """Hauptmethode: Generiert PDF und gibt Dateipfad zurück"""
-        # In einer echten Implementierung würden wir hier prüfen, ob das PDF schon in Minio ist.
-        # Für diese Demo generieren wir es direkt neu oder geben einen lokalen Pfad zurück.
+        # 1. Daten aus DB laden (Echt-Daten)
+        stmt = (
+            select(PV)
+            .options(
+                selectinload(PV.meeting).selectinload(Meeting.participants),
+                selectinload(PV.meeting).selectinload(Meeting.agendas),
+                selectinload(PV.sections)
+            )
+            .where(PV.id == pv_id)
+        )
+        result = await self.db.execute(stmt)
+        pv_obj = result.scalar_one_or_none()
         
-        # 1. HTML rendern
-        html_content = await self._render_pv_html(pv_id)
+        if not pv_obj:
+            raise HTTPException(status_code=404, detail="PV not found")
+            
+        # Action items separat laden
+        action_stmt = select(Action).where(Action.meeting_id == pv_obj.meeting_id)
+        action_result = await self.db.execute(action_stmt)
+        actions = action_result.scalars().all()
+
+        # 2. Template-Daten aufbereiten
+        pv_data = {
+            "title": pv_obj.title or pv_obj.meeting.title,
+            "date": (pv_obj.meeting.start_time.strftime("%Y-%m-%d") if pv_obj.meeting.start_time else "N/A"),
+            "location": pv_obj.meeting.location or "N/A",
+            "duration": str(int((pv_obj.meeting.end_time - pv_obj.meeting.start_time).total_seconds() / 60)) if pv_obj.meeting.end_time else "N/A",
+            "participants": [p.name or p.email for p in pv_obj.meeting.participants],
+            "agenda": "\n".join([a.title for a in sorted(pv_obj.meeting.agendas, key=lambda x: x.order)]),
+            "discussion": pv_obj.content_html or "N/A",
+            "decisions": [s.content for s in pv_obj.sections if s.type == "decision"],
+            "actions": [
+                {
+                    "description": a.title, 
+                    "assignee": a.description.split("Assigned to: ")[-1] if "Assigned to: " in a.description else "N/A", 
+                    "due_date": a.due_date.strftime("%Y-%m-%d") if a.due_date else "N/A"
+                } for a in actions
+            ]
+        }
+
+        # 3. HTML rendern
+        try:
+            template = self.template_env.get_template('pv_template.html')
+            html_content = template.render(pv=pv_data)
+        except Exception as e:
+            logger.error(f"Error rendering template: {e}")
+            raise HTTPException(status_code=500, detail="Could not render PDF template")
         
-        # 2. PDF generieren
+        # 4. PDF generieren
         pdf_filename = f"pv_{pv_id}_{uuid.uuid4().hex[:8]}.pdf"
         pdf_path = f"/tmp/{pdf_filename}"
         
         await self._convert_html_to_pdf(html_content, pdf_path)
         
-        # 3. Optional: In Minio hochladen (hier auskommentiert um Fehler ohne S3 zu vermeiden)
-        # s3_url = await self._upload_to_minio(pdf_path, pdf_filename)
-        
         return pdf_path
-
-    async def _render_pv_html(self, pv_id: int) -> str:
-        """PV-Daten laden und HTML rendern"""
-        # Mock-Daten, in echt würde man das PV und die Relationen (Actions, Meeting) aus der DB laden
-        pv_data = {
-            "title": "اجتماع استراتيجية تكنولوجيا المعلومات (IT Strategy)",
-            "date": "2026-02-23",
-            "location": "قاعة الاجتماعات الرئيسية / Microsoft Teams",
-            "duration": "45",
-            "participants": ["أحمد بن علي (المدير العام)", "سارة محمد (مديرة المشروع)", "يوسف عبد الله (مطور)"],
-            "agenda": """1. مراجعة ميزانية الربع الأول
-2. خطة التوظيف""",
-            "discussion": "<p>تمت مناقشة الميزانية وتمت الموافقة على زيادة ميزانية التدريب بنسبة 15%.</p>",
-            "decisions": ["الموافقة على ميزانية التدريب", "البدء في تعيين 3 مطورين جدد"],
-            "actions": [
-                {"description": "إعداد وصف وظيفي للمطورين", "assignee": "سارة محمد", "due_date": "2026-03-01"},
-                {"description": "التواصل مع قسم المالية", "assignee": "أحمد بن علي", "due_date": "2026-02-28"}
-            ]
-        }
-        
-        try:
-            template = self.template_env.get_template('pv_template.html')
-            return template.render(pv=pv_data)
-        except Exception as e:
-            logger.error(f"Error rendering template: {e}")
-            raise HTTPException(status_code=500, detail="Could not render PDF template")
 
     async def _convert_html_to_pdf(self, html: str, filepath: str) -> str:
         """HTML zu PDF konvertieren mit WeasyPrint"""
@@ -161,7 +179,7 @@ startxref
             HTML(string=html).write_pdf(filepath)
             return filepath
         except Exception as e:
-            logger.error(f"Error generating PDF with WeasyPrint: {e}")
+            logger.error(f"Error generating PDF with WeasyPrint: {e}\n{traceback.format_exc()}")
             raise HTTPException(status_code=500, detail="Error generating PDF file")
 
     async def _upload_to_minio(self, file_path: str, object_name: str) -> str:

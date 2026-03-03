@@ -12,22 +12,27 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 @router.post("/transcription-complete")
+@router.post("/n8n/transcription")
 async def transcription_complete(
     data: dict,
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
+    _authorized: bool = Depends(deps.verify_internal_api_key)
 ):
     """Whisper-Ergebnis empfangen"""
     recording_id = data.get("recording_id")
-    content = data.get("transcription")
+    content = data.get("transcription") or data.get("transcription_text")
     meeting_id = data.get("meeting_id")
 
-    if not recording_id or not content:
+    if not meeting_id or not content:
         raise HTTPException(status_code=400, detail="Missing data")
 
+    import uuid
     # Save transcription
     transcription = Transcription(
+        id=str(uuid.uuid4()),
         meeting_id=meeting_id,
-        content=content,
+        recording_id=recording_id,
+        full_text=content,
         status="completed"
     )
     db.add(transcription)
@@ -43,15 +48,15 @@ async def transcription_complete(
     logger.info(f"Transcription completed for recording {recording_id}")
     
     # Optional: Automatically trigger PV generation
-    pv_service = PVService(db)
-    await pv_service.generate_pv(meeting_id)
+    # await PVService.generate_pv(content)
     
     return {"status": "success"}
 
 @router.post("/pv-generated")
 async def pv_generated(
     data: dict,
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
+    _authorized: bool = Depends(deps.verify_internal_api_key)
 ):
     """Mistral-PV empfangen"""
     meeting_id = data.get("meeting_id")
@@ -75,7 +80,8 @@ async def pv_generated(
 @router.post("/actions-extracted")
 async def actions_extracted(
     data: dict,
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
+    _authorized: bool = Depends(deps.verify_internal_api_key)
 ):
     """Action-Items empfangen"""
     pv_id = data.get("pv_id")

@@ -1,10 +1,11 @@
 import httpx
 import logging
+import os
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-async def transcribe_audio(audio_content: bytes, filename: str, word_timestamps: bool = False) -> dict:
+async def transcribe_audio(audio_file_path: str, word_timestamps: bool = False) -> dict:
     """
     Transcribes audio content using the OpenAI Whisper API.
     If word_timestamps is True, returns detailed verbose_json with words.
@@ -16,26 +17,27 @@ async def transcribe_audio(audio_content: bytes, filename: str, word_timestamps:
         headers = {
             "Authorization": f"Bearer {settings.OPENAI_API_KEY}"
         }
-        files = {
-            "file": (filename, audio_content),
-        }
-        data = {
-            "model": "whisper-1"
-        }
         
-        if word_timestamps:
-            data["response_format"] = "verbose_json"
-            data["timestamp_granularities[]"] = "word"
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.openai.com/v1/audio/transcriptions",
-                headers=headers,
-                data=data,
-                files=files,
-                timeout=300.0
-            )
-            response.raise_for_status()
+        filename = os.path.basename(audio_file_path)
+
+        with open(audio_file_path, "rb") as f:
+            files = {
+                "file": (filename, f),
+            }
+            data = {
+                "model": "whisper-1",
+                "response_format": "json"
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.openai.com/v1/audio/transcriptions",
+                    headers=headers,
+                    data=data,
+                    files=files,
+                    timeout=300.0
+                )
+                response.raise_for_status()
             
             result = response.json()
             if word_timestamps:

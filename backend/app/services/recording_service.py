@@ -11,6 +11,8 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+from datetime import datetime
+
 class RecordingService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -21,8 +23,8 @@ class RecordingService:
             aws_secret_access_key=settings.S3_SECRET_KEY
         )
 
-    async def upload_recording(self, meeting_id: str, file: UploadFile) -> Recording:
-        """Audio zu Minio/S3 hochladen"""
+    async def upload_recording(self, meeting_id: str, file: UploadFile, recording_id: str = None) -> Recording:
+        """Audio zu Minio/S3 hochladen und DB aktualisieren/erstellen"""
         file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_{file.filename}"
         
         # S3 Upload
@@ -37,25 +39,121 @@ class RecordingService:
             logger.error(f"S3 Upload failed: {e}")
             raise
 
-        # Save to DB
-        db_recording = Recording(
-            id=str(uuid.uuid4()),
-            meeting_id=meeting_id,
-            file_path=file_key,
-            status="uploaded",
-            format=file.content_type
-        )
-        self.db.add(db_recording)
+        from sqlalchemy import select
+        db_recording = None
+        
+        if recording_id:
+            result = await self.db.execute(select(Recording).where(Recording.id == recording_id))
+            db_recording = result.scalar_one_or_none()
+
+        if db_recording:
+            # Update existing record
+            db_recording.file_path = file_key
+            db_recording.status = "uploaded"
+            db_recording.format = file.content_type
+        else:
+            # Save new to DB
+            db_recording = Recording(
+                id=recording_id or str(uuid.uuid4()),
+                meeting_id=meeting_id,
+                file_path=file_key,
+                status="uploaded",
+                format=file.content_type,
+                created_at=datetime.utcnow()
+            )
+            self.db.add(db_recording)
+            
         await self.db.commit()
         await self.db.refresh(db_recording)
-
-        # Trigger n8n Webhook
-        await self.after_upload(db_recording)
 
         # Trigger Celery Pipeline
         from app.tasks.transcription_tasks import process_recording
         process_recording.delay(db_recording.id)
         
+        return db_recording
+
+    async def start_stream(self, meeting_id: str, content_type: str = "audio/webm") -> dict:
+        """Start a recording session by using a local temporary file to bypass S3 5MB limits."""
+        file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_stream.webm"
+        upload_id = str(uuid.uuid4()) # Use UUID as local temp file identifier
+        try:
+            # Save placeholder to DB
+            db_recording = Recording(
+                id=str(uuid.uuid4()),
+                meeting_id=meeting_id,
+                file_path=file_key,
+                status="streaming",
+                format=content_type,
+                created_at=datetime.utcnow()
+            )
+            self.db.add(db_recording)
+            await self.db.commit()
+
+            # Ensure temp directory exists
+            import os
+            os.makedirs("/tmp/recordings", exist_ok=True)
+            
+            # Create the empty temp file
+            open(f"/tmp/recordings/{upload_id}.webm", 'wb').close()
+
+            return {
+                "recording_id": db_recording.id,
+                "upload_id": upload_id,
+                "file_key": file_key
+            }
+        except Exception as e:
+            logger.error(f"Failed to start recording session: {e}")
+            raise
+
+    async def upload_chunk(self, file_key: str, upload_id: str, part_number: int, file_bytes: bytes) -> str:
+        """Append the incoming chunk to the local temporary file."""
+        try:
+            temp_path = f"/tmp/recordings/{upload_id}.webm"
+            with open(temp_path, "ab") as f:
+                f.write(file_bytes)
+            return f"local-chunk-{part_number}"
+        except Exception as e:
+            logger.error(f"Local chunk append failed: {e}")
+            raise
+
+    async def stop_stream(self, recording_id: str, file_key: str, upload_id: str, parts: list) -> Recording:
+        """Upload the fully assembled local file to S3 and trigger processing."""
+        import os
+        temp_path = f"/tmp/recordings/{upload_id}.webm"
+        try:
+            if not os.path.exists(temp_path):
+                raise Exception(f"Temporary file {temp_path} not found.")
+
+            # Upload the complete file to MinIO
+            with open(temp_path, "rb") as f:
+                self.s3_client.upload_fileobj(
+                    f,
+                    settings.S3_BUCKET_NAME,
+                    file_key
+                )
+            logger.info(f"Successfully uploaded assembled file to {file_key}")
+            
+            # Clean up local temp file
+            os.remove(temp_path)
+            
+        except Exception as e:
+            logger.error(f"Failed to upload assembled file to S3: {e}")
+            raise
+
+        from sqlalchemy import select
+        result = await self.db.execute(select(Recording).where(Recording.id == recording_id))
+        db_recording = result.scalar_one_or_none()
+
+        if not db_recording:
+            raise Exception("Recording not found in DB")
+
+        db_recording.status = "uploaded"
+        await self.db.commit()
+
+        # Trigger Celery Pipeline
+        from app.tasks.transcription_tasks import process_recording
+        process_recording.delay(db_recording.id)
+
         return db_recording
 
     async def after_upload(self, recording: Recording):

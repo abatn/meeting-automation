@@ -29,5 +29,5 @@ async def test_fallback_when_diarization_fails(mock_diarize, mock_boto3):
     
     # If DB is not available in pure unit test environment, we just assume
     # the logic in transcription_tasks.py defaults to SPEAKER_00 if [] is returned
-    # As implemented: if not speaker_segments: speaker_segments = [{"speaker": "SPEAKER_00", "start": 0.0, "end": 10.0}]
+    # As implemented: if not speaker_segments, we calculate end time from Whisper words.
     assert True

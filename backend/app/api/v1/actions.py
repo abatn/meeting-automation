@@ -6,8 +6,9 @@ import uuid
 
 from app.api import deps
 from app.schemas.action import Action, ActionCreate, ActionUpdate
-from app.models.action import Action as ActionModel
-from app.models.user import User as UserModel
+from app.models.action import Action as ActionModel, Assignment as AssignmentModel
+from app.models.user import User as UserModel, UserRole # UserRole hinzugefügt
+from sqlalchemy.orm import join
 
 router = APIRouter()
 
@@ -32,11 +33,63 @@ async def list_actions(
     if meeting_id:
         stmt = stmt.where(ActionModel.meeting_id == meeting_id)
         
-    # assigned_to filter would need a join with assignments if the schema models it that way, 
-    # but based on API.md we assume a direct relationship or we filter by user's assigned actions.
-    # For now we just return the base query filtered by meeting and status.
+    if assigned_to:
+        stmt = stmt.join(AssignmentModel, ActionModel.id == AssignmentModel.action_id).where(AssignmentModel.user_id == assigned_to)
     
     stmt = stmt.offset(skip).limit(limit)
+    result = await db.execute(stmt)
+    actions = result.scalars().all()
+    return actions
+
+@router.get("/my-actions", response_model=List[Action])
+async def list_my_actions(
+    db: AsyncSession = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[str] = None,
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Retrieve a list of action items assigned to the current user.
+    """
+    stmt = select(ActionModel).join(AssignmentModel).where(AssignmentModel.user_id == current_user.id)
+    
+    if status:
+        stmt = stmt.where(ActionModel.status == status)
+        
+    stmt = stmt.offset(skip).limit(limit)
+    result = await db.execute(stmt)
+    actions = result.scalars().all()
+    return actions
+
+@router.get("/team-actions", response_model=List[Action])
+async def list_team_actions(
+    db: AsyncSession = Depends(deps.get_db),
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[str] = None,
+    current_user: UserModel = Depends(deps.get_current_user), # Expecting current_user to be a manager
+) -> Any:
+    """
+    Retrieve a list of action items assigned to users managed by the current user.
+    Accessible only by managers.
+    """
+    if current_user.role != UserRole.MANAGER and current_user.role != UserRole.DG:
+        raise HTTPException(
+            status_code=403,
+            detail="Insufficient permissions. Only managers can access team actions."
+        )
+
+@router.get("/pending", response_model=List[Action])
+async def get_pending_actions_for_automation(
+    db: AsyncSession = Depends(deps.get_db),
+    api_key_valid: bool = Depends(deps.verify_internal_api_key)
+) -> Any:
+    """
+    Retrieve all pending action items for N8N automation.
+    Protected by X-Internal-API-Key.
+    """
+    stmt = select(ActionModel).where(ActionModel.status == "pending")
     result = await db.execute(stmt)
     actions = result.scalars().all()
     return actions
@@ -61,10 +114,18 @@ async def create_action(
         meeting_id=action_in.meeting_id
     )
     db.add(action)
+    await db.flush()
+    
+    if action_in.assigned_to:
+        assignment = AssignmentModel(
+            id=str(uuid.uuid4()),
+            action_id=action.id,
+            user_id=action_in.assigned_to
+        )
+        db.add(assignment)
+    
     await db.commit()
     await db.refresh(action)
-    
-    # TODO: Create the assignment to the user_id (action_in.assigned_to) if provided
     
     return action
 

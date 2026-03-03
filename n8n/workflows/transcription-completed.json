@@ -1,0 +1,122 @@
+{
+  "name": "Transcription Completed Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "transcription-completed",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://backend:8000/api/v1/reports/automation/meeting/{{$node[\"Webhook\"].json[\"body\"][\"meeting_id\"]}}",
+        "method": "GET",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "x_secret",
+              "value": "super-secret-automation-key-2026"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Get Meeting Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://backend:8000/api/v1/reports/automation/pdf/{{$node[\"Webhook\"].json[\"body\"][\"meeting_id\"]}}",
+        "method": "GET",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "x_secret",
+              "value": "super-secret-automation-key-2026"
+            }
+          ]
+        },
+        "responseFormat": "file",
+        "options": {}
+      },
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@meeting-automation.tn",
+        "toEmail": "={{$node[\"Get Meeting Details\"].json[\"attendees\"].join(',')}}",
+        "subject": "=Meeting Minutes: {{$node[\"Get Meeting Details\"].json[\"title\"]}}",
+        "text": "=Dear participants,\n\nPlease find attached the minutes for the meeting: {{$node[\"Get Meeting Details\"].json[\"title\"]}}.\n\nBest regards,\nYour Meeting Assistant",
+        "attachments": "data",
+        "options": {}
+      },
+      "name": "Send Email with PDF",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        750,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "5",
+          "name": "SMTP Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting Details": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Send Email with PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
