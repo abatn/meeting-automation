@@ -99,7 +99,7 @@ class DiarizationService:
             else:
                 audio_to_process = resampled_path
                 
-            logger.info(f"Starting diarization for {filename}")
+            logger.info(f"Starting diarization for {audio_file_path}")
             
             # Run inference
             diarization = pipeline(audio_to_process)
