@@ -39,8 +39,8 @@ const MeetingRoom: React.FC = () => {
         <Grid item xs={12} md={8}>
           <Paper sx={{ width: '100%', mb: 2 }}>
             <Tabs value={activeTab} onChange={handleTabChange} centered>
-              <Tab label={t('meetings.live_transcription', 'Live Transcription')} />
-              <Tab label={t('meetings.protocol_pv', 'Protocol (PV)')} />
+              <Tab label={t('meetings.live_transcription')} />
+              <Tab label={t('meetings.protocol_pv')} />
             </Tabs>
           </Paper>
 

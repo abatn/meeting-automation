@@ -190,14 +190,25 @@ async def _process_recording_pipeline(recording_id: str):
             decisions = '<br/>'.join([f'- {d}' for d in pv_data.get('decisions', [])])
             html_content = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><p>{decisions}</p>"
 
-            db_pv = PV(
-                id=str(uuid.uuid4()),
-                meeting_id=recording.meeting_id,
-                title=pv_data.get('title', 'Meeting PV'),
-                content_html=html_content,
-                status='draft'
-            )
-            db.add(db_pv)
+            # Check if PV already exists to prevent UniqueViolationError
+            existing_pv_result = await db.execute(select(PV).where(PV.meeting_id == recording.meeting_id))
+            existing_pv = existing_pv_result.scalar_one_or_none()
+
+            if existing_pv:
+                existing_pv.title = pv_data.get('title', 'Meeting PV')
+                existing_pv.content_html = html_content
+                existing_pv.status = 'draft'
+                logger.info(f"Updated existing PV for meeting {recording.meeting_id}")
+            else:
+                db_pv = PV(
+                    id=str(uuid.uuid4()),
+                    meeting_id=recording.meeting_id,
+                    title=pv_data.get('title', 'Meeting PV'),
+                    content_html=html_content,
+                    status='draft'
+                )
+                db.add(db_pv)
+                logger.info(f"Created new PV for meeting {recording.meeting_id}")
             
             actions_data = pv_data.get("actions", [])
 

@@ -68,7 +68,7 @@ const RecordingControls: React.FC = () => {
 
   return (
     <Paper sx={{ p: 3, textAlign: 'center' }}>
-      <Typography variant="h6" gutterBottom>{t('meetings.recording_session', 'Meeting Recording')}</Typography>
+      <Typography variant="h6" gutterBottom>{t('meetings.recording_session')}</Typography>
       
       <Box sx={{ my: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Typography variant="h2" sx={{ fontFamily: 'monospace', mb: 2, color: isRecording ? 'error.main' : 'text.primary' }}>
@@ -78,7 +78,7 @@ const RecordingControls: React.FC = () => {
         {isRecording && (
            <Box sx={{ display: 'flex', gap: 1, mb: 2, color: 'error.main' }}>
               <WaveIcon className="animate-pulse" />
-              <Typography variant="caption">{t('meetings.live_recording', 'Recording Live...')}</Typography>
+              <Typography variant="caption">{t('meetings.live_recording')}</Typography>
            </Box>
         )}
 
@@ -92,7 +92,7 @@ const RecordingControls: React.FC = () => {
               onClick={handleStart}
               sx={{ borderRadius: 10, px: 4 }}
             >
-              {t('meetings.start_recording', 'Start')}
+              {t('meetings.start_recording')}
             </Button>
           ) : (
             <>
@@ -120,7 +120,7 @@ const RecordingControls: React.FC = () => {
       {uploadProgress > 0 && uploadProgress < 100 && (
         <Box sx={{ mt: 3 }}>
           <Typography variant="body2" color="textSecondary" gutterBottom>
-            {t('meetings.uploading', 'Uploading Audio to Secure S3...')}
+            {t('meetings.uploading')}
           </Typography>
           <LinearProgress variant="determinate" value={uploadProgress} sx={{ height: 10, borderRadius: 5 }} />
         </Box>
@@ -129,7 +129,7 @@ const RecordingControls: React.FC = () => {
       {uploadProgress === 100 && (
         <Box sx={{ mt: 3 }}>
           <Alert severity="success" sx={{ mb: 2 }}>
-            {t('meetings.transcription_started', 'Transcription service triggered successfully.')}
+            {t('meetings.transcription_started')}
           </Alert>
           {recordingId && (
             <TranscriptionProgress recordingId={recordingId} />
@@ -139,7 +139,7 @@ const RecordingControls: React.FC = () => {
 
       <Box sx={{ mt: 4, pt: 2, borderTop: '1px solid #eee' }}>
         <Button startIcon={<UploadIcon />} variant="outlined">
-          {t('meetings.upload_file', 'Upload existing audio/video')}
+          {t('meetings.upload_file')}
         </Button>
       </Box>
     </Paper>

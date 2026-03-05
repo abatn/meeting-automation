@@ -19,8 +19,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO n8n_meetings (meeting_id, title, start_time) VALUES ($1, $2, $3)",
-        "parameters": "={{$node[\"Webhook\"].json[\"body\"][\"id\"]}}, {{$node[\"Webhook\"].json[\"body\"][\"title\"]}}, {{$node[\"Webhook\"].json[\"body\"][\"start_time\"]}}"
+        "query": "=INSERT INTO n8n_meetings (meeting_id, title, start_time) VALUES ('{{$node[\"Webhook\"].json[\"body\"][\"id\"]}}', '{{$node[\"Webhook\"].json[\"body\"][\"title\"]}}', '{{$node[\"Webhook\"].json[\"body\"][\"start_time\"]}}')"
       },
       "name": "Save to n8n DB",
       "type": "n8n-nodes-base.postgres",

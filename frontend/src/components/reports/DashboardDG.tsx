@@ -62,29 +62,29 @@ const DashboardDG: React.FC = () => {
   // Map API data to KPI objects
   const kpis = [
     { 
-      title: t('dashboard.meetings_month', 'Total Meetings'), 
+      title: t('dashboard.meetings_month'), 
       value: dashboardData?.total_meetings || '0', 
       icon: <TrendingUp color="primary" />, 
-      trend: '+15%' 
+      trend: t('dashboard.trend_15') 
     },
     { 
-      title: t('dashboard.completion_rate', 'Completed Meetings'), 
+      title: t('dashboard.completion_rate'), 
       value: dashboardData?.completed_meetings || '0', 
       icon: <CheckCircle color="success" />, 
-      trend: 'Stable' 
+      trend: t('dashboard.trend_stable') 
     },
     { 
-      title: t('dashboard.pending_pvs', 'Pending Actions'), 
+      title: t('dashboard.pending_pvs'), 
       value: dashboardData?.pending_actions || '0', 
       icon: <Assignment color="warning" />, 
-      trend: 'Action Required' 
+      trend: t('dashboard.trend_actionrequired') 
     },
   ];
 
   const recentActivities = [
-    { id: 1, text: 'PV for Strategy 2026 generated', time: '2h ago', status: 'Success' },
-    { id: 2, text: 'Budget Review Action assigned to Sami', time: '5h ago', status: 'Pending' },
-    { id: 3, text: 'IT Sync meeting completed', time: '1d ago', status: 'Success' },
+    { id: 1, text: t('dashboard.activity_pv_generated'), time: t('dashboard.time_2h_ago'), status: t('common.success') },
+    { id: 2, text: t('dashboard.activity_action_assigned'), time: t('dashboard.time_5h_ago'), status: t('common.pending') },
+    { id: 3, text: t('dashboard.activity_meeting_completed'), time: t('dashboard.time_1d_ago'), status: t('common.success') },
   ];
 
   return (
@@ -92,7 +92,7 @@ const DashboardDG: React.FC = () => {
       {/* Header */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', mb: 4, alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-          {t('dashboard.dg_title', 'General Manager Dashboard')}
+          {t('dashboard.dg_title')}
         </Typography>
         <Button 
           variant="contained" 
@@ -100,7 +100,7 @@ const DashboardDG: React.FC = () => {
           color="primary"
           sx={{ borderRadius: 2, px: 3 }}
         >
-          {t('common.export', 'Export Executive Report')}
+          {t('common.export')}
         </Button>
       </Box>
 
@@ -136,7 +136,7 @@ const DashboardDG: React.FC = () => {
       <Grid container spacing={4} sx={{ mb: 4 }}>
         <Grid item xs={12} lg={6}>
           <Paper sx={{ p: 3, borderRadius: 4, height: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>{t('dashboard.meeting_distribution', 'Meeting Status Distribution')}</Typography>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>{t('dashboard.meeting_distribution')}</Typography>
             <Divider sx={{ mb: 3 }} />
             <Box sx={{ height: 320, width: '100%' }}>
               <MeetingsPieChart data={meetingData} />
@@ -145,7 +145,7 @@ const DashboardDG: React.FC = () => {
         </Grid>
         <Grid item xs={12} lg={6}>
           <Paper sx={{ p: 3, borderRadius: 4, height: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>{t('dashboard.action_summary', 'Action Item Summary')}</Typography>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>{t('dashboard.action_summary')}</Typography>
             <Divider sx={{ mb: 3 }} />
             <Box sx={{ height: 320, width: '100%' }}>
               <ActionsBarChart data={actionData} />
@@ -159,7 +159,7 @@ const DashboardDG: React.FC = () => {
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, borderRadius: 3, height: '100%' }}>
             <Typography variant="h6" gutterBottom display="flex" alignItems="center">
-              <NotificationsActive sx={{ mr: 1 }} /> {t('dashboard.recent_activity', 'Recent System Activity')}
+              <NotificationsActive sx={{ mr: 1 }} /> {t('dashboard.recent_activity')}
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <List>
@@ -174,7 +174,7 @@ const DashboardDG: React.FC = () => {
                       <Chip 
                         label={activity.status} 
                         size="small" 
-                        color={activity.status === 'Success' ? 'success' : 'warning'} 
+                        color={activity.status === t('common.success') ? 'success' : 'warning'} 
                         variant="outlined"
                       />
                     </ListItemSecondaryAction>
@@ -189,19 +189,19 @@ const DashboardDG: React.FC = () => {
         {/* System Health Summary */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 3, borderRadius: 3, bgcolor: '#f5f7fa' }}>
-            <Typography variant="h6" gutterBottom>{t('dashboard.system_health', 'System Health')}</Typography>
+            <Typography variant="h6" gutterBottom>{t('dashboard.system_health')}</Typography>
             <Divider sx={{ mb: 2 }} />
             <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="textSecondary">API Connectivity</Typography>
-              <Typography variant="subtitle1" color="success.main" sx={{ fontWeight: 'bold' }}>Excellent (99.9%)</Typography>
+              <Typography variant="body2" color="textSecondary">{t('dashboard.health_api')}</Typography>
+              <Typography variant="subtitle1" color="success.main" sx={{ fontWeight: 'bold' }}>{t('dashboard.health_api_status')}</Typography>
             </Box>
             <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" color="textSecondary">AI Transcription Load</Typography>
-              <Typography variant="subtitle1" color="primary" sx={{ fontWeight: 'bold' }}>Normal</Typography>
+              <Typography variant="body2" color="textSecondary">{t('dashboard.health_ai')}</Typography>
+              <Typography variant="subtitle1" color="primary" sx={{ fontWeight: 'bold' }}>{t('dashboard.health_ai_status')}</Typography>
             </Box>
             <Box>
-              <Typography variant="body2" color="textSecondary">Storage Capacity</Typography>
-              <Typography variant="subtitle1" color="warning.main" sx={{ fontWeight: 'bold' }}>85% Full</Typography>
+              <Typography variant="body2" color="textSecondary">{t('dashboard.health_storage')}</Typography>
+              <Typography variant="subtitle1" color="warning.main" sx={{ fontWeight: 'bold' }}>{t('dashboard.health_storage_status')}</Typography>
             </Box>
           </Paper>
         </Grid>

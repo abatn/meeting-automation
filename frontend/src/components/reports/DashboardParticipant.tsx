@@ -36,7 +36,7 @@ const DashboardParticipant: React.FC = () => {
   if (error) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">{t('dashboard.error_loading_data', 'Error loading dashboard data:')} {error}</Alert>
+        <Alert severity="error">{t('dashboard.error_loading_data')} {error}</Alert>
       </Box>
     );
   }
@@ -44,7 +44,7 @@ const DashboardParticipant: React.FC = () => {
   if (!data) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="info">{t('dashboard.no_data_available', 'No dashboard data available.')}</Alert>
+        <Alert severity="info">{t('dashboard.no_data_available')}</Alert>
       </Box>
     );
   }
@@ -52,21 +52,21 @@ const DashboardParticipant: React.FC = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        {t('dashboard.participant_title', 'My Dashboard')}
+        {t('dashboard.participant_title')}
       </Typography>
 
       <Grid container spacing={3} sx={{ mt: 2 }}>
         {/* KPI Cards */}
         <Grid item xs={12} sm={6} md={4}>
           <KPICard 
-            title={t('dashboard.my_upcoming_meetings', 'My Upcoming Meetings')} 
+            title={t('dashboard.my_upcoming_meetings')} 
             value={data.my_upcoming_meetings} 
             icon={<EventIcon />} 
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <KPICard 
-            title={t('dashboard.my_open_actions', 'My Open Actions')} 
+            title={t('dashboard.my_open_actions')} 
             value={data.my_open_actions} 
             icon={<TaskAltIcon />} 
           />
@@ -75,9 +75,9 @@ const DashboardParticipant: React.FC = () => {
         {/* TODO: Implement Personal Action Items List with Virtualization */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>{t('dashboard.my_actions', 'My Action Items')}</Typography>
+            <Typography variant="h6" gutterBottom>{t('dashboard.my_actions')}</Typography>
             <Box sx={{ height: 300, overflow: 'auto' }}>
-              <Typography>{t('dashboard.my_actions_placeholder', 'Personal action items list with virtualization will go here.')}</Typography>
+              <Typography>{t('dashboard.my_actions_placeholder')}</Typography>
               {/* Hier würde die Virtualisierung für die Aufgabenliste implementiert */}
               <List>
                 {/* Beispiel für Listeneinträge, die dynamisch geladen werden würden */}
@@ -91,9 +91,9 @@ const DashboardParticipant: React.FC = () => {
         {/* TODO: Implement My Upcoming Meetings List with Virtualization */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>{t('dashboard.my_meetings', 'My Upcoming Meetings')}</Typography>
+            <Typography variant="h6" gutterBottom>{t('dashboard.my_meetings')}</Typography>
             <Box sx={{ height: 300, overflow: 'auto' }}>
-              <Typography>{t('dashboard.my_meetings_placeholder', 'My upcoming meetings list with virtualization will go here.')}</Typography>
+              <Typography>{t('dashboard.my_meetings_placeholder')}</Typography>
               {/* Hier würde die Virtualisierung für die Meeting-Liste implementiert */}
               <List>
                 {/* Beispiel für Listeneinträge */}

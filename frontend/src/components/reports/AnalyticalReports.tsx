@@ -42,14 +42,14 @@ const AnalyticalReports: React.FC = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 'bold' }}>
-        {t('sidebar.reports', 'Analytical Reports')}
+        {t('sidebar.reports')}
       </Typography>
 
       <Grid container spacing={3}>
         {/* Productivity Table */}
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 3, borderRadius: 3 }}>
-            <Typography variant="h6" gutterBottom>{t('dashboard.dept_performance', 'Team Productivity Overview')}</Typography>
+            <Typography variant="h6" gutterBottom>{t('dashboard.dept_performance')}</Typography>
             <Divider sx={{ mb: 2 }} />
             <ProductivityTable data={teamData} />
           </Paper>
@@ -58,7 +58,7 @@ const AnalyticalReports: React.FC = () => {
         {/* Efficiency Trend Placeholder */}
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 3, borderRadius: 3, bgcolor: '#f5f7fa', height: '100%' }}>
-            <Typography variant="h6" gutterBottom>{t('dashboard.efficiency_trend', 'Efficiency Trend')}</Typography>
+            <Typography variant="h6" gutterBottom>{t('dashboard.efficiency_trend')}</Typography>
             <Divider sx={{ mb: 2 }} />
             <Box sx={{ mt: 5, textAlign: 'center' }}>
               <Typography color="textSecondary">

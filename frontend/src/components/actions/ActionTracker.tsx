@@ -39,9 +39,9 @@ const ActionTracker: React.FC = () => {
     status: 'pending' | 'completed' | 'in_progress';
     due: string;
   }> = [
-    { id: 1, title: 'Fix API Bug', owner: 'Sami Ben Ali', priority: 'High', status: 'pending', due: '2026-02-21' },
-    { id: 2, title: 'Update Documentation', owner: 'Amel Trabelsi', priority: 'Medium', status: 'completed', due: '2026-02-25' },
-    { id: 3, title: 'Client Meeting Prep', owner: 'Mohamed Mahmoud', priority: 'High', status: 'pending', due: '2026-02-19' },
+    { id: 1, title: t('actions.mock_fix_bug'), owner: 'Sami Ben Ali', priority: 'High', status: 'pending', due: '2026-02-21' },
+    { id: 2, title: t('actions.mock_update_docs'), owner: 'Amel Trabelsi', priority: 'Medium', status: 'completed', due: '2026-02-25' },
+    { id: 3, title: t('actions.mock_client_prep'), owner: 'Mohamed Mahmoud', priority: 'High', status: 'pending', due: '2026-02-19' },
   ];
 
   const handleWhatsAppReminder = (owner: string) => {
@@ -51,12 +51,12 @@ const ActionTracker: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" sx={{ mb: 3 }}>{t('actions.tracker_title', 'Action Items Tracker')}</Typography>
+      <Typography variant="h4" sx={{ mb: 3 }}>{t('actions.tracker_title')}</Typography>
 
       <Paper sx={{ mb: 3, p: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
         <TextField
           size="small"
-          placeholder={t('common.search', 'Search actions...')}
+          placeholder={t('common.search')}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           InputProps={{
@@ -68,20 +68,20 @@ const ActionTracker: React.FC = () => {
           }}
           sx={{ flexGrow: 1 }}
         />
-        <Button startIcon={<FilterIcon />} variant="outlined">{t('common.filter', 'Filter')}</Button>
-        <Button variant="contained" color="primary">{t('actions.export', 'Export Report')}</Button>
+        <Button startIcon={<FilterIcon />} variant="outlined">{t('common.filter')}</Button>
+        <Button variant="contained" color="primary">{t('actions.export')}</Button>
       </Paper>
 
       <TableContainer component={Paper}>
         <Table>
           <TableHead sx={{ bgcolor: 'action.hover' }}>
             <TableRow>
-              <TableCell>{t('actions.title', 'Task')}</TableCell>
-              <TableCell>{t('actions.owner', 'Assigned To')}</TableCell>
-              <TableCell>{t('actions.priority', 'Priority')}</TableCell>
-              <TableCell>{t('actions.status', 'Status')}</TableCell>
-              <TableCell>{t('actions.due_date', 'Due Date')}</TableCell>
-              <TableCell align="right">{t('common.actions', 'Actions')}</TableCell>
+              <TableCell>{t('actions.title')}</TableCell>
+              <TableCell>{t('actions.owner')}</TableCell>
+              <TableCell>{t('actions.priority')}</TableCell>
+              <TableCell>{t('actions.status')}</TableCell>
+              <TableCell>{t('actions.due_date')}</TableCell>
+              <TableCell align="right">{t('common.actions')}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -91,7 +91,7 @@ const ActionTracker: React.FC = () => {
                 <TableCell>{action.owner}</TableCell>
                 <TableCell>
                   <Chip 
-                    label={action.priority} 
+                    label={t(`actions.priority_${action.priority.toLowerCase()}`, action.priority)}
                     size="small" 
                     color={action.priority === 'High' ? 'error' : 'warning'} 
                   />

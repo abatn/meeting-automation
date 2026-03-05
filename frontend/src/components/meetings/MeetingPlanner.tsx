@@ -41,8 +41,8 @@ const MeetingPlanner: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const holidays = [
-    { date: '2026-03-20', name: 'Independence Day' },
-    { date: '2026-04-09', name: 'Martyrs\' Day' },
+    { date: '2026-03-20', name: t('meetings.holiday_independence') },
+    { date: '2026-04-09', name: t('meetings.holiday_martyrs') },
   ];
 
   const participantOptions = [
@@ -88,20 +88,20 @@ const MeetingPlanner: React.FC = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" sx={{ mb: 3 }}>
-        {t('meetings.planner_title', 'Meeting Planner')}
+        {t('meetings.planner_title')}
       </Typography>
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={7}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              {t('meetings.new_meeting', 'Schedule New Meeting')}
+              {t('meetings.new_meeting')}
             </Typography>
             <Stack spacing={3} sx={{ mt: 2 }}>
               <TextField 
                 fullWidth 
-                label={t('meetings.title', 'Meeting Title')} 
-                placeholder="e.g. Weekly Strategy"
+                label={t('meetings.title')} 
+                placeholder={t('meetings.title_placeholder')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
@@ -110,26 +110,26 @@ const MeetingPlanner: React.FC = () => {
                 <TextField
                   fullWidth
                   type="date"
-                  label={t('meetings.date', 'Date')}
+                  label={t('meetings.date')}
                   value={meetingDate}
                   onChange={(e) => setMeetingDate(e.target.value)}
                   InputLabelProps={{ shrink: true }}
                 />
                 {holidayWarning && (
                   <Alert severity="warning" icon={<WarningIcon />} sx={{ mt: 1 }}>
-                    {t('meetings.holiday_warning', 'Selected date is a public holiday:')} {holidayWarning}
+                    {t('meetings.holiday_warning')} {holidayWarning}
                   </Alert>
                 )}
               </Box>
 
               <FormControl fullWidth>
-                <InputLabel id="participants-label">{t('meetings.participants', 'Add Participants')}</InputLabel>
+                <InputLabel id="participants-label">{t('meetings.participants')}</InputLabel>
                 <Select
                   labelId="participants-label"
                   multiple
                   value={selectedParticipants}
                   onChange={(e) => setSelectedParticipants(e.target.value as number[])}
-                  input={<OutlinedInput label={t('meetings.participants', 'Add Participants')} />}
+                  input={<OutlinedInput label={t('meetings.participants')} />}
                 >
                   {participantOptions.map((opt) => (
                     <MenuItem key={opt.id} value={opt.id}>
@@ -146,7 +146,7 @@ const MeetingPlanner: React.FC = () => {
                 disabled={!!holidayWarning || !title || isSubmitting}
                 onClick={handleCreate}
               >
-                {t('meetings.create', 'Create Meeting')}
+                {t('meetings.create')}
               </Button>
             </Stack>
           </Paper>
@@ -156,14 +156,14 @@ const MeetingPlanner: React.FC = () => {
           <Paper sx={{ p: 2, bgcolor: 'action.hover' }}>
             <Typography variant="subtitle1" gutterBottom>
               <CalendarIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-              {t('meetings.upcoming_holidays', 'Upcoming Holidays (Tunisia)')}
+              {t('meetings.upcoming_holidays')}
             </Typography>
             <List dense>
               {holidays.map((h, i) => (
                 <ListItem key={i}>
                   <ListItemIcon><EventIcon fontSize="small" /></ListItemIcon>
                   <ListItemText primary={h.name} secondary={h.date} />
-                  <Chip label="Holiday" size="small" color="error" variant="outlined" />
+                  <Chip label={t('meetings.holiday')} size="small" color="error" variant="outlined" />
                 </ListItem>
               ))}
             </List>
@@ -173,5 +173,6 @@ const MeetingPlanner: React.FC = () => {
     </Box>
   );
 };
+
 
 export default MeetingPlanner;

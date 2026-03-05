@@ -28,11 +28,11 @@ const Navbar: React.FC = () => {
     >
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          {t('common.appName', 'Meeting Automation')}
+          {t('common.appName')}
         </Typography>
         
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton color="inherit" onClick={toggleLanguage} title={t('common.toggleLanguage', 'Toggle Language')}>
+          <IconButton color="inherit" onClick={toggleLanguage} title={t('common.toggleLanguage')}>
             <LanguageIcon />
             <Typography variant="body2" sx={{ ml: 1, display: { xs: 'none', sm: 'block' } }}>
               {i18n.language.toUpperCase()}
@@ -49,7 +49,7 @@ const Navbar: React.FC = () => {
                 startIcon={<LogoutIcon />}
                 onClick={() => dispatch(logout())}
               >
-                {t('auth.logout', 'Logout')}
+                {t('auth.logout')}
               </Button>
             </>
           )}

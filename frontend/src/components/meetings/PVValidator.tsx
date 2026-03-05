@@ -80,11 +80,11 @@ const PVValidator: React.FC = () => {
       {error && !pvContent && <Alert severity="info" sx={{ mb: 2 }}>{error}</Alert>}
       
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h5">{t('pv.validator_title', 'PV Validation Workflow')}</Typography>
+        <Typography variant="h5">{t('pv.validator_title')}</Typography>
         <Stack direction="row" spacing={2}>
-          <Button variant="outlined" startIcon={<HistoryIcon />}>{t('pv.versions', 'Versions')}</Button>
+          <Button variant="outlined" startIcon={<HistoryIcon />}>{t('pv.versions')}</Button>
           {pvId && <PDFDownloadButton pvId={pvId} variant="outlined" />}
-          <Button variant="contained" color="success" startIcon={<ApproveIcon />}>{t('pv.approve', 'Approve & Sign')}</Button>
+          <Button variant="contained" color="success" startIcon={<ApproveIcon />}>{t('pv.approve')}</Button>
         </Stack>
       </Box>
 
@@ -93,7 +93,7 @@ const PVValidator: React.FC = () => {
         <Grid item xs={12} md={5} sx={{ height: '100%' }}>
           <Paper sx={{ p: 2, height: '100%', overflowY: 'auto', bgcolor: '#f8f9fa' }}>
             <Typography variant="subtitle2" gutterBottom color="textSecondary">
-              {t('pv.original_transcript', 'Original Transcription (Whisper)')}
+              {t('pv.original_transcript')}
             </Typography>
             <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
               {originalTranscript || 'No transcription available yet.'}
@@ -106,7 +106,7 @@ const PVValidator: React.FC = () => {
           <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography variant="subtitle2" color="primary">
-                {t('pv.ai_draft', 'AI-Generated PV Draft (Mistral)')}
+                {t('pv.ai_draft')}
               </Typography>
               <Tooltip title="Save Draft">
                 <IconButton size="small"><SaveIcon fontSize="small" /></IconButton>
@@ -127,7 +127,7 @@ const PVValidator: React.FC = () => {
             />
             <Box sx={{ mt: 2, p: 2, border: '1px dashed #ccc', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                 <EditIcon fontSize="small" /> {t('pv.signature_placeholder', 'Electronic Signature Area (ISO 27001)')}
+                 <EditIcon fontSize="small" /> {t('pv.signature_placeholder')}
                </Typography>
             </Box>
           </Paper>

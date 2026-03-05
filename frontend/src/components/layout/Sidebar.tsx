@@ -16,10 +16,10 @@ const Sidebar: React.FC = () => {
   const location = useLocation();
 
   const menuItems = [
-    { text: t('sidebar.dashboard', 'Dashboard'), icon: <DashboardIcon />, path: '/' },
-    { text: t('sidebar.meetings', 'Meetings'), icon: <EventIcon />, path: '/meetings' },
-    { text: t('sidebar.actions', 'Action Items'), icon: <AssignmentIcon />, path: '/actions' },
-    { text: t('sidebar.reports', 'Reports'), icon: <AssessmentIcon />, path: '/reports' },
+    { text: t('sidebar.dashboard'), icon: <DashboardIcon />, path: '/' },
+    { text: t('sidebar.meetings'), icon: <EventIcon />, path: '/meetings' },
+    { text: t('sidebar.actions'), icon: <AssignmentIcon />, path: '/actions' },
+    { text: t('sidebar.reports'), icon: <AssessmentIcon />, path: '/reports' },
   ];
 
   return (
@@ -74,7 +74,7 @@ const Sidebar: React.FC = () => {
               <ListItemIcon>
                 <SecurityIcon />
               </ListItemIcon>
-              <ListItemText primary={t('sidebar.security', 'Security & MFA')} />
+              <ListItemText primary={t('sidebar.security')} />
             </ListItemButton>
           </ListItem>
         </List>

@@ -39,7 +39,7 @@ const PDFDownloadButton: React.FC<Props> = ({ pvId, fileName, variant = 'contain
       
     } catch (err: any) {
       console.error('Download failed', err);
-      setError(t('pv.download_error', 'Error downloading PDF'));
+      setError(t('pv.download_error'));
     } finally {
       setDownloading(false);
     }
@@ -55,7 +55,7 @@ const PDFDownloadButton: React.FC<Props> = ({ pvId, fileName, variant = 'contain
         startIcon={downloading ? <CircularProgress size={20} color="inherit" /> : <PdfIcon />}
         sx={{ minWidth: 120 }}
       >
-        {downloading ? t('common.downloading', 'جاري التحميل...') : t('pv.download_pdf', 'تحميل PDF')}
+        {downloading ? t('common.downloading') : t('pv.download_pdf')}
       </Button>
       
       <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
