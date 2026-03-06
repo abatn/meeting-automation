@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import Column, String, Boolean, Table, ForeignKey, DateTime
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -8,6 +8,12 @@ from datetime import datetime
 from app.core.database import Base
 from sqlalchemy_utils import EncryptedType
 from app.core.config import settings
+
+# TYPE_CHECKING imports
+if TYPE_CHECKING:
+    from app.models.meeting import Meeting
+    from app.models.audit_log import AuditLog
+    from app.models.role import Role
 
 
 class UserRole(str, enum.Enum):
