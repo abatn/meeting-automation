@@ -29,7 +29,7 @@ class ReportService:
     ) -> Any:
         """Helper: Versucht Daten aus Redis zu laden, berechnet sonst neu"""
         try:
-            cached_data = self.redis_client.get(key)
+            cached_data = await self.redis_client.get(key)
             if cached_data:
                 return json.loads(cached_data)
         except Exception as e:
@@ -38,7 +38,7 @@ class ReportService:
         data = await compute_func()
 
         try:
-            self.redis_client.setex(key, ttl, json.dumps(data))
+            await self.redis_client.setex(key, ttl, json.dumps(data))
         except Exception as e:
             logger.warning(f"Redis cache save error: {e}")
 

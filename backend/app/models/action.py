@@ -1,7 +1,10 @@
+from __future__ import annotations
+from typing import List, Optional
 from sqlalchemy import Column, String, ForeignKey, DateTime, Text, Enum as SQLEnum
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 import enum
+from datetime import datetime
 from app.core.database import Base
 
 
@@ -16,43 +19,61 @@ class ActionStatus(str, enum.Enum):
 class Action(Base):
     __tablename__ = "actions"
 
-    id = Column(String, primary_key=True, index=True)
-    meeting_id = Column(
-        String, ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False
+    id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    meeting_id: Mapped[str] = mapped_column(
+        String, ForeignKey("meetings.id", ondelete="CASCADE")
     )
 
-    title = Column(String, nullable=False)
-    description = Column(Text)
-    status = Column(SQLEnum(ActionStatus), default=ActionStatus.PENDING)
-    priority = Column(String, default="medium")  # low, medium, high, urgent
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[ActionStatus] = mapped_column(
+        SQLEnum(ActionStatus), default=ActionStatus.PENDING
+    )
+    priority: Mapped[str] = mapped_column(String, default="medium")
 
-    due_date = Column(DateTime(timezone=True))
-    completed_at = Column(DateTime(timezone=True))
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
 
     # Relationships
-    meeting = relationship("Meeting", back_populates="actions")
-    assignments = relationship(
+    meeting: Mapped["Meeting"] = relationship("Meeting", back_populates="actions")
+    assignments: Mapped[List["Assignment"]] = relationship(
         "Assignment", back_populates="action", cascade="all, delete-orphan"
     )
+
+    @property
+    def assignee_id(self) -> Optional[str]:
+        if self.assignments:
+            return self.assignments[0].user_id
+        return None
 
 
 class Assignment(Base):
     __tablename__ = "action_assignments"
 
-    id = Column(String, primary_key=True, index=True)
-    action_id = Column(
-        String, ForeignKey("actions.id", ondelete="CASCADE"), nullable=False
+    id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    action_id: Mapped[str] = mapped_column(
+        String, ForeignKey("actions.id", ondelete="CASCADE")
     )
-    user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    user_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("users.id"), nullable=True
+    )
 
     # In case user is not in system yet
-    external_email = Column(String)
-    external_name = Column(String)
+    external_email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    external_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
-    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+    assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
-    action = relationship("Action", back_populates="assignments")
-    user = relationship("User")
+    action: Mapped["Action"] = relationship("Action", back_populates="assignments")
+    user: Mapped["User"] = relationship("User")

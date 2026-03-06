@@ -10,6 +10,7 @@ import redis
 import boto3
 from botocore.exceptions import ClientError
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.tasks.celery_app import celery_app
 from app.core.config import settings
@@ -24,12 +25,17 @@ from app.services.diarization_service import DiarizationService
 
 
 logger = logging.getLogger(__name__)
-redis_client = redis.Redis.from_url(settings.REDIS_URL)
 
 
-def publish_status(recording_id: str, status: str, progress: int, message: str = ""):
-    """Hilfsfunktion, um Status-Updates an Redis zu senden"""
+def get_redis_client() -> redis.Redis:
+    # This ensures a new connection is created if one doesn't exist in the context
+    return redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+
+
+def publish_status(recording_id: str, status: str, progress: int, message: str = "") -> None:
+    """Helper to publish status updates to Redis for WebSockets."""
     try:
+        redis_client = get_redis_client()
         channel = f"transcription_status_{recording_id}"
         payload = {
             "status": status,
@@ -44,15 +50,13 @@ def publish_status(recording_id: str, status: str, progress: int, message: str =
 def match_timestamps(
     words: List[Dict[str, Any]], segments: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
-    """
-    Match Whisper words with Pyannote segments based on time midpoint.
-    """
+    """Match Whisper words with Pyannote segments."""
     if not segments or not words:
         return []
 
     segments.sort(key=lambda x: x['start'])
-    matched_blocks = []
-    current_block = None
+    matched_blocks: List[Dict[str, Any]] = []
+    current_block: Optional[Dict[str, Any]] = None
 
     for word_info in words:
         word = word_info.get("word", "")
@@ -60,19 +64,12 @@ def match_timestamps(
         end = word_info.get("end", 0.0)
         midpoint = (start + end) / 2
 
-        closest_segment = None
-        for seg in segments:
-            if seg['start'] <= midpoint <= seg['end']:
-                closest_segment = seg
-                break
+        closest_segment = next(
+            (seg for seg in segments if seg['start'] <= midpoint <= seg['end']),
+            min(segments, key=lambda s: min(abs(s['start'] - midpoint), abs(s['end'] - midpoint)))
+        )
 
-        if not closest_segment:
-            closest_segment = min(
-                segments,
-                key=lambda s: min(abs(s['start'] - midpoint), abs(s['end'] - midpoint))
-            )
-
-        speaker = closest_segment['speaker']
+        speaker = str(closest_segment['speaker'])
 
         if current_block is None or current_block['speaker'] != speaker:
             if current_block:
@@ -92,8 +89,8 @@ def match_timestamps(
     return matched_blocks
 
 
-async def _process_recording_pipeline(recording_id: str):
-    publish_status(recording_id, "uploaded", 0, "Audio hochgeladen...")
+async def _process_recording_pipeline(recording_id: str) -> None:
+    publish_status(recording_id, "uploaded", 0, "Audio uploaded, starting processing...")
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Recording).where(Recording.id == recording_id))
@@ -101,80 +98,81 @@ async def _process_recording_pipeline(recording_id: str):
 
         if not recording:
             logger.error(f"Recording {recording_id} not found")
-            publish_status(recording_id, "failed", 0, "Recording nicht gefunden")
+            publish_status(recording_id, "failed", 0, "Recording not found in DB")
             return
 
         recording.status = "transcribing"
         await db.commit()
 
+        temp_path: Optional[str] = None
         try:
-            # 1. Download
-            temp_path = await _download_audio(recording.file_path)
+            temp_path = await _download_audio(str(recording.file_path))
             if not temp_path:
-                publish_status(recording_id, "failed", 0, "S3-Download Fehler")
-                return
+                raise Exception("S3 Download failed")
 
-            # 2. Diarization
-            publish_status(recording_id, "transcribing", 25, "Sprechererkennung...")
+            publish_status(recording_id, "transcribing", 25, "Speaker diarization...")
             speaker_segments = await DiarizationService.diarize(temp_path)
 
-            # 3. Whisper
-            publish_status(recording_id, "transcribing", 50, "Transkription...")
+            publish_status(recording_id, "transcribing", 50, "Transcription...")
             trans_res = await transcribe_audio(temp_path, word_timestamps=True)
 
-            # 4. Processing
-            publish_status(recording_id, "transcribing", 75, "Verarbeitung...")
+            publish_status(recording_id, "transcribing", 75, "Matching results...")
             await _handle_ai_results(db, recording, speaker_segments, trans_res)
 
-            publish_status(recording_id, "completed", 100, "Erfolgreich!")
-            await _notify_n8n_completion(recording_id, recording.meeting_id)
+            publish_status(recording_id, "completed", 100, "Processing complete!")
+            await _notify_n8n_completion(str(recording.id), str(recording.meeting_id))
 
         except Exception as e:
             logger.error(f"Error in transcription pipeline: {e}")
             recording.status = "failed"
             await db.commit()
-            publish_status(recording_id, "failed", 0, "Fehler aufgetreten")
+            publish_status(recording_id, "failed", 0, f"Error: {str(e)}")
         finally:
-            if 'temp_path' in locals() and os.path.exists(temp_path):
+            if temp_path and os.path.exists(temp_path):
                 os.remove(temp_path)
 
 
 async def _download_audio(file_key: str) -> Optional[str]:
     s3_client = boto3.client(
         's3',
-        endpoint_url=getattr(settings, 'S3_ENDPOINT', 'http://minio:9000'),
-        aws_access_key_id=getattr(settings, 'S3_ACCESS_KEY', 'minio_user'),
-        aws_secret_access_key=getattr(settings, 'S3_SECRET_KEY', 'minio_password')
+        endpoint_url=settings.S3_ENDPOINT,
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY
     )
-    bucket = getattr(settings, 'S3_BUCKET_NAME', 'meeting-recordings')
     try:
-        response = s3_client.get_object(Bucket=bucket, Key=file_key)
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            for chunk in response['Body'].iter_chunks(1024 * 1024):
-                tmp.write(chunk)
+            s3_client.download_fileobj(settings.S3_BUCKET_NAME, file_key, tmp)
             return tmp.name
     except ClientError as e:
-        logger.critical(f"S3-Download fehlgeschlagen: {e}")
+        logger.critical(f"S3 Download failed: {e}")
         return None
 
 
-async def _handle_ai_results(db, recording, speaker_segments, trans_res):
+async def _handle_ai_results(
+    db: AsyncSession,
+    recording: Recording,
+    speaker_segments: List[Dict[str, Any]],
+    trans_res: Dict[str, Any],
+) -> None:
     if not speaker_segments:
         words = trans_res.get("words", [])
         end_time = words[-1].get("end", 0.0) if words else 0.0
         speaker_segments = [{"speaker": "SPEAKER_00", "start": 0.0, "end": end_time}]
 
     matched = match_timestamps(trans_res.get("words", []), speaker_segments)
-    mistral_text = "\n".join([f"{b['speaker']}: {b['text']}" for b in matched]) \
-        if matched else trans_res.get("text", "")
+    mistral_text = (
+        "\\n".join(f"{b['speaker']}: {b['text']}" for b in matched)
+        if matched
+        else trans_res.get("text", "")
+    )
 
     db_trans = Transcription(
         id=str(uuid.uuid4()),
-        recording_id=recording.id,
-        meeting_id=recording.meeting_id,
+        recording_id=str(recording.id),
+        meeting_id=str(recording.meeting_id),
         full_text=trans_res.get("text", ""),
         language="de",
-        segments=matched if matched else None
+        segments=matched or None,
     )
     db.add(db_trans)
     recording.status = "analyzing"
@@ -186,7 +184,9 @@ async def _handle_ai_results(db, recording, speaker_segments, trans_res):
     await db.commit()
 
 
-async def _save_pv_and_actions(db, recording, pv_data):
+async def _save_pv_and_actions(
+    db: AsyncSession, recording: Recording, pv_data: Dict[str, Any]
+) -> None:
     summary = pv_data.get('summary', '')
     decisions = '<br/>'.join([f'- {d}' for d in pv_data.get('decisions', [])])
     html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><p>{decisions}</p>"
@@ -202,28 +202,30 @@ async def _save_pv_and_actions(db, recording, pv_data):
     else:
         db_pv = PV(
             id=str(uuid.uuid4()),
-            meeting_id=recording.meeting_id,
+            meeting_id=str(recording.meeting_id),
             title=pv_data.get('title', 'Meeting PV'),
             content_html=html,
-            status='draft'
+            status='draft',
         )
         db.add(db_pv)
 
     for action_item in pv_data.get("actions", []):
-        db.add(Action(
-            id=str(uuid.uuid4()),
-            meeting_id=recording.meeting_id,
-            title=action_item["description"],
-            description=action_item.get("priority_reason", ""),
-            status="pending"
-        ))
+        db.add(
+            Action(
+                id=str(uuid.uuid4()),
+                meeting_id=str(recording.meeting_id),
+                title=action_item.get("description", "N/A"),
+                description=action_item.get("priority_reason", ""),
+                status="pending",
+            )
+        )
 
 
-async def _notify_n8n_completion(recording_id: str, meeting_id: str):
+async def _notify_n8n_completion(recording_id: str, meeting_id: str) -> None:
     payload = {
         "event": "transcription.completed",
         "recording_id": recording_id,
-        "meeting_id": meeting_id
+        "meeting_id": meeting_id,
     }
     try:
         async with httpx.AsyncClient() as client:
@@ -235,7 +237,6 @@ async def _notify_n8n_completion(recording_id: str, meeting_id: str):
 
 
 @celery_app.task(name="process_recording")
-def process_recording(recording_id: str):
+def process_recording(recording_id: str) -> None:
     """Celery task wrapper for the async pipeline"""
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(_process_recording_pipeline(recording_id))
+    asyncio.run(_process_recording_pipeline(recording_id))

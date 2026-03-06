@@ -1,11 +1,13 @@
 import httpx
 import logging
-from typing import List
+import uuid
+from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from datetime import datetime, timedelta
 
-from app.models.action import Action
+from app.models.action import Action, Assignment
+from app.models.pv import PV
 from app.core.config import settings
 
 
@@ -16,15 +18,25 @@ class ActionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def extract_actions_from_pv(self, pv_id: int, actions_data: List[dict]):
+    async def extract_actions_from_pv(self, pv_id: str, actions_data: List[dict]) -> List[Action]:
         """n8n-Callback von Mistral verarbeiten"""
+        # Lookup meeting_id from PV
+        pv_res = await self.db.execute(select(PV).where(PV.id == pv_id))
+        pv = pv_res.scalar_one_or_none()
+        if not pv:
+            logger.error(f"PV {pv_id} not found. Cannot extract actions.")
+            return []
+
+        meeting_id = pv.meeting_id
         new_actions = []
+
         for item in actions_data:
+            action_id = str(uuid.uuid4())
             action = Action(
-                pv_id=pv_id,
-                title=item.get("title"),
-                description=item.get("description"),
-                assignee_id=item.get("assignee_id"),
+                id=action_id,
+                meeting_id=meeting_id,
+                title=item.get("title", "Untitled Action"),
+                description=item.get("description", ""),
                 due_date=datetime.fromisoformat(item["due_date"])
                 if item.get("due_date") else None,
                 status="pending"
@@ -32,31 +44,52 @@ class ActionService:
             self.db.add(action)
             new_actions.append(action)
 
+            assignee_id = item.get("assignee_id")
+            if assignee_id:
+                assignment = Assignment(
+                    id=str(uuid.uuid4()),
+                    action_id=action_id,
+                    user_id=assignee_id
+                )
+                self.db.add(assignment)
+
         await self.db.commit()
 
         # Trigger notifications for each assigned action
         for action in new_actions:
-            if action.assignee_id:
-                await self.assign_action(action.id, action.assignee_id)
+            if action.assignments and action.assignments[0].user_id:
+                await self.assign_action(str(action.id), str(action.assignments[0].user_id))
 
         return new_actions
 
-    async def assign_action(self, action_id: int, user_id: int):
+    async def assign_action(self, action_id: str, user_id: str) -> Optional[Action]:
         """Verantwortlichen zuweisen -> WhatsApp Reminder via n8n"""
         result = await self.db.execute(select(Action).where(Action.id == action_id))
-        action = result.scalars().first()
+        action = result.scalar_one_or_none()
 
         if not action:
             return None
 
-        action.assignee_id = user_id
-        await self.db.commit()
+        # Check if assignment already exists
+        assignment_result = await self.db.execute(
+            select(Assignment).where(Assignment.action_id == action_id, Assignment.user_id == user_id)
+        )
+        existing_assignment = assignment_result.scalar_one_or_none()
+
+        if not existing_assignment:
+            assignment = Assignment(
+                id=str(uuid.uuid4()),
+                action_id=action_id,
+                user_id=user_id
+            )
+            self.db.add(assignment)
+            await self.db.commit()
 
         # WhatsApp Reminder via n8n
         payload = {
             "event": "action.assigned",
             "action_id": action.id,
-            "title": action.title,
+            "title": str(action.title),
             "assignee_id": user_id,
             "due_date": action.due_date.isoformat() if action.due_date else None
         }
@@ -70,15 +103,16 @@ class ActionService:
 
         return action
 
-    async def update_action_status(self, action_id: int, status: str):
+    async def update_action_status(self, action_id: str, status: str) -> Optional[Action]:
         """Status-Änderung -> n8n Notification"""
         result = await self.db.execute(select(Action).where(Action.id == action_id))
-        action = result.scalars().first()
+        action = result.scalar_one_or_none()
 
         if not action:
             return None
 
-        action.status = status
+        # Hack for enum
+        action.status = status  # type: ignore
         await self.db.commit()
 
         # n8n Notification (e.g., to Manager)
@@ -86,7 +120,7 @@ class ActionService:
             "event": "action.status_updated",
             "action_id": action.id,
             "status": status,
-            "title": action.title
+            "title": str(action.title)
         }
 
         try:
@@ -105,9 +139,9 @@ class ActionService:
                 Action.due_date <= tomorrow, Action.status != "completed"
             )
         )
-        return result.scalars().all()
+        return list(result.scalars().all())
 
-    async def escalate_overdue(self, action_id: int):
+    async def escalate_overdue(self, action_id: str) -> None:
         """Eskalation an Manager"""
         payload = {
             "event": "action.escalate",

@@ -1,7 +1,10 @@
+from __future__ import annotations
+from typing import List, Optional
 from sqlalchemy import Column, String, ForeignKey, DateTime, Text, Integer, Enum as SQLEnum
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 import enum
+from datetime import datetime
 from app.core.database import Base
 
 
@@ -15,57 +18,67 @@ class MeetingStatus(str, enum.Enum):
 class Meeting(Base):
     __tablename__ = "meetings"
 
-    id = Column(String, primary_key=True, index=True)
-    title = Column(String, index=True, nullable=False)
-    description = Column(Text)
-    location = Column(String)
-    status = Column(SQLEnum(MeetingStatus), default=MeetingStatus.PLANNED)
+    id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    status: Mapped[MeetingStatus] = mapped_column(
+        SQLEnum(MeetingStatus), default=MeetingStatus.PLANNED
+    )
 
-    start_time = Column(DateTime(timezone=True), nullable=False)
-    end_time = Column(DateTime(timezone=True))
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    end_time: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
-    creator_id = Column(String, ForeignKey("users.id"))
+    creator_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"))
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    deleted_at = Column(DateTime(timezone=True), nullable=True)  # Soft Delete
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Relationships
-    creator = relationship("User", back_populates="created_meetings")
-    participants = relationship(
+    creator: Mapped["User"] = relationship("User", back_populates="created_meetings")
+    participants: Mapped[List["Participant"]] = relationship(
         "Participant", back_populates="meeting", cascade="all, delete-orphan"
     )
-    agendas = relationship(
+    agendas: Mapped[List["Agenda"]] = relationship(
         "Agenda", back_populates="meeting", cascade="all, delete-orphan"
     )
-    recordings = relationship("Recording", back_populates="meeting")
-    transcriptions = relationship("Transcription", back_populates="meeting")
-    actions = relationship("Action", back_populates="meeting")
-    pv = relationship("PV", back_populates="meeting", uselist=False)
+    recordings: Mapped[List["Recording"]] = relationship("Recording", back_populates="meeting")
+    transcriptions: Mapped[List["Transcription"]] = relationship(
+        "Transcription", back_populates="meeting"
+    )
+    actions: Mapped[List["Action"]] = relationship("Action", back_populates="meeting")
+    pv: Mapped[Optional["PV"]] = relationship("PV", back_populates="meeting", uselist=False)
 
 
 class Participant(Base):
     __tablename__ = "participants"
 
-    id = Column(String, primary_key=True, index=True)
-    meeting_id = Column(String, ForeignKey("meetings.id", ondelete="CASCADE"))
-    user_id = Column(
-        String, ForeignKey("users.id"), nullable=True
-    )  # Optional link to registered user
-    email = Column(String, nullable=False)
-    name = Column(String)
-    role = Column(String)  # e.g., "Moderator", "Secretary", "Participant"
+    id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    meeting_id: Mapped[str] = mapped_column(String, ForeignKey("meetings.id", ondelete="CASCADE"))
+    user_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("users.id"), nullable=True)
+    email: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    role: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
-    meeting = relationship("Meeting", back_populates="participants")
+    meeting: Mapped["Meeting"] = relationship("Meeting", back_populates="participants")
 
 
 class Agenda(Base):
     __tablename__ = "agendas"
 
-    id = Column(String, primary_key=True, index=True)
-    meeting_id = Column(String, ForeignKey("meetings.id"))
-    title = Column(String)
-    description = Column(String, nullable=True)
-    order = Column(Integer, default=0)
+    id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    meeting_id: Mapped[str] = mapped_column(String, ForeignKey("meetings.id"))
+    title: Mapped[str] = mapped_column(String)
+    description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    order: Mapped[int] = mapped_column(Integer, default=0)
 
-    meeting = relationship("Meeting", back_populates="agendas")
+    meeting: Mapped["Meeting"] = relationship("Meeting", back_populates="agendas")

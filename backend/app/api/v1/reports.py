@@ -80,9 +80,8 @@ async def get_dashboard_data(
         managed_user_ids = [report.id for report in current_user.reports]
         if not managed_user_ids:
             return ManagerDashboard(
-                meeting_stats=MeetingStats(total=0, completed=0, scheduled=0),
+                meeting_stats=MeetingStats(completed=0, scheduled=0),
                 action_stats=ActionStats(pending=0, completed=0),
-                team_members_count=0,
                 team_productivity=[],
                 efficiency_trend=[]
             )
@@ -122,7 +121,6 @@ async def get_dashboard_data(
 
         return ManagerDashboard(
             meeting_stats=MeetingStats(
-                total=total_team_meetings,
                 completed=completed_team_meetings,
                 scheduled=total_team_meetings - completed_team_meetings
             ),
@@ -130,7 +128,6 @@ async def get_dashboard_data(
                 pending=pending_team_actions,
                 completed=completed_team_actions
             ),
-            team_members_count=len(managed_user_ids),
             team_productivity=[],
             efficiency_trend=[]
         )

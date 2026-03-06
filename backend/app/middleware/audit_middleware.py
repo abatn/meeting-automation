@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Callable
+from typing import Callable, Optional
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from jose import jwt, JWTError
@@ -12,24 +12,18 @@ from app.core.config import settings
 
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable):
-        # 1. Skip auditing for non-modifying requests OR heavy file uploads
         path = request.url.path
-        if request.method not in ["POST", "PUT", "PATCH", "DELETE"] or \
-           "/recordings/upload" in path:
+        if (request.method not in ["POST", "PUT", "PATCH", "DELETE"] or
+                "/recordings/upload" in path):
             return await call_next(request)
 
-        # 2. Extract user_id from JWT if present
         user_id = self._get_user_id(request)
-
-        # 3. Process request first
         response = await call_next(request)
-
-        # 4. Perform audit logging after response is ready
         await self._log_audit(request, user_id)
 
         return response
 
-    def _get_user_id(self, request: Request) -> str:
+    def _get_user_id(self, request: Request) -> Optional[str]:
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
             return None
@@ -38,11 +32,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
             payload = jwt.decode(
                 token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
             )
-            return payload.get("sub")
+            sub = payload.get("sub")
+            return str(sub) if sub else None
         except JWTError:
             return None
 
-    async def _log_audit(self, request: Request, user_id: str):
+    async def _log_audit(self, request: Request, user_id: Optional[str]):
         try:
             async with AsyncSessionLocal() as db:
                 valid_user_id = None
