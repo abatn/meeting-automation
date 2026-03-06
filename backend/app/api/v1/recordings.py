@@ -29,7 +29,7 @@ async def upload_recording(
     """
     Upload an audio recording for a specific meeting.
     """
-    if not file.content_type.startswith("audio/"):
+    if file.content_type is None or not file.content_type.startswith("audio/"):
         raise HTTPException(status_code=400, detail="File must be an audio recording")
 
     service = RecordingService(db)

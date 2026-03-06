@@ -27,7 +27,7 @@ class RecordingService:
         )
 
     async def upload_recording(
-        self, meeting_id: str, file: UploadFile, recording_id: str = None
+        self, meeting_id: str, file: UploadFile, recording_id: Optional[str] = None
     ) -> Recording:
         """Audio zu Minio/S3 hochladen und DB aktualisieren/erstellen"""
         file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_{file.filename}"
@@ -56,14 +56,14 @@ class RecordingService:
             # Update existing record
             db_recording.file_path = file_key
             db_recording.status = "uploaded"
-            db_recording.format = file.content_type
+            db_recording.format = file.content_type or "unknown"
         else:
             # Save new to DB
             db_recording = Recording(
                 id=recording_id or str(uuid.uuid4()),
                 meeting_id=meeting_id,
                 file_path=file_key,
-                status="uploaded",
+                status="uploaded", # Ensure status is always a string
                 format=file.content_type,
                 created_at=datetime.utcnow()
             )
