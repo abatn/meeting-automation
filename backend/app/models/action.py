@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import Column, String, ForeignKey, DateTime, Text, Enum as SQLEnum
+from sqlalchemy import String, ForeignKey, DateTime, Text, Enum as SQLEnum
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 import enum

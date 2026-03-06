@@ -77,8 +77,6 @@ class User(Base):
     manager_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey('users.id'), nullable=True)
     reports: Mapped[List["User"]] = relationship(back_populates="manager")
     manager: Mapped["User"] = relationship(back_populates="reports", remote_side=[id])
-
-
     # Relationships
     roles: Mapped[List["Role"]] = relationship(
         secondary=user_roles, back_populates="users", lazy="selectin"
