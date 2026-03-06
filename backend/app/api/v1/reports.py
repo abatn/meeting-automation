@@ -1,23 +1,23 @@
 from datetime import datetime
 from typing import Any
+
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
-from app.schemas.report import ManagerDashboard, MeetingStats, ActionStats
-from app.models.user import User as UserModel
-from app.models.meeting import (
-    Meeting as MeetingModel,
-    MeetingStatus,
-    Participant as ParticipantModel,
-)
+from app.models.action import Action as ActionModel
 from app.models.action import (
-    Action as ActionModel,
     ActionStatus,
-    Assignment as AssignmentModel,
 )
-
+from app.models.action import Assignment as AssignmentModel
+from app.models.meeting import Meeting as MeetingModel
+from app.models.meeting import (
+    MeetingStatus,
+)
+from app.models.meeting import Participant as ParticipantModel
+from app.models.user import User as UserModel
+from app.schemas.report import ActionStats, ManagerDashboard, MeetingStats
 
 router = APIRouter()
 
@@ -31,7 +31,7 @@ async def get_dashboard_data(
     """
     Get dashboard data based on user role.
     """
-    if role == 'dg':
+    if role == "dg":
         # --- ECHTE DATENBANKLOGIK FÜR DG DASHBOARD ---
 
         # 1. Total and Completed Meetings
@@ -67,13 +67,13 @@ async def get_dashboard_data(
             "completed_meetings": completed_meetings,
             "pending_actions": pending_actions,
             "action_status_distribution": {
-                "completed": action_status_distribution.get('completed', 0),
-                "in_progress": action_status_distribution.get('in_progress', 0),
-                "open": action_status_distribution.get('pending', 0)
-            }
+                "completed": action_status_distribution.get("completed", 0),
+                "in_progress": action_status_distribution.get("in_progress", 0),
+                "open": action_status_distribution.get("pending", 0),
+            },
         }
 
-    elif role == 'manager':
+    elif role == "manager":
         # --- DATENBANKLOGIK FÜR MANAGER DASHBOARD ---
 
         # 1. Managed User IDs
@@ -83,18 +83,22 @@ async def get_dashboard_data(
                 meeting_stats=MeetingStats(completed=0, scheduled=0),
                 action_stats=ActionStats(pending=0, completed=0),
                 team_productivity=[],
-                efficiency_trend=[]
+                efficiency_trend=[],
             )
 
         # 2. Total and Completed Meetings for Team
-        team_meetings_query = select(func.count(MeetingModel.id)) \
-            .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id) \
+        team_meetings_query = (
+            select(func.count(MeetingModel.id))
+            .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
             .where(ParticipantModel.user_id.in_(managed_user_ids))
+        )
 
-        team_completed_meetings_query = select(func.count(MeetingModel.id)) \
-            .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id) \
-            .where(ParticipantModel.user_id.in_(managed_user_ids)) \
+        team_completed_meetings_query = (
+            select(func.count(MeetingModel.id))
+            .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
+            .where(ParticipantModel.user_id.in_(managed_user_ids))
             .where(MeetingModel.status == MeetingStatus.COMPLETED)
+        )
 
         total_team_meetings = (await db.execute(team_meetings_query)).scalar_one()
         completed_team_meetings = (
@@ -102,18 +106,24 @@ async def get_dashboard_data(
         ).scalar_one()
 
         # 3. Pending Actions for Team
-        team_pending_actions_query = select(func.count(ActionModel.id)) \
-            .join(AssignmentModel, ActionModel.id == AssignmentModel.action_id) \
-            .where(AssignmentModel.user_id.in_(managed_user_ids)) \
+        team_pending_actions_query = (
+            select(func.count(ActionModel.id))
+            .join(AssignmentModel, ActionModel.id == AssignmentModel.action_id)
+            .where(AssignmentModel.user_id.in_(managed_user_ids))
             .where(ActionModel.status == ActionStatus.PENDING)
+        )
 
-        pending_team_actions = (await db.execute(team_pending_actions_query)).scalar_one()
+        pending_team_actions = (
+            await db.execute(team_pending_actions_query)
+        ).scalar_one()
 
         # 4. Completed Actions for Team
-        team_completed_actions_query = select(func.count(ActionModel.id)) \
-            .join(AssignmentModel, ActionModel.id == AssignmentModel.action_id) \
-            .where(AssignmentModel.user_id.in_(managed_user_ids)) \
+        team_completed_actions_query = (
+            select(func.count(ActionModel.id))
+            .join(AssignmentModel, ActionModel.id == AssignmentModel.action_id)
+            .where(AssignmentModel.user_id.in_(managed_user_ids))
             .where(ActionModel.status == ActionStatus.COMPLETED)
+        )
 
         completed_team_actions = (
             await db.execute(team_completed_actions_query)
@@ -122,38 +132,60 @@ async def get_dashboard_data(
         return ManagerDashboard(
             meeting_stats=MeetingStats(
                 completed=completed_team_meetings,
-                scheduled=total_team_meetings - completed_team_meetings
+                scheduled=total_team_meetings - completed_team_meetings,
             ),
             action_stats=ActionStats(
-                pending=pending_team_actions,
-                completed=completed_team_actions
+                pending=pending_team_actions, completed=completed_team_actions
             ),
             team_productivity=[],
-            efficiency_trend=[]
+            efficiency_trend=[],
         )
 
     else:  # role == 'participant'
         # --- DATENBANKLOGIK FÜR PARTICIPANT DASHBOARD ---
 
         # 1. My Upcoming Meetings
-        my_upcoming_meetings_query = select(func.count(MeetingModel.id)) \
-            .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id) \
-            .where(ParticipantModel.user_id == current_user.id) \
+        my_upcoming_meetings_query = (
+            select(func.count(MeetingModel.id))
+            .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
+            .where(ParticipantModel.user_id == current_user.id)
             .where(MeetingModel.end_time > datetime.utcnow())
+        )
 
         my_upcoming_meetings = (
             await db.execute(my_upcoming_meetings_query)
         ).scalar_one()
 
         # 2. My Open Actions
-        my_open_actions_query = select(func.count(ActionModel.id)) \
-            .join(AssignmentModel, ActionModel.id == AssignmentModel.action_id) \
-            .where(AssignmentModel.user_id == current_user.id) \
+        my_open_actions_query = (
+            select(func.count(ActionModel.id))
+            .join(AssignmentModel, ActionModel.id == AssignmentModel.action_id)
+            .where(AssignmentModel.user_id == current_user.id)
             .where(ActionModel.status == ActionStatus.PENDING)
+        )
 
         my_open_actions = (await db.execute(my_open_actions_query)).scalar_one()
 
         return {
             "my_upcoming_meetings": my_upcoming_meetings,
-            "my_open_actions": my_open_actions
+            "my_open_actions": my_open_actions,
         }
+
+from typing import List
+from app.models.audit_log import AuditLog as AuditLogModel
+from app.schemas.audit_log import AuditLog as AuditLogSchema
+
+@router.get("/audit-logs", response_model=List[AuditLogSchema])
+async def get_audit_logs(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+    skip: int = 0,
+    limit: int = 100,
+) -> Any:
+    """
+    Get audit logs.
+    """
+    result = await db.execute(
+        select(AuditLogModel).order_by(AuditLogModel.timestamp.desc()).offset(skip).limit(limit)
+    )
+    return list(result.scalars().all())

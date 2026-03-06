@@ -1,15 +1,17 @@
 from typing import Any, List
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api import deps
+from app.models.meeting import Meeting as MeetingModel
+from app.models.meeting import Participant as ParticipantModel
+from app.models.user import User as UserModel
+from app.models.user import UserRole
 from app.schemas.meeting import Meeting, MeetingCreate
-from app.models.meeting import Meeting as MeetingModel, Participant as ParticipantModel
-from app.models.user import User as UserModel, UserRole
 from app.services.meeting_service import MeetingService
-
 
 router = APIRouter()
 
@@ -25,10 +27,12 @@ async def read_meetings(
     Retrieve meetings.
     """
     result = await db.execute(
-        select(MeetingModel).options(
-            selectinload(MeetingModel.participants),
-            selectinload(MeetingModel.agendas)
-        ).offset(skip).limit(limit)
+        select(MeetingModel)
+        .options(
+            selectinload(MeetingModel.participants), selectinload(MeetingModel.agendas)
+        )
+        .offset(skip)
+        .limit(limit)
     )
     meetings = result.scalars().all()
     return meetings
@@ -45,13 +49,14 @@ async def list_my_meetings(
     Retrieve a list of meetings the current user is a participant in.
     """
     result = await db.execute(
-        select(MeetingModel).options(
-            selectinload(MeetingModel.participants),
-            selectinload(MeetingModel.agendas)
+        select(MeetingModel)
+        .options(
+            selectinload(MeetingModel.participants), selectinload(MeetingModel.agendas)
         )
         .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
         .where(ParticipantModel.user_id == current_user.id)
-        .offset(skip).limit(limit)
+        .offset(skip)
+        .limit(limit)
     )
     meetings = result.scalars().all()
     return meetings
@@ -71,7 +76,7 @@ async def list_team_meetings(
     if current_user.role != UserRole.MANAGER and current_user.role != UserRole.DG:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough privileges to access team meetings"
+            detail="Not enough privileges to access team meetings",
         )
 
     managed_user_ids = [report.id for report in current_user.reports]
@@ -80,13 +85,14 @@ async def list_team_meetings(
         return []  # No reports, no team meetings
 
     result = await db.execute(
-        select(MeetingModel).options(
-            selectinload(MeetingModel.participants),
-            selectinload(MeetingModel.agendas)
+        select(MeetingModel)
+        .options(
+            selectinload(MeetingModel.participants), selectinload(MeetingModel.agendas)
         )
         .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
         .where(ParticipantModel.user_id.in_(managed_user_ids))
-        .offset(skip).limit(limit)
+        .offset(skip)
+        .limit(limit)
     )
     meetings = result.scalars().all()
     return meetings
@@ -98,7 +104,7 @@ async def create_meeting(
     db: AsyncSession = Depends(deps.get_db),
     meeting_in: MeetingCreate,
     current_user: UserModel = Depends(deps.get_current_user),
-    meeting_service: MeetingService = Depends(deps.get_meeting_service)
+    meeting_service: MeetingService = Depends(deps.get_meeting_service),
 ) -> Any:
     """
     Create new meeting.
@@ -106,4 +112,20 @@ async def create_meeting(
     meeting = await meeting_service.create_meeting(
         meeting_in=meeting_in, owner_id=current_user.id
     )
+    return meeting
+
+
+@router.get("/{meeting_id}", response_model=Meeting)
+async def get_meeting(
+    meeting_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+    meeting_service: MeetingService = Depends(deps.get_meeting_service),
+) -> Any:
+    """
+    Get meeting by ID.
+    """
+    meeting = await meeting_service.get_meeting(meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting

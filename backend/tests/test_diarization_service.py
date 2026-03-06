@@ -9,7 +9,7 @@ async def test_diarize_no_pipeline(mock_get_pipeline):
     # Setup mock to return None
     mock_get_pipeline.return_value = None
 
-    segments = await DiarizationService.diarize(b"fake audio bytes", "test.wav")
+    segments = await DiarizationService.diarize("test.wav")
     assert segments == []
 
 @pytest.mark.asyncio
@@ -31,7 +31,7 @@ async def test_diarize_success(mock_resample, mock_get_pipeline):
     mock_get_pipeline.return_value = MockPipeline()
     mock_resample.return_value = True
 
-    segments = await DiarizationService.diarize(b"fake audio", "test.wav")
+    segments = await DiarizationService.diarize("test.wav")
     
     assert len(segments) == 2
     assert segments[0]["speaker"] == "SPEAKER_00"

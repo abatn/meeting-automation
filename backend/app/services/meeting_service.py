@@ -64,13 +64,18 @@ class MeetingService:
 
         return db_meeting
 
-    async def get_meeting(self, meeting_id: int) -> Optional[Meeting]:
+    async def get_meeting(self, meeting_id: str) -> Optional[Meeting]:
         """Meeting mit allen Relations"""
-        result = await self.db.execute(select(Meeting).where(Meeting.id == meeting_id))
+        from sqlalchemy.orm import selectinload
+        result = await self.db.execute(
+            select(Meeting)
+            .options(selectinload(Meeting.participants), selectinload(Meeting.agendas))
+            .where(Meeting.id == meeting_id)
+        )
         return result.scalars().first()
 
     async def update_meeting(
-        self, meeting_id: int, meeting_in: MeetingUpdate
+        self, meeting_id: str, meeting_in: MeetingUpdate
     ) -> Optional[Meeting]:
         """Status-Änderungen -> n8n Benachrichtigung"""
         db_meeting = await self.get_meeting(meeting_id)
@@ -90,7 +95,7 @@ class MeetingService:
 
         return db_meeting
 
-    async def delete_meeting(self, meeting_id: int) -> bool:
+    async def delete_meeting(self, meeting_id: str) -> bool:
         """Soft Delete + Audit Log (simplified)"""
         db_meeting = await self.get_meeting(meeting_id)
         if not db_meeting:
