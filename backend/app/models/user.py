@@ -6,8 +6,6 @@ from sqlalchemy.sql import func
 import enum
 from datetime import datetime
 from app.core.database import Base
-from app.models.audit_log import AuditLog
-from app.models.meeting import Meeting
 from sqlalchemy_utils import EncryptedType
 from app.core.config import settings
 
