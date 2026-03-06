@@ -1,15 +1,15 @@
-import httpx
 import logging
-from typing import List, Optional
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import List, Optional
+
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.models.meeting import Meeting, Participant, Agenda
-from app.schemas.meeting import MeetingCreate, MeetingUpdate
 from app.core.config import settings
-
+from app.models.meeting import Agenda, Meeting, Participant
+from app.schemas.meeting import MeetingCreate, MeetingUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -29,30 +29,30 @@ class MeetingService:
             end_time=meeting_in.end_time,
             status=meeting_in.status,
             creator_id=owner_id,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
         )
         self.db.add(db_meeting)
         await self.db.flush()
 
         # Add participants
-        for participant_data in meeting_in.participants:
+        for participant_data in (meeting_in.participants or []):
             participant = Participant(
                 id=str(uuid.uuid4()),
                 meeting_id=db_meeting.id,
                 email=participant_data.email,
                 name=participant_data.name,
-                role=participant_data.role
+                role=participant_data.role,
             )
             self.db.add(participant)
 
         # Add agendas
-        for agenda_data in meeting_in.agendas:
+        for agenda_data in (meeting_in.agendas or []):
             agenda = Agenda(
                 id=str(uuid.uuid4()),
                 meeting_id=db_meeting.id,
                 title=agenda_data.title,
                 description=agenda_data.description,
-                order=agenda_data.order
+                order=agenda_data.order,
             )
             self.db.add(agenda)
 
@@ -66,9 +66,7 @@ class MeetingService:
 
     async def get_meeting(self, meeting_id: int) -> Optional[Meeting]:
         """Meeting mit allen Relations"""
-        result = await self.db.execute(
-            select(Meeting).where(Meeting.id == meeting_id)
-        )
+        result = await self.db.execute(select(Meeting).where(Meeting.id == meeting_id))
         return result.scalars().first()
 
     async def update_meeting(
@@ -105,11 +103,11 @@ class MeetingService:
     async def get_upcoming_meetings(self) -> List[Meeting]:
         """Für Dashboard/Reminders"""
         result = await self.db.execute(
-            select(Meeting).where(
-                Meeting.start_time > datetime.utcnow()
-            ).order_by(Meeting.start_time)
+            select(Meeting)
+            .where(Meeting.start_time > datetime.utcnow())
+            .order_by(Meeting.start_time)
         )
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def _trigger_n8n_meeting_created(self, meeting: Meeting):
         """Triggert n8n Webhook: meeting-created"""
@@ -125,16 +123,17 @@ class MeetingService:
                 "title": meeting.title,
                 "description": meeting.description,
                 "location": meeting.location,
-                "start_time": meeting.start_time.isoformat()
-                if meeting.start_time else None,
-                "end_time": meeting.end_time.isoformat()
-                if meeting.end_time else None,
+                "start_time": (
+                    meeting.start_time.isoformat() if meeting.start_time else None
+                ),
+                "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
                 "status": meeting.status,
                 "creator_id": meeting.creator_id,
-                "created_at": meeting.created_at.isoformat()
-                if meeting.created_at else None,
-                "participants": participants_payload
-            }
+                "created_at": (
+                    meeting.created_at.isoformat() if meeting.created_at else None
+                ),
+                "participants": participants_payload,
+            },
         }
         try:
             async with httpx.AsyncClient() as client:

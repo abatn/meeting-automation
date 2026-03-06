@@ -1,47 +1,46 @@
-import logging
 import asyncio
 import json
-import uuid
+import logging
 import os
 import tempfile
-from typing import Dict, Any, List, Optional
+import uuid
+from typing import Any, Dict, List, Optional
+
+import boto3
 import httpx
 import redis
-import boto3
 from botocore.exceptions import ClientError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.tasks.celery_app import celery_app
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
-from app.models.recording import Recording
-from app.models.transcription import Transcription
 from app.models.action import Action
 from app.models.pv import PV
-from app.services.transcription_service import transcribe_audio
-from app.services.pv_service import PVService
+from app.models.recording import Recording
+from app.models.transcription import Transcription
 from app.services.diarization_service import DiarizationService
-
+from app.services.pv_service import PVService
+from app.services.transcription_service import transcribe_audio
+from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
 
 def get_redis_client() -> redis.Redis:
     # This ensures a new connection is created if one doesn't exist in the context
-    return redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return client  # type: ignore
 
 
-def publish_status(recording_id: str, status: str, progress: int, message: str = "") -> None:
+def publish_status(
+    recording_id: str, status: str, progress: int, message: str = ""
+) -> None:
     """Helper to publish status updates to Redis for WebSockets."""
     try:
         redis_client = get_redis_client()
         channel = f"transcription_status_{recording_id}"
-        payload = {
-            "status": status,
-            "progress": progress,
-            "message": message
-        }
+        payload = {"status": status, "progress": progress, "message": message}
         redis_client.publish(channel, json.dumps(payload))
     except Exception as e:
         logger.error(f"Redis publish failed for {recording_id}: {e}")
@@ -54,7 +53,7 @@ def match_timestamps(
     if not segments or not words:
         return []
 
-    segments.sort(key=lambda x: x['start'])
+    segments.sort(key=lambda x: x["start"])
     matched_blocks: List[Dict[str, Any]] = []
     current_block: Optional[Dict[str, Any]] = None
 
@@ -65,24 +64,27 @@ def match_timestamps(
         midpoint = (start + end) / 2
 
         closest_segment = next(
-            (seg for seg in segments if seg['start'] <= midpoint <= seg['end']),
-            min(segments, key=lambda s: min(abs(s['start'] - midpoint), abs(s['end'] - midpoint)))
+            (seg for seg in segments if seg["start"] <= midpoint <= seg["end"]),
+            min(
+                segments,
+                key=lambda s: min(abs(s["start"] - midpoint), abs(s["end"] - midpoint)),
+            ),
         )
 
-        speaker = str(closest_segment['speaker'])
+        speaker = str(closest_segment["speaker"])
 
-        if current_block is None or current_block['speaker'] != speaker:
+        if current_block is None or current_block["speaker"] != speaker:
             if current_block:
                 matched_blocks.append(current_block)
             current_block = {
                 "speaker": speaker,
                 "text": word.strip(),
                 "start": start,
-                "end": end
+                "end": end,
             }
         else:
-            current_block['text'] += " " + word.strip()
-            current_block['end'] = end
+            current_block["text"] += " " + word.strip()
+            current_block["end"] = end
 
     if current_block:
         matched_blocks.append(current_block)
@@ -90,7 +92,9 @@ def match_timestamps(
 
 
 async def _process_recording_pipeline(recording_id: str) -> None:
-    publish_status(recording_id, "uploaded", 0, "Audio uploaded, starting processing...")
+    publish_status(
+        recording_id, "uploaded", 0, "Audio uploaded, starting processing..."
+    )
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Recording).where(Recording.id == recording_id))
@@ -134,10 +138,10 @@ async def _process_recording_pipeline(recording_id: str) -> None:
 
 async def _download_audio(file_key: str) -> Optional[str]:
     s3_client = boto3.client(
-        's3',
+        "s3",
         endpoint_url=settings.S3_ENDPOINT,
         aws_access_key_id=settings.S3_ACCESS_KEY,
-        aws_secret_access_key=settings.S3_SECRET_KEY
+        aws_secret_access_key=settings.S3_SECRET_KEY,
     )
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
@@ -187,8 +191,8 @@ async def _handle_ai_results(
 async def _save_pv_and_actions(
     db: AsyncSession, recording: Recording, pv_data: Dict[str, Any]
 ) -> None:
-    summary = pv_data.get('summary', '')
-    decisions = '<br/>'.join([f'- {d}' for d in pv_data.get('decisions', [])])
+    summary = pv_data.get("summary", "")
+    decisions = "<br/>".join([f"- {d}" for d in pv_data.get("decisions", [])])
     html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><p>{decisions}</p>"
 
     existing_pv_res = await db.execute(
@@ -197,15 +201,15 @@ async def _save_pv_and_actions(
     existing_pv = existing_pv_res.scalar_one_or_none()
 
     if existing_pv:
-        existing_pv.title = pv_data.get('title', 'Meeting PV')
+        existing_pv.title = pv_data.get("title", "Meeting PV")
         existing_pv.content_html = html
     else:
         db_pv = PV(
             id=str(uuid.uuid4()),
             meeting_id=str(recording.meeting_id),
-            title=pv_data.get('title', 'Meeting PV'),
+            title=pv_data.get("title", "Meeting PV"),
             content_html=html,
-            status='draft',
+            status="draft",
         )
         db.add(db_pv)
 
