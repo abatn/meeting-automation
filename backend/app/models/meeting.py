@@ -6,11 +6,6 @@ from sqlalchemy.sql import func
 import enum
 from datetime import datetime
 from app.core.database import Base
-from app.models.action import Action
-from app.models.pv import PV
-from app.models.recording import Recording
-from app.models.transcription import Transcription
-from app.models.user import User
 
 
 class MeetingStatus(str, enum.Enum):
