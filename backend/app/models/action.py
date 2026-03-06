@@ -6,6 +6,7 @@ from sqlalchemy.sql import func
 import enum
 from datetime import datetime
 from app.core.database import Base
+from app.models.user import User
 
 
 class ActionStatus(str, enum.Enum):
