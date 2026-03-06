@@ -6,17 +6,22 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.services.action_service import ActionService
 
+
 logger = logging.getLogger(__name__)
+
 
 async def _send_reminder_via_n8n(payload: dict):
     """Ruft n8n-Webhook auf"""
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(settings.N8N_WEBHOOK_URL, json=payload, timeout=5.0)
+            response = await client.post(
+                settings.N8N_WEBHOOK_URL, json=payload, timeout=5.0
+            )
             response.raise_for_status()
             logger.info("Reminder sent via n8n")
     except Exception as e:
         logger.error(f"Failed to send reminder via n8n: {e}")
+
 
 @celery_app.task(name="send_reminder_via_n8n")
 def send_reminder_via_n8n(payload: dict):
@@ -27,12 +32,13 @@ def send_reminder_via_n8n(payload: dict):
         asyncio.set_event_loop(loop)
     return loop.run_until_complete(_send_reminder_via_n8n(payload))
 
+
 async def _daily_reminder_task():
     """Cron-Job -> n8n 'daily-reminders' triggern"""
     async with AsyncSessionLocal() as db:
         action_service = ActionService(db)
         due_actions = await action_service.get_due_actions()
-        
+
         if not due_actions:
             return "No actions due"
 
@@ -47,13 +53,16 @@ async def _daily_reminder_task():
                 } for a in due_actions
             ]
         }
-        
+
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(settings.N8N_WEBHOOK_DAILY_REMINDER, json=payload, timeout=10.0)
-                logger.info(f"Daily reminders triggered for {len(due_actions)} actions")
+                await client.post(
+                    settings.N8N_WEBHOOK_DAILY_REMINDER, json=payload, timeout=10.0
+                )
+                logger.info(f"Daily reminders triggered for {len(due_actions)}")
         except Exception as e:
             logger.error(f"Failed to trigger daily reminders: {e}")
+
 
 @celery_app.task(name="daily_reminder_task")
 def daily_reminder_task():

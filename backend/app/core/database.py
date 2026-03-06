@@ -1,7 +1,10 @@
 from typing import AsyncGenerator
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncSession, create_async_engine, async_sessionmaker
+)
 from sqlalchemy.orm import DeclarativeBase
 from app.core.config import settings
+
 
 # Create Async Engine
 # ISO 27001: Ensure connection string is loaded from secure environment variables
@@ -20,12 +23,14 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
 )
 
+
 class Base(DeclarativeBase):
     """
     Base class for all SQLAlchemy models.
     Uses SQLAlchemy 2.0 DeclarativeBase.
     """
     pass
+
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """

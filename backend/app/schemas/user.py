@@ -1,6 +1,7 @@
-from typing import Optional, List
-from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
 from datetime import datetime
+from pydantic import BaseModel, EmailStr
+
 
 class UserBase(BaseModel):
     email: EmailStr
@@ -9,8 +10,10 @@ class UserBase(BaseModel):
     role: Optional[str] = "user"
     department: Optional[str] = None
 
+
 class UserCreate(UserBase):
     password: str
+
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
@@ -20,6 +23,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     department: Optional[str] = None
 
+
 class UserInDBBase(UserBase):
     id: str
     created_at: datetime
@@ -28,16 +32,20 @@ class UserInDBBase(UserBase):
     class Config:
         from_attributes = True
 
+
 class User(UserInDBBase):
     pass
 
+
 class UserInDB(UserInDBBase):
     hashed_password: str
+
 
 class Token(BaseModel):
     access_token: str
     token_type: str
     user: User
+
 
 class TokenData(BaseModel):
     user_id: Optional[str] = None

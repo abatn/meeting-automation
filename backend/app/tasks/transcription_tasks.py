@@ -4,7 +4,7 @@ import json
 import uuid
 import os
 import tempfile
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import httpx
 import redis
 import boto3
@@ -24,12 +24,11 @@ from app.services.diarization_service import DiarizationService
 
 
 logger = logging.getLogger(__name__)
-
 redis_client = redis.Redis.from_url(settings.REDIS_URL)
 
 
 def publish_status(recording_id: str, status: str, progress: int, message: str = ""):
-    """Hilfsfunktion, um Status-Updates an Redis zu senden (für WebSockets)"""
+    """Hilfsfunktion, um Status-Updates an Redis zu senden"""
     try:
         channel = f"transcription_status_{recording_id}"
         payload = {
@@ -47,7 +46,6 @@ def match_timestamps(
 ) -> List[Dict[str, Any]]:
     """
     Match Whisper words with Pyannote segments based on time midpoint.
-    Groups matched words into text blocks by speaker.
     """
     if not segments or not words:
         return []
@@ -91,14 +89,11 @@ def match_timestamps(
 
     if current_block:
         matched_blocks.append(current_block)
-
     return matched_blocks
 
 
 async def _process_recording_pipeline(recording_id: str):
-    publish_status(
-        recording_id, "uploaded", 0, "Audio hochgeladen, starte Verarbeitung..."
-    )
+    publish_status(recording_id, "uploaded", 0, "Audio hochgeladen...")
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Recording).where(Recording.id == recording_id))
@@ -106,170 +101,122 @@ async def _process_recording_pipeline(recording_id: str):
 
         if not recording:
             logger.error(f"Recording {recording_id} not found")
-            publish_status(recording_id, "failed", 0, "Recording in DB nicht gefunden")
+            publish_status(recording_id, "failed", 0, "Recording nicht gefunden")
             return
 
         recording.status = "transcribing"
         await db.commit()
 
         try:
-            # 1. Download Audio from S3 (Minio)
-            publish_status(
-                recording_id, "transcribing", 10, "Lade Audio-Datei herunter..."
-            )
-            s3_client = boto3.client(
-                's3',
-                endpoint_url=getattr(settings, 'S3_ENDPOINT', 'http://minio:9000'),
-                aws_access_key_id=getattr(settings, 'S3_ACCESS_KEY', 'minio_user'),
-                aws_secret_access_key=getattr(settings, 'S3_SECRET_KEY', 'minio_password')
-            )
-            bucket = getattr(settings, 'S3_BUCKET_NAME', 'meeting-recordings')
-            file_key = recording.file_path
-
-            try:
-                response = s3_client.get_object(Bucket=bucket, Key=file_key)
-                # Schreibe den Stream direkt in eine temporäre Datei
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                    for chunk in response['Body'].iter_chunks(1024 * 1024):  # 1MB
-                        tmp.write(chunk)
-                    temp_audio_file_path = tmp.name
-            except ClientError as e:
-                error_msg = f"S3-Download fehlgeschlagen für {file_key}: {e}"
-                logger.critical(error_msg)
-                recording.status = "failed"
-                await db.commit()
-                publish_status(recording_id, "failed", 0, error_msg)
+            # 1. Download
+            temp_path = await _download_audio(recording.file_path)
+            if not temp_path:
+                publish_status(recording_id, "failed", 0, "S3-Download Fehler")
                 return
 
-            # 2. Speaker Diarization (Pyannote)
-            publish_status(recording_id, "transcribing", 25, "Sprechererkennung läuft...")
-            logger.info("Running Diarization...")
-            speaker_segments = await DiarizationService.diarize(temp_audio_file_path)
+            # 2. Diarization
+            publish_status(recording_id, "transcribing", 25, "Sprechererkennung...")
+            speaker_segments = await DiarizationService.diarize(temp_path)
 
-            # 3. Whisper Transcription with word timestamps
-            publish_status(
-                recording_id, "transcribing", 50, "Audio wird in Text umgewandelt..."
-            )
-            logger.info("Running Whisper...")
+            # 3. Whisper
+            publish_status(recording_id, "transcribing", 50, "Transkription...")
+            trans_res = await transcribe_audio(temp_path, word_timestamps=True)
 
-            trans_res = await transcribe_audio(temp_audio_file_path, word_timestamps=True)
+            # 4. Processing
+            publish_status(recording_id, "transcribing", 75, "Verarbeitung...")
+            await _handle_ai_results(db, recording, speaker_segments, trans_res)
 
-            if not speaker_segments:
-                words = trans_res.get("words", [])
-                end_time = words[-1].get("end", 0.0) if words else 0.0
-                speaker_segments = [
-                    {"speaker": "SPEAKER_00", "start": 0.0, "end": end_time}
-                ]
-                logger.warning(
-                    f"Diarization returned no segments. Fallback to single speaker."
-                )
-
-            publish_status(
-                recording_id, "transcribing", 75, "Kombiniere Text und Sprecher..."
-            )
-
-            # 4. Match Timestamps
-            matched_blocks = match_timestamps(
-                trans_res.get("words", []), speaker_segments
-            )
-
-            # Format for Mistral
-            if matched_blocks:
-                mistral_input_text = "\n".join(
-                    [f"{b['speaker']}: {b['text']}" for b in matched_blocks]
-                )
-            else:
-                mistral_input_text = trans_res.get("text", "")
-
-            # Fallback for DB segments if matching failed
-            db_segments = matched_blocks if matched_blocks else None
-
-            # 5. Save Transcription
-            db_transcription = Transcription(
-                id=str(uuid.uuid4()),
-                recording_id=recording_id,
-                meeting_id=recording.meeting_id,
-                full_text=trans_res.get("text", ""),
-                language="de",
-                segments=db_segments
-            )
-            db.add(db_transcription)
-            recording.status = "analyzing"
-            await db.commit()
-            await db.refresh(db_transcription)
-
-            # 6. Call Mistral for Analysis (PV & Actions)
-            publish_status(
-                recording_id, "analyzing", 90, "KI analysiert das Protokoll..."
-            )
-            logger.info(f"Starting analysis for transcription {db_transcription.id}")
-
-            pv_data = await PVService.generate_pv(mistral_input_text)
-
-            # Format PV content as HTML and save to DB
-            summary = pv_data.get('summary', '')
-            decisions = '<br/>'.join([f'- {d}' for d in pv_data.get('decisions', [])])
-            html_content = f"<h3>Résumé</h3><p>{summary}</p>" \
-                           f"<h3>Décisions</h3><p>{decisions}</p>"
-
-            # Check if PV already exists to prevent UniqueViolationError
-            existing_pv_res = await db.execute(
-                select(PV).where(PV.meeting_id == recording.meeting_id)
-            )
-            existing_pv = existing_pv_res.scalar_one_or_none()
-
-            if existing_pv:
-                existing_pv.title = pv_data.get('title', 'Meeting PV')
-                existing_pv.content_html = html_content
-                existing_pv.status = 'draft'
-                logger.info(f"Updated existing PV for meeting {recording.meeting_id}")
-            else:
-                db_pv = PV(
-                    id=str(uuid.uuid4()),
-                    meeting_id=recording.meeting_id,
-                    title=pv_data.get('title', 'Meeting PV'),
-                    content_html=html_content,
-                    status='draft'
-                )
-                db.add(db_pv)
-                logger.info(f"Created new PV for meeting {recording.meeting_id}")
-
-            actions_data = pv_data.get("actions", [])
-
-            # Save Actions
-            for action_item in actions_data:
-                db_action = Action(
-                    id=str(uuid.uuid4()),
-                    meeting_id=recording.meeting_id,
-                    title=action_item["description"],
-                    description=action_item.get("priority_reason", ""),
-                    status="pending"
-                )
-                db.add(db_action)
-
-            recording.status = "completed"
-            await db.commit()
-            logger.info(f"Pipeline completed for recording {recording_id}")
-
-            publish_status(
-                recording_id, "completed", 100, "Verarbeitung abgeschlossen!"
-            )
-
-            # Final Notification to n8n
+            publish_status(recording_id, "completed", 100, "Erfolgreich!")
             await _notify_n8n_completion(recording_id, recording.meeting_id)
 
         except Exception as e:
             logger.error(f"Error in transcription pipeline: {e}")
             recording.status = "failed"
             await db.commit()
-            publish_status(recording_id, "failed", 0, f"Fehler: {str(e)}")
+            publish_status(recording_id, "failed", 0, "Fehler aufgetreten")
         finally:
-            # Clean up temporary audio file
-            if 'temp_audio_file_path' in locals() and os.path.exists(
-                temp_audio_file_path
-            ):
-                os.remove(temp_audio_file_path)
-                logger.info(f"Temporäre Datei gelöscht: {temp_audio_file_path}")
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                os.remove(temp_path)
+
+
+async def _download_audio(file_key: str) -> Optional[str]:
+    s3_client = boto3.client(
+        's3',
+        endpoint_url=getattr(settings, 'S3_ENDPOINT', 'http://minio:9000'),
+        aws_access_key_id=getattr(settings, 'S3_ACCESS_KEY', 'minio_user'),
+        aws_secret_access_key=getattr(settings, 'S3_SECRET_KEY', 'minio_password')
+    )
+    bucket = getattr(settings, 'S3_BUCKET_NAME', 'meeting-recordings')
+    try:
+        response = s3_client.get_object(Bucket=bucket, Key=file_key)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+            for chunk in response['Body'].iter_chunks(1024 * 1024):
+                tmp.write(chunk)
+            return tmp.name
+    except ClientError as e:
+        logger.critical(f"S3-Download fehlgeschlagen: {e}")
+        return None
+
+
+async def _handle_ai_results(db, recording, speaker_segments, trans_res):
+    if not speaker_segments:
+        words = trans_res.get("words", [])
+        end_time = words[-1].get("end", 0.0) if words else 0.0
+        speaker_segments = [{"speaker": "SPEAKER_00", "start": 0.0, "end": end_time}]
+
+    matched = match_timestamps(trans_res.get("words", []), speaker_segments)
+    mistral_text = "\n".join([f"{b['speaker']}: {b['text']}" for b in matched]) \
+        if matched else trans_res.get("text", "")
+
+    db_trans = Transcription(
+        id=str(uuid.uuid4()),
+        recording_id=recording.id,
+        meeting_id=recording.meeting_id,
+        full_text=trans_res.get("text", ""),
+        language="de",
+        segments=matched if matched else None
+    )
+    db.add(db_trans)
+    recording.status = "analyzing"
+    await db.commit()
+
+    pv_data = await PVService.generate_pv(mistral_text)
+    await _save_pv_and_actions(db, recording, pv_data)
+    recording.status = "completed"
+    await db.commit()
+
+
+async def _save_pv_and_actions(db, recording, pv_data):
+    summary = pv_data.get('summary', '')
+    decisions = '<br/>'.join([f'- {d}' for d in pv_data.get('decisions', [])])
+    html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><p>{decisions}</p>"
+
+    existing_pv_res = await db.execute(
+        select(PV).where(PV.meeting_id == recording.meeting_id)
+    )
+    existing_pv = existing_pv_res.scalar_one_or_none()
+
+    if existing_pv:
+        existing_pv.title = pv_data.get('title', 'Meeting PV')
+        existing_pv.content_html = html
+    else:
+        db_pv = PV(
+            id=str(uuid.uuid4()),
+            meeting_id=recording.meeting_id,
+            title=pv_data.get('title', 'Meeting PV'),
+            content_html=html,
+            status='draft'
+        )
+        db.add(db_pv)
+
+    for action_item in pv_data.get("actions", []):
+        db.add(Action(
+            id=str(uuid.uuid4()),
+            meeting_id=recording.meeting_id,
+            title=action_item["description"],
+            description=action_item.get("priority_reason", ""),
+            status="pending"
+        ))
 
 
 async def _notify_n8n_completion(recording_id: str, meeting_id: str):

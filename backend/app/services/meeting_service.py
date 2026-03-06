@@ -2,16 +2,17 @@ import httpx
 import logging
 from typing import List, Optional
 from datetime import datetime
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import update, delete
-import uuid
 
 from app.models.meeting import Meeting, Participant, Agenda
 from app.schemas.meeting import MeetingCreate, MeetingUpdate
 from app.core.config import settings
 
+
 logger = logging.getLogger(__name__)
+
 
 class MeetingService:
     def __init__(self, db: AsyncSession):
@@ -47,7 +48,7 @@ class MeetingService:
         # Add agendas
         for agenda_data in meeting_in.agendas:
             agenda = Agenda(
-                id=str(uuid.uuid4()), # Korrektur
+                id=str(uuid.uuid4()),
                 meeting_id=db_meeting.id,
                 title=agenda_data.title,
                 description=agenda_data.description,
@@ -60,7 +61,7 @@ class MeetingService:
 
         # n8n Webhook triggern
         await self._trigger_n8n_meeting_created(db_meeting)
-        
+
         return db_meeting
 
     async def get_meeting(self, meeting_id: int) -> Optional[Meeting]:
@@ -70,7 +71,9 @@ class MeetingService:
         )
         return result.scalars().first()
 
-    async def update_meeting(self, meeting_id: int, meeting_in: MeetingUpdate) -> Optional[Meeting]:
+    async def update_meeting(
+        self, meeting_id: int, meeting_in: MeetingUpdate
+    ) -> Optional[Meeting]:
         """Status-Änderungen -> n8n Benachrichtigung"""
         db_meeting = await self.get_meeting(meeting_id)
         if not db_meeting:
@@ -94,7 +97,7 @@ class MeetingService:
         db_meeting = await self.get_meeting(meeting_id)
         if not db_meeting:
             return False
-        
+
         await self.db.delete(db_meeting)
         await self.db.commit()
         return True
@@ -102,7 +105,9 @@ class MeetingService:
     async def get_upcoming_meetings(self) -> List[Meeting]:
         """Für Dashboard/Reminders"""
         result = await self.db.execute(
-            select(Meeting).where(Meeting.start_time > datetime.utcnow()).order_by(Meeting.start_time)
+            select(Meeting).where(
+                Meeting.start_time > datetime.utcnow()
+            ).order_by(Meeting.start_time)
         )
         return result.scalars().all()
 
@@ -120,17 +125,22 @@ class MeetingService:
                 "title": meeting.title,
                 "description": meeting.description,
                 "location": meeting.location,
-                "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
-                "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
+                "start_time": meeting.start_time.isoformat()
+                if meeting.start_time else None,
+                "end_time": meeting.end_time.isoformat()
+                if meeting.end_time else None,
                 "status": meeting.status,
                 "creator_id": meeting.creator_id,
-                "created_at": meeting.created_at.isoformat() if meeting.created_at else None,
+                "created_at": meeting.created_at.isoformat()
+                if meeting.created_at else None,
                 "participants": participants_payload
             }
         }
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post(settings.N8N_WEBHOOK_MEETING_CREATED, json=payload, timeout=5.0)
+                response = await client.post(
+                    settings.N8N_WEBHOOK_MEETING_CREATED, json=payload, timeout=5.0
+                )
                 response.raise_for_status()
                 logger.info(f"n8n meeting-created triggered for meeting {meeting.id}")
         except Exception as e:
