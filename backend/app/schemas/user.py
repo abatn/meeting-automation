@@ -28,8 +28,8 @@ class UserInDBBase(UserBase):
     id: str
     created_at: datetime
     updated_at: Optional[datetime] = None
-    is_superuser: bool = False # Added
-    is_mfa_enabled: bool = False # Added
+    is_superuser: bool = False  # Added
+    is_mfa_enabled: bool = False  # Added
 
     class Config:
         from_attributes = True
