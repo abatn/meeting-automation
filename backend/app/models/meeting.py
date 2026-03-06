@@ -14,8 +14,6 @@ if TYPE_CHECKING:
     from app.models.transcription import Transcription
     from app.models.action import Action
     from app.models.pv import PV
-    from app.models.participant import Participant
-    from app.models.agenda import Agenda
 
 
 class MeetingStatus(str, enum.Enum):
