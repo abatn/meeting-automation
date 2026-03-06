@@ -1,11 +1,21 @@
 from __future__ import annotations
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import Column, String, ForeignKey, DateTime, Text, Integer, Enum as SQLEnum
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 import enum
 from datetime import datetime
 from app.core.database import Base
+
+# TYPE_CHECKING imports
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.recording import Recording
+    from app.models.transcription import Transcription
+    from app.models.action import Action
+    from app.models.pv import PV
+    from app.models.participant import Participant
+    from app.models.agenda import Agenda
 
 
 class MeetingStatus(str, enum.Enum):
