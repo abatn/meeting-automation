@@ -2,18 +2,17 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-import uuid
-from datetime import datetime
+from sqlalchemy.orm import selectinload
 
 from app.api import deps
-from app.schemas.meeting import Meeting, MeetingCreate, MeetingUpdate
-from app.models.meeting import Meeting as MeetingModel, Participant as ParticipantModel, Agenda as AgendaModel
+from app.schemas.meeting import Meeting, MeetingCreate
+from app.models.meeting import Meeting as MeetingModel, Participant as ParticipantModel
 from app.models.user import User as UserModel, UserRole
 from app.services.meeting_service import MeetingService
 
-from sqlalchemy.orm import selectinload, join
 
 router = APIRouter()
+
 
 @router.get("/", response_model=List[Meeting])
 async def read_meetings(
@@ -33,6 +32,7 @@ async def read_meetings(
     )
     meetings = result.scalars().all()
     return meetings
+
 
 @router.get("/my-meetings", response_model=List[Meeting])
 async def list_my_meetings(
@@ -56,6 +56,7 @@ async def list_my_meetings(
     meetings = result.scalars().all()
     return meetings
 
+
 @router.get("/team-meetings", response_model=List[Meeting])
 async def list_team_meetings(
     db: AsyncSession = Depends(deps.get_db),
@@ -76,7 +77,7 @@ async def list_team_meetings(
     managed_user_ids = [report.id for report in current_user.reports]
 
     if not managed_user_ids:
-        return [] # No reports, no team meetings
+        return []  # No reports, no team meetings
 
     result = await db.execute(
         select(MeetingModel).options(
@@ -90,6 +91,7 @@ async def list_team_meetings(
     meetings = result.scalars().all()
     return meetings
 
+
 @router.post("/", response_model=Meeting, status_code=status.HTTP_201_CREATED)
 async def create_meeting(
     *,
@@ -101,5 +103,7 @@ async def create_meeting(
     """
     Create new meeting.
     """
-    meeting = await meeting_service.create_meeting(meeting_in=meeting_in, owner_id=current_user.id)
+    meeting = await meeting_service.create_meeting(
+        meeting_in=meeting_in, owner_id=current_user.id
+    )
     return meeting

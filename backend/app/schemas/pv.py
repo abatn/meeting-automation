@@ -2,14 +2,17 @@ from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime
 
+
 class SectionBase(BaseModel):
     title: str
     content: Optional[str] = None
     order: Optional[int] = 0
     type: Optional[str] = None
 
+
 class SectionCreate(SectionBase):
     pass
+
 
 class Section(SectionBase):
     id: str
@@ -18,6 +21,7 @@ class Section(SectionBase):
     class Config:
         from_attributes = True
 
+
 class PVBase(BaseModel):
     meeting_id: str
     title: str
@@ -25,14 +29,17 @@ class PVBase(BaseModel):
     status: Optional[str] = "draft"
     is_validated: Optional[bool] = False
 
+
 class PVCreate(PVBase):
     sections: Optional[List[SectionCreate]] = []
+
 
 class PVUpdate(BaseModel):
     title: Optional[str] = None
     content_html: Optional[str] = None
     status: Optional[str] = None
     is_validated: Optional[bool] = None
+
 
 class PV(PVBase):
     id: str

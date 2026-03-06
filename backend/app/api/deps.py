@@ -1,11 +1,10 @@
 import logging
-from typing import AsyncGenerator, Optional
+from typing import Optional
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import ValidationError
-from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 import redis.asyncio as redis
 
 from app.core.config import settings
@@ -24,6 +23,7 @@ reusable_oauth2 = OAuth2PasswordBearer(
 
 api_key_header = APIKeyHeader(name="X-Internal-API-Key", auto_error=False)
 
+
 async def verify_internal_api_key(
     api_key: Optional[str] = Depends(api_key_header)
 ) -> bool:
@@ -34,11 +34,13 @@ async def verify_internal_api_key(
         )
     return True
 
+
 async def get_auth_service(
     db: AsyncSession = Depends(get_db),
     redis_client: redis.Redis = Depends(get_redis_client)
 ) -> AuthService:
     return AuthService(db, redis_client)
+
 
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
@@ -55,7 +57,7 @@ async def get_current_user(
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        
+
         logger.debug(f"JWT Payload: {payload}")
         logger.debug(f"JWT Decode SECRET_KEY: {settings.SECRET_KEY}")
         logger.debug(f"JWT Decode ALGORITHM: {settings.ALGORITHM}")
@@ -70,20 +72,22 @@ async def get_current_user(
         logger.warning(f"JWT Validation Error: {e}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Could not validate credentials",
+            detail="Could not validate credentials",
         )
-    
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalars().first()
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return user
 
+
 async def get_meeting_service(db: AsyncSession = Depends(get_db)) -> MeetingService:
     return MeetingService(db)
+
 
 def check_permissions(allowed_roles: list[UserRole]):
     async def permission_checker(

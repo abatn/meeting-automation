@@ -1,14 +1,15 @@
 import logging
-import httpx
 import asyncio
 import json
-import redis
 import uuid
+import os
+import tempfile
 from typing import Dict, Any, List
+import httpx
+import redis
+import boto3
+from botocore.exceptions import ClientError
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-import tempfile # Neu hinzugefügt
-import os # Neu hinzugefügt
 
 from app.tasks.celery_app import celery_app
 from app.core.config import settings
@@ -16,18 +17,16 @@ from app.core.database import AsyncSessionLocal
 from app.models.recording import Recording
 from app.models.transcription import Transcription
 from app.models.action import Action
-from app.models.meeting import Meeting
 from app.models.pv import PV
 from app.services.transcription_service import transcribe_audio
 from app.services.pv_service import PVService
 from app.services.diarization_service import DiarizationService
-from app.services.pdf_service import PDFService
-import boto3
-from botocore.exceptions import ClientError
+
 
 logger = logging.getLogger(__name__)
 
 redis_client = redis.Redis.from_url(settings.REDIS_URL)
+
 
 def publish_status(recording_id: str, status: str, progress: int, message: str = ""):
     """Hilfsfunktion, um Status-Updates an Redis zu senden (für WebSockets)"""
@@ -42,7 +41,10 @@ def publish_status(recording_id: str, status: str, progress: int, message: str =
     except Exception as e:
         logger.error(f"Redis publish failed for {recording_id}: {e}")
 
-def match_timestamps(words: List[Dict[str, Any]], segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+def match_timestamps(
+    words: List[Dict[str, Any]], segments: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     """
     Match Whisper words with Pyannote segments based on time midpoint.
     Groups matched words into text blocks by speaker.
@@ -65,10 +67,10 @@ def match_timestamps(words: List[Dict[str, Any]], segments: List[Dict[str, Any]]
             if seg['start'] <= midpoint <= seg['end']:
                 closest_segment = seg
                 break
-        
+
         if not closest_segment:
             closest_segment = min(
-                segments, 
+                segments,
                 key=lambda s: min(abs(s['start'] - midpoint), abs(s['end'] - midpoint))
             )
 
@@ -92,13 +94,16 @@ def match_timestamps(words: List[Dict[str, Any]], segments: List[Dict[str, Any]]
 
     return matched_blocks
 
+
 async def _process_recording_pipeline(recording_id: str):
-    publish_status(recording_id, "uploaded", 0, "Audio hochgeladen, starte Verarbeitung...")
-    
+    publish_status(
+        recording_id, "uploaded", 0, "Audio hochgeladen, starte Verarbeitung..."
+    )
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Recording).where(Recording.id == recording_id))
         recording = result.scalar_one_or_none()
-        
+
         if not recording:
             logger.error(f"Recording {recording_id} not found")
             publish_status(recording_id, "failed", 0, "Recording in DB nicht gefunden")
@@ -109,7 +114,9 @@ async def _process_recording_pipeline(recording_id: str):
 
         try:
             # 1. Download Audio from S3 (Minio)
-            publish_status(recording_id, "transcribing", 10, "Lade Audio-Datei herunter...")
+            publish_status(
+                recording_id, "transcribing", 10, "Lade Audio-Datei herunter..."
+            )
             s3_client = boto3.client(
                 's3',
                 endpoint_url=getattr(settings, 'S3_ENDPOINT', 'http://minio:9000'),
@@ -118,14 +125,14 @@ async def _process_recording_pipeline(recording_id: str):
             )
             bucket = getattr(settings, 'S3_BUCKET_NAME', 'meeting-recordings')
             file_key = recording.file_path
-            
+
             try:
                 response = s3_client.get_object(Bucket=bucket, Key=file_key)
                 # Schreibe den Stream direkt in eine temporäre Datei
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio_file:
-                    for chunk in response['Body'].iter_chunks(chunk_size=1024 * 1024): # 1MB chunks
-                        temp_audio_file.write(chunk)
-                    temp_audio_file_path = temp_audio_file.name
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                    for chunk in response['Body'].iter_chunks(1024 * 1024):  # 1MB
+                        tmp.write(chunk)
+                    temp_audio_file_path = tmp.name
             except ClientError as e:
                 error_msg = f"S3-Download fehlgeschlagen für {file_key}: {e}"
                 logger.critical(error_msg)
@@ -140,28 +147,40 @@ async def _process_recording_pipeline(recording_id: str):
             speaker_segments = await DiarizationService.diarize(temp_audio_file_path)
 
             # 3. Whisper Transcription with word timestamps
-            publish_status(recording_id, "transcribing", 50, "Audio wird in Text umgewandelt...")
+            publish_status(
+                recording_id, "transcribing", 50, "Audio wird in Text umgewandelt..."
+            )
             logger.info("Running Whisper...")
-            
-            transcription_result = await transcribe_audio(temp_audio_file_path, word_timestamps=True)
+
+            trans_res = await transcribe_audio(temp_audio_file_path, word_timestamps=True)
 
             if not speaker_segments:
-                words = transcription_result.get("words", [])
+                words = trans_res.get("words", [])
                 end_time = words[-1].get("end", 0.0) if words else 0.0
-                speaker_segments = [{"speaker": "SPEAKER_00", "start": 0.0, "end": end_time}]
-                logger.warning(f"Diarization returned no segments. Using fallback single speaker up to {end_time}s.")
+                speaker_segments = [
+                    {"speaker": "SPEAKER_00", "start": 0.0, "end": end_time}
+                ]
+                logger.warning(
+                    f"Diarization returned no segments. Fallback to single speaker."
+                )
 
-            publish_status(recording_id, "transcribing", 75, "Kombiniere Text und Sprecher...")
-            
+            publish_status(
+                recording_id, "transcribing", 75, "Kombiniere Text und Sprecher..."
+            )
+
             # 4. Match Timestamps
-            matched_blocks = match_timestamps(transcription_result.get("words", []), speaker_segments)
-            
+            matched_blocks = match_timestamps(
+                trans_res.get("words", []), speaker_segments
+            )
+
             # Format for Mistral
             if matched_blocks:
-                mistral_input_text = "\n".join([f"{block['speaker']}: {block['text']}" for block in matched_blocks])
+                mistral_input_text = "\n".join(
+                    [f"{b['speaker']}: {b['text']}" for b in matched_blocks]
+                )
             else:
-                mistral_input_text = transcription_result.get("text", "")
-            
+                mistral_input_text = trans_res.get("text", "")
+
             # Fallback for DB segments if matching failed
             db_segments = matched_blocks if matched_blocks else None
 
@@ -170,7 +189,7 @@ async def _process_recording_pipeline(recording_id: str):
                 id=str(uuid.uuid4()),
                 recording_id=recording_id,
                 meeting_id=recording.meeting_id,
-                full_text=transcription_result.get("text", ""),
+                full_text=trans_res.get("text", ""),
                 language="de",
                 segments=db_segments
             )
@@ -180,19 +199,24 @@ async def _process_recording_pipeline(recording_id: str):
             await db.refresh(db_transcription)
 
             # 6. Call Mistral for Analysis (PV & Actions)
-            publish_status(recording_id, "analyzing", 90, "KI analysiert das Protokoll (Mistral)...")
+            publish_status(
+                recording_id, "analyzing", 90, "KI analysiert das Protokoll..."
+            )
             logger.info(f"Starting analysis for transcription {db_transcription.id}")
-            
+
             pv_data = await PVService.generate_pv(mistral_input_text)
-            
+
             # Format PV content as HTML and save to DB
             summary = pv_data.get('summary', '')
             decisions = '<br/>'.join([f'- {d}' for d in pv_data.get('decisions', [])])
-            html_content = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><p>{decisions}</p>"
+            html_content = f"<h3>Résumé</h3><p>{summary}</p>" \
+                           f"<h3>Décisions</h3><p>{decisions}</p>"
 
             # Check if PV already exists to prevent UniqueViolationError
-            existing_pv_result = await db.execute(select(PV).where(PV.meeting_id == recording.meeting_id))
-            existing_pv = existing_pv_result.scalar_one_or_none()
+            existing_pv_res = await db.execute(
+                select(PV).where(PV.meeting_id == recording.meeting_id)
+            )
+            existing_pv = existing_pv_res.scalar_one_or_none()
 
             if existing_pv:
                 existing_pv.title = pv_data.get('title', 'Meeting PV')
@@ -209,7 +233,7 @@ async def _process_recording_pipeline(recording_id: str):
                 )
                 db.add(db_pv)
                 logger.info(f"Created new PV for meeting {recording.meeting_id}")
-            
+
             actions_data = pv_data.get("actions", [])
 
             # Save Actions
@@ -227,7 +251,9 @@ async def _process_recording_pipeline(recording_id: str):
             await db.commit()
             logger.info(f"Pipeline completed for recording {recording_id}")
 
-            publish_status(recording_id, "completed", 100, "Verarbeitung erfolgreich abgeschlossen!")
+            publish_status(
+                recording_id, "completed", 100, "Verarbeitung abgeschlossen!"
+            )
 
             # Final Notification to n8n
             await _notify_n8n_completion(recording_id, recording.meeting_id)
@@ -236,12 +262,15 @@ async def _process_recording_pipeline(recording_id: str):
             logger.error(f"Error in transcription pipeline: {e}")
             recording.status = "failed"
             await db.commit()
-            publish_status(recording_id, "failed", 0, f"Fehler aufgetreten: {str(e)}")
+            publish_status(recording_id, "failed", 0, f"Fehler: {str(e)}")
         finally:
             # Clean up temporary audio file
-            if 'temp_audio_file_path' in locals() and os.path.exists(temp_audio_file_path):
+            if 'temp_audio_file_path' in locals() and os.path.exists(
+                temp_audio_file_path
+            ):
                 os.remove(temp_audio_file_path)
                 logger.info(f"Temporäre Datei gelöscht: {temp_audio_file_path}")
+
 
 async def _notify_n8n_completion(recording_id: str, meeting_id: str):
     payload = {
@@ -251,9 +280,12 @@ async def _notify_n8n_completion(recording_id: str, meeting_id: str):
     }
     try:
         async with httpx.AsyncClient() as client:
-            await client.post(settings.N8N_WEBHOOK_TRANSCRIPTION_COMPLETED, json=payload)
+            await client.post(
+                settings.N8N_WEBHOOK_TRANSCRIPTION_COMPLETED, json=payload
+            )
     except Exception as e:
         logger.error(f"Failed to notify n8n: {e}")
+
 
 @celery_app.task(name="process_recording")
 def process_recording(recording_id: str):

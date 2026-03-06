@@ -7,23 +7,26 @@ import jinja2
 import boto3
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
-
-# Versuche WeasyPrint zu importieren (kann je nach System libs erfordern)
-try:
-    from weasyprint import HTML, CSS
-    WEASYPRINT_AVAILABLE = True
-except (ImportError, OSError):
-    logging.warning("WeasyPrint is not installed or missing system dependencies. PDF generation will mock if called.")
-    WEASYPRINT_AVAILABLE = False
-
-from app.core.config import settings
-from app.models.pv import PV, Section
-from app.models.meeting import Meeting, Participant, Agenda
-from app.models.action import Action
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+# Versuche WeasyPrint zu importieren (kann je nach System libs erfordern)
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except (ImportError, OSError):
+    logging.warning(
+        "WeasyPrint is not installed. PDF generation will mock if called."
+    )
+    WEASYPRINT_AVAILABLE = False
+
+from app.core.config import settings
+from app.models.pv import PV
+from app.models.meeting import Meeting
+from app.models.action import Action
+
 logger = logging.getLogger(__name__)
+
 
 class PDFService:
     def __init__(self, db: AsyncSession, s3_client=None):
@@ -39,9 +42,11 @@ class PDFService:
         except Exception as e:
             logger.warning(f"Could not initialize S3 client: {e}")
             self.s3 = None
-            
+
         # Jinja2 Setup für das HTML Template
-        template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'templates')
+        template_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), 'templates'
+        )
         self.template_env = jinja2.Environment(
             loader=jinja2.FileSystemLoader(template_dir),
             autoescape=True
@@ -62,30 +67,40 @@ class PDFService:
         )
         result = await self.db.execute(stmt)
         pv_obj = result.scalar_one_or_none()
-        
+
         if not pv_obj:
             raise HTTPException(status_code=404, detail="PV not found")
-            
+
         # Action items separat laden
         action_stmt = select(Action).where(Action.meeting_id == pv_obj.meeting_id)
         action_result = await self.db.execute(action_stmt)
         actions = action_result.scalars().all()
 
         # 2. Template-Daten aufbereiten
+        start_time = pv_obj.meeting.start_time
+        end_time = pv_obj.meeting.end_time
+        duration = "N/A"
+        if start_time and end_time:
+            duration = str(int((end_time - start_time).total_seconds() / 60))
+
         pv_data = {
             "title": pv_obj.title or pv_obj.meeting.title,
-            "date": (pv_obj.meeting.start_time.strftime("%Y-%m-%d") if pv_obj.meeting.start_time else "N/A"),
+            "date": (start_time.strftime("%Y-%m-%d") if start_time else "N/A"),
             "location": pv_obj.meeting.location or "N/A",
-            "duration": str(int((pv_obj.meeting.end_time - pv_obj.meeting.start_time).total_seconds() / 60)) if pv_obj.meeting.end_time else "N/A",
+            "duration": duration,
             "participants": [p.name or p.email for p in pv_obj.meeting.participants],
-            "agenda": "\n".join([a.title for a in sorted(pv_obj.meeting.agendas, key=lambda x: x.order)]),
+            "agenda": "\n".join(
+                [a.title for a in sorted(pv_obj.meeting.agendas, key=lambda x: x.order)]
+            ),
             "discussion": pv_obj.content_html or "N/A",
             "decisions": [s.content for s in pv_obj.sections if s.type == "decision"],
             "actions": [
                 {
-                    "description": a.title, 
-                    "assignee": a.description.split("Assigned to: ")[-1] if "Assigned to: " in a.description else "N/A", 
-                    "due_date": a.due_date.strftime("%Y-%m-%d") if a.due_date else "N/A"
+                    "description": a.title,
+                    "assignee": a.description.split("Assigned to: ")[-1]
+                    if a.description and "Assigned to: " in a.description else "N/A",
+                    "due_date": a.due_date.strftime("%Y-%m-%d")
+                    if a.due_date else "N/A"
                 } for a in actions
             ]
         }
@@ -97,13 +112,13 @@ class PDFService:
         except Exception as e:
             logger.error(f"Error rendering template: {e}")
             raise HTTPException(status_code=500, detail="Could not render PDF template")
-        
+
         # 4. PDF generieren
         pdf_filename = f"pv_{pv_id}_{uuid.uuid4().hex[:8]}.pdf"
         pdf_path = f"/tmp/{pdf_filename}"
-        
+
         await self._convert_html_to_pdf(html_content, pdf_path)
-        
+
         return pdf_path
 
     async def _convert_html_to_pdf(self, html: str, filepath: str) -> str:
@@ -111,75 +126,27 @@ class PDFService:
         if not WEASYPRINT_AVAILABLE:
             # Erstelle ein Dummy-PDF, falls WeasyPrint nicht verfügbar ist
             with open(filepath, "wb") as f:
-                f.write(b"""%PDF-1.4
-1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
-2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj
-3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/Resources <<
-/Font <<
-/F1 4 0 R
->>
->>
-/MediaBox [0 0 612 792]
-/Contents 5 0 R
->>
-endobj
-4 0 obj
-<<
-/Type /Font
-/Subtype /Type1
-/BaseFont /Helvetica
->>
-endobj
-5 0 obj
-<<
-/Length 44
->>
-stream
-BT
-/F1 24 Tf
-100 700 Td
-(WeasyPrint not installed) Tj
-ET
-endstream
-endobj
-xref
-0 6
-0000000000 65535 f
-0000000009 00000 n
-0000000058 00000 n
-0000000115 00000 n
-0000000219 00000 n
-0000000307 00000 n
-trailer
-<<
-/Size 6
-/Root 1 0 R
->>
-startxref
-402
-%%EOF""")
+                f.write(b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\n"
+                        b"endobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\n"
+                        b"endobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources "
+                        b"<< /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] "
+                        b"/Contents 5 0 R >>\nendobj\n4 0 obj\n<< /Type /Font "
+                        b"/Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n5 0 obj\n"
+                        b"<< /Length 44 >>\nstream\nBT\n/F1 24 Tf\n100 700 Td\n"
+                        b"(WeasyPrint not installed) Tj\nET\nendstream\nendobj\n"
+                        b"xref\n0 6\n0000000000 65535 f\n0000000009 00000 n\n"
+                        b"0000000058 00000 n\n0000000115 00000 n\n0000000219 00000 n\n"
+                        b"0000000307 00000 n\ntrailer\n<< /Size 6 /Root 1 0 R >>\n"
+                        b"startxref\n402\n%%EOF")
             return filepath
-            
+
         try:
             HTML(string=html).write_pdf(filepath)
             return filepath
         except Exception as e:
-            logger.error(f"Error generating PDF with WeasyPrint: {e}\n{traceback.format_exc()}")
+            logger.error(
+                f"Error generating PDF with WeasyPrint: {e}\n{traceback.format_exc()}"
+            )
             raise HTTPException(status_code=500, detail="Error generating PDF file")
 
     async def _upload_to_minio(self, file_path: str, object_name: str) -> str:
@@ -200,5 +167,5 @@ startxref
 
     async def get_pdf_from_minio(self, pv_id: int) -> Optional[bytes]:
         """Bestehendes PDF aus Minio holen"""
-        # Implementierung für produktiven Einsatz
-        pass
+        # Implementierung für produktiven Einsatz (TBD)
+        return None

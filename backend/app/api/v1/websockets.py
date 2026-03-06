@@ -6,6 +6,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 @router.websocket("/transcription/{recording_id}")
 async def websocket_transcription_endpoint(websocket: WebSocket, recording_id: str):
     """
@@ -19,14 +20,14 @@ async def websocket_transcription_endpoint(websocket: WebSocket, recording_id: s
             '{"status": "connected", "progress": 0, "message": "Connection established"}',
             websocket
         )
-        
+
         # Verbindung offen halten und auf Client-Nachrichten (Ping) warten
         while True:
             # Wir warten hier nur passiv, da Updates über Redis reinkommen
             data = await websocket.receive_text()
             if data == "ping":
                 await manager.send_personal_message("pong", websocket)
-                
+
     except WebSocketDisconnect:
         manager.disconnect(websocket, recording_id)
     except Exception as e:

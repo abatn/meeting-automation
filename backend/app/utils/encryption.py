@@ -2,6 +2,7 @@ import base64
 from cryptography.fernet import Fernet
 from app.core.config import settings
 
+
 def get_fernet() -> Fernet:
     """
     Get a Fernet instance using the configured encryption key.
@@ -12,6 +13,7 @@ def get_fernet() -> Fernet:
     key = base64.urlsafe_b64encode(settings.ENCRYPTION_KEY)
     return Fernet(key)
 
+
 def encrypt_data(data: str) -> str:
     """
     Encrypt a string using symmetric encryption.
@@ -20,6 +22,7 @@ def encrypt_data(data: str) -> str:
         return data
     f = get_fernet()
     return f.encrypt(data.encode()).decode()
+
 
 def decrypt_data(encrypted_data: str) -> str:
     """

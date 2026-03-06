@@ -1,11 +1,12 @@
-import json
 import logging
 from typing import Dict, List
 from fastapi import WebSocket
 import redis.asyncio as redis
 from app.core.config import settings
 
+
 logger = logging.getLogger(__name__)
+
 
 class ConnectionManager:
     def __init__(self):
@@ -47,7 +48,7 @@ class ConnectionManager:
                 except Exception as e:
                     logger.warning(f"Error sending message to client: {e}")
                     disconnected_clients.append(connection)
-            
+
             # Fehlerhafte Verbindungen aufräumen
             for connection in disconnected_clients:
                 self.disconnect(connection, recording_id)
@@ -56,21 +57,22 @@ class ConnectionManager:
         """Hintergrund-Task: Auf Redis Pub/Sub Kanälen lauschen"""
         await self.pubsub.psubscribe("transcription_status_*")
         logger.info("Subscribed to Redis pattern 'transcription_status_*'")
-        
+
         try:
             async for message in self.pubsub.listen():
                 if message["type"] == "pmessage":
                     # Channel Name auswerten, um die recording_id zu extrahieren
                     channel = message["channel"].decode("utf-8")
                     recording_id = channel.replace("transcription_status_", "")
-                    
+
                     data = message["data"].decode("utf-8")
                     logger.debug(f"Redis Broadcast received for {recording_id}: {data}")
-                    
+
                     # An die entsprechenden WebSockets verteilen
                     await self.broadcast(data, recording_id)
         except Exception as e:
             logger.error(f"Error in Redis listener: {e}")
-            
+
+
 # Singleton-Instanz für die gesamte App
 manager = ConnectionManager()

@@ -1,6 +1,6 @@
 import httpx
 import logging
-from typing import List, Optional
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from datetime import datetime, timedelta
@@ -8,7 +8,9 @@ from datetime import datetime, timedelta
 from app.models.action import Action
 from app.core.config import settings
 
+
 logger = logging.getLogger(__name__)
+
 
 class ActionService:
     def __init__(self, db: AsyncSession):
@@ -23,26 +25,27 @@ class ActionService:
                 title=item.get("title"),
                 description=item.get("description"),
                 assignee_id=item.get("assignee_id"),
-                due_date=datetime.fromisoformat(item["due_date"]) if item.get("due_date") else None,
+                due_date=datetime.fromisoformat(item["due_date"])
+                if item.get("due_date") else None,
                 status="pending"
             )
             self.db.add(action)
             new_actions.append(action)
-        
+
         await self.db.commit()
-        
+
         # Trigger notifications for each assigned action
         for action in new_actions:
             if action.assignee_id:
                 await self.assign_action(action.id, action.assignee_id)
-        
+
         return new_actions
 
     async def assign_action(self, action_id: int, user_id: int):
         """Verantwortlichen zuweisen -> WhatsApp Reminder via n8n"""
         result = await self.db.execute(select(Action).where(Action.id == action_id))
         action = result.scalars().first()
-        
+
         if not action:
             return None
 
@@ -71,7 +74,7 @@ class ActionService:
         """Status-Änderung -> n8n Notification"""
         result = await self.db.execute(select(Action).where(Action.id == action_id))
         action = result.scalars().first()
-        
+
         if not action:
             return None
 
@@ -98,7 +101,9 @@ class ActionService:
         """Für tägliche Reminder (via Celery)"""
         tomorrow = datetime.utcnow() + timedelta(days=1)
         result = await self.db.execute(
-            select(Action).where(Action.due_date <= tomorrow, Action.status != "completed")
+            select(Action).where(
+                Action.due_date <= tomorrow, Action.status != "completed"
+            )
         )
         return result.scalars().all()
 
@@ -112,4 +117,4 @@ class ActionService:
             async with httpx.AsyncClient() as client:
                 await client.post(settings.N8N_WEBHOOK_URL, json=payload, timeout=5.0)
         except Exception as e:
-            logger.error(f"Failed to trigger n8n escalation: {e}")
+            logger.error(f"Failed to trigger n8n escalate notification: {e}")

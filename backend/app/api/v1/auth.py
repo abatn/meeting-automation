@@ -6,23 +6,28 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.core import security
 from app.core.config import settings
 from app.api import deps
-from app.models.user import User as UserModel, Role as RoleModel, UserRole
+from app.models.user import User as UserModel, Role as RoleModel
 from app.schemas.user import User, UserCreate, Token
+from app.services.auth_service import AuthService
 
 router = APIRouter()
+
 
 @router.post("/login", response_model=Token)
 async def login(
     db: AsyncSession = Depends(deps.get_db),
     form_data: OAuth2PasswordRequestForm = Depends()
 ) -> Any:
-    user_result = await db.execute(select(UserModel).where(UserModel.email == form_data.username))
+    user_result = await db.execute(
+        select(UserModel).where(UserModel.email == form_data.username)
+    )
     user = user_result.scalar_one_or_none()
-    
+
     if not user or not security.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -31,12 +36,13 @@ async def login(
         )
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
-    
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+
     # Load roles for the user
-    from sqlalchemy.orm import selectinload
-    user_stmt = select(UserModel).options(selectinload(UserModel.roles)).where(UserModel.id == user.id)
+    user_stmt = select(UserModel).options(
+        selectinload(UserModel.roles)
+    ).where(UserModel.id == user.id)
     user_with_roles = (await db.execute(user_stmt)).scalar_one()
     role_name = user_with_roles.roles[0].name if user_with_roles.roles else "participant"
 
@@ -54,20 +60,23 @@ async def login(
         }
     }
 
+
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 async def register(
     *,
     db: AsyncSession = Depends(deps.get_db),
     user_in: UserCreate
 ) -> Any:
-    user_result = await db.execute(select(UserModel).where(UserModel.email == user_in.email))
+    user_result = await db.execute(
+        select(UserModel).where(UserModel.email == user_in.email)
+    )
     user = user_result.scalar_one_or_none()
     if user:
         raise HTTPException(
             status_code=400,
             detail="The user with this username already exists in the system.",
         )
-    
+
     # Create user with string ID (UUID)
     db_obj = UserModel(
         id=str(uuid.uuid4()),
@@ -81,25 +90,20 @@ async def register(
     )
     db.add(db_obj)
     await db.flush()
-    
+
     # Assign role
-    role_result = await db.execute(select(RoleModel).where(RoleModel.name == user_in.role))
+    role_result = await db.execute(
+        select(RoleModel).where(RoleModel.name == user_in.role)
+    )
     role = role_result.scalar_one_or_none()
     if not role:
         role = RoleModel(id=str(uuid.uuid4()), name=user_in.role)
         db.add(role)
         await db.flush()
-    
-    # Check if UserRole is a model or an enum - based on grep it might be an enum
-    # but the DB schema shows a user_roles table. 
-    # If it's a table, we need the model.
-    # For now, let's assume it works via the relationship if defined, 
-    # or we need to import UserRole table model if it exists separately.
-    # Looking at the previous psql output, user_roles table exists.
-    
+
     await db.commit()
     await db.refresh(db_obj)
-    
+
     return User(
         id=db_obj.id,
         email=db_obj.email,
@@ -111,11 +115,13 @@ async def register(
         role=user_in.role
     )
 
+
 @router.get("/me", response_model=User)
 async def read_user_me(
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     return current_user
+
 
 @router.get("/validate")
 async def validate_token(
@@ -127,8 +133,9 @@ async def validate_token(
     Used for initial App load to prevent redirect loops.
     """
     # Load roles for the user
-    from sqlalchemy.orm import selectinload
-    user_stmt = select(UserModel).options(selectinload(UserModel.roles)).where(UserModel.id == current_user.id)
+    user_stmt = select(UserModel).options(
+        selectinload(UserModel.roles)
+    ).where(UserModel.id == current_user.id)
     user_with_roles = (await db.execute(user_stmt)).scalar_one()
     role_name = user_with_roles.roles[0].name if user_with_roles.roles else "participant"
 
@@ -142,7 +149,6 @@ async def validate_token(
         }
     }
 
-from app.services.auth_service import AuthService
 
 @router.post("/logout")
 async def logout(
@@ -157,14 +163,12 @@ async def logout(
     await auth_service.add_token_to_blacklist(token)
     return {"msg": "Successfully logged out"}
 
+
 @router.post("/refresh", response_model=Token)
 async def refresh_token(current_user: UserModel = Depends(deps.get_current_user)) -> Any:
     """
     Refresh JWT token.
     """
-    from app.core import security
-    from app.core.config import settings
-    from datetime import timedelta
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
         "access_token": security.create_access_token(

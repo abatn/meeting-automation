@@ -7,7 +7,17 @@ import logging
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.middleware.audit_middleware import AuditMiddleware
-from app.api.v1 import auth, meetings, recordings, transcriptions, pv, actions, reports, webhooks, websockets
+from app.api.v1 import (
+    auth,
+    meetings,
+    recordings,
+    transcriptions,
+    pv,
+    actions,
+    reports,
+    webhooks,
+    websockets,
+)
 from app.core.websocket import manager
 import asyncio
 
@@ -18,20 +28,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Meeting Automation System...")
-    
+
     # Start Redis WebSocket Listener task
     asyncio.create_task(manager.listen_to_redis())
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database initialized")
     yield
     # Shutdown
     logger.info("Shutting down...")
+
 
 app = FastAPI(
     title="Meeting Automation API",
@@ -54,6 +66,7 @@ app.add_middleware(
 # Audit Middleware (ISO 27001)
 app.add_middleware(AuditMiddleware)
 
+
 # Exception handlers
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -63,16 +76,20 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"}
     )
 
+
 # Health check
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "version": "1.0.0"}
 
+
 # API Routes
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(meetings.router, prefix="/api/v1/meetings", tags=["Meetings"])
 app.include_router(recordings.router, prefix="/api/v1/recordings", tags=["Recordings"])
-app.include_router(transcriptions.router, prefix="/api/v1/transcriptions", tags=["Transcriptions"])
+app.include_router(
+    transcriptions.router, prefix="/api/v1/transcriptions", tags=["Transcriptions"]
+)
 app.include_router(pv.router, prefix="/api/v1/pv", tags=["Procès-Verbaux"])
 app.include_router(actions.router, prefix="/api/v1/actions", tags=["Actions"])
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])

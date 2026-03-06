@@ -1,6 +1,7 @@
 from sqlalchemy.types import TypeDecorator, String, Text
 from app.utils.encryption import encrypt_data, decrypt_data
 
+
 class EncryptedString(TypeDecorator):
     """
     A SQLAlchemy TypeDecorator that encrypts data on the way into the DB
@@ -19,13 +20,14 @@ class EncryptedString(TypeDecorator):
             try:
                 return decrypt_data(value)
             except Exception:
-                # Fallback in case the DB has some unencrypted legacy data during migration
+                # Fallback for unencrypted legacy data during migration
                 return value
         return value
 
+
 class EncryptedText(TypeDecorator):
     """
-    Same as EncryptedString, but backed by Text for longer content like PVs and Transcripts.
+    Same as EncryptedString, but backed by Text for longer content.
     """
     impl = Text
     cache_ok = True

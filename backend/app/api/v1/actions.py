@@ -1,16 +1,17 @@
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-import uuid
 
 from app.api import deps
-from app.schemas.action import Action, ActionCreate, ActionUpdate
+from app.schemas.action import Action, ActionCreate
 from app.models.action import Action as ActionModel, Assignment as AssignmentModel
-from app.models.user import User as UserModel, UserRole # UserRole hinzugefügt
-from sqlalchemy.orm import join
+from app.models.user import User as UserModel, UserRole
+
 
 router = APIRouter()
+
 
 @router.get("/", response_model=List[Action])
 async def list_actions(
@@ -26,20 +27,23 @@ async def list_actions(
     Retrieve a list of action items, with optional filters.
     """
     stmt = select(ActionModel)
-    
+
     # Optional filters
     if status:
         stmt = stmt.where(ActionModel.status == status)
     if meeting_id:
         stmt = stmt.where(ActionModel.meeting_id == meeting_id)
-        
+
     if assigned_to:
-        stmt = stmt.join(AssignmentModel, ActionModel.id == AssignmentModel.action_id).where(AssignmentModel.user_id == assigned_to)
-    
+        stmt = stmt.join(
+            AssignmentModel, ActionModel.id == AssignmentModel.action_id
+        ).where(AssignmentModel.user_id == assigned_to)
+
     stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
     actions = result.scalars().all()
     return actions
+
 
 @router.get("/my-actions", response_model=List[Action])
 async def list_my_actions(
@@ -52,15 +56,18 @@ async def list_my_actions(
     """
     Retrieve a list of action items assigned to the current user.
     """
-    stmt = select(ActionModel).join(AssignmentModel).where(AssignmentModel.user_id == current_user.id)
-    
+    stmt = select(ActionModel).join(AssignmentModel).where(
+        AssignmentModel.user_id == current_user.id
+    )
+
     if status:
         stmt = stmt.where(ActionModel.status == status)
-        
+
     stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
     actions = result.scalars().all()
     return actions
+
 
 @router.get("/team-actions", response_model=List[Action])
 async def list_team_actions(
@@ -68,7 +75,7 @@ async def list_team_actions(
     skip: int = 0,
     limit: int = 100,
     status: Optional[str] = None,
-    current_user: UserModel = Depends(deps.get_current_user), # Expecting current_user to be a manager
+    current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
     Retrieve a list of action items assigned to users managed by the current user.
@@ -79,6 +86,9 @@ async def list_team_actions(
             status_code=403,
             detail="Insufficient permissions. Only managers can access team actions."
         )
+    # Note: Implementation of filtering by managed users would go here
+    return []
+
 
 @router.get("/pending", response_model=List[Action])
 async def get_pending_actions_for_automation(
@@ -93,6 +103,7 @@ async def get_pending_actions_for_automation(
     result = await db.execute(stmt)
     actions = result.scalars().all()
     return actions
+
 
 @router.post("/", response_model=Action, status_code=201)
 async def create_action(
@@ -115,7 +126,7 @@ async def create_action(
     )
     db.add(action)
     await db.flush()
-    
+
     if action_in.assigned_to:
         assignment = AssignmentModel(
             id=str(uuid.uuid4()),
@@ -123,11 +134,12 @@ async def create_action(
             user_id=action_in.assigned_to
         )
         db.add(assignment)
-    
+
     await db.commit()
     await db.refresh(action)
-    
+
     return action
+
 
 @router.get("/{action_id}", response_model=Action)
 async def get_action(
@@ -145,12 +157,13 @@ async def get_action(
         raise HTTPException(status_code=404, detail="Action not found")
     return action
 
+
 @router.patch("/{action_id}/status", response_model=Action)
 async def update_action_status(
     *,
     db: AsyncSession = Depends(deps.get_db),
     action_id: str,
-    status_update: dict, # Simplified for PATCH {"status": "completed"}
+    status_update: dict,  # Simplified for PATCH {"status": "completed"}
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
@@ -158,13 +171,13 @@ async def update_action_status(
     """
     result = await db.execute(select(ActionModel).where(ActionModel.id == action_id))
     action = result.scalars().first()
-    
+
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
-        
+
     if "status" in status_update:
         action.status = status_update["status"]
-        
+
     db.add(action)
     await db.commit()
     await db.refresh(action)

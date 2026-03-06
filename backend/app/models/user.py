@@ -6,27 +6,41 @@ from app.core.database import Base
 from sqlalchemy_utils import EncryptedType
 from app.core.config import settings
 
+
 class UserRole(str, enum.Enum):
     ADMIN = "admin"
     MANAGER = "manager"
     PARTICIPANT = "participant"
     DG = "dg"
 
+
 # Association table for User-Role (Many-to-Many)
 user_roles = Table(
     "user_roles",
     Base.metadata,
-    Column("user_id", String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", String, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "user_id", String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column(
+        "role_id", String, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    ),
 )
 
 # Association table for Role-Permission (Many-to-Many)
 role_permissions = Table(
     "role_permissions",
     Base.metadata,
-    Column("role_id", String, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-    Column("permission_id", String, ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "role_id", String, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column(
+        "permission_id",
+        String,
+        ForeignKey("permissions.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
+
 
 class User(Base):
     __tablename__ = "users"
@@ -37,11 +51,11 @@ class User(Base):
     full_name = Column(String)
     is_active = Column(Boolean, default=True)
     is_superuser = Column(Boolean, default=False)
-    
+
     # MFA
     totp_secret = Column(EncryptedType(String, settings.SECRET_KEY), nullable=True)
     is_mfa_enabled = Column(Boolean, default=False)
-    
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -54,6 +68,7 @@ class User(Base):
     audit_logs = relationship("AuditLog", back_populates="user")
     created_meetings = relationship("Meeting", back_populates="creator")
 
+
 class Role(Base):
     __tablename__ = "roles"
 
@@ -62,7 +77,10 @@ class Role(Base):
     description = Column(String)
 
     users = relationship("User", secondary=user_roles, back_populates="roles")
-    permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
+    permissions = relationship(
+        "Permission", secondary=role_permissions, back_populates="roles"
+    )
+
 
 class Permission(Base):
     __tablename__ = "permissions"

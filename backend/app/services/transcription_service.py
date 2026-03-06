@@ -3,7 +3,9 @@ import logging
 import os
 from app.core.config import settings
 
+
 logger = logging.getLogger(__name__)
+
 
 async def transcribe_audio(audio_file_path: str, word_timestamps: bool = False) -> dict:
     """
@@ -17,7 +19,7 @@ async def transcribe_audio(audio_file_path: str, word_timestamps: bool = False) 
         headers = {
             "Authorization": f"Bearer {settings.OPENAI_API_KEY}"
         }
-        
+
         filename = os.path.basename(audio_file_path)
 
         with open(audio_file_path, "rb") as f:
@@ -28,7 +30,7 @@ async def transcribe_audio(audio_file_path: str, word_timestamps: bool = False) 
                 "model": "whisper-1",
                 "response_format": "json"
             }
-            
+
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     "https://api.openai.com/v1/audio/transcriptions",
@@ -38,7 +40,7 @@ async def transcribe_audio(audio_file_path: str, word_timestamps: bool = False) 
                     timeout=300.0
                 )
                 response.raise_for_status()
-            
+
             result = response.json()
             if word_timestamps:
                 # result contains 'text' and 'words'
