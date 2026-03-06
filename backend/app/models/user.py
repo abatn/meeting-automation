@@ -8,6 +8,8 @@ from datetime import datetime
 from app.core.database import Base
 from sqlalchemy_utils import EncryptedType
 from app.core.config import settings
+from app.models.audit_log import AuditLog # Added
+from app.models.meeting import Meeting # Added
 
 
 class UserRole(str, enum.Enum):
@@ -78,10 +80,10 @@ class User(Base):
     roles: Mapped[List["Role"]] = relationship(
         secondary=user_roles, back_populates="users", lazy="selectin"
     )
-    audit_logs: Mapped[List["AuditLog"]] = relationship("AuditLog", back_populates="user")
-    created_meetings: Mapped[List["Meeting"]] = relationship(
-        "Meeting", back_populates="creator"
-    )
+    audit_logs: Mapped[List[AuditLog]] = relationship(AuditLog, back_populates="user") # Changed
+    created_meetings: Mapped[List[Meeting]] = relationship(
+        Meeting, back_populates="creator"
+    ) # Changed
 
     @property
     def role(self) -> str:
