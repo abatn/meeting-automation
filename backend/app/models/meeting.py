@@ -8,6 +8,8 @@ from datetime import datetime
 from app.core.database import Base
 from app.models.action import Action
 from app.models.pv import PV
+from app.models.recording import Recording
+from app.models.transcription import Transcription
 
 
 class MeetingStatus(str, enum.Enum):
