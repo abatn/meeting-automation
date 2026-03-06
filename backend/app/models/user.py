@@ -79,9 +79,11 @@ class User(Base):
     manager: Mapped["User"] = relationship(back_populates="reports", remote_side=[id])
 
 
-    # Relationships    roles: Mapped[List["Role"]] = relationship(
+    # Relationships
+    roles: Mapped[List["Role"]] = relationship(
         secondary=user_roles, back_populates="users", lazy="selectin"
-    )    audit_logs: Mapped[List["AuditLog"]] = relationship("AuditLog", back_populates="user")
+    )
+    audit_logs: Mapped[List["AuditLog"]] = relationship("AuditLog", back_populates="user")
     created_meetings: Mapped[List["Meeting"]] = relationship(
         "Meeting", back_populates="creator"
     )
