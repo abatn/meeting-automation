@@ -38,9 +38,17 @@ done
 echo -e "${GREEN}PostgreSQL is ready!${NC}"
 
 # 3. Run Database Migrations (Alembic)
-echo -e "${YELLOW}Running Alembic migrations...${NC}"
-$DOCKER_COMPOSE exec -T backend alembic upgrade head
-echo -e "${GREEN}Migrations completed.${NC}"
+echo -e "${YELLOW}Checking database state for Alembic migrations...${NC}"
+TABLE_EXISTS=$($DOCKER_COMPOSE exec -T postgres psql -U meeting_user -d meeting_db -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename  = 'users');")
+
+if [ "$TABLE_EXISTS" = "t" ]; then
+    echo -e "${BLUE}Tables already auto-created by backend. Syncing Alembic state...${NC}"
+    $DOCKER_COMPOSE exec -T backend alembic stamp head
+else
+    echo -e "${YELLOW}Running Alembic migrations from scratch...${NC}"
+    $DOCKER_COMPOSE exec -T backend alembic upgrade head
+fi
+echo -e "${GREEN}Database schema is up to date.${NC}"
 
 # 4. Create n8n Helper Table (Not in standard migrations)
 echo -e "${YELLOW}Initializing n8n auxiliary table (n8n_meetings)...${NC}"
