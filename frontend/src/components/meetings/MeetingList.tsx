@@ -1,6 +1,6 @@
-import React from 'react';
-import { List, ListItem, ListItemText, Typography } from '@mui/material';
-import { useTranslation } from 'react-i18next';
+import React from "react";
+import { List, ListItem, ListItemText, Typography } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 interface Meeting {
   id: number;
@@ -17,7 +17,7 @@ const MeetingList: React.FC<MeetingListProps> = ({ meetings }) => {
 
   return (
     <div>
-      <Typography variant="h6">{t('upcomingMeetings')}</Typography>
+      <Typography variant="h6">{t("upcomingMeetings")}</Typography>
       <List>
         {meetings.map((meeting) => (
           <ListItem key={meeting.id}>

@@ -1,5 +1,5 @@
-import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { getDashboardData } from '../services/reportService';
+import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
+import { getDashboardData } from "../services/reportService";
 
 // Interfaces for data types
 interface MeetingStats {
@@ -53,35 +53,43 @@ const initialState: DashboardState = {
 
 // Async Thunks
 export const fetchManagerDashboardData = createAsyncThunk(
-  'dashboard/fetchManagerDashboardData',
+  "dashboard/fetchManagerDashboardData",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await getDashboardData('manager');
+      const response = await getDashboardData("manager");
       return response;
     } catch (error: any) {
       const detail = error.response?.data?.detail;
-      const errorMessage = typeof detail === 'string' ? detail : JSON.stringify(detail || 'Failed to fetch manager dashboard data');
+      const errorMessage =
+        typeof detail === "string"
+          ? detail
+          : JSON.stringify(detail || "Failed to fetch manager dashboard data");
       return rejectWithValue(errorMessage);
     }
-  }
+  },
 );
 
 export const fetchParticipantDashboardData = createAsyncThunk(
-  'dashboard/fetchParticipantDashboardData',
+  "dashboard/fetchParticipantDashboardData",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await getDashboardData('participant');
+      const response = await getDashboardData("participant");
       return response;
     } catch (error: any) {
       const detail = error.response?.data?.detail;
-      const errorMessage = typeof detail === 'string' ? detail : JSON.stringify(detail || 'Failed to fetch participant dashboard data');
+      const errorMessage =
+        typeof detail === "string"
+          ? detail
+          : JSON.stringify(
+              detail || "Failed to fetch participant dashboard data",
+            );
       return rejectWithValue(errorMessage);
     }
-  }
+  },
 );
 
 const dashboardSlice = createSlice({
-  name: 'dashboard',
+  name: "dashboard",
   initialState,
   reducers: {},
   extraReducers: (builder) => {
@@ -91,10 +99,13 @@ const dashboardSlice = createSlice({
         state.managerDashboard.loading = true;
         state.managerDashboard.error = null;
       })
-      .addCase(fetchManagerDashboardData.fulfilled, (state, action: PayloadAction<ManagerDashboardData>) => {
-        state.managerDashboard.loading = false;
-        state.managerDashboard.data = action.payload;
-      })
+      .addCase(
+        fetchManagerDashboardData.fulfilled,
+        (state, action: PayloadAction<ManagerDashboardData>) => {
+          state.managerDashboard.loading = false;
+          state.managerDashboard.data = action.payload;
+        },
+      )
       .addCase(fetchManagerDashboardData.rejected, (state, action) => {
         state.managerDashboard.loading = false;
         state.managerDashboard.error = action.payload as string;
@@ -104,10 +115,13 @@ const dashboardSlice = createSlice({
         state.participantDashboard.loading = true;
         state.participantDashboard.error = null;
       })
-      .addCase(fetchParticipantDashboardData.fulfilled, (state, action: PayloadAction<ParticipantDashboardData>) => {
-        state.participantDashboard.loading = false;
-        state.participantDashboard.data = action.payload;
-      })
+      .addCase(
+        fetchParticipantDashboardData.fulfilled,
+        (state, action: PayloadAction<ParticipantDashboardData>) => {
+          state.participantDashboard.loading = false;
+          state.participantDashboard.data = action.payload;
+        },
+      )
       .addCase(fetchParticipantDashboardData.rejected, (state, action) => {
         state.participantDashboard.loading = false;
         state.participantDashboard.error = action.payload as string;

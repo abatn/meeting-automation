@@ -1,28 +1,31 @@
-import React, { useState } from 'react';
-import { 
-  Box, 
-  Button, 
-  Typography, 
-  Paper, 
-  IconButton, 
+import React, { useState } from "react";
+import {
+  Box,
+  Button,
+  Typography,
+  Paper,
+  IconButton,
   LinearProgress,
   Alert,
-  CircularProgress
-} from '@mui/material';
+  CircularProgress,
+} from "@mui/material";
 import {
   Mic as MicIcon,
   Stop as StopIcon,
   Pause as PauseIcon,
-  PlayArrow as PlayArrowIcon
-} from '@mui/icons-material';
-import { useAudioRecorder } from '../../hooks/useAudioRecorder';
+  PlayArrow as PlayArrowIcon,
+} from "@mui/icons-material";
+import { useAudioRecorder } from "../../hooks/useAudioRecorder";
 
 interface AudioRecorderProps {
   meetingId: string;
   onUploadSuccess?: (recording: any) => void;
 }
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSuccess }) => {
+const AudioRecorder: React.FC<AudioRecorderProps> = ({
+  meetingId,
+  onUploadSuccess,
+}) => {
   const {
     isRecording,
     isPaused,
@@ -31,7 +34,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
     stopRecording,
     pauseRecording,
     resumeRecording,
-    error: recorderError
+    error: recorderError,
   } = useAudioRecorder();
 
   const [isFinishing, setIsFinishing] = useState(false);
@@ -40,7 +43,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleStart = async () => {
@@ -55,17 +58,19 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
       if (recordingResponse && onUploadSuccess) {
         onUploadSuccess(recordingResponse);
       } else if (!recordingResponse) {
-        setUploadError('Failed to save the recording.');
+        setUploadError("Failed to save the recording.");
       }
     } catch (err: any) {
-      setUploadError(err.message || 'An error occurred while finishing recording.');
+      setUploadError(
+        err.message || "An error occurred while finishing recording.",
+      );
     } finally {
       setIsFinishing(false);
     }
   };
 
   return (
-    <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'background.default' }}>
+    <Paper sx={{ p: 3, textAlign: "center", bgcolor: "background.default" }}>
       <Typography variant="h6" gutterBottom>
         Live Meeting Assistant
       </Typography>
@@ -76,25 +81,34 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
         </Alert>
       )}
 
-      <Box sx={{ my: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Typography variant="h3" sx={{ mb: 2, fontFamily: 'monospace' }}>
+      <Box
+        sx={{
+          my: 4,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        <Typography variant="h3" sx={{ mb: 2, fontFamily: "monospace" }}>
           {formatDuration(duration)}
         </Typography>
-        
+
         {isRecording && !isFinishing && (
-          <Box sx={{ width: '100%', mb: 2 }}>
+          <Box sx={{ width: "100%", mb: 2 }}>
             <LinearProgress color="secondary" />
           </Box>
         )}
-        
+
         {isFinishing && (
-           <Box sx={{ width: '100%', mb: 2 }}>
-             <Typography variant="body2" sx={{ mb: 1 }}>Finalizing Protocol...</Typography>
-             <LinearProgress color="primary" />
-           </Box>
+          <Box sx={{ width: "100%", mb: 2 }}>
+            <Typography variant="body2" sx={{ mb: 1 }}>
+              Finalizing Protocol...
+            </Typography>
+            <LinearProgress color="primary" />
+          </Box>
         )}
 
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: "flex", gap: 2 }}>
           {!isRecording && !isFinishing && (
             <Button
               variant="contained"
@@ -109,18 +123,14 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
 
           {isRecording && !isFinishing && (
             <>
-              <IconButton 
-                color="secondary" 
+              <IconButton
+                color="secondary"
                 onClick={isPaused ? resumeRecording : pauseRecording}
                 size="large"
               >
                 {isPaused ? <PlayArrowIcon /> : <PauseIcon />}
               </IconButton>
-              <IconButton 
-                color="error" 
-                onClick={handleStop}
-                size="large"
-              >
+              <IconButton color="error" onClick={handleStop} size="large">
                 <StopIcon />
               </IconButton>
             </>
@@ -129,7 +139,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ meetingId, onUploadSucces
       </Box>
 
       <Typography variant="caption" color="textSecondary">
-        {isFinishing ? 'Saving recording to server...' : isRecording ? 'Recording in progress (Streaming)...' : 'Ready to record live'}
+        {isFinishing
+          ? "Saving recording to server..."
+          : isRecording
+            ? "Recording in progress (Streaming)..."
+            : "Ready to record live"}
       </Typography>
     </Paper>
   );

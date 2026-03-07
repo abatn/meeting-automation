@@ -1,18 +1,25 @@
-import React, { useEffect } from 'react';
-import { Box, Typography, Paper, Grid, CircularProgress, Alert } from '@mui/material';
-import { useTranslation } from 'react-i18next';
-import { useDispatch, useSelector } from 'react-redux';
-import { RootState, AppDispatch } from '../../store';
-import { fetchManagerDashboardData } from '../../store/dashboardSlice';
-import MeetingsPieChart from './MeetingsPieChart';
-import ActionsBarChart from './ActionsBarChart';
-import KPICard from '../common/KPICard';
+import React, { useEffect } from "react";
+import {
+  Box,
+  Typography,
+  Paper,
+  Grid,
+  CircularProgress,
+  Alert,
+} from "@mui/material";
+import { useTranslation } from "react-i18next";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState, AppDispatch } from "../../store";
+import { fetchManagerDashboardData } from "../../store/dashboardSlice";
+import MeetingsPieChart from "./MeetingsPieChart";
+import ActionsBarChart from "./ActionsBarChart";
+import KPICard from "../common/KPICard";
 
 // Material UI Icons
-import EventIcon from '@mui/icons-material/Event';
-import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import GroupsIcon from '@mui/icons-material/Groups';
+import EventIcon from "@mui/icons-material/Event";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import AssignmentIcon from "@mui/icons-material/Assignment";
+import GroupsIcon from "@mui/icons-material/Groups";
 
 interface MeetingStats {
   total: number;
@@ -35,7 +42,7 @@ const DashboardManager: React.FC = () => {
   const { t } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const { data, loading, error } = useSelector(
-    (state: RootState) => state.dashboard.managerDashboard
+    (state: RootState) => state.dashboard.managerDashboard,
   );
 
   useEffect(() => {
@@ -44,7 +51,7 @@ const DashboardManager: React.FC = () => {
 
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
         <CircularProgress />
       </Box>
     );
@@ -53,7 +60,9 @@ const DashboardManager: React.FC = () => {
   if (error) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">{t('dashboard.error_loading_data')} {error}</Alert>
+        <Alert severity="error">
+          {t("dashboard.error_loading_data")} {error}
+        </Alert>
       </Box>
     );
   }
@@ -61,7 +70,7 @@ const DashboardManager: React.FC = () => {
   if (!data) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="info">{t('dashboard.no_data_available')}</Alert>
+        <Alert severity="info">{t("dashboard.no_data_available")}</Alert>
       </Box>
     );
   }
@@ -69,50 +78,52 @@ const DashboardManager: React.FC = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        {t('dashboard.manager_title')}
+        {t("dashboard.manager_title")}
       </Typography>
 
       <Grid container spacing={3} sx={{ mt: 2 }}>
         {/* KPI Cards */}
         <Grid item xs={12} sm={6} md={3}>
-          <KPICard 
-            title={t('dashboard.total_team_meetings')} 
-            value={data.meeting_stats.total} 
-            icon={<EventIcon color="primary" fontSize="large" />} 
+          <KPICard
+            title={t("dashboard.total_team_meetings")}
+            value={data.meeting_stats.total}
+            icon={<EventIcon color="primary" fontSize="large" />}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <KPICard 
-            title={t('dashboard.completed_team_meetings')} 
-            value={data.meeting_stats.completed} 
-            icon={<EventAvailableIcon color="success" fontSize="large" />} 
+          <KPICard
+            title={t("dashboard.completed_team_meetings")}
+            value={data.meeting_stats.completed}
+            icon={<EventAvailableIcon color="success" fontSize="large" />}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <KPICard 
-            title={t('dashboard.pending_team_actions')} 
-            value={data.action_stats.pending} 
-            icon={<AssignmentIcon color="warning" fontSize="large" />} 
+          <KPICard
+            title={t("dashboard.pending_team_actions")}
+            value={data.action_stats.pending}
+            icon={<AssignmentIcon color="warning" fontSize="large" />}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={3}>
-          <KPICard 
-            title={t('dashboard.team_members')} 
-            value={data.team_members_count} 
-            icon={<GroupsIcon color="info" fontSize="large" />} 
+          <KPICard
+            title={t("dashboard.team_members")}
+            value={data.team_members_count}
+            icon={<GroupsIcon color="info" fontSize="large" />}
           />
         </Grid>
 
         {/* Charts */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2, height: 350 }}>
-            <Typography variant="h6" gutterBottom>{t('dashboard.meeting_status_distribution')}</Typography>
-            <Box sx={{ height: '90%' }}>
-              <MeetingsPieChart 
+            <Typography variant="h6" gutterBottom>
+              {t("dashboard.meeting_status_distribution")}
+            </Typography>
+            <Box sx={{ height: "90%" }}>
+              <MeetingsPieChart
                 data={{
                   completed: data.meeting_stats.completed,
                   scheduled: data.meeting_stats.scheduled,
-                  cancelled: 0 // Annahme, da backend noch keine cancels liefert
+                  cancelled: 0, // Annahme, da backend noch keine cancels liefert
                 }}
               />
             </Box>
@@ -120,13 +131,15 @@ const DashboardManager: React.FC = () => {
         </Grid>
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2, height: 350 }}>
-            <Typography variant="h6" gutterBottom>{t('dashboard.action_status_distribution')}</Typography>
-            <Box sx={{ height: '90%' }}>
-              <ActionsBarChart 
+            <Typography variant="h6" gutterBottom>
+              {t("dashboard.action_status_distribution")}
+            </Typography>
+            <Box sx={{ height: "90%" }}>
+              <ActionsBarChart
                 data={{
                   completed: data.action_stats.completed,
                   pending: data.action_stats.pending,
-                  overdue: 0 // Annahme
+                  overdue: 0, // Annahme
                 }}
               />
             </Box>
@@ -136,9 +149,22 @@ const DashboardManager: React.FC = () => {
         {/* Placeholder for Data Table */}
         <Grid item xs={12}>
           <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>{t('dashboard.team_tasks')}</Typography>
-            <Box sx={{ height: 300, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f5f5f5' }}>
-              <Typography color="text.secondary">{t('dashboard.team_tasks_placeholder')}</Typography>
+            <Typography variant="h6" gutterBottom>
+              {t("dashboard.team_tasks")}
+            </Typography>
+            <Box
+              sx={{
+                height: 300,
+                overflow: "auto",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#f5f5f5",
+              }}
+            >
+              <Typography color="text.secondary">
+                {t("dashboard.team_tasks_placeholder")}
+              </Typography>
             </Box>
           </Paper>
         </Grid>

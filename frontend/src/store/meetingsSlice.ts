@@ -1,10 +1,10 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface Meeting {
   id: string; // Corrected to string
   title: string;
   description: string;
-  status: 'planned' | 'in_progress' | 'completed';
+  status: "planned" | "in_progress" | "completed";
   scheduled_at: string;
 }
 
@@ -23,7 +23,7 @@ const initialState: MeetingsState = {
 };
 
 const meetingsSlice = createSlice({
-  name: 'meetings',
+  name: "meetings",
   initialState,
   reducers: {
     setMeetings: (state, action: PayloadAction<Meeting[]>) => {
@@ -41,5 +41,6 @@ const meetingsSlice = createSlice({
   },
 });
 
-export const { setMeetings, setCurrentMeeting, setLoading, setError } = meetingsSlice.actions;
+export const { setMeetings, setCurrentMeeting, setLoading, setError } =
+  meetingsSlice.actions;
 export default meetingsSlice.reducer;

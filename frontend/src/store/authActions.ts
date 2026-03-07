@@ -1,10 +1,10 @@
-import { AppDispatch } from './index';
-import { setAuthenticatedUser, logout, setLoading } from './authSlice';
-import authService from '../services/auth';
+import { AppDispatch } from "./index";
+import { setAuthenticatedUser, logout, setLoading } from "./authSlice";
+import authService from "../services/auth";
 
 export const initializeAuth = () => async (dispatch: AppDispatch) => {
-  const token = localStorage.getItem('accessToken');
-  
+  const token = localStorage.getItem("accessToken");
+
   if (!token) {
     dispatch(logout());
     return;
@@ -18,7 +18,7 @@ export const initializeAuth = () => async (dispatch: AppDispatch) => {
       dispatch(logout());
     }
   } catch (error) {
-    console.error('Auth initialization failed', error);
+    console.error("Auth initialization failed", error);
     dispatch(logout());
   }
 };

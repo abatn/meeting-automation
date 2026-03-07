@@ -1,13 +1,13 @@
-import React from 'react';
-import { ListItem, ListItemText, Chip } from '@mui/material';
-import StatusBadge from './StatusBadge'; // Assuming StatusBadge is in the same directory
+import React from "react";
+import { ListItem, ListItemText, Chip } from "@mui/material";
+import StatusBadge from "./StatusBadge"; // Assuming StatusBadge is in the same directory
 
 interface Action {
   id: number;
   description: string;
   assignee: string;
   dueDate: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  status: "pending" | "in_progress" | "completed";
 }
 
 interface ActionCardProps {

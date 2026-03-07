@@ -1,34 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { 
-  Box, 
-  Grid, 
-  Paper, 
-  Typography, 
-  TextField, 
-  Button, 
+import React, { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import {
+  Box,
+  Grid,
+  Paper,
+  Typography,
+  TextField,
+  Button,
   Divider,
   Stack,
   IconButton,
   Tooltip,
   CircularProgress,
-  Alert
-} from '@mui/material';
-import { 
-  CheckCircle as ApproveIcon, 
-  Edit as EditIcon, 
+  Alert,
+} from "@mui/material";
+import {
+  CheckCircle as ApproveIcon,
+  Edit as EditIcon,
   History as HistoryIcon,
-  Save as SaveIcon
-} from '@mui/icons-material';
-import { useTranslation } from 'react-i18next';
-import PDFDownloadButton from './PDFDownloadButton';
-import api from '../../services/api';
+  Save as SaveIcon,
+} from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
+import PDFDownloadButton from "./PDFDownloadButton";
+import api from "../../services/api";
 
 const PVValidator: React.FC = () => {
   const { id: meetingId } = useParams<{ id: string }>();
   const { t } = useTranslation();
-  const [pvContent, setPvContent] = useState('');
-  const [originalTranscript, setOriginalTranscript] = useState('');
+  const [pvContent, setPvContent] = useState("");
+  const [originalTranscript, setOriginalTranscript] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pvId, setPvId] = useState<string | null>(null);
@@ -36,25 +36,31 @@ const PVValidator: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!meetingId) return;
-      
+
       try {
         // 1. Fetch transcription for this meeting
-        const transcriptRes = await api.get(`/transcriptions/meeting/${meetingId}`);
-        setOriginalTranscript(transcriptRes.data.full_text || transcriptRes.data.content);
+        const transcriptRes = await api.get(
+          `/transcriptions/meeting/${meetingId}`,
+        );
+        setOriginalTranscript(
+          transcriptRes.data.full_text || transcriptRes.data.content,
+        );
 
         // 2. Fetch PV for this meeting
         const pvRes = await api.get(`/pv/meeting/${meetingId}`);
         setPvContent(pvRes.data.content_html || pvRes.data.content);
         setPvId(pvRes.data.id);
-        
+
         setError(null);
         setLoading(false);
       } catch (err: any) {
-        console.error('Error fetching PV data:', err);
+        console.error("Error fetching PV data:", err);
         if (err.response?.status === 404) {
-          setError('AI is still processing your meeting. Please wait a few seconds...');
+          setError(
+            "AI is still processing your meeting. Please wait a few seconds...",
+          );
         } else {
-          setError('Failed to load real-time AI results.');
+          setError("Failed to load real-time AI results.");
         }
         // Don't stop loading if we expect data to arrive (polling)
       }
@@ -68,48 +74,86 @@ const PVValidator: React.FC = () => {
 
   if (loading && !pvContent) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px' }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "300px",
+        }}
+      >
         <CircularProgress sx={{ mb: 2 }} />
-        <Typography variant="body1">AI Engine (Whisper & Mistral) is processing your recording...</Typography>
+        <Typography variant="body1">
+          AI Engine (Whisper & Mistral) is processing your recording...
+        </Typography>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ p: 3, height: 'calc(100vh - 100px)' }}>
-      {error && !pvContent && <Alert severity="info" sx={{ mb: 2 }}>{error}</Alert>}
-      
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h5">{t('pv.validator_title')}</Typography>
+    <Box sx={{ p: 3, height: "calc(100vh - 100px)" }}>
+      {error && !pvContent && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
+        <Typography variant="h5">{t("pv.validator_title")}</Typography>
         <Stack direction="row" spacing={2}>
-          <Button variant="outlined" startIcon={<HistoryIcon />}>{t('pv.versions')}</Button>
+          <Button variant="outlined" startIcon={<HistoryIcon />}>
+            {t("pv.versions")}
+          </Button>
           {pvId && <PDFDownloadButton pvId={pvId} variant="outlined" />}
-          <Button variant="contained" color="success" startIcon={<ApproveIcon />}>{t('pv.approve')}</Button>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<ApproveIcon />}
+          >
+            {t("pv.approve")}
+          </Button>
         </Stack>
       </Box>
 
-      <Grid container spacing={2} sx={{ height: '90%' }}>
+      <Grid container spacing={2} sx={{ height: "90%" }}>
         {/* Left: Original Transcript */}
-        <Grid item xs={12} md={5} sx={{ height: '100%' }}>
-          <Paper sx={{ p: 2, height: '100%', overflowY: 'auto', bgcolor: '#f8f9fa' }}>
+        <Grid item xs={12} md={5} sx={{ height: "100%" }}>
+          <Paper
+            sx={{ p: 2, height: "100%", overflowY: "auto", bgcolor: "#f8f9fa" }}
+          >
             <Typography variant="subtitle2" gutterBottom color="textSecondary">
-              {t('pv.original_transcript')}
+              {t("pv.original_transcript")}
             </Typography>
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-              {originalTranscript || 'No transcription available yet.'}
+            <Typography
+              variant="body2"
+              sx={{ whiteSpace: "pre-wrap", fontFamily: "monospace" }}
+            >
+              {originalTranscript || "No transcription available yet."}
             </Typography>
           </Paper>
         </Grid>
 
         {/* Right: AI Generated PV (Editable) */}
-        <Grid item xs={12} md={7} sx={{ height: '100%' }}>
-          <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+        <Grid item xs={12} md={7} sx={{ height: "100%" }}>
+          <Paper
+            sx={{
+              p: 2,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <Box
+              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
+            >
               <Typography variant="subtitle2" color="primary">
-                {t('pv.ai_draft')}
+                {t("pv.ai_draft")}
               </Typography>
               <Tooltip title="Save Draft">
-                <IconButton size="small"><SaveIcon fontSize="small" /></IconButton>
+                <IconButton size="small">
+                  <SaveIcon fontSize="small" />
+                </IconButton>
               </Tooltip>
             </Box>
             <TextField
@@ -118,17 +162,37 @@ const PVValidator: React.FC = () => {
               value={pvContent}
               onChange={(e) => setPvContent(e.target.value)}
               variant="outlined"
-              sx={{ 
+              sx={{
                 flexGrow: 1,
-                '& .MuiInputBase-root': { height: '100%', alignItems: 'flex-start' },
-                '& textarea': { height: '100% !important', fontFamily: 'serif', fontSize: '1.1rem' }
+                "& .MuiInputBase-root": {
+                  height: "100%",
+                  alignItems: "flex-start",
+                },
+                "& textarea": {
+                  height: "100% !important",
+                  fontFamily: "serif",
+                  fontSize: "1.1rem",
+                },
               }}
               placeholder="Waiting for Mistral to generate the draft..."
             />
-            <Box sx={{ mt: 2, p: 2, border: '1px dashed #ccc', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-               <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                 <EditIcon fontSize="small" /> {t('pv.signature_placeholder')}
-               </Typography>
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                border: "1px dashed #ccc",
+                borderRadius: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <EditIcon fontSize="small" /> {t("pv.signature_placeholder")}
+              </Typography>
             </Box>
           </Paper>
         </Grid>

@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface User {
   id: string;
@@ -7,7 +7,7 @@ interface User {
   role: string;
 }
 
-export type AuthStateStatus = 'loading' | 'authenticated' | 'unauthenticated';
+export type AuthStateStatus = "loading" | "authenticated" | "unauthenticated";
 
 interface AuthState {
   user: User | null;
@@ -21,36 +21,40 @@ interface AuthState {
 
 const initialState: AuthState = {
   user: null,
-  accessToken: localStorage.getItem('accessToken'),
-  refreshToken: localStorage.getItem('refreshToken'),
-  authState: 'loading',
+  accessToken: localStorage.getItem("accessToken"),
+  refreshToken: localStorage.getItem("refreshToken"),
+  authState: "loading",
   loading: false,
   error: null,
-  isAuthenticated: !!localStorage.getItem('accessToken'), // Hinzugefügt: Basierend auf Token-Existenz
+  isAuthenticated: !!localStorage.getItem("accessToken"), // Hinzugefügt: Basierend auf Token-Existenz
 };
 
 const authSlice = createSlice({
-  name: 'auth',
+  name: "auth",
   initialState,
   reducers: {
     setCredentials: (
       state,
-      action: PayloadAction<{ user: User; access_token: string; refresh_token?: string }>
+      action: PayloadAction<{
+        user: User;
+        access_token: string;
+        refresh_token?: string;
+      }>,
     ) => {
       state.user = action.payload.user;
       state.accessToken = action.payload.access_token;
       state.refreshToken = action.payload.refresh_token || state.refreshToken; // Keep old refresh token if new one not provided
-      state.authState = 'authenticated';
+      state.authState = "authenticated";
       state.error = null;
       state.isAuthenticated = true; // Hinzugefügt
-      localStorage.setItem('accessToken', action.payload.access_token);
+      localStorage.setItem("accessToken", action.payload.access_token);
       if (action.payload.refresh_token) {
-        localStorage.setItem('refreshToken', action.payload.refresh_token);
+        localStorage.setItem("refreshToken", action.payload.refresh_token);
       }
     },
     setAuthenticatedUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
-      state.authState = 'authenticated';
+      state.authState = "authenticated";
       state.error = null;
       state.isAuthenticated = true; // Hinzugefügt
     },
@@ -58,7 +62,7 @@ const authSlice = createSlice({
       state.user = null;
       state.accessToken = null;
       state.refreshToken = null;
-      state.authState = 'unauthenticated';
+      state.authState = "unauthenticated";
       state.error = null;
       state.isAuthenticated = false; // Hinzugefügt
       localStorage.clear();
@@ -73,11 +77,11 @@ const authSlice = createSlice({
   },
 });
 
-export const { 
-  setCredentials, 
-  setAuthenticatedUser, 
-  logout, 
-  setLoading, 
-  setError 
+export const {
+  setCredentials,
+  setAuthenticatedUser,
+  logout,
+  setLoading,
+  setError,
 } = authSlice.actions;
 export default authSlice.reducer;

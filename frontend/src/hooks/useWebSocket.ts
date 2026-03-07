@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 
 // TODO: Implement robust WebSocket hook with reconnection logic
 export const useWebSocket = (url: string) => {

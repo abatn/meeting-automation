@@ -3,8 +3,10 @@
 
 // TODO: Implement Hijri calendar conversion
 export const toHijri = (date: Date): string => {
-    // Placeholder
-    return new Intl.DateTimeFormat('ar-TN-u-ca-islamic', {
-        day: 'numeric', month: 'long', year: 'numeric'
-    }).format(date);
+  // Placeholder
+  return new Intl.DateTimeFormat("ar-TN-u-ca-islamic", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
 };

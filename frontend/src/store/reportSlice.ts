@@ -1,5 +1,5 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import * as reportAPI from '../services/reportService';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import * as reportAPI from "../services/reportService";
 
 interface ReportState {
   dashboardData: any | null;
@@ -14,19 +14,21 @@ const initialState: ReportState = {
 };
 
 export const fetchDashboardData = createAsyncThunk(
-  'reports/fetchDashboardData',
+  "reports/fetchDashboardData",
   async (role: string, { rejectWithValue }) => {
     try {
       const data = await reportAPI.getDashboardData(role);
       return data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.detail || 'Failed to fetch reports');
+      return rejectWithValue(
+        error.response?.data?.detail || "Failed to fetch reports",
+      );
     }
-  }
+  },
 );
 
 const reportSlice = createSlice({
-  name: 'reports',
+  name: "reports",
   initialState,
   reducers: {},
   extraReducers: (builder) => {

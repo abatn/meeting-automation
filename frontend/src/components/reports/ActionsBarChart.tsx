@@ -1,7 +1,16 @@
-import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@mui/material';
+import React from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@mui/material";
 
 interface Props {
   data: {
@@ -17,11 +26,11 @@ const ActionsBarChart: React.FC<Props> = ({ data }) => {
 
   const chartData = [
     {
-      name: t('Actions'),
+      name: t("Actions"),
       completed: data.completed,
       pending: data.pending,
       overdue: data.overdue,
-    }
+    },
   ];
 
   return (
@@ -39,11 +48,27 @@ const ActionsBarChart: React.FC<Props> = ({ data }) => {
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="name" />
         <YAxis />
-        <Tooltip cursor={{fill: 'transparent'}} />
-        <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '20px' }} />
-        <Bar dataKey="completed" stackId="a" fill="#4caf50" name={t('Completed')} radius={[0, 0, 0, 0]} />
-        <Bar dataKey="pending" stackId="a" fill="#ff9800" name={t('Pending')} />
-        <Bar dataKey="overdue" stackId="a" fill="#f44336" name={t('Overdue')} radius={[4, 4, 0, 0]} />
+        <Tooltip cursor={{ fill: "transparent" }} />
+        <Legend
+          verticalAlign="bottom"
+          height={36}
+          wrapperStyle={{ paddingTop: "20px" }}
+        />
+        <Bar
+          dataKey="completed"
+          stackId="a"
+          fill="#4caf50"
+          name={t("Completed")}
+          radius={[0, 0, 0, 0]}
+        />
+        <Bar dataKey="pending" stackId="a" fill="#ff9800" name={t("Pending")} />
+        <Bar
+          dataKey="overdue"
+          stackId="a"
+          fill="#f44336"
+          name={t("Overdue")}
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ResponsiveContainer>
   );

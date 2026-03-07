@@ -1,25 +1,37 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  CircularProgress, 
-  IconButton, 
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Box,
+  Typography,
+  Paper,
+  CircularProgress,
+  IconButton,
   Tooltip,
   Divider,
   Chip,
   TextField,
-  Avatar
-} from '@mui/material';
-import { Refresh as RefreshIcon, Download as DownloadIcon, Edit as EditIcon, Check as CheckIcon } from '@mui/icons-material';
-import { useTranslation } from 'react-i18next';
-import { meetingsApi } from '../../services/meetings';
+  Avatar,
+} from "@mui/material";
+import {
+  Refresh as RefreshIcon,
+  Download as DownloadIcon,
+  Edit as EditIcon,
+  Check as CheckIcon,
+} from "@mui/icons-material";
+import { useTranslation } from "react-i18next";
+import { meetingsApi } from "../../services/meetings";
 
 interface TranscriptionViewerProps {
   meetingId: string;
 }
 
-const COLORS = ['#1976d2', '#388e3c', '#d32f2f', '#f57c00', '#7b1fa2', '#00796b'];
+const COLORS = [
+  "#1976d2",
+  "#388e3c",
+  "#d32f2f",
+  "#f57c00",
+  "#7b1fa2",
+  "#00796b",
+];
 
 const getSpeakerColor = (speaker: string) => {
   let hash = 0;
@@ -30,21 +42,29 @@ const getSpeakerColor = (speaker: string) => {
 };
 
 const formatTimestamp = (seconds: number) => {
-  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  const m = Math.floor(seconds / 60)
+    .toString()
+    .padStart(2, "0");
+  const s = Math.floor(seconds % 60)
+    .toString()
+    .padStart(2, "0");
   return `${m}:${s}`;
 };
 
-const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) => {
+const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({
+  meetingId,
+}) => {
   const { t } = useTranslation();
   const [transcription, setTranscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Local speaker mapping
-  const [speakerMapping, setSpeakerMapping] = useState<Record<string, string>>({});
+  const [speakerMapping, setSpeakerMapping] = useState<Record<string, string>>(
+    {},
+  );
   const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [editValue, setEditValue] = useState("");
 
   const fetchTranscription = useCallback(async () => {
     try {
@@ -53,7 +73,7 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
       setError(null);
     } catch (err: any) {
       if (err.response?.status !== 404) {
-        setError('Failed to load transcription');
+        setError("Failed to load transcription");
       }
     } finally {
       setLoading(false);
@@ -62,10 +82,13 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
 
   useEffect(() => {
     fetchTranscription();
-    
+
     // Poll for transcription if status is not 'completed' or 'failed'
     let interval: number;
-    if (transcription && ['pending', 'processing'].includes(transcription.status)) {
+    if (
+      transcription &&
+      ["pending", "processing"].includes(transcription.status)
+    ) {
       interval = window.setInterval(fetchTranscription, 5000);
     }
 
@@ -75,11 +98,14 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
   }, [fetchTranscription, transcription?.status]);
 
   const handleSpeakerRename = (originalSpeaker: string) => {
-    if (editValue.trim() !== '') {
-      setSpeakerMapping(prev => ({ ...prev, [originalSpeaker]: editValue.trim() }));
+    if (editValue.trim() !== "") {
+      setSpeakerMapping((prev) => ({
+        ...prev,
+        [originalSpeaker]: editValue.trim(),
+      }));
     }
     setEditingSpeaker(null);
-    setEditValue('');
+    setEditValue("");
   };
 
   if (loading && !transcription) {
@@ -100,7 +126,7 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
 
   if (!transcription) {
     return (
-      <Paper sx={{ p: 4, textAlign: 'center', bgcolor: 'action.hover' }}>
+      <Paper sx={{ p: 4, textAlign: "center", bgcolor: "action.hover" }}>
         <Typography variant="body1" color="textSecondary">
           No transcription available yet. Start recording to generate one.
         </Typography>
@@ -108,20 +134,33 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
     );
   }
 
-  const hasSegments = transcription.segments && Array.isArray(transcription.segments) && transcription.segments.length > 0;
+  const hasSegments =
+    transcription.segments &&
+    Array.isArray(transcription.segments) &&
+    transcription.segments.length > 0;
 
   return (
-    <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <Paper sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <Box
+        sx={{
+          p: 2,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <Box display="flex" alignItems="center" gap={2}>
-          <Typography variant="h6">{t('transcription')}</Typography>
-          <Chip 
-            label={transcription.status.toUpperCase()} 
-            size="small" 
+          <Typography variant="h6">{t("transcription")}</Typography>
+          <Chip
+            label={transcription.status.toUpperCase()}
+            size="small"
             color={
-              transcription.status === 'completed' ? 'success' : 
-              transcription.status === 'failed' ? 'error' : 'warning'
-            } 
+              transcription.status === "completed"
+                ? "success"
+                : transcription.status === "failed"
+                  ? "error"
+                  : "warning"
+            }
           />
         </Box>
         <Box>
@@ -131,15 +170,15 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
             </IconButton>
           </Tooltip>
           <Tooltip title="Download">
-            <IconButton disabled={transcription.status !== 'completed'}>
+            <IconButton disabled={transcription.status !== "completed"}>
               <DownloadIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         </Box>
       </Box>
       <Divider />
-      <Box sx={{ p: 2, flexGrow: 1, overflowY: 'auto', maxHeight: 500 }}>
-        {transcription.status === 'processing' && (
+      <Box sx={{ p: 2, flexGrow: 1, overflowY: "auto", maxHeight: 500 }}>
+        {transcription.status === "processing" && (
           <Box display="flex" alignItems="center" gap={2} mb={2}>
             <CircularProgress size={20} />
             <Typography variant="body2" color="textSecondary italic">
@@ -147,39 +186,57 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
             </Typography>
           </Box>
         )}
-        
+
         {hasSegments ? (
           transcription.segments.map((segment: any, index: number) => {
-            const originalSpeaker = segment.speaker || 'Unknown Speaker';
-            const displaySpeaker = speakerMapping[originalSpeaker] || originalSpeaker;
+            const originalSpeaker = segment.speaker || "Unknown Speaker";
+            const displaySpeaker =
+              speakerMapping[originalSpeaker] || originalSpeaker;
             const speakerColor = getSpeakerColor(originalSpeaker);
             const isEditing = editingSpeaker === originalSpeaker;
 
             return (
               <Box key={index} mb={3} display="flex" gap={2}>
-                <Avatar sx={{ bgcolor: speakerColor, width: 40, height: 40, fontSize: '1rem' }}>
+                <Avatar
+                  sx={{
+                    bgcolor: speakerColor,
+                    width: 40,
+                    height: 40,
+                    fontSize: "1rem",
+                  }}
+                >
                   {displaySpeaker.substring(0, 2).toUpperCase()}
                 </Avatar>
                 <Box flexGrow={1}>
                   <Box display="flex" alignItems="center" gap={1} mb={0.5}>
                     {isEditing ? (
                       <Box display="flex" alignItems="center">
-                        <TextField 
-                          size="small" 
-                          variant="standard" 
+                        <TextField
+                          size="small"
+                          variant="standard"
                           autoFocus
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleSpeakerRename(originalSpeaker)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" &&
+                            handleSpeakerRename(originalSpeaker)
+                          }
                         />
-                        <IconButton size="small" onClick={() => handleSpeakerRename(originalSpeaker)}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleSpeakerRename(originalSpeaker)}
+                        >
                           <CheckIcon fontSize="small" color="success" />
                         </IconButton>
                       </Box>
                     ) : (
-                      <Typography 
-                        variant="subtitle2" 
-                        sx={{ color: speakerColor, fontWeight: 'bold', cursor: 'pointer' }}
+                      <Typography
+                        variant="subtitle2"
+                        sx={{
+                          color: speakerColor,
+                          fontWeight: "bold",
+                          cursor: "pointer",
+                        }}
                         onClick={() => {
                           setEditingSpeaker(originalSpeaker);
                           setEditValue(displaySpeaker);
@@ -189,10 +246,14 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
                       </Typography>
                     )}
                     <Typography variant="caption" color="textSecondary">
-                      {formatTimestamp(segment.start)} - {formatTimestamp(segment.end)}
+                      {formatTimestamp(segment.start)} -{" "}
+                      {formatTimestamp(segment.end)}
                     </Typography>
                   </Box>
-                  <Typography variant="body1" sx={{ bgcolor: 'action.hover', p: 1.5, borderRadius: 2 }}>
+                  <Typography
+                    variant="body1"
+                    sx={{ bgcolor: "action.hover", p: 1.5, borderRadius: 2 }}
+                  >
                     {segment.text}
                   </Typography>
                 </Box>
@@ -201,7 +262,10 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({ meetingId }) 
           })
         ) : transcription.full_text || transcription.content ? (
           <Box>
-            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+            <Typography
+              variant="body1"
+              sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
+            >
               {transcription.full_text || transcription.content}
             </Typography>
           </Box>

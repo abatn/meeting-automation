@@ -1,4 +1,4 @@
-import api from './api';
+import api from "./api";
 
 export const getDashboardData = async (role: string) => {
   const response = await api.get(`/reports/dashboard/${role}`);
@@ -6,10 +6,10 @@ export const getDashboardData = async (role: string) => {
 };
 
 export const getManagerDashboard = async () => {
-  return getDashboardData('manager');
+  return getDashboardData("manager");
 };
 
-export const getMeetingStats = async (period: string = 'month') => {
+export const getMeetingStats = async (period: string = "month") => {
   const response = await api.get(`/reports/meetings/stats?period=${period}`);
   return response.data;
 };
@@ -20,7 +20,7 @@ export const getActionCompletionRate = async (days: number = 30) => {
 };
 
 export const getTeamProductivity = async () => {
-  const response = await api.get('/reports/team/productivity');
+  const response = await api.get("/reports/team/productivity");
   return response.data;
 };
 

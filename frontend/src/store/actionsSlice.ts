@@ -1,11 +1,11 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface ActionItem {
   id: string; // Corrected to string
   description: string;
   assignee_name: string;
   due_date: string;
-  status: 'pending' | 'completed' | 'overdue';
+  status: "pending" | "completed" | "overdue";
 }
 
 interface ActionsState {
@@ -21,13 +21,16 @@ const initialState: ActionsState = {
 };
 
 const actionsSlice = createSlice({
-  name: 'actions',
+  name: "actions",
   initialState,
   reducers: {
     setActions: (state, action: PayloadAction<ActionItem[]>) => {
       state.list = action.payload;
     },
-    updateActionStatus: (state, action: PayloadAction<{ id: string; status: ActionItem['status'] }>) => {
+    updateActionStatus: (
+      state,
+      action: PayloadAction<{ id: string; status: ActionItem["status"] }>,
+    ) => {
       const index = state.list.findIndex((a) => a.id === action.payload.id);
       if (index !== -1) {
         state.list[index].status = action.payload.status;
@@ -42,5 +45,6 @@ const actionsSlice = createSlice({
   },
 });
 
-export const { setActions, updateActionStatus, setLoading, setError } = actionsSlice.actions;
+export const { setActions, updateActionStatus, setLoading, setError } =
+  actionsSlice.actions;
 export default actionsSlice.reducer;

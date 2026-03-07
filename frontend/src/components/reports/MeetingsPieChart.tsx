@@ -1,7 +1,14 @@
-import React from 'react';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@mui/material';
+import React from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@mui/material";
 
 interface Props {
   data: {
@@ -11,16 +18,16 @@ interface Props {
   };
 }
 
-const COLORS = ['#4caf50', '#2196f3', '#f44336'];
+const COLORS = ["#4caf50", "#2196f3", "#f44336"];
 
 const MeetingsPieChart: React.FC<Props> = ({ data }) => {
   const { t } = useTranslation();
   const theme = useTheme();
 
   const chartData = [
-    { name: t('Completed'), value: data.completed },
-    { name: t('Scheduled'), value: data.scheduled },
-    { name: t('Cancelled'), value: data.cancelled },
+    { name: t("Completed"), value: data.completed },
+    { name: t("Scheduled"), value: data.scheduled },
+    { name: t("Cancelled"), value: data.cancelled },
   ];
 
   return (
@@ -41,7 +48,11 @@ const MeetingsPieChart: React.FC<Props> = ({ data }) => {
           ))}
         </Pie>
         <Tooltip />
-        <Legend verticalAlign="bottom" height={36} wrapperStyle={{ paddingTop: '20px' }} />
+        <Legend
+          verticalAlign="bottom"
+          height={36}
+          wrapperStyle={{ paddingTop: "20px" }}
+        />
       </PieChart>
     </ResponsiveContainer>
   );

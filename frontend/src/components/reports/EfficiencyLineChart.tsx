@@ -1,6 +1,15 @@
-import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useTranslation } from 'react-i18next';
+import React from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { useTranslation } from "react-i18next";
 
 interface TrendData {
   month: string;
@@ -32,8 +41,21 @@ const EfficiencyLineChart: React.FC<Props> = ({ data }) => {
         <YAxis yAxisId="right" orientation="right" />
         <Tooltip />
         <Legend />
-        <Line yAxisId="left" type="monotone" dataKey="avg_duration_minutes" stroke="#8884d8" name={t('Avg Duration (min)')} activeDot={{ r: 8 }} />
-        <Line yAxisId="right" type="monotone" dataKey="actions_per_meeting" stroke="#82ca9d" name={t('Actions per Meeting')} />
+        <Line
+          yAxisId="left"
+          type="monotone"
+          dataKey="avg_duration_minutes"
+          stroke="#8884d8"
+          name={t("Avg Duration (min)")}
+          activeDot={{ r: 8 }}
+        />
+        <Line
+          yAxisId="right"
+          type="monotone"
+          dataKey="actions_per_meeting"
+          stroke="#82ca9d"
+          name={t("Actions per Meeting")}
+        />
       </LineChart>
     </ResponsiveContainer>
   );
