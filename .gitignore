@@ -32,6 +32,13 @@ dist/
 *.swo
 *~
 
+# AI Tools & Logs
+.gemini/
+.kilocode/
+.aider*
+clinerules.md
+
+
 # Database
 *.db
 *.sqlite
