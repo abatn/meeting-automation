@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, List
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -17,6 +17,8 @@ from app.models.meeting import (
 )
 from app.models.meeting import Participant as ParticipantModel
 from app.models.user import User as UserModel
+from app.models.audit_log import AuditLog as AuditLogModel
+from app.schemas.audit_log import AuditLog as AuditLogSchema
 from app.schemas.report import ActionStats, ManagerDashboard, MeetingStats
 
 router = APIRouter()
@@ -171,9 +173,6 @@ async def get_dashboard_data(
             "my_open_actions": my_open_actions,
         }
 
-from typing import List
-from app.models.audit_log import AuditLog as AuditLogModel
-from app.schemas.audit_log import AuditLog as AuditLogSchema
 
 @router.get("/audit-logs", response_model=List[AuditLogSchema])
 async def get_audit_logs(
@@ -186,6 +185,9 @@ async def get_audit_logs(
     Get audit logs.
     """
     result = await db.execute(
-        select(AuditLogModel).order_by(AuditLogModel.timestamp.desc()).offset(skip).limit(limit)
+        select(AuditLogModel)
+        .order_by(AuditLogModel.timestamp.desc())
+        .offset(skip)
+        .limit(limit)
     )
     return list(result.scalars().all())

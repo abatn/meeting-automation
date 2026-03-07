@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 try:
     import torch
     from pyannote.audio import Pipeline
+
     PYANNOTE_AVAILABLE = True
 except ImportError:
     PYANNOTE_AVAILABLE = False
@@ -41,8 +42,7 @@ class DiarizationService:
             try:
                 # Load pipeline from HuggingFace
                 cls._pipeline = Pipeline.from_pretrained(
-                    "pyannote/speaker-diarization-3.1",
-                    use_auth_token=token
+                    "pyannote/speaker-diarization-3.1", use_auth_token=token
                 )
 
                 # Check for CUDA GPU availability
@@ -50,9 +50,7 @@ class DiarizationService:
                     logger.info("CUDA is available. Moving pipeline to GPU.")
                     cls._pipeline.to(torch.device("cuda"))
                 else:
-                    logger.warning(
-                        "CUDA not available. Running pyannote on CPU."
-                    )
+                    logger.warning("CUDA not available. Running pyannote on CPU.")
             except Exception as e:
                 logger.error(f"Failed to initialize diarization pipeline: {e}")
                 cls._pipeline = None
@@ -67,11 +65,20 @@ class DiarizationService:
         try:
             logger.info(f"Resampling audio from {input_path} to {output_path}")
             subprocess.run(
-                ["ffmpeg", "-y", "-i", input_path, "-ac", "1", "-ar", "16000",
-                 output_path],
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    input_path,
+                    "-ac",
+                    "1",
+                    "-ar",
+                    "16000",
+                    output_path,
+                ],
                 check=True,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
             )
             return True
         except subprocess.CalledProcessError as e:
@@ -110,11 +117,13 @@ class DiarizationService:
 
             segments = []
             for turn, _, speaker in diarization.itertracks(yield_label=True):
-                segments.append({
-                    "speaker": speaker,
-                    "start": round(turn.start, 2),
-                    "end": round(turn.end, 2)
-                })
+                segments.append(
+                    {
+                        "speaker": speaker,
+                        "start": round(turn.start, 2),
+                        "end": round(turn.end, 2),
+                    }
+                )
 
             logger.info(f"Diarization completed. Found {len(segments)} segments.")
             return segments

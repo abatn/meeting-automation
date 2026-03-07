@@ -25,19 +25,19 @@ api_key_header = APIKeyHeader(name="X-Internal-API-Key", auto_error=False)
 
 
 async def verify_internal_api_key(
-    api_key: Optional[str] = Depends(api_key_header)
+    api_key: Optional[str] = Depends(api_key_header),
 ) -> bool:
     if not api_key or api_key != settings.INTERNAL_API_SECRET:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid or missing Internal API Key"
+            detail="Invalid or missing Internal API Key",
         )
     return True
 
 
 async def get_auth_service(
     db: AsyncSession = Depends(get_db),
-    redis_client: redis.Redis = Depends(get_redis_client)
+    redis_client: redis.Redis = Depends(get_redis_client),
 ) -> AuthService:
     return AuthService(db, redis_client)
 
@@ -45,7 +45,7 @@ async def get_auth_service(
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
     token: str = Depends(reusable_oauth2),
-    auth_service: AuthService = Depends(get_auth_service)
+    auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
     if await auth_service.is_token_blacklisted(token):
         raise HTTPException(
@@ -91,12 +91,13 @@ async def get_meeting_service(db: AsyncSession = Depends(get_db)) -> MeetingServ
 
 def check_permissions(allowed_roles: list[UserRole]):
     async def permission_checker(
-        current_user: User = Depends(get_current_user)
+        current_user: User = Depends(get_current_user),
     ) -> User:
         if current_user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="The user doesn't have enough privileges"
+                detail="The user doesn't have enough privileges",
             )
         return current_user
+
     return permission_checker

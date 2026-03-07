@@ -21,14 +21,16 @@ router = APIRouter()
 @router.post("/login", response_model=Token)
 async def login(
     db: AsyncSession = Depends(deps.get_db),
-    form_data: OAuth2PasswordRequestForm = Depends()
+    form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Any:
     user_result = await db.execute(
         select(UserModel).where(UserModel.email == form_data.username)
     )
     user = user_result.scalar_one_or_none()
 
-    if not user or not security.verify_password(form_data.password, user.hashed_password):
+    if not user or not security.verify_password(
+        form_data.password, user.hashed_password
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -40,11 +42,15 @@ async def login(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     # Load roles for the user
-    user_stmt = select(UserModel).options(
-        selectinload(UserModel.roles)
-    ).where(UserModel.id == user.id)
+    user_stmt = (
+        select(UserModel)
+        .options(selectinload(UserModel.roles))
+        .where(UserModel.id == user.id)
+    )
     user_with_roles = (await db.execute(user_stmt)).scalar_one()
-    role_name = user_with_roles.roles[0].name if user_with_roles.roles else "participant"
+    role_name = (
+        user_with_roles.roles[0].name if user_with_roles.roles else "participant"
+    )
 
     return {
         "access_token": security.create_access_token(
@@ -56,16 +62,14 @@ async def login(
             "email": user.email,
             "full_name": user.full_name,
             "role": role_name,
-            "created_at": user.created_at
-        }
+            "created_at": user.created_at,
+        },
     }
 
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 async def register(
-    *,
-    db: AsyncSession = Depends(deps.get_db),
-    user_in: UserCreate
+    *, db: AsyncSession = Depends(deps.get_db), user_in: UserCreate
 ) -> Any:
     user_result = await db.execute(
         select(UserModel).where(UserModel.email == user_in.email)
@@ -86,7 +90,7 @@ async def register(
         is_active=True,
         is_superuser=False,
         is_mfa_enabled=False,
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
     db.add(db_obj)
     await db.flush()
@@ -112,7 +116,7 @@ async def register(
         is_superuser=db_obj.is_superuser,
         is_mfa_enabled=db_obj.is_mfa_enabled,
         created_at=db_obj.created_at,
-        role=user_in.role
+        role=user_in.role,
     )
 
 
@@ -133,11 +137,15 @@ async def validate_token(
     Used for initial App load to prevent redirect loops.
     """
     # Load roles for the user
-    user_stmt = select(UserModel).options(
-        selectinload(UserModel.roles)
-    ).where(UserModel.id == current_user.id)
+    user_stmt = (
+        select(UserModel)
+        .options(selectinload(UserModel.roles))
+        .where(UserModel.id == current_user.id)
+    )
     user_with_roles = (await db.execute(user_stmt)).scalar_one()
-    role_name = user_with_roles.roles[0].name if user_with_roles.roles else "participant"
+    role_name = (
+        user_with_roles.roles[0].name if user_with_roles.roles else "participant"
+    )
 
     return {
         "authenticated": True,
@@ -145,8 +153,8 @@ async def validate_token(
             "id": current_user.id,
             "email": current_user.email,
             "full_name": current_user.full_name,
-            "role": role_name
-        }
+            "role": role_name,
+        },
     }
 
 
@@ -154,7 +162,7 @@ async def validate_token(
 async def logout(
     current_user: UserModel = Depends(deps.get_current_user),
     auth_service: AuthService = Depends(deps.get_auth_service),
-    token: str = Depends(deps.reusable_oauth2)
+    token: str = Depends(deps.reusable_oauth2),
 ) -> Any:
     """
     Logout user. In a stateless JWT setup, the client discards the token.
@@ -165,7 +173,9 @@ async def logout(
 
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(current_user: UserModel = Depends(deps.get_current_user)) -> Any:
+async def refresh_token(
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
     """
     Refresh JWT token.
     """

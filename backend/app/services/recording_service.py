@@ -12,7 +12,6 @@ from fastapi import UploadFile
 from app.models.recording import Recording
 from app.core.config import settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -20,10 +19,10 @@ class RecordingService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.s3_client = boto3.client(
-            's3',
+            "s3",
             endpoint_url=settings.S3_ENDPOINT,
             aws_access_key_id=settings.S3_ACCESS_KEY,
-            aws_secret_access_key=settings.S3_SECRET_KEY
+            aws_secret_access_key=settings.S3_SECRET_KEY,
         )
 
     async def upload_recording(
@@ -34,11 +33,7 @@ class RecordingService:
 
         # S3 Upload
         try:
-            self.s3_client.upload_fileobj(
-                file.file,
-                settings.S3_BUCKET_NAME,
-                file_key
-            )
+            self.s3_client.upload_fileobj(file.file, settings.S3_BUCKET_NAME, file_key)
             logger.info(f"File {file.filename} uploaded to S3: {file_key}")
         except Exception as e:
             logger.error(f"S3 Upload failed: {e}")
@@ -63,9 +58,9 @@ class RecordingService:
                 id=recording_id or str(uuid.uuid4()),
                 meeting_id=meeting_id,
                 file_path=file_key,
-                status="uploaded", # Ensure status is always a string
+                status="uploaded",  # Ensure status is always a string
                 format=file.content_type,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
             )
             self.db.add(db_recording)
 
@@ -74,6 +69,7 @@ class RecordingService:
 
         # Trigger Celery Pipeline
         from app.tasks.transcription_tasks import process_recording
+
         process_recording.delay(db_recording.id)
 
         return db_recording
@@ -95,7 +91,7 @@ class RecordingService:
                 file_path=file_key,
                 status="streaming",
                 format=content_type,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
             )
             self.db.add(db_recording)
             await self.db.commit()
@@ -104,12 +100,12 @@ class RecordingService:
             os.makedirs("/tmp/recordings", exist_ok=True)
 
             # Create the empty temp file
-            open(f"/tmp/recordings/{upload_id}.webm", 'wb').close()
+            open(f"/tmp/recordings/{upload_id}.webm", "wb").close()
 
             return {
                 "recording_id": db_recording.id,
                 "upload_id": upload_id,
-                "file_key": file_key
+                "file_key": file_key,
             }
         except Exception as e:
             logger.error(f"Failed to start recording session: {e}")
@@ -139,11 +135,7 @@ class RecordingService:
 
             # Upload the complete file to MinIO
             with open(temp_path, "rb") as f:
-                self.s3_client.upload_fileobj(
-                    f,
-                    settings.S3_BUCKET_NAME,
-                    file_key
-                )
+                self.s3_client.upload_fileobj(f, settings.S3_BUCKET_NAME, file_key)
             logger.info(f"Successfully uploaded assembled file to {file_key}")
 
             # Clean up local temp file
@@ -166,6 +158,7 @@ class RecordingService:
 
         # Trigger Celery Pipeline
         from app.tasks.transcription_tasks import process_recording
+
         process_recording.delay(db_recording.id)
 
         return db_recording
@@ -177,7 +170,7 @@ class RecordingService:
             "recording_id": recording.id,
             "meeting_id": recording.meeting_id,
             "file_path": recording.file_path,
-            "callback_url": f"{settings.BACKEND_CALLBACK_URL}/transcription-complete"
+            "callback_url": f"{settings.BACKEND_CALLBACK_URL}/transcription-complete",
         }
         try:
             async with httpx.AsyncClient() as client:
@@ -185,7 +178,9 @@ class RecordingService:
                     settings.N8N_WEBHOOK_AUDIO_UPLOADED, json=payload, timeout=5.0
                 )
                 response.raise_for_status()
-                logger.info(f"n8n audio-uploaded triggered for recording {recording.id}")
+                logger.info(
+                    f"n8n audio-uploaded triggered for recording {recording.id}"
+                )
         except Exception as e:
             logger.error(f"Failed to trigger n8n audio-uploaded: {e}")
 

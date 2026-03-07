@@ -18,7 +18,7 @@ async def websocket_transcription_endpoint(websocket: WebSocket, recording_id: s
         # Bestätigung an den Client senden
         await manager.send_personal_message(
             '{"status": "connected", "progress": 0, "message": "Connection established"}',
-            websocket
+            websocket,
         )
 
         # Verbindung offen halten und auf Client-Nachrichten (Ping) warten

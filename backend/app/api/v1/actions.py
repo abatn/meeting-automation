@@ -9,7 +9,6 @@ from app.schemas.action import Action, ActionCreate
 from app.models.action import Action as ActionModel, Assignment as AssignmentModel
 from app.models.user import User as UserModel, UserRole
 
-
 router = APIRouter()
 
 
@@ -56,8 +55,10 @@ async def list_my_actions(
     """
     Retrieve a list of action items assigned to the current user.
     """
-    stmt = select(ActionModel).join(AssignmentModel).where(
-        AssignmentModel.user_id == current_user.id
+    stmt = (
+        select(ActionModel)
+        .join(AssignmentModel)
+        .where(AssignmentModel.user_id == current_user.id)
     )
 
     if status:
@@ -84,7 +85,7 @@ async def list_team_actions(
     if current_user.role != UserRole.MANAGER and current_user.role != UserRole.DG:
         raise HTTPException(
             status_code=403,
-            detail="Insufficient permissions. Only managers can access team actions."
+            detail="Insufficient permissions. Only managers can access team actions.",
         )
     # Note: Implementation of filtering by managed users would go here
     return []
@@ -93,7 +94,7 @@ async def list_team_actions(
 @router.get("/pending", response_model=List[Action])
 async def get_pending_actions_for_automation(
     db: AsyncSession = Depends(deps.get_db),
-    api_key_valid: bool = Depends(deps.verify_internal_api_key)
+    api_key_valid: bool = Depends(deps.verify_internal_api_key),
 ) -> Any:
     """
     Retrieve all pending action items for N8N automation.
@@ -122,16 +123,14 @@ async def create_action(
         status=action_in.status,
         due_date=action_in.due_date,
         priority=action_in.priority,
-        meeting_id=action_in.meeting_id
+        meeting_id=action_in.meeting_id,
     )
     db.add(action)
     await db.flush()
 
     if action_in.assigned_to:
         assignment = AssignmentModel(
-            id=str(uuid.uuid4()),
-            action_id=action.id,
-            user_id=action_in.assigned_to
+            id=str(uuid.uuid4()), action_id=action.id, user_id=action_in.assigned_to
         )
         db.add(assignment)
 

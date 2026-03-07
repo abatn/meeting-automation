@@ -59,20 +59,28 @@ class Meeting(Base):
     agendas: Mapped[List["Agenda"]] = relationship(
         "Agenda", back_populates="meeting", cascade="all, delete-orphan"
     )
-    recordings: Mapped[List["Recording"]] = relationship("Recording", back_populates="meeting")
+    recordings: Mapped[List["Recording"]] = relationship(
+        "Recording", back_populates="meeting"
+    )
     transcriptions: Mapped[List["Transcription"]] = relationship(
         "Transcription", back_populates="meeting"
     )
     actions: Mapped[List["Action"]] = relationship("Action", back_populates="meeting")
-    pv: Mapped[Optional["PV"]] = relationship("PV", back_populates="meeting", uselist=False)
+    pv: Mapped[Optional["PV"]] = relationship(
+        "PV", back_populates="meeting", uselist=False
+    )
 
 
 class Participant(Base):
     __tablename__ = "participants"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
-    meeting_id: Mapped[str] = mapped_column(String, ForeignKey("meetings.id", ondelete="CASCADE"))
-    user_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("users.id"), nullable=True)
+    meeting_id: Mapped[str] = mapped_column(
+        String, ForeignKey("meetings.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("users.id"), nullable=True
+    )
     email: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     role: Mapped[Optional[str]] = mapped_column(String, nullable=True)

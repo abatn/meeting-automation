@@ -18,11 +18,13 @@ celery_app.conf.update(
 )
 
 # Auto-discover tasks in the 'app.tasks' package
-celery_app.autodiscover_tasks([
-    "app.tasks.email_tasks",
-    "app.tasks.transcription_tasks",
-    "app.tasks.data_retention"
-])
+celery_app.autodiscover_tasks(
+    [
+        "app.tasks.email_tasks",
+        "app.tasks.transcription_tasks",
+        "app.tasks.data_retention",
+    ]
+)
 
 # Beat Schedule for periodic tasks
 celery_app.conf.beat_schedule = {

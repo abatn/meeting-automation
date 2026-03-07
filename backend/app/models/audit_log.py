@@ -15,10 +15,14 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
-    user_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("users.id"), nullable=True)
+    user_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("users.id"), nullable=True
+    )
 
     # ISO 27001 requirements
-    action: Mapped[str] = mapped_column(String, nullable=False)  # e.g., "CREATE", "UPDATE", "DELETE"
+    action: Mapped[str] = mapped_column(
+        String, nullable=False
+    )  # e.g., "CREATE", "UPDATE", "DELETE"
     table_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     record_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
@@ -28,7 +32,9 @@ class AuditLog(Base):
     ip_address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="audit_logs")

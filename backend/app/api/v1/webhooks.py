@@ -10,7 +10,6 @@ from app.models.transcription import Transcription
 from app.models.recording import Recording
 from app.models.pv import PV
 
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 async def transcription_complete(
     data: dict,
     db: AsyncSession = Depends(deps.get_db),
-    _authorized: bool = Depends(deps.verify_internal_api_key)
+    _authorized: bool = Depends(deps.verify_internal_api_key),
 ):
     """Whisper-Ergebnis empfangen"""
     recording_id = data.get("recording_id")
@@ -36,13 +35,15 @@ async def transcription_complete(
         meeting_id=meeting_id,
         recording_id=recording_id,
         full_text=content,
-        status="completed"
+        status="completed",
     )
     db.add(transcription)
 
     # Update recording status
     await db.execute(
-        update(Recording).where(Recording.id == recording_id).values(status="transcribed")
+        update(Recording)
+        .where(Recording.id == recording_id)
+        .values(status="transcribed")
     )
 
     await db.commit()
@@ -58,7 +59,7 @@ async def transcription_complete(
 async def pv_generated(
     data: dict,
     db: AsyncSession = Depends(deps.get_db),
-    _authorized: bool = Depends(deps.verify_internal_api_key)
+    _authorized: bool = Depends(deps.verify_internal_api_key),
 ):
     """Mistral-PV empfangen"""
     meeting_id = data.get("meeting_id")
@@ -67,11 +68,7 @@ async def pv_generated(
     if not meeting_id or not content:
         raise HTTPException(status_code=400, detail="Missing data")
 
-    pv = PV(
-        meeting_id=meeting_id,
-        content=content,
-        status="draft"
-    )
+    pv = PV(meeting_id=meeting_id, content=content, status="draft")
     db.add(pv)
     await db.commit()
     logger.info(f"PV draft generated for meeting {meeting_id}")
@@ -83,7 +80,7 @@ async def pv_generated(
 async def actions_extracted(
     data: dict,
     db: AsyncSession = Depends(deps.get_db),
-    _authorized: bool = Depends(deps.verify_internal_api_key)
+    _authorized: bool = Depends(deps.verify_internal_api_key),
 ):
     """Action-Items empfangen"""
     pv_id = data.get("pv_id")

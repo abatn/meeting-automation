@@ -6,7 +6,6 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.services.action_service import ActionService
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -49,9 +48,10 @@ async def _daily_reminder_task():
                     "id": a.id,
                     "title": a.title,
                     "assignee_id": a.assignee_id,
-                    "due_date": a.due_date.isoformat() if a.due_date else None
-                } for a in due_actions
-            ]
+                    "due_date": a.due_date.isoformat() if a.due_date else None,
+                }
+                for a in due_actions
+            ],
         }
 
         try:

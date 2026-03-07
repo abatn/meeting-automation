@@ -13,8 +13,10 @@ from app.core.config import settings
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable):
         path = request.url.path
-        if (request.method not in ["POST", "PUT", "PATCH", "DELETE"] or
-                "/recordings/upload" in path):
+        if (
+            request.method not in ["POST", "PUT", "PATCH", "DELETE"]
+            or "/recordings/upload" in path  # noqa: W503
+        ):
             return await call_next(request)
 
         user_id = self._get_user_id(request)
@@ -44,6 +46,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 if user_id:
                     from sqlalchemy import select
                     from app.models.user import User
+
                     user_exists = await db.execute(
                         select(User.id).where(User.id == user_id)
                     )
@@ -54,9 +57,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     id=str(uuid.uuid4()),
                     user_id=valid_user_id,
                     action=request.method,
-                    table_name=request.url.path.strip('/').split("/")[-1] or "root",
+                    table_name=request.url.path.strip("/").split("/")[-1] or "root",
                     ip_address=request.client.host if request.client else "unknown",
-                    user_agent=request.headers.get("user-agent", "unknown")
+                    user_agent=request.headers.get("user-agent", "unknown"),
                 )
 
                 if not valid_user_id and user_id:

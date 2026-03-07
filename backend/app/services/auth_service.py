@@ -7,7 +7,6 @@ from jose import jwt
 
 from app.core.config import settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -50,9 +49,7 @@ class AuthService:
                     f"Token JTI {jti} blacklisted for {expires_in_seconds} seconds."
                 )
             else:
-                logger.warning(
-                    f"Token JTI {jti} already expired. Not blacklisting."
-                )
+                logger.warning(f"Token JTI {jti} already expired. Not blacklisting.")
 
         except Exception as e:
             logger.error(f"Error blacklisting token: {e}")

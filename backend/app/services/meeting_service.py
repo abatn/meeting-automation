@@ -35,7 +35,7 @@ class MeetingService:
         await self.db.flush()
 
         # Add participants
-        for participant_data in (meeting_in.participants or []):
+        for participant_data in meeting_in.participants or []:
             participant = Participant(
                 id=str(uuid.uuid4()),
                 meeting_id=db_meeting.id,
@@ -46,7 +46,7 @@ class MeetingService:
             self.db.add(participant)
 
         # Add agendas
-        for agenda_data in (meeting_in.agendas or []):
+        for agenda_data in meeting_in.agendas or []:
             agenda = Agenda(
                 id=str(uuid.uuid4()),
                 meeting_id=db_meeting.id,
@@ -67,6 +67,7 @@ class MeetingService:
     async def get_meeting(self, meeting_id: str) -> Optional[Meeting]:
         """Meeting mit allen Relations"""
         from sqlalchemy.orm import selectinload
+
         result = await self.db.execute(
             select(Meeting)
             .options(selectinload(Meeting.participants), selectinload(Meeting.agendas))

@@ -74,14 +74,18 @@ class User(Base):
     )
 
     # Manager relationship
-    manager_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey('users.id'), nullable=True)
+    manager_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("users.id"), nullable=True
+    )
     reports: Mapped[List["User"]] = relationship(back_populates="manager")
     manager: Mapped["User"] = relationship(back_populates="reports", remote_side=[id])
     # Relationships
     roles: Mapped[List["Role"]] = relationship(
         secondary=user_roles, back_populates="users", lazy="selectin"
     )
-    audit_logs: Mapped[List["AuditLog"]] = relationship("AuditLog", back_populates="user")
+    audit_logs: Mapped[List["AuditLog"]] = relationship(
+        "AuditLog", back_populates="user"
+    )
     created_meetings: Mapped[List["Meeting"]] = relationship(
         "Meeting", back_populates="creator"
     )
@@ -106,7 +110,9 @@ class Role(Base):
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
-    users: Mapped[List["User"]] = relationship(secondary=user_roles, back_populates="roles")
+    users: Mapped[List["User"]] = relationship(
+        secondary=user_roles, back_populates="roles"
+    )
     permissions: Mapped[List["Permission"]] = relationship(
         secondary=role_permissions, back_populates="roles"
     )

@@ -5,7 +5,6 @@ from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from app.core.config import settings
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
 # Using pbkdf2_sha256 instead of bcrypt to avoid dependency issues

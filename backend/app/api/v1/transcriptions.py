@@ -9,7 +9,6 @@ from app.models.user import User as UserModel
 from app.models.transcription import Transcription as TranscriptionModel
 from app.tasks.transcription_tasks import process_recording
 
-
 router = APIRouter()
 
 
@@ -33,7 +32,7 @@ async def initiate_transcription(
     return {
         "message": "Transcription initiated",
         "transcription_id": str(uuid.uuid4()),  # In reality, we'd create pending record
-        "status": "in_progress"
+        "status": "in_progress",
     }
 
 
@@ -50,7 +49,9 @@ async def get_transcription_by_meeting(
     result = await db.execute(stmt)
     transcription = result.scalars().first()
     if not transcription:
-        raise HTTPException(status_code=404, detail="Transcription for meeting not found")
+        raise HTTPException(
+            status_code=404, detail="Transcription for meeting not found"
+        )
     return {
         "id": transcription.id,
         "recording_id": transcription.recording_id,
@@ -58,7 +59,7 @@ async def get_transcription_by_meeting(
         "language": transcription.language or "unknown",
         "full_text": transcription.full_text,
         "segments": transcription.segments,
-        "status": transcription.status
+        "status": transcription.status,
     }
 
 
@@ -85,7 +86,7 @@ async def get_transcription(
         "language": transcription.language or "unknown",
         "text": transcription.full_text,
         "segments": transcription.segments,  # Hinzugefügt
-        "status": transcription.status
+        "status": transcription.status,
     }
 
 

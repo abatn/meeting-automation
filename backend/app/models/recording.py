@@ -1,9 +1,8 @@
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import Column, String, ForeignKey, DateTime, Integer, Float, Enum as SQLEnum
+from sqlalchemy import String, ForeignKey, DateTime, Integer, Float
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
-import enum
 from datetime import datetime
 from app.core.database import Base
 
@@ -37,7 +36,9 @@ class Recording(Base):
     chunks: Mapped[List["Chunk"]] = relationship(
         "Chunk", back_populates="recording", cascade="all, delete-orphan"
     )
-    transcriptions: Mapped[List["Transcription"]] = relationship("Transcription", back_populates="recording")
+    transcriptions: Mapped[List["Transcription"]] = relationship(
+        "Transcription", back_populates="recording"
+    )
 
 
 class Chunk(Base):

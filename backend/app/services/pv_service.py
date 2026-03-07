@@ -9,7 +9,6 @@ from datetime import datetime
 from app.core.config import settings
 from app.models.pv import PV
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +24,7 @@ class PVService:
         try:
             headers = {
                 "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             }
             system_content = """Du erstellst professionelle Procès-Verbaux (PV) aus
 Meeting-Transkriptionen. Kontext: Maghreb/Tunesien (Sprachen: Arabisch,
@@ -45,16 +44,13 @@ Antworte EXKLUSIV im strukturierten JSON Format."""
             payload = {
                 "model": "mistral-large-latest",
                 "messages": [
-                    {
-                        "role": "system",
-                        "content": system_content
-                    },
+                    {"role": "system", "content": system_content},
                     {
                         "role": "user",
-                        "content": f"Erstelle ein PV für folgende Transkription:\n\n{transcription_text}"
-                    }
+                        "content": f"Erstelle ein PV für folgende Transkription:\n\n{transcription_text}",
+                    },
                 ],
-                "response_format": {"type": "json_object"}
+                "response_format": {"type": "json_object"},
             }
 
             async with httpx.AsyncClient() as client:
@@ -62,12 +58,12 @@ Antworte EXKLUSIV im strukturierten JSON Format."""
                     "https://api.mistral.ai/v1/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=60.0
+                    timeout=60.0,
                 )
                 response.raise_for_status()
                 result = response.json()
                 # Extract content from the first choice
-                content_str = result['choices'][0]['message']['content']
+                content_str = result["choices"][0]["message"]["content"]
                 return json.loads(content_str)
 
         except Exception as e:
@@ -97,13 +93,11 @@ Antworte EXKLUSIV im strukturierten JSON Format."""
         return pv
 
     async def _notify_validation(self, pv: PV):
-        payload = {
-            "event": "pv.validated",
-            "pv_id": pv.id,
-            "meeting_id": pv.meeting_id
-        }
+        payload = {"event": "pv.validated", "pv_id": pv.id, "meeting_id": pv.meeting_id}
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(settings.N8N_WEBHOOK_PV_VALIDATED, json=payload, timeout=5.0)
+                await client.post(
+                    settings.N8N_WEBHOOK_PV_VALIDATED, json=payload, timeout=5.0
+                )
         except Exception as e:
             logger.error(f"Failed to notify n8n about PV validation: {e}")

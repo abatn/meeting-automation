@@ -1,8 +1,14 @@
 from fastapi import APIRouter
 
 from . import (
-    auth, meetings, recordings, transcriptions,
-    pv, actions, reports, websockets
+    auth,
+    meetings,
+    recordings,
+    transcriptions,
+    pv,
+    actions,
+    reports,
+    websockets,
 )
 
 router = APIRouter()

@@ -7,6 +7,7 @@ class EncryptedString(TypeDecorator):
     A SQLAlchemy TypeDecorator that encrypts data on the way into the DB
     and decrypts it on the way out.
     """
+
     impl = String
     cache_ok = True
 
@@ -29,6 +30,7 @@ class EncryptedText(TypeDecorator):
     """
     Same as EncryptedString, but backed by Text for longer content.
     """
+
     impl = Text
     cache_ok = True
 

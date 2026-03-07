@@ -10,7 +10,6 @@ from app.models.action import Action, Assignment
 from app.models.pv import PV
 from app.core.config import settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +17,9 @@ class ActionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def extract_actions_from_pv(self, pv_id: str, actions_data: List[dict]) -> List[Action]:
+    async def extract_actions_from_pv(
+        self, pv_id: str, actions_data: List[dict]
+    ) -> List[Action]:
         """n8n-Callback von Mistral verarbeiten"""
         # Lookup meeting_id from PV
         pv_res = await self.db.execute(select(PV).where(PV.id == pv_id))
@@ -37,9 +38,12 @@ class ActionService:
                 meeting_id=meeting_id,
                 title=item.get("title", "Untitled Action"),
                 description=item.get("description", ""),
-                due_date=datetime.fromisoformat(item["due_date"])
-                if item.get("due_date") else None,
-                status="pending"
+                due_date=(
+                    datetime.fromisoformat(item["due_date"])
+                    if item.get("due_date")
+                    else None
+                ),
+                status="pending",
             )
             self.db.add(action)
             new_actions.append(action)
@@ -47,9 +51,7 @@ class ActionService:
             assignee_id = item.get("assignee_id")
             if assignee_id:
                 assignment = Assignment(
-                    id=str(uuid.uuid4()),
-                    action_id=action_id,
-                    user_id=assignee_id
+                    id=str(uuid.uuid4()), action_id=action_id, user_id=assignee_id
                 )
                 self.db.add(assignment)
 
@@ -58,7 +60,9 @@ class ActionService:
         # Trigger notifications for each assigned action
         for action in new_actions:
             if action.assignments and action.assignments[0].user_id:
-                await self.assign_action(str(action.id), str(action.assignments[0].user_id))
+                await self.assign_action(
+                    str(action.id), str(action.assignments[0].user_id)
+                )
 
         return new_actions
 
@@ -72,15 +76,15 @@ class ActionService:
 
         # Check if assignment already exists
         assignment_result = await self.db.execute(
-            select(Assignment).where(Assignment.action_id == action_id, Assignment.user_id == user_id)
+            select(Assignment).where(
+                Assignment.action_id == action_id, Assignment.user_id == user_id
+            )
         )
         existing_assignment = assignment_result.scalar_one_or_none()
 
         if not existing_assignment:
             assignment = Assignment(
-                id=str(uuid.uuid4()),
-                action_id=action_id,
-                user_id=user_id
+                id=str(uuid.uuid4()), action_id=action_id, user_id=user_id
             )
             self.db.add(assignment)
             await self.db.commit()
@@ -91,7 +95,7 @@ class ActionService:
             "action_id": action.id,
             "title": str(action.title),
             "assignee_id": user_id,
-            "due_date": action.due_date.isoformat() if action.due_date else None
+            "due_date": action.due_date.isoformat() if action.due_date else None,
         }
 
         try:
@@ -103,7 +107,9 @@ class ActionService:
 
         return action
 
-    async def update_action_status(self, action_id: str, status: str) -> Optional[Action]:
+    async def update_action_status(
+        self, action_id: str, status: str
+    ) -> Optional[Action]:
         """Status-Änderung -> n8n Notification"""
         result = await self.db.execute(select(Action).where(Action.id == action_id))
         action = result.scalar_one_or_none()
@@ -120,7 +126,7 @@ class ActionService:
             "event": "action.status_updated",
             "action_id": action.id,
             "status": status,
-            "title": str(action.title)
+            "title": str(action.title),
         }
 
         try:
@@ -143,10 +149,7 @@ class ActionService:
 
     async def escalate_overdue(self, action_id: str) -> None:
         """Eskalation an Manager"""
-        payload = {
-            "event": "action.escalate",
-            "action_id": action_id
-        }
+        payload = {"event": "action.escalate", "action_id": action_id}
         try:
             async with httpx.AsyncClient() as client:
                 await client.post(settings.N8N_WEBHOOK_URL, json=payload, timeout=5.0)

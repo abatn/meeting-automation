@@ -13,11 +13,10 @@ from sqlalchemy.orm import selectinload
 # Versuche WeasyPrint zu importieren (kann je nach System libs erfordern)
 try:
     from weasyprint import HTML
+
     WEASYPRINT_AVAILABLE = True
 except (ImportError, OSError):
-    logging.warning(
-        "WeasyPrint is not installed. PDF generation will mock if called."
-    )
+    logging.warning("WeasyPrint is not installed. PDF generation will mock if called.")
     WEASYPRINT_AVAILABLE = False
 
 from app.core.config import settings
@@ -34,10 +33,10 @@ class PDFService:
         # Fallback auf mock-client, falls keine S3 credentials existieren
         try:
             self.s3 = s3_client or boto3.client(
-                's3',
-                endpoint_url=getattr(settings, 'S3_ENDPOINT', 'http://localhost:9000'),
-                aws_access_key_id=getattr(settings, 'S3_ACCESS_KEY', 'minioadmin'),
-                aws_secret_access_key=getattr(settings, 'S3_SECRET_KEY', 'minioadmin')
+                "s3",
+                endpoint_url=getattr(settings, "S3_ENDPOINT", "http://localhost:9000"),
+                aws_access_key_id=getattr(settings, "S3_ACCESS_KEY", "minioadmin"),
+                aws_secret_access_key=getattr(settings, "S3_SECRET_KEY", "minioadmin"),
             )
         except Exception as e:
             logger.warning(f"Could not initialize S3 client: {e}")
@@ -45,13 +44,12 @@ class PDFService:
 
         # Jinja2 Setup für das HTML Template
         template_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 'templates'
+            os.path.dirname(os.path.dirname(__file__)), "templates"
         )
         self.template_env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(template_dir),
-            autoescape=True
+            loader=jinja2.FileSystemLoader(template_dir), autoescape=True
         )
-        self.bucket_name = getattr(settings, 'S3_BUCKET_NAME', 'meeting-pdfs')
+        self.bucket_name = getattr(settings, "S3_BUCKET_NAME", "meeting-pdfs")
 
     async def generate_pv_pdf(self, pv_id: str) -> str:
         """Hauptmethode: Generiert PDF und gibt Dateipfad zurück"""
@@ -61,7 +59,7 @@ class PDFService:
             .options(
                 selectinload(PV.meeting).selectinload(Meeting.participants),
                 selectinload(PV.meeting).selectinload(Meeting.agendas),
-                selectinload(PV.sections)
+                selectinload(PV.sections),
             )
             .where(PV.id == pv_id)
         )
@@ -97,17 +95,22 @@ class PDFService:
             "actions": [
                 {
                     "description": a.title,
-                    "assignee": a.description.split("Assigned to: ")[-1]
-                    if a.description and "Assigned to: " in a.description else "N/A",
-                    "due_date": a.due_date.strftime("%Y-%m-%d")
-                    if a.due_date else "N/A"
-                } for a in actions
-            ]
+                    "assignee": (
+                        a.description.split("Assigned to: ")[-1]
+                        if a.description and "Assigned to: " in a.description
+                        else "N/A"
+                    ),
+                    "due_date": (
+                        a.due_date.strftime("%Y-%m-%d") if a.due_date else "N/A"
+                    ),
+                }
+                for a in actions
+            ],
         }
 
         # 3. HTML rendern
         try:
-            template = self.template_env.get_template('pv_template.html')
+            template = self.template_env.get_template("pv_template.html")
             html_content = template.render(pv=pv_data)
         except Exception as e:
             logger.error(f"Error rendering template: {e}")
@@ -126,18 +129,20 @@ class PDFService:
         if not WEASYPRINT_AVAILABLE:
             # Erstelle ein Dummy-PDF, falls WeasyPrint nicht verfügbar ist
             with open(filepath, "wb") as f:
-                f.write(b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\n"
-                        b"endobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\n"
-                        b"endobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources "
-                        b"<< /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] "
-                        b"/Contents 5 0 R >>\nendobj\n4 0 obj\n<< /Type /Font "
-                        b"/Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n5 0 obj\n"
-                        b"<< /Length 44 >>\nstream\nBT\n/F1 24 Tf\n100 700 Td\n"
-                        b"(WeasyPrint not installed) Tj\nET\nendstream\nendobj\n"
-                        b"xref\n0 6\n0000000000 65535 f\n0000000009 00000 n\n"
-                        b"0000000058 00000 n\n0000000115 00000 n\n0000000219 00000 n\n"
-                        b"0000000307 00000 n\ntrailer\n<< /Size 6 /Root 1 0 R >>\n"
-                        b"startxref\n402\n%%EOF")
+                f.write(
+                    b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\n"
+                    b"endobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\n"
+                    b"endobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources "
+                    b"<< /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] "
+                    b"/Contents 5 0 R >>\nendobj\n4 0 obj\n<< /Type /Font "
+                    b"/Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n5 0 obj\n"
+                    b"<< /Length 44 >>\nstream\nBT\n/F1 24 Tf\n100 700 Td\n"
+                    b"(WeasyPrint not installed) Tj\nET\nendstream\nendobj\n"
+                    b"xref\n0 6\n0000000000 65535 f\n0000000009 00000 n\n"
+                    b"0000000058 00000 n\n0000000115 00000 n\n0000000219 00000 n\n"
+                    b"0000000307 00000 n\ntrailer\n<< /Size 6 /Root 1 0 R >>\n"
+                    b"startxref\n402\n%%EOF"
+                )
             return filepath
 
         try:
@@ -156,9 +161,9 @@ class PDFService:
         try:
             self.s3.upload_file(file_path, self.bucket_name, object_name)
             url = self.s3.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': self.bucket_name, 'Key': object_name},
-                ExpiresIn=3600
+                "get_object",
+                Params={"Bucket": self.bucket_name, "Key": object_name},
+                ExpiresIn=3600,
             )
             return url
         except Exception as e:

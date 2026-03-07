@@ -13,7 +13,6 @@ from app.models.action import Action as ActionModel
 from app.services.pv_service import PVService
 from app.services.pdf_service import PDFService
 
-
 router = APIRouter()
 
 
@@ -29,7 +28,7 @@ async def initiate_pv_generation_with_id(
     return {
         "message": "PV generation initiated",
         "pv_id": str(uuid.uuid4()),
-        "status": "in_progress"
+        "status": "in_progress",
     }
 
 
@@ -51,7 +50,7 @@ async def initiate_pv_generation(
     return {
         "message": "PV generation initiated",
         "pv_id": str(uuid.uuid4()),
-        "status": "in_progress"
+        "status": "in_progress",
     }
 
 
@@ -71,7 +70,7 @@ async def download_pv_pdf(
         return FileResponse(
             path=pdf_path,
             filename=f"meeting_minutes_{pv_id}.pdf",
-            media_type="application/pdf"
+            media_type="application/pdf",
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -86,9 +85,11 @@ async def get_pv_by_meeting(
     """
     Retrieves the PV associated with a specific meeting.
     """
-    stmt = select(PVModel).options(
-        selectinload(PVModel.sections)
-    ).where(PVModel.meeting_id == meeting_id)
+    stmt = (
+        select(PVModel)
+        .options(selectinload(PVModel.sections))
+        .where(PVModel.meeting_id == meeting_id)
+    )
     result = await db.execute(stmt)
     pv = result.scalars().first()
     if not pv:
@@ -109,9 +110,10 @@ async def get_pv_by_meeting(
                 "id": a.id,
                 "description": a.title,
                 "priority": a.priority,
-                "status": a.status
-            } for a in actions
-        ]
+                "status": a.status,
+            }
+            for a in actions
+        ],
     }
 
 
@@ -124,9 +126,11 @@ async def get_pv(
     """
     Retrieves the generated PV content.
     """
-    stmt = select(PVModel).options(
-        selectinload(PVModel.sections)
-    ).where(PVModel.id == pv_id)
+    stmt = (
+        select(PVModel)
+        .options(selectinload(PVModel.sections))
+        .where(PVModel.id == pv_id)
+    )
 
     result = await db.execute(stmt)
     pv = result.scalars().first()
@@ -149,9 +153,10 @@ async def get_pv(
             {
                 "id": a.id,
                 "description": a.description,
-                "assigned_to": "Mocked User"  # Usually via relationship
-            } for a in actions
-        ]
+                "assigned_to": "Mocked User",  # Usually via relationship
+            }
+            for a in actions
+        ],
     }
 
 
@@ -170,7 +175,4 @@ async def validate_pv(
     if not pv:
         raise HTTPException(status_code=404, detail="PV not found")
 
-    return {
-        "message": "PV validated successfully",
-        "status": pv.status
-    }
+    return {"message": "PV validated successfully", "status": pv.status}

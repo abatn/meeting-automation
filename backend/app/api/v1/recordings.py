@@ -15,7 +15,6 @@ from app.schemas.recording import (
 )
 from app.services.recording_service import RecordingService
 
-
 router = APIRouter()
 
 
@@ -24,7 +23,7 @@ async def upload_recording(
     meeting_id: str,
     file: UploadFile = File(...),
     recording_id: Optional[str] = Form(None),
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
 ):
     """
     Upload an audio recording for a specific meeting.
@@ -37,18 +36,15 @@ async def upload_recording(
 
     # Reload with selectinload to avoid MissingGreenlet error during serialization
     result = await db.execute(
-        select(RecordingModel).options(
-            selectinload(RecordingModel.chunks)
-        ).where(RecordingModel.id == recording.id)
+        select(RecordingModel)
+        .options(selectinload(RecordingModel.chunks))
+        .where(RecordingModel.id == recording.id)
     )
     return result.scalars().first()
 
 
 @router.post("/stream/start/{meeting_id}", response_model=StreamStartResponse)
-async def start_stream(
-    meeting_id: str,
-    db: AsyncSession = Depends(deps.get_db)
-):
+async def start_stream(meeting_id: str, db: AsyncSession = Depends(deps.get_db)):
     """Start a chunked audio stream upload."""
     service = RecordingService(db)
     result = await service.start_stream(meeting_id)
@@ -61,7 +57,7 @@ async def upload_stream_chunk(
     file_key: str = Form(...),
     part_number: int = Form(...),
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
 ):
     """Upload a chunk to an active stream."""
     service = RecordingService(db)
@@ -76,7 +72,7 @@ async def stop_stream(
     upload_id: str,
     file_key: str,
     request: StreamStopRequest,
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
 ):
     """Stop the stream and complete the upload."""
     service = RecordingService(db)
@@ -88,7 +84,7 @@ async def stop_stream(
 async def get_recording(
     recording_id: str,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: UserModel = Depends(deps.get_current_user)
+    current_user: UserModel = Depends(deps.get_current_user),
 ):
     """
     Get recording details by ID.
