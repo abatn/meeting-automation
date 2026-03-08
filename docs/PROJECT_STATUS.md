@@ -44,6 +44,13 @@ Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilenste
 4. **[N8N-Automatisierung & Kommunikation](PROTOCOL_N8N_AUTOMATION_&_SMTP_FIXES.md)**: Konfiguration der Workflow-Engine, SMTP-Migration und Webhook-Härtung.
 5. **[Security-Härtung & UI-Optimierung](PROTOCOL_SECURITY_UI_&_QA.md)**: ISO 27001 Compliance, sicherer Logout, Audit-Logging und rollenbasierte Dashboards.
 
+## Letzte Änderungen (08.03.2026) - FRONTEND CI/CD FIXES
+
+- **TypeScript-Fehler behoben**: 
+  - Korrektur in `PVValidator.tsx`: Der `pvId`-Typ wurde von `number` auf `string` geändert, um UUIDs korrekt zu verarbeiten.
+  - Korrektur in `ManagerDashboard.tsx`: Fehlender Parameter (`"manager"`) beim Aufruf von `fetchDashboardData` hinzugefügt.
+- **CI-Pipeline-Härtung**: Hinzufügen des Skripts `"type-check": "tsc --noEmit"` in die `frontend/package.json`, um TypeScript-Fehler in GitHub Actions korrekt abzufangen und zu validieren.
+
 ---
 
 ## Letzte Änderungen (08.03.2026) - FRONTEND I18N BEREINIGUNG
