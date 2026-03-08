@@ -10,48 +10,13 @@ The backend uses `HTTP POST` webhooks to trigger n8n workflows. n8n processes th
 
 | Workflow | Event | Backend Trigger | n8n Webhook URL |
 | :--- | :--- | :--- | :--- |
-| **Meeting Created** | `meeting.created` | `MeetingService.create_meeting` | `N8N_WEBHOOK_URL` |
-| **Audio Uploaded** | `audio.uploaded` | `RecordingService.upload_audio` | `N8N_WEBHOOK_AUDIO_UPLOAD` |
-| **PV Validated** | `pv.validated` | `PVService.validate_pv` | `N8N_WEBHOOK_PV_VALIDATED` |
+| **Meeting Created** | `meeting.created` | `MeetingService.create_meeting` | `N8N_WEBHOOK_MEETING_CREATED` |
+| **Transcription Completed**| `transcription.completed`| `transcription_tasks._notify_n8n_completion` | `N8N_WEBHOOK_TRANSCRIPTION_COMPLETED` |
 | **Daily Reminders**| `daily_reminders` | `daily_reminder_task` (Celery) | `N8N_WEBHOOK_DAILY_REMINDER`|
 
 ## 3. Callback Endpoints
 
-n8n workflows must send results back to the following endpoints in `backend/app/api/v1/webhooks.py`:
-
-### POST `/api/v1/webhooks/transcription-complete`
-**Payload:**
-```json
-{
-  "recording_id": "uuid",
-  "meeting_id": "uuid",
-  "transcription": "Text content..."
-}
-```
-
-### POST `/api/v1/webhooks/pv-generated`
-**Payload:**
-```json
-{
-  "meeting_id": "uuid",
-  "pv_content": "Draft text..."
-}
-```
-
-### POST `/api/v1/webhooks/actions-extracted`
-**Payload:**
-```json
-{
-  "pv_id": "uuid",
-  "actions": [
-    {
-      "title": "Task 1",
-      "assignee_email": "user@example.com",
-      "due_date": "2024-12-31"
-    }
-  ]
-}
-```
+*Hinweis: Da die KI-Verarbeitung nun komplett im Backend stattfindet, ruft n8n keine Callbacks mehr auf, um Transkripte oder PVs zurückzusenden. n8n fungiert nur noch als Empfänger von Webhooks für den E-Mail/WhatsApp-Versand.*
 
 ## 4. Setup in n8n
 
