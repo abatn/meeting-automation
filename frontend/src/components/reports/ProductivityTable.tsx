@@ -46,7 +46,7 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
   });
 
   return (
-    <TableContainer component={Paper} sx={{ maxHeight: 300 }}>
+    <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
       <Table stickyHeader size="small">
         <TableHead>
           <TableRow>
@@ -56,34 +56,34 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
                 direction={orderBy === "name" ? order : "asc"}
                 onClick={() => handleRequestSort("name")}
               >
-                {t("Name")}
+                {t("common.name")}
               </TableSortLabel>
             </TableCell>
-            <TableCell align="right">
+            <TableCell align="center">
               <TableSortLabel
                 active={orderBy === "completed"}
                 direction={orderBy === "completed" ? order : "asc"}
                 onClick={() => handleRequestSort("completed")}
               >
-                {t("Completed")}
+                {t("common.completed")}
               </TableSortLabel>
             </TableCell>
-            <TableCell align="right">
+            <TableCell align="center">
               <TableSortLabel
                 active={orderBy === "pending"}
                 direction={orderBy === "pending" ? order : "asc"}
                 onClick={() => handleRequestSort("pending")}
               >
-                {t("Pending")}
+                {t("common.pending")}
               </TableSortLabel>
             </TableCell>
-            <TableCell align="right">
+            <TableCell align="center">
               <TableSortLabel
                 active={orderBy === "overdue"}
                 direction={orderBy === "overdue" ? order : "asc"}
                 onClick={() => handleRequestSort("overdue")}
               >
-                {t("Overdue")}
+                {t("common.overdue")}
               </TableSortLabel>
             </TableCell>
           </TableRow>
@@ -94,9 +94,9 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
               <TableCell component="th" scope="row">
                 {row.name}
               </TableCell>
-              <TableCell align="right">{row.completed}</TableCell>
-              <TableCell align="right">{row.pending}</TableCell>
-              <TableCell align="right">{row.overdue}</TableCell>
+              <TableCell align="center">{row.completed}</TableCell>
+              <TableCell align="center">{row.pending}</TableCell>
+              <TableCell align="center">{row.overdue}</TableCell>
             </TableRow>
           ))}
         </TableBody>

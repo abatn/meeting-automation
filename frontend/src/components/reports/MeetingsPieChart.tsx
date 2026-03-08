@@ -25,9 +25,9 @@ const MeetingsPieChart: React.FC<Props> = ({ data }) => {
   const theme = useTheme();
 
   const chartData = [
-    { name: t("Completed"), value: data.completed },
-    { name: t("Scheduled"), value: data.scheduled },
-    { name: t("Cancelled"), value: data.cancelled },
+    { name: t("common.completed"), value: data.completed },
+    { name: t("common.scheduled"), value: data.scheduled },
+    { name: t("common.cancelled"), value: data.cancelled },
   ];
 
   return (

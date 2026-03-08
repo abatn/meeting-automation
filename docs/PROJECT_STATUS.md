@@ -46,6 +46,14 @@ Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilenste
 
 ---
 
+## Letzte Änderungen (08.03.2026) - FRONTEND I18N BEREINIGUNG
+
+- **Vollständige Internationalisierung**: Das Frontend wurde konsequent von hartkodierten englischen Strings (wie "Completed", "Scheduled", "Pending") befreit. Alle UI-Komponenten (einschließlich Diagramme und Tabellen) nutzen nun strikt die i18n-Übersetzungs-Schlüssel.
+- **RTL-Optimierung**: Die Ausrichtung in Tabellen (`ProductivityTable`) wurde vereinheitlicht, um Darstellungsprobleme im arabischen RTL-Modus zu verhindern.
+- **Cache-Bereinigung**: Ein kompletter Docker-Rebuild (`--no-cache`) stellte sicher, dass keine alten Code-Fragmente im Vite-Produktionsbundle verbleiben. Das Dashboard für den Directeur Général ist nun 100% lokalisiert.
+
+**Neues Protokoll:** `docs/PROTOCOL_PART_26_FRONTEND_I18N_FIX.md`
+
 ## Letzte Änderungen (03.03.2026) - FINALE SYSTEMSTABILISIERUNG & SPRACHANPASSUNG
 
 In der abschließenden Phase der Stabilisierung wurden die letzten funktionalen Lücken geschlossen:

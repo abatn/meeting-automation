@@ -26,7 +26,7 @@ const ActionsBarChart: React.FC<Props> = ({ data }) => {
 
   const chartData = [
     {
-      name: t("Actions"),
+      name: t("common.actions"),
       completed: data.completed,
       pending: data.pending,
       overdue: data.overdue,
@@ -58,15 +58,15 @@ const ActionsBarChart: React.FC<Props> = ({ data }) => {
           dataKey="completed"
           stackId="a"
           fill="#4caf50"
-          name={t("Completed")}
+          name={t("common.completed")}
           radius={[0, 0, 0, 0]}
         />
-        <Bar dataKey="pending" stackId="a" fill="#ff9800" name={t("Pending")} />
+        <Bar dataKey="pending" stackId="a" fill="#ff9800" name={t("common.pending")} />
         <Bar
           dataKey="overdue"
           stackId="a"
           fill="#f44336"
-          name={t("Overdue")}
+          name={t("common.overdue")}
           radius={[4, 4, 0, 0]}
         />
       </BarChart>

@@ -14,8 +14,6 @@ import {
   InputAdornment,
   Button,
   IconButton,
-  Menu,
-  MenuItem,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -35,7 +33,7 @@ const ActionTracker: React.FC = () => {
     id: number;
     title: string;
     owner: string;
-    priority: string;
+    priority: "High" | "Medium" | "Low";
     status: "pending" | "completed" | "in_progress";
     due: string;
   }> = [
@@ -67,7 +65,6 @@ const ActionTracker: React.FC = () => {
 
   const handleWhatsAppReminder = (owner: string) => {
     console.log(`Sending WhatsApp reminder to ${owner}`);
-    // Simulation of WhatsApp integration logic
   };
 
   return (
@@ -122,10 +119,7 @@ const ActionTracker: React.FC = () => {
                 <TableCell>{action.owner}</TableCell>
                 <TableCell>
                   <Chip
-                    label={t(
-                      `actions.priority_${action.priority.toLowerCase()}`,
-                      action.priority,
-                    )}
+                    label={t(`actions.priority_${action.priority.toLowerCase()}`)}
                     size="small"
                     color={action.priority === "High" ? "error" : "warning"}
                   />
@@ -138,7 +132,7 @@ const ActionTracker: React.FC = () => {
                   <IconButton
                     color="success"
                     onClick={() => handleWhatsAppReminder(action.owner)}
-                    title="Send WhatsApp Reminder"
+                    title={t("common.actions")}
                   >
                     <WhatsAppIcon fontSize="small" />
                   </IconButton>

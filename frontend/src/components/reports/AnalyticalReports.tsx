@@ -76,7 +76,7 @@ const AnalyticalReports: React.FC = () => {
             <Divider sx={{ mb: 2 }} />
             <Box sx={{ mt: 5, textAlign: "center" }}>
               <Typography color="textSecondary">
-                Historical efficiency data is being processed by the AI engine.
+                {t("dashboard.efficiency_processing")}
               </Typography>
             </Box>
           </Paper>

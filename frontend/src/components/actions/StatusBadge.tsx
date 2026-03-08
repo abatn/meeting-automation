@@ -10,9 +10,9 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   const { t } = useTranslation();
 
   const statusMap = {
-    pending: { label: t("pending"), color: "warning" as const },
-    in_progress: { label: t("inProgress"), color: "info" as const },
-    completed: { label: t("completed"), color: "success" as const },
+    pending: { label: t("common.pending"), color: "warning" as const },
+    in_progress: { label: t("common.in_progress"), color: "info" as const },
+    completed: { label: t("common.completed"), color: "success" as const },
   };
 
   return (
