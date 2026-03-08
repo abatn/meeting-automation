@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import api from "../../services/api";
 
 interface Props {
-  pvId: number;
+  pvId: string;
   fileName?: string;
   variant?: "contained" | "outlined" | "text";
 }

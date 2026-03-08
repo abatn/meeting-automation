@@ -23,7 +23,7 @@ const ManagerDashboard: React.FC = () => {
   );
 
   useEffect(() => {
-    dispatch(fetchDashboardData());
+    dispatch(fetchDashboardData("manager"));
   }, [dispatch]);
 
   if (loading)
