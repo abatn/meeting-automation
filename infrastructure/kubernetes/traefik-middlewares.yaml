@@ -1,0 +1,21 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit-general
+  namespace: meeting-automation
+spec:
+  rateLimit:
+    # 50 Requests per second on average, allowing bursts of 100 requests.
+    average: 50
+    burst: 100
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit-auth
+  namespace: meeting-automation
+spec:
+  rateLimit:
+    # Stricter limits for login/auth endpoints (e.g. 5 req/s) to prevent brute force
+    average: 5
+    burst: 10

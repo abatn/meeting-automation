@@ -32,9 +32,10 @@
 
 Basierend auf dem jüngsten Security-Audit (ISO 27001:2022) wurden folgende Architektur-Erweiterungen für den Produktionsbetrieb definiert:
 
-- [ ] **Sofort (Phase 1)**: Secret Management. Migration aller Credentials (DB, API-Keys) aus der lokalen `.env`-Datei in einen sicheren Speicher (z.B. HashiCorp Vault oder Kubernetes Secrets mit SOPS).
-- [ ] **Kurzfristig**: Netzwerksegmentierung. Isolierung von Datenbank, Redis und Message Broker in strikt getrennten Kubernetes Namespaces mittels NetworkPolicies.
-- [ ] **Parallel**: API Gateway & Rate Limiting. Einsatz von Traefik, Kong oder Cloudflare (WAF) vor Nginx zur Abwehr von DDoS, Bot-Management und Zero-Trust Access.
+- [x] **Sofort (Phase 1)**: Secret Management. Migration aller Credentials (DB, API-Keys) aus der lokalen .env-Datei in einen sicheren Speicher (SOPS mit age-Verschlüsselung für Kubernetes Secrets).
+- [x] **Kurzfristig**: Netzwerksegmentierung. Isolierung von Datenbank, Redis und Message Broker in strikt getrennten Kubernetes Namespaces mittels NetworkPolicies.
+- [x] **Parallel**: API Gateway & Rate Limiting. Einsatz von Traefik, Kong oder Cloudflare (WAF) vor Nginx zur Abwehr von DDoS, Bot-Management und Zero-Trust Access.
+
 - [ ] **Vor Go-Live**: 
     - Session Management: Implementierung von Session-Fixation Protection und automatischer Terminierung bei Inaktivität.
     - SSL/TLS: Verschlüsselung für jeglichen Traffic (auch intern via mTLS).
@@ -45,11 +46,16 @@ Basierend auf dem jüngsten Security-Audit (ISO 27001:2022) wurden folgende Arch
 
 Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilensteine ist in den folgenden konsolidierten Protokollen zu finden:
 
-1. **[System-Audit & Fehlerbehebung 2026](PROTOCOL_COMPREHENSIVE_SYSTEM_AUDIT_2026.md)**: Dokumentation des 100% Audits (Phasen 1-5), der Netzwerk-Fixes und der Test-Validierung.
-2. **[Infrastruktur & Startup-Stabilisierung](PROTOCOL_INFRASTRUCTURE_&_STARTUP_STABILIZATION.md)**: Details zu Docker-Caching, Schema-Migrationen und Container-Abhängigkeiten.
-3. **[Core-Pipeline: Audio & KI](PROTOCOL_CORE_PIPELINE_AI_&_AUDIO.md)**: Umfassende Dokumentation der Recording-Architektur, S3-Streaming, Whisper/Mistral-Integration und PDF-Export.
-4. **[N8N-Automatisierung & Kommunikation](PROTOCOL_N8N_AUTOMATION_&_SMTP_FIXES.md)**: Konfiguration der Workflow-Engine, SMTP-Migration und Webhook-Härtung.
-5. **[Security-Härtung & UI-Optimierung](PROTOCOL_SECURITY_UI_&_QA.md)**: ISO 27001 Compliance, sicherer Logout, Audit-Logging und rollenbasierte Dashboards.
+1. **[Traefik Rate Limiting](PROTOCOL_PART_31_TRAEFIK_RATE_LIMITING.md)**: Einführung von Traefik als API Gateway mit Rate Limiting (DDoS Schutz).
+2. **[Network Segmentation](PROTOCOL_PART_30_NETWORK_SEGMENTATION.md)**: Implementierung von Kubernetes NetworkPolicies für Zero-Trust Sicherheit.
+3. **[Kubernetes Setup Script & Key Security](PROTOCOL_PART_29_KUBERNETES_SETUP_SCRIPT.md)**: Erstellung eines automatisierten Setup-Skripts für K8s inkl. SOPS Key Management.
+4. **[Kubernetes Setup Fixes](PROTOCOL_PART_28_KUBERNETES_SETUP_FIXES.md)**: Vollständige K8s-Migration des docker-compose Setups inkl. Nginx/CORS Fixes.
+5. **[Secret Management Phase 1](PROTOCOL_PART_27_SECRET_MANAGEMENT_PHASE_1.md)**: Migration von Secrets zu SOPS-verschlüsselten Kubernetes Secrets mit age.
+6. **[System-Audit & Fehlerbehebung 2026](PROTOCOL_COMPREHENSIVE_SYSTEM_AUDIT_2026.md)**: Dokumentation des 100% Audits (Phasen 1-5), der Netzwerk-Fixes und der Test-Validierung.
+7. **[Infrastruktur & Startup-Stabilisierung](PROTOCOL_INFRASTRUCTURE_&_STARTUP_STABILIZATION.md)**: Details zu Docker-Caching, Schema-Migrationen und Container-Abhängigkeiten.
+8. **[Core-Pipeline: Audio & KI](PROTOCOL_CORE_PIPELINE_AI_&_AUDIO.md)**: Umfassende Dokumentation der Recording-Architektur, S3-Streaming, Whisper/Mistral-Integration und PDF-Export.
+9. **[N8N-Automatisierung & Kommunikation](PROTOCOL_N8N_AUTOMATION_&_SMTP_FIXES.md)**: Konfiguration der Workflow-Engine, SMTP-Migration und Webhook-Härtung.
+10. **[Security-Härtung & UI-Optimierung](PROTOCOL_SECURITY_UI_&_QA.md)**: ISO 27001 Compliance, sicherer Logout, Audit-Logging und rollenbasierte Dashboards.
 
 ## Letzte Änderungen (08.03.2026) - FRONTEND CI/CD FIXES
 

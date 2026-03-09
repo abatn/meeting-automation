@@ -1,0 +1,151 @@
+# Network Policies for Meeting Automation (ISO 27001 Compliance)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: meeting-automation
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+---
+# Postgres: Only allow Backend and n8n
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: n8n
+    - podSelector:
+        matchLabels:
+          app: celery-worker
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# Redis: Only allow Backend and Celery
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: celery-worker
+    - podSelector:
+        matchLabels:
+          app: celery-beat
+    ports:
+    - protocol: TCP
+      port: 6379
+---
+# RabbitMQ: Only allow Backend and Celery
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rabbitmq-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: celery-worker
+    - podSelector:
+        matchLabels:
+          app: celery-beat
+    ports:
+    - protocol: TCP
+      port: 5672
+    - protocol: TCP
+      port: 15672
+---
+# MinIO: Only allow Backend, Celery and Frontend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: celery-worker
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 9000
+    - protocol: TCP
+      port: 9001
+---
+# Backend: Only allow Frontend and Ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# Frontend: Allow from everywhere (via Ingress/LoadBalancer)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 80

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-nginx-config
+  namespace: meeting-automation
+data:
+  default.conf: |
+    server {
+      listen 80;
+      server_name localhost;
+
+      root /usr/share/nginx/html;
+      index index.html index.htm;
+
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+
+      location /api/ {
+        # In Kubernetes, the internal DNS is at kube-dns.kube-system.svc.cluster.local
+        resolver kube-dns.kube-system.svc.cluster.local valid=10s;
+        set $backend_upstream http://backend.meeting-automation.svc.cluster.local:8000;
+        proxy_pass $backend_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+    }

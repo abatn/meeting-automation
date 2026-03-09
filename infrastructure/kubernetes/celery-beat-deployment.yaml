@@ -1,24 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend
+  name: celery-beat
   namespace: meeting-automation
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: backend
+      app: celery-beat
   template:
     metadata:
       labels:
-        app: backend
+        app: celery-beat
     spec:
       containers:
-      - name: backend
+      - name: celery-beat
         image: meeting-automation-backend:latest
         imagePullPolicy: Never
-        ports:
-        - containerPort: 8000
+        command: ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info"]
+        env:
+        - name: PYTHONPATH
+          value: "/app"
         envFrom:
         - secretRef:
             name: backend-secrets

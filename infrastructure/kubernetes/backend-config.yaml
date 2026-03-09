@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: meeting-automation
+data:
+  DEBUG: "true"
+  PROJECT_NAME: "Meeting Automation"
+  VERSION: "1.0.0"
+  ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  S3_ENDPOINT: "http://minio:9000"
+  S3_BUCKET_NAME: "meeting-recordings"
+  SMTP_HOST: "smtp.sendgrid.net"
+  SMTP_PORT: "587"
+  SMTP_USER: "apikey"
+  EMAIL_FROM: "noreply@example.com"
+  WHATSAPP_API_URL: "https://graph.facebook.com/v18.0"
+  WHATSAPP_PHONE_ID: "your-phone-id"
+  N8N_WEBHOOK_URL: "http://n8n:5678/webhook"
+  CORS_ORIGINS: '["http://localhost:3000","http://localhost:5173","http://127.0.0.1:3000"]'

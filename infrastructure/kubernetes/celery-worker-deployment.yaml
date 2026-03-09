@@ -1,24 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend
+  name: celery-worker
   namespace: meeting-automation
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: backend
+      app: celery-worker
   template:
     metadata:
       labels:
-        app: backend
+        app: celery-worker
     spec:
       containers:
-      - name: backend
+      - name: celery-worker
         image: meeting-automation-backend:latest
         imagePullPolicy: Never
-        ports:
-        - containerPort: 8000
+        command: ["bash", "-c", "echo 'Waiting 10s for RabbitMQ...' && sleep 10 && celery -A app.tasks.celery_app worker --loglevel=info"]
+        env:
+        - name: PYTHONPATH
+          value: "/app"
         envFrom:
         - secretRef:
             name: backend-secrets
