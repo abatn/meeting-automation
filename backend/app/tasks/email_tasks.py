@@ -24,12 +24,17 @@ async def _send_reminder_via_n8n(payload: dict):
 
 @celery_app.task(name="send_reminder_via_n8n")
 def send_reminder_via_n8n(payload: dict):
+    """Celery task wrapper for the async n8n call"""
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    return loop.run_until_complete(_send_reminder_via_n8n(payload))
+
+    if not loop.is_running():
+        loop.run_until_complete(_send_reminder_via_n8n(payload))
+    else:
+        asyncio.ensure_future(_send_reminder_via_n8n(payload), loop=loop)
 
 
 async def _daily_reminder_task():
@@ -66,9 +71,14 @@ async def _daily_reminder_task():
 
 @celery_app.task(name="daily_reminder_task")
 def daily_reminder_task():
+    """Celery task wrapper for the async cron job"""
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    return loop.run_until_complete(_daily_reminder_task())
+
+    if not loop.is_running():
+        loop.run_until_complete(_daily_reminder_task())
+    else:
+        asyncio.ensure_future(_daily_reminder_task(), loop=loop)

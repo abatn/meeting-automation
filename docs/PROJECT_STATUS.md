@@ -28,10 +28,17 @@
 - [x] **Sicherer Logout (Redis Blacklist)**: Vollständige Implementierung und Verifizierung des sicheren Logout-Prozesses, einschließlich clientseitiger Token-Entfernung und serverseitiger Token-Invalidierung via Redis-Blacklist. Das Frontend zeigt den Logout-Button nun korrekt an und der gesamte Login/Logout-Fluss ist stabil.
 
 
-## Offene Punkte & Produktions-Checkliste
-- [ ] **JWT Laufzeit Härtung**: `ACCESS_TOKEN_EXPIRE_MINUTES` in `backend/app/core/config.py` von 1440 (24h) wieder auf 30-60 Minuten reduzieren.
-- [ ] **API-Key Validierung**: Sicherstellen, dass alle Cloud-API Keys (OpenAI, Mistral) in der finalen Umgebung sicher über Secrets (nicht nur `.env`) verwaltet werden.
-- [ ] **n8n Workflow-Härtung**: Finale Prüfung der SMTP-Zugangsdaten für den Mailversand in der Produktionsumgebung.
+## Priorisierte Roadmap für Produktion (Security & ISO 27001)
+
+Basierend auf dem jüngsten Security-Audit (ISO 27001:2022) wurden folgende Architektur-Erweiterungen für den Produktionsbetrieb definiert:
+
+- [ ] **Sofort (Phase 1)**: Secret Management. Migration aller Credentials (DB, API-Keys) aus der lokalen `.env`-Datei in einen sicheren Speicher (z.B. HashiCorp Vault oder Kubernetes Secrets mit SOPS).
+- [ ] **Kurzfristig**: Netzwerksegmentierung. Isolierung von Datenbank, Redis und Message Broker in strikt getrennten Kubernetes Namespaces mittels NetworkPolicies.
+- [ ] **Parallel**: API Gateway & Rate Limiting. Einsatz von Traefik, Kong oder Cloudflare (WAF) vor Nginx zur Abwehr von DDoS, Bot-Management und Zero-Trust Access.
+- [ ] **Vor Go-Live**: 
+    - Session Management: Implementierung von Session-Fixation Protection und automatischer Terminierung bei Inaktivität.
+    - SSL/TLS: Verschlüsselung für jeglichen Traffic (auch intern via mTLS).
+    - JWT-Härtung: Reduzierung der `ACCESS_TOKEN_EXPIRE_MINUTES` von 1440 (24h) auf 30-60 Minuten.
 
 
 ## Historie & Protokolle

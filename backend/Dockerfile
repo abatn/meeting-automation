@@ -9,6 +9,7 @@ COPY requirements.txt .
 # Install setuptools/wheel first to ensure PEP 517 builds work for complex dependencies
 RUN pip install --no-cache-dir setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
+RUN mkdir -p /tmp/recordings
 COPY . .
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

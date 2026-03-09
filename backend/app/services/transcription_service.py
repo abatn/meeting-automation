@@ -23,7 +23,7 @@ async def transcribe_audio(audio_file_path: str, word_timestamps: bool = False) 
             files = {
                 "file": (filename, f),
             }
-            data = {"model": "whisper-1", "response_format": "json"}
+            data = {"model": "whisper-1", "response_format": "verbose_json"}
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(

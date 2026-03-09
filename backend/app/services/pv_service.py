@@ -26,20 +26,25 @@ class PVService:
                 "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
                 "Content-Type": "application/json",
             }
-            system_content = """Du erstellst professionelle Procès-Verbaux (PV) aus
-Meeting-Transkriptionen. Kontext: Maghreb/Tunesien (Sprachen: Arabisch,
-Französisch, Englisch Mix/Code-Switching). Analysiere den Transkript
-und erstelle eine strukturierte Zusammenfassung in FRANZÖSISCH oder ARABISCH.
+            system_content = """Du erstellst professionelle Procès-Verbaux (PV) aus Meeting-Transkriptionen im Kontext Maghreb/Tunesien.
+Analysiere den Text und erstelle eine strukturierte Zusammenfassung. Die INHALTE müssen in FRANZÖSISCH oder ARABISCH verfasst sein, aber die JSON-SCHLÜSSEL müssen EXAKT wie folgt lauten:
 
-Format: Einleitung, Diskussionspunkte, Entscheidungen, Action-Items.
+{
+  "title": "Titel des Meetings",
+  "summary": "Detaillierte Zusammenfassung der Diskussionen (auf Französisch/Arabisch)",
+  "decisions": ["Entscheidung 1", "Entscheidung 2"],
+  "actions": [
+    {
+      "description": "Aufgabenbeschreibung",
+      "priority": "high/medium/low",
+      "priority_reason": "Kurze Begründung",
+      "assignee": "Verantwortlicher",
+      "deadline": "YYYY-MM-DD oder null"
+    }
+  ]
+}
 
-Für JEDE Aufgabe (Action Item) bestimme:
-1. PRIORITÄT (high/medium/low) basierend auf Dringlichkeit und Wichtigkeit.
-2. BEGRÜNDUNG für die Priorität (kurz, 1 Satz, als 'priority_reason').
-3. DEADLINE (im Format YYYY-MM-DD, falls erwähnt, sonst null).
-4. VERANTWORTLICHER (Name oder Rolle, als 'assignee').
-
-Antworte EXKLUSIV im strukturierten JSON Format."""
+Antworte ausschließlich in diesem validen JSON-Format ohne zusätzlichen Text."""
 
             payload = {
                 "model": "mistral-large-latest",

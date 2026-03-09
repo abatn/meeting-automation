@@ -4,19 +4,20 @@ import logging
 import os
 import tempfile
 import uuid
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import boto3
 import httpx
 import redis
 from botocore.exceptions import ClientError
-from sqlalchemy import select
+from sqlalchemy import select, insert, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.models.action import Action
-from app.models.pv import PV
+from app.models.pv import PV, Section
 from app.models.recording import Recording
 from app.models.transcription import Transcription
 from app.services.diarization_service import DiarizationService
@@ -28,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 def get_redis_client() -> redis.Redis:
-    # This ensures a new connection is created if one doesn't exist in the context
     client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
     return client  # type: ignore
 
@@ -128,8 +128,9 @@ async def _process_recording_pipeline(recording_id: str) -> None:
 
         except Exception as e:
             logger.error(f"Error in transcription pipeline: {e}")
-            recording.status = "failed"
-            await db.commit()
+            if recording:
+                recording.status = "failed"
+                await db.commit()
             publish_status(recording_id, "failed", 0, f"Error: {str(e)}")
         finally:
             if temp_path and os.path.exists(temp_path):
@@ -165,10 +166,11 @@ async def _handle_ai_results(
 
     matched = match_timestamps(trans_res.get("words", []), speaker_segments)
     mistral_text = (
-        "\\n".join(f"{b['speaker']}: {b['text']}" for b in matched)
+        "\n".join([f"{b['speaker']}: {b['text']}" for b in matched])
         if matched
         else trans_res.get("text", "")
     )
+    logger.info(f"Text sent to Mistral (first 500 chars): {mistral_text[:500]}")
 
     db_trans = Transcription(
         id=str(uuid.uuid4()),
@@ -192,26 +194,61 @@ async def _save_pv_and_actions(
     db: AsyncSession, recording: Recording, pv_data: Dict[str, Any]
 ) -> None:
     summary = pv_data.get("summary", "")
-    decisions = "<br/>".join([f"- {d}" for d in pv_data.get("decisions", [])])
-    html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><p>{decisions}</p>"
+    decisions_list = pv_data.get("decisions", [])
+    decisions_html = "<br/>".join([f"- {d}" for d in decisions_list])
+    html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><p>{decisions_html}</p>"
 
     existing_pv_res = await db.execute(
         select(PV).where(PV.meeting_id == recording.meeting_id)
     )
     existing_pv = existing_pv_res.scalar_one_or_none()
 
+    pv_id = None
     if existing_pv:
-        existing_pv.title = pv_data.get("title", "Meeting PV")
-        existing_pv.content_html = html
-    else:
-        db_pv = PV(
-            id=str(uuid.uuid4()),
-            meeting_id=str(recording.meeting_id),
-            title=pv_data.get("title", "Meeting PV"),
-            content_html=html,
-            status="draft",
+        pv_id = existing_pv.id
+        await db.execute(
+            update(PV)
+            .where(PV.id == pv_id)
+            .values(
+                title=pv_data.get("title", "Meeting PV"),
+                content_html=html,
+                updated_at=datetime.utcnow()
+            )
         )
-        db.add(db_pv)
+        # Clear existing sections to avoid duplicates on re-run
+        await db.execute(delete(Section).where(Section.pv_id == pv_id))
+    else:
+        pv_id = str(uuid.uuid4())
+        await db.execute(
+            insert(PV).values(
+                id=pv_id,
+                meeting_id=str(recording.meeting_id),
+                title=pv_data.get("title", "Meeting PV"),
+                content_html=html,
+                status="draft"
+            )
+        )
+
+    # Save summary as a section for the PDF
+    db.add(Section(
+        id=str(uuid.uuid4()),
+        pv_id=pv_id,
+        title="Summary",
+        content=summary,
+        type="discussion",
+        order=0
+    ))
+
+    # Save decisions as individual sections for PDF generation
+    for idx, decision in enumerate(decisions_list):
+        db.add(Section(
+            id=str(uuid.uuid4()),
+            pv_id=pv_id,
+            title=f"Decision {idx+1}",
+            content=decision,
+            type="decision",
+            order=idx + 1
+        ))
 
     for action_item in pv_data.get("actions", []):
         db.add(
@@ -223,6 +260,8 @@ async def _save_pv_and_actions(
                 status="pending",
             )
         )
+    
+    await db.flush()
 
 
 async def _notify_n8n_completion(recording_id: str, meeting_id: str) -> None:
@@ -243,4 +282,13 @@ async def _notify_n8n_completion(recording_id: str, meeting_id: str) -> None:
 @celery_app.task(name="process_recording")
 def process_recording(recording_id: str) -> None:
     """Celery task wrapper for the async pipeline"""
-    asyncio.run(_process_recording_pipeline(recording_id))
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if not loop.is_running():
+        loop.run_until_complete(_process_recording_pipeline(recording_id))
+    else:
+        asyncio.ensure_future(_process_recording_pipeline(recording_id), loop=loop)
