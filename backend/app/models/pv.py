@@ -50,7 +50,35 @@ class PV(Base):
     sections: Mapped[List["Section"]] = relationship(
         "Section", back_populates="pv", cascade="all, delete-orphan"
     )
+    versions: Mapped[List["PVVersion"]] = relationship(
+        "PVVersion", back_populates="pv", cascade="all, delete-orphan"
+    )
     validated_by: Mapped[Optional["User"]] = relationship("User")
+
+
+class PVVersion(Base):
+    __tablename__ = "pv_versions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    pv_id: Mapped[str] = mapped_column(
+        String, ForeignKey("pvs.id", ondelete="CASCADE"), nullable=False
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    
+    # Stores a serialized JSON snapshot of the PV and its Sections
+    snapshot_data: Mapped[str] = mapped_column(EncryptedText, nullable=False)
+    change_summary: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    created_by_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("users.id"), nullable=True
+    )
+
+    # Relationships
+    pv: Mapped["PV"] = relationship("PV", back_populates="versions")
+    created_by: Mapped[Optional["User"]] = relationship("User")
 
 
 class Section(Base):

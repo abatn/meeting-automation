@@ -45,8 +45,23 @@ Beginne mit "Sofort (Phase 1)" der folgenden ISO 27001 Roadmap:
     - JWT-Härtung (Token-Laufzeit auf 30 Min reduziert).
     - Erweitertes Session Management (Auto-Timeout nach 15 Min Inaktivität).
 
-## 6. Zukünftige Entwicklungsziele (Post-Go-Live)
-*(Hier können neue Features definiert werden, da die ISO 27001 Security Roadmap erfolgreich abgeschlossen wurde.)*
+## 6. Zukünftige Entwicklungsziele (Phase 2: Feature Expansion)
+Da die ISO 27001 Security Roadmap erfolgreich abgeschlossen wurde, konzentriert sich die nächste Phase auf folgende funktionale Erweiterungen:
+
+1. **Action Suggestions (ML-basiert):**
+   - Endpunkte für wiederkehrende Aktionsvorschläge und ML-Lernzyklen.
+2. **Speaker Attribution (Diarization):**
+   - Integration der Sprecherzuordnung in Whisper/Deepgram und im Transkript-Response.
+3. **PV Versioning:**
+   - ISO 27001-konforme Versionierung der Protokolle inklusive Wiederherstellung (Restore).
+4. **Custom Branding für Exporte:**
+   - Konfigurierbare Logos, Wasserzeichen und Kopf-/Fußzeilen für PDF/Excel-Exporte.
+5. **Action History / Patterns:**
+   - Analysen zu wiederkehrenden Aufgaben und Teilnehmer-Statistiken.
+6. **Multilingual Export:**
+   - Mehrsprachige PDF/Excel-Ausgabe (AR, FR, EN) unter Berücksichtigung von RTL-Layouts.
+
+*(ISO 27001 Audit-Logging für alle neuen Endpunkte ist obligatorisch!)*
 
 ## 6. Arbeitsregeln für den Agenten
 *   Prüfe immer zuerst `docs/PROJECT_STATUS.md`.

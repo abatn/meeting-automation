@@ -51,3 +51,24 @@ class PV(PVBase):
 
     class Config:
         from_attributes = True
+
+
+class PVVersionBase(BaseModel):
+    pv_id: str
+    version_number: int
+    change_summary: Optional[str] = None
+
+
+class PVVersionCreate(PVVersionBase):
+    snapshot_data: str
+
+
+class PVVersion(PVVersionBase):
+    id: str
+    snapshot_data: str
+    created_at: datetime
+    created_by_id: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+

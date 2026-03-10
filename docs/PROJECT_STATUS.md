@@ -41,6 +41,29 @@ Basierend auf dem jüngsten Security-Audit (ISO 27001:2022) wurden folgende Arch
     - JWT-Härtung: Reduzierung der `ACCESS_TOKEN_EXPIRE_MINUTES` von 1440 (24h) auf 30 Minuten.
     - [x] SSL/TLS: Verschlüsselung für jeglichen Traffic (auch intern via HTTPS/TLS).
 
+## Roadmap für Phase 2 (Feature Expansion)
+
+Nach dem erfolgreichen Abschluss der ISO 27001 Security Roadmap fokussiert sich die nächste Entwicklungsphase auf fehlende Funktionen und Endpunkte laut Projektzielen (Objectifs).
+
+- [ ] **1. Action Suggestions (ML-basiert)**:
+  - `GET /api/v1/actions/suggestions/{meeting_id}`: Vorschläge für wiederkehrende Aktionen.
+  - `POST /api/v1/actions/suggestions/learn`: Endpoint für ML-Lernzyklen.
+- [ ] **2. Speaker Attribution**:
+  - `POST /api/v1/transcriptions/initiate`: Neuer Parameter `enable_speaker_diarization: boolean`.
+  - `GET /api/v1/transcriptions/{transcription_id}`: Ausgabe der Speaker-Segmente.
+- [x] **3. PV Versioning (mit ISO Audit)**:
+  - `GET /api/v1/pv/{pv_id}/versions`: Auflistung aller Versionen.
+  - `GET /api/v1/pv/{pv_id}/versions/{version_id}`: Abruf einer spezifischen Version.
+  - `POST /api/v1/pv/{pv_id}/restore/{version_id}`: Wiederherstellung einer spezifischen Version.
+  - `PUT /api/v1/pv/{pv_id}`: ISO 27001-konforme Bearbeitung und Snapshot-Erstellung.
+- [ ] **4. Custom Branding (Exporte)**:
+  - `POST` / `GET /api/v1/settings/branding`: Konfiguration von Logos, Wasserzeichen und Headern.
+  - `GET /api/v1/reports/export`: Neue Parameter `branding_id` und `watermark`.
+- [ ] **5. Action History / Patterns**:
+  - `GET /api/v1/actions/patterns` & `GET /api/v1/actions/statistics/recurring`: Analysen und Statistiken.
+- [ ] **6. Multilingual Export**:
+  - `GET /api/v1/reports/export`: Neuer Parameter `language` (fr/ar/en) für lokalisierte PDF/Excel Dateien (RTL Support).
+
 
 ## Historie & Protokolle
 
