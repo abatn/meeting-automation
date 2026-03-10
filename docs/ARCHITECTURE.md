@@ -10,16 +10,66 @@ The system is composed of several loosely coupled services that communicate prim
 
 ```mermaid
 graph TD
-    User(Web/Mobile User) --> Frontend
-    Frontend -- REST API --> Backend
-    Backend -- Messaging (RabbitMQ) --> CeleryWorkers
-    Backend -- REST API --> AIServices(AI Services)
-    Backend -- Webhooks --> n8n(n8n Workflows)
-    Backend -- S3 --> Minio(Object Storage)
-    CeleryWorkers -- DB Operations --> PostgreSQL(Database)
-    CeleryWorkers -- Cache/Broker --> Redis
-    n8n -- APIs --> ExternalServices(WhatsApp, Email, etc.)
-    AIServices -- Models --> AIModels(AI Models)
+    %% Styling Definitions
+    classDef frontend fill:#61dafb,stroke:#333,stroke-width:2px,color:#000
+    classDef backend fill:#4584b6,stroke:#333,stroke-width:2px,color:#fff
+    classDef storage fill:#ff9900,stroke:#333,stroke-width:2px,color:#000
+    classDef queue fill:#ff6600,stroke:#333,stroke-width:2px,color:#fff
+    classDef external fill:#2ea44f,stroke:#333,stroke-width:2px,color:#fff
+    classDef n8n fill:#ea4b5e,stroke:#333,stroke-width:2px,color:#fff
+
+    %% Components
+    User((User / Browser))
+    
+    subgraph "Frontend (React)"
+        UI[Frontend App]:::frontend
+    end
+
+    subgraph "Core (FastAPI)"
+        API[Backend API]:::backend
+    end
+
+    subgraph "Databases & Storage"
+        DB[(PostgreSQL)]:::storage
+        S3[(MinIO Object Storage)]:::storage
+        Cache[(Redis)]:::storage
+    end
+
+    subgraph "Async Pipeline"
+        Broker[[RabbitMQ Broker]]:::queue
+        Worker[Celery Worker]:::backend
+    end
+
+    subgraph "AI Services"
+        Deepgram[Deepgram Nova-2]:::external
+        Mistral[Mistral AI]:::external
+    end
+
+    subgraph "Automation (n8n)"
+        N8N[n8n Hub]:::n8n
+        Email[Email / WhatsApp]:::external
+    end
+
+    %% Connections
+    User <--> UI
+    UI <--> API
+    
+    API <--> DB
+    API <--> S3
+    API <--> Cache
+    
+    API -- "Task" --> Broker
+    Broker -- "Job" --> Worker
+    
+    Worker <--> S3
+    Worker <--> DB
+    
+    Worker -- "Audio -> Text" --> Deepgram
+    Worker -- "Text -> PV" --> Mistral
+    
+    API -- "Webhook" --> N8N
+    Worker -- "Webhook" --> N8N
+    N8N --> Email
 ```
 
 ## 3. Component Breakdown
