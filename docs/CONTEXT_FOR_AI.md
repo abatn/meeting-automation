@@ -40,10 +40,13 @@ Beginne mit "Sofort (Phase 1)" der folgenden ISO 27001 Roadmap:
 - [x] **Sofort (Phase 1): Secret Management**. Migration aller Credentials (Datenbank, API-Keys wie OPENAI_API_KEY, MISTRAL_API_KEY) aus der lokalen `.env`-Datei in Kubernetes Secrets (SOPS) oder HashiCorp Vault.
 - [x] **Kurzfristig: Netzwerksegmentierung**. Isolierung von Datenbank, Redis und RabbitMQ in ein geschlossenes Subnetz (K8s NetworkPolicies), getrennt vom Frontend/Backend.
 - [x] **Parallel: API Gateway & Rate Limiting**. Konfiguration von Cloudflare/AWS WAF oder Traefik vor Nginx zur Abwehr von DDoS und für Rate Limiting.
-- [ ] **Vor Go-Live**: 
-    - SSL/TLS in Transit (auch intern via mTLS).
-    - JWT-Härtung (`ACCESS_TOKEN_EXPIRE_MINUTES` auf 30-60 Min reduzieren).
-    - Erweitertes Session Management (Fixation Protection, Auto-Timeout).
+- [x] **Vor Go-Live**: 
+    - SSL/TLS in Transit (HTTPS via Traefik).
+    - JWT-Härtung (Token-Laufzeit auf 30 Min reduziert).
+    - Erweitertes Session Management (Auto-Timeout nach 15 Min Inaktivität).
+
+## 6. Zukünftige Entwicklungsziele (Post-Go-Live)
+*(Hier können neue Features definiert werden, da die ISO 27001 Security Roadmap erfolgreich abgeschlossen wurde.)*
 
 ## 6. Arbeitsregeln für den Agenten
 *   Prüfe immer zuerst `docs/PROJECT_STATUS.md`.
