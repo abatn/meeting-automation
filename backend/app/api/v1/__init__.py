@@ -9,6 +9,7 @@ from . import (
     actions,
     reports,
     websockets,
+    settings,
 )
 
 router = APIRouter()
@@ -22,3 +23,4 @@ router.include_router(pv.router, prefix="/pv", tags=["Procès-Verbaux"])
 router.include_router(actions.router, prefix="/actions", tags=["Actions"])
 router.include_router(reports.router, prefix="/reports", tags=["Reports"])
 router.include_router(websockets.router, prefix="/websockets", tags=["WebSockets"])
+router.include_router(settings.router, prefix="/settings", tags=["Settings"])

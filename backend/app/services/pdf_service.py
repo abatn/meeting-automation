@@ -23,6 +23,7 @@ from app.core.config import settings
 from app.models.pv import PV
 from app.models.meeting import Meeting
 from app.models.action import Action
+from app.models.setting import BrandingSettings
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ class PDFService:
         )
         self.bucket_name = getattr(settings, "S3_BUCKET_NAME", "meeting-pdfs")
 
-    async def generate_pv_pdf(self, pv_id: str) -> str:
+    async def generate_pv_pdf(self, pv_id: str, branding_id: Optional[str] = None, watermark: Optional[bool] = None) -> str:
         """Hauptmethode: Generiert PDF und gibt Dateipfad zurück"""
         # 1. Daten aus DB laden (Echt-Daten)
         stmt = (
@@ -73,6 +74,22 @@ class PDFService:
         action_stmt = select(Action).where(Action.meeting_id == pv_obj.meeting_id)
         action_result = await self.db.execute(action_stmt)
         actions = action_result.scalars().all()
+        
+        # Load Branding Settings
+        branding_stmt = select(BrandingSettings).where(BrandingSettings.is_active == True)
+        if branding_id:
+            branding_stmt = select(BrandingSettings).where(BrandingSettings.id == branding_id)
+            
+        b_result = await self.db.execute(branding_stmt)
+        branding_obj = b_result.scalars().first()
+        
+        branding_data = {
+            "organization_name": branding_obj.organization_name if branding_obj else "",
+            "logo_url": branding_obj.logo_url if branding_obj else "",
+            "header_text": branding_obj.header_text if branding_obj else "",
+            "footer_text": branding_obj.footer_text if branding_obj else "",
+            "show_watermark": watermark if watermark is not None else (branding_obj.default_watermark if branding_obj else False)
+        }
 
         # 2. Template-Daten aufbereiten
         start_time = pv_obj.meeting.start_time
@@ -111,7 +128,7 @@ class PDFService:
         # 3. HTML rendern
         try:
             template = self.template_env.get_template("pv_template.html")
-            html_content = template.render(pv=pv_data)
+            html_content = template.render(pv=pv_data, branding=branding_data)
         except Exception as e:
             logger.error(f"Error rendering template: {e}")
             raise HTTPException(status_code=500, detail="Could not render PDF template")

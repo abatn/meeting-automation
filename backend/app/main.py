@@ -17,6 +17,7 @@ from app.api.v1 import (
     reports,
     webhooks,
     websockets,
+    settings as settings_router,
 )
 from app.core.websocket import manager
 import asyncio
@@ -91,6 +92,7 @@ app.include_router(actions.router, prefix="/api/v1/actions", tags=["Actions"])
 app.include_router(reports.router, prefix="/api/v1/reports", tags=["Reports"])
 app.include_router(webhooks.router, prefix="/api/v1/webhooks", tags=["Webhooks"])
 app.include_router(websockets.router, prefix="/api/v1/websockets", tags=["WebSockets"])
+app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["Settings"])
 
 if __name__ == "__main__":
     import uvicorn

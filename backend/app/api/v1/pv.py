@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional
 import uuid
 import json
 from fastapi import APIRouter, Depends, HTTPException
@@ -59,6 +59,8 @@ async def initiate_pv_generation(
 @router.get("/{pv_id}/pdf")
 async def download_pv_pdf(
     pv_id: str,
+    branding_id: Optional[str] = None,
+    watermark: Optional[bool] = None,
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
@@ -67,7 +69,11 @@ async def download_pv_pdf(
     """
     try:
         pdf_service = PDFService(db)
-        pdf_path = await pdf_service.generate_pv_pdf(pv_id)
+        pdf_path = await pdf_service.generate_pv_pdf(
+            pv_id=pv_id, 
+            branding_id=branding_id, 
+            watermark=watermark
+        )
 
         return FileResponse(
             path=pdf_path,

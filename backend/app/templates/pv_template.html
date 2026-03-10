@@ -83,11 +83,24 @@
             content: "صفحة " counter(page);
         }
         
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            opacity: 0.1;
+            font-size: 150px;
+            color: #1a237e;
+            z-index: -100;
+            pointer-events: none;
+            font-weight: bold;
+        }
+
         @page {
             size: A4;
             margin: 2cm;
             @bottom-center {
-                content: "محضر اجتماع تم إنشاؤه آلياً | Meeting Automation System";
+                content: "{{ branding.footer_text if branding and branding.footer_text else 'محضر اجتماع تم إنشاؤه آلياً | Meeting Automation System' }}";
                 font-family: 'Cairo', sans-serif;
                 font-size: 10px;
                 color: #888;
@@ -101,7 +114,19 @@
     </style>
 </head>
 <body>
+    {% if branding and branding.show_watermark %}
+    <div class="watermark">CONFIDENTIEL</div>
+    {% endif %}
+
     <div class="header">
+        {% if branding and branding.logo_url %}
+        <img src="{{ branding.logo_url }}" class="logo" alt="Logo">
+        {% endif %}
+        
+        {% if branding and branding.header_text %}
+        <div style="margin-bottom: 10px; color: #555;">{{ branding.header_text }}</div>
+        {% endif %}
+        
         <h1>محضر اجتماع</h1>
         <h2>{{ pv.title }}</h2>
     </div>

@@ -56,7 +56,7 @@ Nach dem erfolgreichen Abschluss der ISO 27001 Security Roadmap fokussiert sich 
   - `GET /api/v1/pv/{pv_id}/versions/{version_id}`: Abruf einer spezifischen Version.
   - `POST /api/v1/pv/{pv_id}/restore/{version_id}`: Wiederherstellung einer spezifischen Version.
   - `PUT /api/v1/pv/{pv_id}`: ISO 27001-konforme Bearbeitung und Snapshot-Erstellung.
-- [ ] **4. Custom Branding (Exporte)**:
+- [x] **4. Custom Branding (Exporte)**:
   - `POST` / `GET /api/v1/settings/branding`: Konfiguration von Logos, Wasserzeichen und Headern.
   - `GET /api/v1/reports/export`: Neue Parameter `branding_id` und `watermark`.
 - [ ] **5. Action History / Patterns**:
