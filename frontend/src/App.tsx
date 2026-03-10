@@ -16,6 +16,7 @@ import MeetingRoom from "./components/meetings/MeetingRoom";
 import ActionTracker from "./components/actions/ActionTracker";
 import MFASetup from "./components/auth/MFASetup";
 import ErrorBoundary from "./components/ErrorBoundary";
+import AutoLogout from "./components/auth/AutoLogout";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -58,109 +59,111 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <Box sx={{ minHeight: "100vh" }}>
-        <CssBaseline />
-        <Routes>
-          {/* Unauthenticated -> Show Login */}
-          <Route
-            path="/login"
-            element={
-              authState === "unauthenticated" ? (
-                <LoginForm />
-              ) : (
-                <Navigate to="/" replace />
-              )
-            }
-          />
+      <AutoLogout>
+        <Box sx={{ minHeight: "100vh" }}>
+          <CssBaseline />
+          <Routes>
+            {/* Unauthenticated -> Show Login */}
+            <Route
+              path="/login"
+              element={
+                authState === "unauthenticated" ? (
+                  <LoginForm />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
 
-          {/* Authenticated -> Base Dashboard Route */}
-          <Route
-            path="/"
-            element={
-              authState === "authenticated" && user ? (
-                <MainLayout>{getDashboard()}</MainLayout>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
+            {/* Authenticated -> Base Dashboard Route */}
+            <Route
+              path="/"
+              element={
+                authState === "authenticated" && user ? (
+                  <MainLayout>{getDashboard()}</MainLayout>
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
 
-          {/* Protected Feature Routes */}
-          <Route
-            path="/meetings"
-            element={
-              authState === "authenticated" && user ? (
-                <MainLayout>
-                  <MeetingPlanner />
-                </MainLayout>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
+            {/* Protected Feature Routes */}
+            <Route
+              path="/meetings"
+              element={
+                authState === "authenticated" && user ? (
+                  <MainLayout>
+                    <MeetingPlanner />
+                  </MainLayout>
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
 
-          {/* Live Meeting Room Test Route */}
-          <Route
-            path="/meetings/live/:id"
-            element={
-              authState === "authenticated" && user ? (
-                <MainLayout>
-                  <MeetingRoom />
-                </MainLayout>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
+            {/* Live Meeting Room Test Route */}
+            <Route
+              path="/meetings/live/:id"
+              element={
+                authState === "authenticated" && user ? (
+                  <MainLayout>
+                    <MeetingRoom />
+                  </MainLayout>
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
 
-          <Route
-            path="/actions"
-            element={
-              authState === "authenticated" && user ? (
-                <MainLayout>
-                  <ActionTracker />
-                </MainLayout>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
+            <Route
+              path="/actions"
+              element={
+                authState === "authenticated" && user ? (
+                  <MainLayout>
+                    <ActionTracker />
+                  </MainLayout>
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
 
-          <Route
-            path="/reports"
-            element={
-              authState === "authenticated" && user ? (
-                <MainLayout>
-                  <AnalyticalReports />
-                </MainLayout>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
+            <Route
+              path="/reports"
+              element={
+                authState === "authenticated" && user ? (
+                  <MainLayout>
+                    <AnalyticalReports />
+                  </MainLayout>
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
 
-          <Route
-            path="/settings"
-            element={
-              authState === "authenticated" && user ? (
-                <MainLayout>
-                  <Box sx={{ p: 3 }}>
-                    <MFASetup
-                      qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ExampleSecret"
-                      secret="JBSWY3DPEHPK3PXP"
-                    />
-                  </Box>
-                </MainLayout>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
+            <Route
+              path="/settings"
+              element={
+                authState === "authenticated" && user ? (
+                  <MainLayout>
+                    <Box sx={{ p: 3 }}>
+                      <MFASetup
+                        qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ExampleSecret"
+                        secret="JBSWY3DPEHPK3PXP"
+                      />
+                    </Box>
+                  </MainLayout>
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Box>
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Box>
+      </AutoLogout>
     </ErrorBoundary>
   );
 }

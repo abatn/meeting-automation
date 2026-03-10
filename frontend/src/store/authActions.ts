@@ -22,3 +22,15 @@ export const initializeAuth = () => async (dispatch: AppDispatch) => {
     dispatch(logout());
   }
 };
+
+export const performLogout = () => async (dispatch: AppDispatch) => {
+  try {
+    // Notify the backend to blacklist the token
+    await authService.logout();
+  } catch (error) {
+    console.error("Backend logout failed, proceeding with local logout", error);
+  } finally {
+    // Always clear local state
+    dispatch(logout());
+  }
+};

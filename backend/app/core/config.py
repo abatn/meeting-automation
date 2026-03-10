@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # Fixed secret key for development to prevent logout on every restart
     SECRET_KEY: str = "dev-secret-key-fix-2026-ensure-session-stability"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # Set back to 24h for dev
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30  # Production standard (30 mins)
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ENCRYPTION_KEY: bytes = b"12345678901234567890123456789012"
 

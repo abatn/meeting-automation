@@ -37,9 +37,9 @@ Das System ist stabil. Der nächste Fokus liegt auf der Vorbereitung für die Pr
 **STARTPUNKT FÜR NEUE SESSION:**
 Beginne mit "Sofort (Phase 1)" der folgenden ISO 27001 Roadmap:
 
-- [ ] **Sofort (Phase 1): Secret Management**. Migration aller Credentials (Datenbank, API-Keys wie OPENAI_API_KEY, MISTRAL_API_KEY) aus der lokalen `.env`-Datei in Kubernetes Secrets (SOPS) oder HashiCorp Vault.
-- [ ] **Kurzfristig: Netzwerksegmentierung**. Isolierung von Datenbank, Redis und RabbitMQ in ein geschlossenes Subnetz (K8s NetworkPolicies), getrennt vom Frontend/Backend.
-- [ ] **Parallel: API Gateway & Rate Limiting**. Konfiguration von Cloudflare/AWS WAF oder Traefik vor Nginx zur Abwehr von DDoS und für Rate Limiting.
+- [x] **Sofort (Phase 1): Secret Management**. Migration aller Credentials (Datenbank, API-Keys wie OPENAI_API_KEY, MISTRAL_API_KEY) aus der lokalen `.env`-Datei in Kubernetes Secrets (SOPS) oder HashiCorp Vault.
+- [x] **Kurzfristig: Netzwerksegmentierung**. Isolierung von Datenbank, Redis und RabbitMQ in ein geschlossenes Subnetz (K8s NetworkPolicies), getrennt vom Frontend/Backend.
+- [x] **Parallel: API Gateway & Rate Limiting**. Konfiguration von Cloudflare/AWS WAF oder Traefik vor Nginx zur Abwehr von DDoS und für Rate Limiting.
 - [ ] **Vor Go-Live**: 
     - SSL/TLS in Transit (auch intern via mTLS).
     - JWT-Härtung (`ACCESS_TOKEN_EXPIRE_MINUTES` auf 30-60 Min reduzieren).
