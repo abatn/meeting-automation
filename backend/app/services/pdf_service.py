@@ -52,8 +52,69 @@ class PDFService:
         )
         self.bucket_name = getattr(settings, "S3_BUCKET_NAME", "meeting-pdfs")
 
-    async def generate_pv_pdf(self, pv_id: str, branding_id: Optional[str] = None, watermark: Optional[bool] = None) -> str:
+    async def generate_pv_pdf(self, pv_id: str, branding_id: Optional[str] = None, watermark: Optional[bool] = None, language: str = "ar") -> str:
         """Hauptmethode: Generiert PDF und gibt Dateipfad zurück"""
+        
+        # 0. Load Localization Strings
+        LOCALES = {
+            "ar": {
+                "title": "محضر اجتماع",
+                "date": "التاريخ",
+                "location": "المكان",
+                "duration": "المدة (دقيقة)",
+                "participants": "المشاركون",
+                "agenda": "جدول الأعمال",
+                "discussion": "ملخص المناقشات",
+                "decisions": "القرارات",
+                "actions": "خطة العمل (Action Items)",
+                "task": "المهمة",
+                "assignee": "المسؤول",
+                "due_date": "الموعد النهائي",
+                "signature": "الاعتماد (التوقيع الإلكتروني)",
+                "director": "المدير العام (DG)",
+                "page": "صفحة",
+                "default_footer": "محضر اجتماع تم إنشاؤه آلياً | Meeting Automation System"
+            },
+            "fr": {
+                "title": "Procès-Verbal",
+                "date": "Date",
+                "location": "Lieu",
+                "duration": "Durée (min)",
+                "participants": "Participants",
+                "agenda": "Ordre du Jour",
+                "discussion": "Résumé des Discussions",
+                "decisions": "Décisions",
+                "actions": "Plan d'Action",
+                "task": "Tâche",
+                "assignee": "Responsable",
+                "due_date": "Échéance",
+                "signature": "Approbation (Signature)",
+                "director": "Directeur Général (DG)",
+                "page": "Page",
+                "default_footer": "Procès-verbal généré automatiquement | Meeting Automation System"
+            },
+            "en": {
+                "title": "Meeting Minutes",
+                "date": "Date",
+                "location": "Location",
+                "duration": "Duration (min)",
+                "participants": "Participants",
+                "agenda": "Agenda",
+                "discussion": "Discussion Summary",
+                "decisions": "Decisions",
+                "actions": "Action Items",
+                "task": "Task",
+                "assignee": "Assignee",
+                "due_date": "Due Date",
+                "signature": "Approval (Signature)",
+                "director": "General Manager (DG)",
+                "page": "Page",
+                "default_footer": "Automatically generated minutes | Meeting Automation System"
+            }
+        }
+        
+        strings = LOCALES.get(language, LOCALES["ar"])
+        
         # 1. Daten aus DB laden (Echt-Daten)
         stmt = (
             select(PV)
@@ -128,7 +189,7 @@ class PDFService:
         # 3. HTML rendern
         try:
             template = self.template_env.get_template("pv_template.html")
-            html_content = template.render(pv=pv_data, branding=branding_data)
+            html_content = template.render(pv=pv_data, branding=branding_data, strings=strings, language=language)
         except Exception as e:
             logger.error(f"Error rendering template: {e}")
             raise HTTPException(status_code=500, detail="Could not render PDF template")

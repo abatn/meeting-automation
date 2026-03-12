@@ -13,6 +13,7 @@ from app.models.pv import PV as PVModel, PVVersion as PVVersionModel
 from app.models.action import Action as ActionModel
 from app.services.pv_service import PVService
 from app.services.pdf_service import PDFService
+from app.services.docx_service import DOCXService
 from app.schemas.pv import PVUpdate, PVVersion as PVVersionSchema
 
 router = APIRouter()
@@ -61,24 +62,54 @@ async def download_pv_pdf(
     pv_id: str,
     branding_id: Optional[str] = None,
     watermark: Optional[bool] = None,
+    language: Optional[str] = "ar",
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
     Generates and downloads the PV as a PDF.
+    Supports multilingual output via the 'language' parameter (ar, fr, en).
     """
     try:
         pdf_service = PDFService(db)
         pdf_path = await pdf_service.generate_pv_pdf(
             pv_id=pv_id, 
             branding_id=branding_id, 
-            watermark=watermark
+            watermark=watermark,
+            language=language
         )
 
         return FileResponse(
             path=pdf_path,
             filename=f"meeting_minutes_{pv_id}.pdf",
             media_type="application/pdf",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{pv_id}/docx")
+async def download_pv_docx(
+    pv_id: str,
+    language: Optional[str] = "ar",
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Generates and downloads the PV as a Word document (DOCX).
+    Supports multilingual output via the 'language' parameter (ar, fr, en).
+    """
+    try:
+        docx_service = DOCXService(db)
+        docx_path = await docx_service.generate_pv_docx(
+            pv_id=pv_id, 
+            language=language
+        )
+
+        return FileResponse(
+            path=docx_path,
+            filename=f"meeting_minutes_{pv_id}.docx",
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
