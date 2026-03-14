@@ -59,7 +59,8 @@ Da die ISO 27001 Security Roadmap erfolgreich abgeschlossen wurde, konzentriert 
 5. **Action History / Patterns:**
    - Analysen zu wiederkehrenden Aufgaben und Teilnehmer-Statistiken.
 6. **Multilingual Export:**
-   - Mehrsprachige PDF/Excel-Ausgabe (AR, FR, EN) unter Berücksichtigung von RTL-Layouts.
+   - Mehrsprachige PDF/Word-Ausgabe (AR, FR, EN) unter Berücksichtigung von RTL-Layouts.
+   - **WICHTIG**: Dies beinhaltet die On-the-fly-Übersetzung des Protokoll-Inhalts (Summary/Actions) durch Mistral AI, falls die Zielsprache von der gespeicherten Sprache abweicht.
 
 *(ISO 27001 Audit-Logging für alle neuen Endpunkte ist obligatorisch!)*
 

@@ -177,21 +177,25 @@ async def _handle_ai_results(
         recording_id=str(recording.id),
         meeting_id=str(recording.meeting_id),
         full_text=trans_res.get("text", ""),
-        language="de",
+        language=trans_res.get("language", "auto"),
         segments=matched or None,
     )
     db.add(db_trans)
     recording.status = "analyzing"
     await db.commit()
 
-    pv_data = await PVService.generate_pv(mistral_text)
-    await _save_pv_and_actions(db, recording, pv_data)
+    # Use the detected or requested language for PV generation
+    target_lang = trans_res.get("language", "fr")
+    if target_lang == "auto": target_lang = "fr"
+    
+    pv_data = await PVService.generate_pv(mistral_text, target_language=target_lang)
+    await _save_pv_and_actions(db, recording, pv_data, language=target_lang)
     recording.status = "completed"
     await db.commit()
 
 
 async def _save_pv_and_actions(
-    db: AsyncSession, recording: Recording, pv_data: Dict[str, Any]
+    db: AsyncSession, recording: Recording, pv_data: Dict[str, Any], language: str = "fr"
 ) -> None:
     summary = pv_data.get("summary", "")
     decisions_list = pv_data.get("decisions", [])
@@ -212,6 +216,7 @@ async def _save_pv_and_actions(
             .values(
                 title=pv_data.get("title", "Meeting PV"),
                 content_html=html,
+                language=language,
                 updated_at=datetime.utcnow()
             )
         )
@@ -225,6 +230,7 @@ async def _save_pv_and_actions(
                 meeting_id=str(recording.meeting_id),
                 title=pv_data.get("title", "Meeting PV"),
                 content_html=html,
+                language=language,
                 status="draft"
             )
         )

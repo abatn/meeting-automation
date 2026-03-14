@@ -29,6 +29,7 @@ class PV(Base):
     status: Mapped[str] = mapped_column(
         String, default="draft"
     )  # draft, pending_review, published
+    language: Mapped[str] = mapped_column(String, default="fr") # ar, fr, en
 
     is_validated: Mapped[bool] = mapped_column(Boolean, default=False)
     validated_by_id: Mapped[Optional[str]] = mapped_column(

@@ -61,24 +61,55 @@ async def download_pv_pdf(
     pv_id: str,
     branding_id: Optional[str] = None,
     watermark: Optional[bool] = None,
+    language: Optional[str] = "fr",
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
     Generates and downloads the PV as a PDF.
+    Supports multilingual output (ar, fr, en).
     """
     try:
         pdf_service = PDFService(db)
         pdf_path = await pdf_service.generate_pv_pdf(
             pv_id=pv_id, 
             branding_id=branding_id, 
-            watermark=watermark
+            watermark=watermark,
+            language=language
         )
 
         return FileResponse(
             path=pdf_path,
             filename=f"meeting_minutes_{pv_id}.pdf",
             media_type="application/pdf",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{pv_id}/docx")
+async def download_pv_docx(
+    pv_id: str,
+    language: Optional[str] = "fr",
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Generates and downloads the PV as a Word document (DOCX).
+    Supports multilingual output (ar, fr, en).
+    """
+    try:
+        from app.services.docx_service import DOCXService # Local import to break circular dependency
+        docx_service = DOCXService(db)
+        docx_path = await docx_service.generate_pv_docx(
+            pv_id=pv_id, 
+            language=language
+        )
+
+        return FileResponse(
+            path=docx_path,
+            filename=f"meeting_minutes_{pv_id}.docx",
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

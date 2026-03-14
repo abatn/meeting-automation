@@ -60,7 +60,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 30s
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -114,6 +114,12 @@ services:
 
   backend:
     build: ./backend
+    command: >
+      bash -c "
+      echo 'Waiting 10s for PostgreSQL...' &&
+      sleep 10 &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
     env_file: .env
     environment:
       - PYTHONPATH=/app

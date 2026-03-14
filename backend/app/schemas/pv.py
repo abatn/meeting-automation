@@ -27,6 +27,7 @@ class PVBase(BaseModel):
     title: str
     content_html: Optional[str] = None
     status: Optional[str] = "draft"
+    language: Optional[str] = "fr"
     is_validated: Optional[bool] = False
 
 
@@ -38,6 +39,7 @@ class PVUpdate(BaseModel):
     title: Optional[str] = None
     content_html: Optional[str] = None
     status: Optional[str] = None
+    language: Optional[str] = None
     is_validated: Optional[bool] = None
 
 

@@ -13,6 +13,10 @@ import {
   Tooltip,
   CircularProgress,
   Alert,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import {
   CheckCircle as ApproveIcon,
@@ -21,7 +25,7 @@ import {
   Save as SaveIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
-import PDFDownloadButton from "./PDFDownloadButton";
+import DocumentExportMenu from "./DocumentExportMenu";
 import api from "../../services/api";
 
 const PVValidator: React.FC = () => {
@@ -32,27 +36,35 @@ const PVValidator: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pvId, setPvId] = useState<string | null>(null);
+  const [exportLanguage, setExportLanguage] = useState<string>("fr");
 
   useEffect(() => {
     const fetchData = async () => {
       if (!meetingId) return;
 
+      // 1. Fetch transcription independently
       try {
-        // 1. Fetch transcription for this meeting
         const transcriptRes = await api.get(
           `/transcriptions/meeting/${meetingId}`,
         );
-        setOriginalTranscript(
-          transcriptRes.data.full_text || transcriptRes.data.content,
-        );
+        if (transcriptRes.data) {
+          setOriginalTranscript(
+            transcriptRes.data.full_text || transcriptRes.data.content || "",
+          );
+        }
+      } catch (err) {
+        console.warn("Transcription not yet available");
+      }
 
-        // 2. Fetch PV for this meeting
+      // 2. Fetch PV independently
+      try {
         const pvRes = await api.get(`/pv/meeting/${meetingId}`);
-        setPvContent(pvRes.data.content_html || pvRes.data.content);
-        setPvId(pvRes.data.id);
-
-        setError(null);
-        setLoading(false);
+        if (pvRes.data) {
+          setPvContent(pvRes.data.content_html || pvRes.data.content || "");
+          setPvId(pvRes.data.id);
+          setLoading(false);
+          setError(null);
+        }
       } catch (err: any) {
         console.error("Error fetching PV data:", err);
         if (err.response?.status === 404) {
@@ -62,7 +74,6 @@ const PVValidator: React.FC = () => {
         } else {
           setError("Failed to load real-time AI results.");
         }
-        // Don't stop loading if we expect data to arrive (polling)
       }
     };
 
@@ -71,6 +82,17 @@ const PVValidator: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [meetingId]);
+
+  const handleApprove = async () => {
+    if (!pvId) return;
+    try {
+      await api.post(`/pv/${pvId}/approve`);
+      // You can add a success notification here
+    } catch (err) {
+      console.error("Failed to approve PV", err);
+      // You can add an error notification here
+    }
+  };
 
   if (loading && !pvContent) {
     return (
@@ -99,17 +121,40 @@ const PVValidator: React.FC = () => {
         </Alert>
       )}
 
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2, alignItems: "center" }}>
         <Typography variant="h5">{t("pv.validator_title")}</Typography>
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel id="export-lang-label">{t("common.language") || "Language"}</InputLabel>
+            <Select
+              labelId="export-lang-label"
+              value={exportLanguage}
+              label={t("common.language") || "Language"}
+              onChange={(e) => setExportLanguage(e.target.value as string)}
+            >
+              <MenuItem value="ar">العربية</MenuItem>
+              <MenuItem value="fr">Français</MenuItem>
+              <MenuItem value="en">English</MenuItem>
+            </Select>
+          </FormControl>
+
           <Button variant="outlined" startIcon={<HistoryIcon />}>
             {t("pv.versions")}
           </Button>
-          {pvId && <PDFDownloadButton pvId={pvId} variant="outlined" />}
+          
+          {pvId && (
+            <DocumentExportMenu 
+              pvId={pvId} 
+              language={exportLanguage} 
+              variant="outlined" 
+            />
+          )}
+
           <Button
             variant="contained"
             color="success"
             startIcon={<ApproveIcon />}
+            onClick={handleApprove}
           >
             {t("pv.approve")}
           </Button>

@@ -61,8 +61,9 @@ Nach dem erfolgreichen Abschluss der ISO 27001 Security Roadmap fokussiert sich 
   - `GET /api/v1/reports/export`: Neue Parameter `branding_id` und `watermark`.
 - [ ] **5. Action History / Patterns**:
   - `GET /api/v1/actions/patterns` & `GET /api/v1/actions/statistics/recurring`: Analysen und Statistiken.
-- [ ] **6. Multilingual Export**:
-  - `GET /api/v1/reports/export`: Neuer Parameter `language` (fr/ar/en) für lokalisierte PDF/Excel Dateien (RTL Support).
+- [x] **6. Multilingual Export**:
+  - `GET /api/v1/pv/{pv_id}/pdf` & `/docx`: Neuer Parameter `language` (fr/ar/en) für lokalisierte Dokumente (RTL Support).
+  - **Inhalts-Lokalisierung**: Der Export-Prozess triggert automatisch die Übersetzung des KI-Inhalts durch Mistral AI, falls die Zielsprache von der gespeicherten Sprache abweicht.
 
 
 ## Historie & Protokolle

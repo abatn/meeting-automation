@@ -2,7 +2,8 @@ import os
 import uuid
 import logging
 import traceback
-from typing import Optional
+import json
+from typing import Optional, Dict, Any
 import jinja2
 import boto3
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,8 +53,69 @@ class PDFService:
         )
         self.bucket_name = getattr(settings, "S3_BUCKET_NAME", "meeting-pdfs")
 
-    async def generate_pv_pdf(self, pv_id: str, branding_id: Optional[str] = None, watermark: Optional[bool] = None) -> str:
+    async def generate_pv_pdf(self, pv_id: str, branding_id: Optional[str] = None, watermark: Optional[bool] = None, language: str = "fr") -> str:
         """Hauptmethode: Generiert PDF und gibt Dateipfad zurück"""
+        
+        # 0. Localization Strings for Headers
+        LOCALES = {
+            "ar": {
+                "title": "محضر اجتماع",
+                "date": "التاريخ",
+                "location": "المكان",
+                "duration": "المدة (دقيقة)",
+                "participants": "المشاركون",
+                "agenda": "جدول الأعمال",
+                "discussion": "ملخص المناقشات",
+                "decisions": "القرارات",
+                "actions": "خطة العمل",
+                "task": "المهمة",
+                "assignee": "المسؤول",
+                "due_date": "الموعد النهائي",
+                "signature": "الاعتماد",
+                "director": "المدير العام",
+                "page": "صفحة",
+                "default_footer": "محضر اجتماع تم إنشاؤه آلياً | Meeting Automation System"
+            },
+            "fr": {
+                "title": "Procès-Verbal",
+                "date": "Date",
+                "location": "Lieu",
+                "duration": "Durée (min)",
+                "participants": "Participants",
+                "agenda": "Ordre du Jour",
+                "discussion": "Résumé des Discussions",
+                "decisions": "Décisions",
+                "actions": "Plan d'Action",
+                "task": "Tâche",
+                "assignee": "Responsable",
+                "due_date": "Échéance",
+                "signature": "Approbation (Signature)",
+                "director": "Directeur Général (DG)",
+                "page": "Page",
+                "default_footer": "Procès-verbal généré automatiquement | Meeting Automation System"
+            },
+            "en": {
+                "title": "Meeting Minutes",
+                "date": "Date",
+                "location": "Location",
+                "duration": "Duration (min)",
+                "participants": "Participants",
+                "agenda": "Agenda",
+                "discussion": "Discussion Summary",
+                "decisions": "Decisions",
+                "actions": "Action Items",
+                "task": "Task",
+                "assignee": "Assignee",
+                "due_date": "Due Date",
+                "signature": "Approval (Signature)",
+                "director": "General Manager (DG)",
+                "page": "Page",
+                "default_footer": "Automatically generated minutes | Meeting Automation System"
+            }
+        }
+        
+        strings = LOCALES.get(language, LOCALES["fr"])
+
         # 1. Daten aus DB laden (Echt-Daten)
         stmt = (
             select(PV)
@@ -75,7 +137,49 @@ class PDFService:
         action_result = await self.db.execute(action_stmt)
         actions = action_result.scalars().all()
         
-        # Load Branding Settings
+        # 2. Content Translation Logic (Mistral)
+        # If the requested language differs from the PV source language, translate content
+        display_title = pv_obj.title
+        display_discussion = pv_obj.content_html
+        display_decisions = [s.content for s in pv_obj.sections if s.type == "decision"]
+        display_actions = []
+        for a in actions:
+            display_actions.append({
+                "description": a.title,
+                "assignee": (
+                    a.description.split("Assigned to: ")[-1]
+                    if a.description and "Assigned to: " in a.description
+                    else "N/A"
+                ),
+                "due_date": (
+                    a.due_date.strftime("%Y-%m-%d") if a.due_date else "N/A"
+                ),
+            })
+
+        from app.services.pv_service import PVService, TranslationError
+        if pv_obj.language != language:
+            logger.info(f"Language mismatch (Stored: {pv_obj.language}, Requested: {language}). Translating via Mistral...")
+            content_to_translate = {
+                "title": display_title,
+                "summary": display_discussion,
+                "decisions": display_decisions,
+                "actions": display_actions
+            }
+            try:
+                translated = await PVService.translate_content(content_to_translate, language)
+                display_title = translated.get("title", display_title)
+                display_discussion = translated.get("summary", display_discussion)
+                display_decisions = translated.get("decisions", display_decisions)
+                display_actions = translated.get("actions", display_actions)
+            except TranslationError as e:
+                logger.error(f"Translation failed for PDF pv_id={pv_id}: {e}")
+                raise HTTPException(
+                    status_code=502,
+                    detail="AI translation service failed. Please try again later.",
+                )
+
+
+        # 3. Load Branding Settings
         branding_stmt = select(BrandingSettings).where(BrandingSettings.is_active == True)
         if branding_id:
             branding_stmt = select(BrandingSettings).where(BrandingSettings.id == branding_id)
@@ -91,7 +195,7 @@ class PDFService:
             "show_watermark": watermark if watermark is not None else (branding_obj.default_watermark if branding_obj else False)
         }
 
-        # 2. Template-Daten aufbereiten
+        # 4. Template-Daten aufbereiten
         start_time = pv_obj.meeting.start_time
         end_time = pv_obj.meeting.end_time
         duration = "N/A"
@@ -99,7 +203,7 @@ class PDFService:
             duration = str(int((end_time - start_time).total_seconds() / 60))
 
         pv_data = {
-            "title": pv_obj.title or pv_obj.meeting.title,
+            "title": display_title,
             "date": (start_time.strftime("%Y-%m-%d") if start_time else "N/A"),
             "location": pv_obj.meeting.location or "N/A",
             "duration": duration,
@@ -107,33 +211,25 @@ class PDFService:
             "agenda": "\n".join(
                 [a.title for a in sorted(pv_obj.meeting.agendas, key=lambda x: x.order)]
             ),
-            "discussion": pv_obj.content_html or "N/A",
-            "decisions": [s.content for s in pv_obj.sections if s.type == "decision"],
-            "actions": [
-                {
-                    "description": a.title,
-                    "assignee": (
-                        a.description.split("Assigned to: ")[-1]
-                        if a.description and "Assigned to: " in a.description
-                        else "N/A"
-                    ),
-                    "due_date": (
-                        a.due_date.strftime("%Y-%m-%d") if a.due_date else "N/A"
-                    ),
-                }
-                for a in actions
-            ],
+            "discussion": display_discussion,
+            "decisions": display_decisions,
+            "actions": display_actions,
         }
 
-        # 3. HTML rendern
+        # 5. HTML rendern
         try:
             template = self.template_env.get_template("pv_template.html")
-            html_content = template.render(pv=pv_data, branding=branding_data)
+            html_content = template.render(
+                pv=pv_data, 
+                branding=branding_data,
+                strings=strings,
+                language=language
+            )
         except Exception as e:
             logger.error(f"Error rendering template: {e}")
             raise HTTPException(status_code=500, detail="Could not render PDF template")
 
-        # 4. PDF generieren
+        # 6. PDF generieren
         pdf_filename = f"pv_{pv_id}_{uuid.uuid4().hex[:8]}.pdf"
         pdf_path = f"/tmp/{pdf_filename}"
 

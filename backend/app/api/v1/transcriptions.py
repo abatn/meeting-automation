@@ -7,7 +7,6 @@ from sqlalchemy import select
 from app.api import deps
 from app.models.user import User as UserModel
 from app.models.transcription import Transcription as TranscriptionModel
-from app.tasks.transcription_tasks import process_recording
 
 router = APIRouter()
 
@@ -26,6 +25,7 @@ async def initiate_transcription(
         raise HTTPException(status_code=400, detail="recording_id is required")
 
     # Trigger the Celery task (which includes Diarization now)
+    from app.tasks.transcription_tasks import process_recording
     process_recording.delay(recording_id)
 
     # Mock returning a transcription ID immediately
