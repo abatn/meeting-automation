@@ -5,11 +5,74 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.api import deps
-from app.schemas.action import Action, ActionCreate
-from app.models.action import Action as ActionModel, Assignment as AssignmentModel
+from app.schemas.action import Action, ActionCreate, ActionSuggestion
+from app.models.action import Action as ActionModel, Assignment as AssignmentModel, ActionSuggestion as ActionSuggestionModel
 from app.models.user import User as UserModel, UserRole
+from app.services.action_service import ActionService
+from pydantic import BaseModel
 
 router = APIRouter()
+
+class FeedbackRequest(BaseModel):
+    suggestion_id: str
+    action: str # "accept" or "reject"
+
+class TranslateSuggestionsRequest(BaseModel):
+    suggestions: List[dict]
+    target_language: str
+
+@router.get("/suggestions/{meeting_id}", response_model=List[ActionSuggestion])
+async def get_action_suggestions(
+    meeting_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Analyzes the transcription of a meeting using ML (Mistral) to suggest potential action items.
+    Checks DB first, if none exist, calls the AI.
+    """
+    # Check if we already have suggestions
+    stmt = select(ActionSuggestionModel).where(ActionSuggestionModel.meeting_id == meeting_id)
+    result = await db.execute(stmt)
+    existing_suggestions = result.scalars().all()
+    
+    if existing_suggestions:
+        return existing_suggestions
+
+    # If none exist, generate them
+    action_service = ActionService(db)
+    suggestions = await action_service.generate_suggestions_from_transcription(meeting_id)
+    return suggestions
+
+@router.post("/suggestions/learn")
+async def learn_action_suggestion_feedback(
+    feedback: FeedbackRequest,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Receives user feedback (accept/reject) on an ML-suggested action item.
+    In a fully realized ML system, this data would feed back into model fine-tuning.
+    """
+    if feedback.action not in ["accept", "reject"]:
+        raise HTTPException(status_code=400, detail="Action must be 'accept' or 'reject'")
+        
+    action_service = ActionService(db)
+    await action_service.learn_from_feedback(feedback.suggestion_id, feedback.action)
+    return {"status": "success", "message": "Feedback recorded successfully."}
+
+@router.post("/suggestions/translate")
+async def translate_action_suggestions(
+    request: TranslateSuggestionsRequest,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Translates a list of suggestions into the target language for the UI.
+    """
+    action_service = ActionService(db)
+    translated = await action_service.translate_suggestions(request.suggestions, request.target_language)
+    return translated
 
 
 @router.get("/", response_model=List[Action])

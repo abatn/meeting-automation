@@ -6,8 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from datetime import datetime, timedelta
 
-from app.models.action import Action, Assignment
+from app.models.action import Action, Assignment, ActionSuggestion
 from app.models.pv import PV
+from app.models.transcription import Transcription
+import json
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -16,6 +18,86 @@ logger = logging.getLogger(__name__)
 class ActionService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def generate_suggestions_from_transcription(self, meeting_id: str) -> List[ActionSuggestion]:
+        """Analyzes transcription to suggest new actions."""
+        # 1. Fetch Transcription
+        stmt = select(Transcription).where(Transcription.meeting_id == meeting_id)
+        res = await self.db.execute(stmt)
+        transcription = res.scalar_one_or_none()
+        
+        if not transcription or not transcription.full_text:
+            logger.warning(f"No transcription found for meeting {meeting_id}")
+            return []
+
+        # 2. Call Mistral
+        headers = {
+            "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        
+        system_content = """You are an AI assistant that analyzes meeting transcripts to identify potential action items, tasks, or follow-ups that were discussed but might not have been formally decided yet.
+Extract these implicit suggestions.
+Return ONLY a JSON array of objects with the following structure:
+[
+  {
+    "title": "Short title of the task",
+    "description": "More detailed description",
+    "suggested_assignee": "Name of the person if mentioned, else null",
+    "confidence_score": 0.0 to 1.0 indicating how likely this is a real task
+  }
+]"""
+
+        payload = {
+            "model": "mistral-large-latest",
+            "messages": [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": f"Analyze this transcript:\n\n{transcription.full_text}"}
+            ],
+            "response_format": {"type": "json_object"}
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.mistral.ai/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                result = response.json()
+                content_str = result["choices"][0]["message"]["content"]
+                
+                # Check if it returned a dict wrapper around the array (common with Mistral json mode)
+                parsed = json.loads(content_str)
+                suggestions_data = parsed if isinstance(parsed, list) else list(parsed.values())[0]
+                
+                if not isinstance(suggestions_data, list):
+                    logger.error("Mistral returned invalid format for suggestions")
+                    return []
+
+        except Exception as e:
+            logger.error(f"Failed to generate suggestions via Mistral: {e}")
+            return []
+
+        # 3. Store in DB
+        suggestions = []
+        for item in suggestions_data:
+            suggestion = ActionSuggestion(
+                id=str(uuid.uuid4()),
+                meeting_id=meeting_id,
+                title=item.get("title", "Unknown Task"),
+                description=item.get("description", ""),
+                suggested_assignee=item.get("suggested_assignee"),
+                confidence_score=item.get("confidence_score", 0.5),
+                status="suggested"
+            )
+            self.db.add(suggestion)
+            suggestions.append(suggestion)
+            
+        await self.db.commit()
+        return suggestions
 
     async def extract_actions_from_pv(
         self, pv_id: str, actions_data: List[dict]
@@ -136,6 +218,71 @@ class ActionService:
             logger.error(f"Failed to trigger n8n status notification: {e}")
 
         return action
+
+    async def learn_from_feedback(self, suggestion_id: str, action: str) -> None:
+        """Records feedback and creates a real Action if accepted."""
+        stmt = select(ActionSuggestion).where(ActionSuggestion.id == suggestion_id)
+        res = await self.db.execute(stmt)
+        suggestion = res.scalar_one_or_none()
+
+        if not suggestion:
+            logger.warning(f"Suggestion {suggestion_id} not found for feedback.")
+            return
+
+        if action == "accept":
+            suggestion.status = "accepted"
+            # Create the actual action entry so it appears in the PV/PDF
+            new_action = Action(
+                id=str(uuid.uuid4()),
+                meeting_id=suggestion.meeting_id,
+                title=suggestion.title,
+                description=suggestion.description,
+                status="pending",
+                priority="medium"
+            )
+            self.db.add(new_action)
+            logger.info(f"Suggestion {suggestion_id} accepted and converted to Action {new_action.id}")
+        elif action == "reject":
+            suggestion.status = "rejected"
+        
+        await self.db.commit()
+
+    async def translate_suggestions(self, suggestions_data: List[dict], target_language: str) -> List[dict]:
+        """Translates a list of suggestions for the UI sidebar using Mistral."""
+        if not suggestions_data:
+            return []
+            
+        headers = {
+            "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        
+        lang_names = {"ar": "Arabic", "fr": "French", "en": "English"}
+        target_lang = lang_names.get(target_language, "French")
+
+        system_content = f"You are a professional translator. Translate the following list of action suggestions into {target_lang}. Return ONLY a JSON array of objects with 'id', 'title', and 'description'."
+        
+        payload = {
+            "model": "mistral-large-latest",
+            "messages": [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": json.dumps(suggestions_data)}
+            ],
+            "response_format": {"type": "json_object"}
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post("https://api.mistral.ai/v1/chat/completions", headers=headers, json=payload, timeout=30.0)
+                response.raise_for_status()
+                result = response.json()
+                content_str = result["choices"][0]["message"]["content"]
+                parsed = json.loads(content_str)
+                # Handle Mistral's potential dict wrapper
+                return parsed if isinstance(parsed, list) else list(parsed.values())[0]
+        except Exception as e:
+            logger.error(f"Failed to translate suggestions: {e}")
+            return suggestions_data
 
     async def get_due_actions(self) -> List[Action]:
         """Für tägliche Reminder (via Celery)"""

@@ -7,7 +7,6 @@ import {
   Typography,
   TextField,
   Button,
-  Divider,
   Stack,
   IconButton,
   Tooltip,
@@ -28,7 +27,12 @@ import { useTranslation } from "react-i18next";
 import DocumentExportMenu from "./DocumentExportMenu";
 import api from "../../services/api";
 
-const PVValidator: React.FC = () => {
+interface PVValidatorProps {
+  exportLanguage: string;
+  onLanguageChange: (lang: string) => void;
+}
+
+const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageChange }) => {
   const { id: meetingId } = useParams<{ id: string }>();
   const { t } = useTranslation();
   const [pvContent, setPvContent] = useState("");
@@ -36,7 +40,7 @@ const PVValidator: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pvId, setPvId] = useState<string | null>(null);
-  const [exportLanguage, setExportLanguage] = useState<string>("fr");
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -62,7 +66,6 @@ const PVValidator: React.FC = () => {
         if (pvRes.data) {
           setPvContent(pvRes.data.content_html || pvRes.data.content || "");
           setPvId(pvRes.data.id);
-          setLoading(false);
           setError(null);
         }
       } catch (err: any) {
@@ -74,11 +77,13 @@ const PVValidator: React.FC = () => {
         } else {
           setError("Failed to load real-time AI results.");
         }
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 10000);
 
     return () => clearInterval(interval);
   }, [meetingId]);
@@ -90,11 +95,10 @@ const PVValidator: React.FC = () => {
       // You can add a success notification here
     } catch (err) {
       console.error("Failed to approve PV", err);
-      // You can add an error notification here
     }
   };
 
-  if (loading && !pvContent) {
+  if (loading && !pvContent && !originalTranscript) {
     return (
       <Box
         sx={{
@@ -107,7 +111,7 @@ const PVValidator: React.FC = () => {
       >
         <CircularProgress sx={{ mb: 2 }} />
         <Typography variant="body1">
-          AI Engine (Whisper & Mistral) is processing your recording...
+          Connecting to AI Engine...
         </Typography>
       </Box>
     );
@@ -130,7 +134,7 @@ const PVValidator: React.FC = () => {
               labelId="export-lang-label"
               value={exportLanguage}
               label={t("common.language") || "Language"}
-              onChange={(e) => setExportLanguage(e.target.value as string)}
+              onChange={(e) => onLanguageChange(e.target.value as string)}
             >
               <MenuItem value="ar">العربية</MenuItem>
               <MenuItem value="fr">Français</MenuItem>

@@ -45,9 +45,10 @@ Basierend auf dem jüngsten Security-Audit (ISO 27001:2022) wurden folgende Arch
 
 Nach dem erfolgreichen Abschluss der ISO 27001 Security Roadmap fokussiert sich die nächste Entwicklungsphase auf fehlende Funktionen und Endpunkte laut Projektzielen (Objectifs).
 
-- [ ] **1. Action Suggestions (ML-basiert)**:
+- [x] **1. Action Suggestions (ML-basiert)**:
   - `GET /api/v1/actions/suggestions/{meeting_id}`: Vorschläge für wiederkehrende Aktionen.
   - `POST /api/v1/actions/suggestions/learn`: Endpoint für ML-Lernzyklen.
+  - **Integration**: Automatische Generierung nach PV-Erstellung und UI-Integration im PVValidator zur Annahme/Ablehnung von Vorschlägen.
 - [ ] **2. Speaker Attribution**:
   - `POST /api/v1/transcriptions/initiate`: Neuer Parameter `enable_speaker_diarization: boolean`.
   - `GET /api/v1/transcriptions/{transcription_id}`: Ausgabe der Speaker-Segmente.

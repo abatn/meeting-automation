@@ -269,6 +269,16 @@ async def _save_pv_and_actions(
     
     await db.flush()
 
+    # Automatically generate ML Action Suggestions
+    try:
+        from app.services.action_service import ActionService
+        logger.info(f"Triggering ML action suggestions for meeting {recording.meeting_id}")
+        action_service = ActionService(db)
+        await action_service.generate_suggestions_from_transcription(str(recording.meeting_id))
+    except Exception as e:
+        logger.error(f"Failed to generate action suggestions: {e}")
+        pass
+
 
 async def _notify_n8n_completion(recording_id: str, meeting_id: str) -> None:
     payload = {

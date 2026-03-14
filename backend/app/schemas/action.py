@@ -41,3 +41,28 @@ class Action(ActionBase):
 
     class Config:
         from_attributes = True
+
+class SuggestionStatus(str, Enum):
+    SUGGESTED = "suggested"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+class ActionSuggestionBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    suggested_assignee: Optional[str] = None
+    confidence_score: Optional[float] = None
+    status: SuggestionStatus = SuggestionStatus.SUGGESTED
+
+class ActionSuggestionCreate(ActionSuggestionBase):
+    meeting_id: str
+
+class ActionSuggestion(ActionSuggestionBase):
+    id: str
+    meeting_id: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+

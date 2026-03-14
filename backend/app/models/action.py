@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, ForeignKey, DateTime, Text, Enum as SQLEnum
+from sqlalchemy import String, ForeignKey, DateTime, Text, Enum as SQLEnum, Float
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 import enum
@@ -19,6 +19,35 @@ class ActionStatus(str, enum.Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     OVERDUE = "overdue"
+
+class SuggestionStatus(str, enum.Enum):
+    SUGGESTED = "suggested"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+class ActionSuggestion(Base):
+    __tablename__ = "action_suggestions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    meeting_id: Mapped[str] = mapped_column(
+        String, ForeignKey("meetings.id", ondelete="CASCADE")
+    )
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    suggested_assignee: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    confidence_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    status: Mapped[SuggestionStatus] = mapped_column(
+        SQLEnum(SuggestionStatus), default=SuggestionStatus.SUGGESTED
+    )
+    
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), onupdate=func.now(), nullable=True
+    )
+    
+    meeting: Mapped["Meeting"] = relationship("Meeting")
 
 
 class Action(Base):
