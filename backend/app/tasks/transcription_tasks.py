@@ -20,9 +20,8 @@ from app.models.action import Action
 from app.models.pv import PV, Section
 from app.models.recording import Recording
 from app.models.transcription import Transcription
-from app.services.diarization_service import DiarizationService
+from app.services.gladia_service import gladia_service
 from app.services.pv_service import PVService
-from app.services.transcription_service import transcribe_audio
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -44,51 +43,6 @@ def publish_status(
         redis_client.publish(channel, json.dumps(payload))
     except Exception as e:
         logger.error(f"Redis publish failed for {recording_id}: {e}")
-
-
-def match_timestamps(
-    words: List[Dict[str, Any]], segments: List[Dict[str, Any]]
-) -> List[Dict[str, Any]]:
-    """Match Whisper words with Pyannote segments."""
-    if not segments or not words:
-        return []
-
-    segments.sort(key=lambda x: x["start"])
-    matched_blocks: List[Dict[str, Any]] = []
-    current_block: Optional[Dict[str, Any]] = None
-
-    for word_info in words:
-        word = word_info.get("word", "")
-        start = word_info.get("start", 0.0)
-        end = word_info.get("end", 0.0)
-        midpoint = (start + end) / 2
-
-        closest_segment = next(
-            (seg for seg in segments if seg["start"] <= midpoint <= seg["end"]),
-            min(
-                segments,
-                key=lambda s: min(abs(s["start"] - midpoint), abs(s["end"] - midpoint)),
-            ),
-        )
-
-        speaker = str(closest_segment["speaker"])
-
-        if current_block is None or current_block["speaker"] != speaker:
-            if current_block:
-                matched_blocks.append(current_block)
-            current_block = {
-                "speaker": speaker,
-                "text": word.strip(),
-                "start": start,
-                "end": end,
-            }
-        else:
-            current_block["text"] += " " + word.strip()
-            current_block["end"] = end
-
-    if current_block:
-        matched_blocks.append(current_block)
-    return matched_blocks
 
 
 async def _process_recording_pipeline(recording_id: str) -> None:
@@ -114,14 +68,11 @@ async def _process_recording_pipeline(recording_id: str) -> None:
             if not temp_path:
                 raise Exception("S3 Download failed")
 
-            publish_status(recording_id, "transcribing", 25, "Speaker diarization...")
-            speaker_segments = await DiarizationService.diarize(temp_path)
+            publish_status(recording_id, "transcribing", 25, "Transcribing and diarizing with Gladia...")
+            gladia_result = await gladia_service.transcribe_and_diarize(temp_path)
 
-            publish_status(recording_id, "transcribing", 50, "Transcription...")
-            trans_res = await transcribe_audio(temp_path, word_timestamps=True)
-
-            publish_status(recording_id, "transcribing", 75, "Matching results...")
-            await _handle_ai_results(db, recording, speaker_segments, trans_res)
+            publish_status(recording_id, "transcribing", 75, "Saving results and generating PV...")
+            await _handle_ai_results(db, recording, gladia_result)
 
             publish_status(recording_id, "completed", 100, "Processing complete!")
             await _notify_n8n_completion(str(recording.id), str(recording.meeting_id))
@@ -156,19 +107,12 @@ async def _download_audio(file_key: str) -> Optional[str]:
 async def _handle_ai_results(
     db: AsyncSession,
     recording: Recording,
-    speaker_segments: List[Dict[str, Any]],
-    trans_res: Dict[str, Any],
+    gladia_result: Dict[str, Any],
 ) -> None:
-    if not speaker_segments:
-        words = trans_res.get("words", [])
-        end_time = words[-1].get("end", 0.0) if words else 0.0
-        speaker_segments = [{"speaker": "SPEAKER_00", "start": 0.0, "end": end_time}]
-
-    matched = match_timestamps(trans_res.get("words", []), speaker_segments)
     mistral_text = (
-        "\n".join([f"{b['speaker']}: {b['text']}" for b in matched])
-        if matched
-        else trans_res.get("text", "")
+        "\n".join([f"{s['speaker']}: {s['text']}" for s in gladia_result["segments"]])
+        if gladia_result.get("segments")
+        else gladia_result.get("full_text", "")
     )
     logger.info(f"Text sent to Mistral (first 500 chars): {mistral_text[:500]}")
 
@@ -176,20 +120,16 @@ async def _handle_ai_results(
         id=str(uuid.uuid4()),
         recording_id=str(recording.id),
         meeting_id=str(recording.meeting_id),
-        full_text=trans_res.get("text", ""),
-        language=trans_res.get("language", "auto"),
-        segments=matched or None,
+        full_text=gladia_result.get("full_text", ""),
+        language="auto",  # Gladia handles detection
+        segments=gladia_result.get("segments", []),
     )
     db.add(db_trans)
     recording.status = "analyzing"
     await db.commit()
 
-    # Use the detected or requested language for PV generation
-    target_lang = trans_res.get("language", "fr")
-    if target_lang == "auto": target_lang = "fr"
-    
-    pv_data = await PVService.generate_pv(mistral_text, target_language=target_lang)
-    await _save_pv_and_actions(db, recording, pv_data, language=target_lang)
+    pv_data = await PVService.generate_pv(mistral_text, target_language="fr")
+    await _save_pv_and_actions(db, recording, pv_data, language="fr")
     recording.status = "completed"
     await db.commit()
 

@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     # AI Services
     OPENAI_API_KEY: str = ""
     MISTRAL_API_KEY: str = ""
+    GLADIA_API_KEY: str = ""
     HUGGINGFACE_TOKEN: str = ""
 
     # Email

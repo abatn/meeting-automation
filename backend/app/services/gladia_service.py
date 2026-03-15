@@ -1,0 +1,106 @@
+import httpx
+import logging
+import asyncio
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+class GladiaService:
+    def __init__(self):
+        self.api_key = settings.GLADIA_API_KEY
+        self.base_url = "https://api.gladia.io/v2"
+
+    async def transcribe_and_diarize(self, audio_file_path: str) -> dict:
+        """
+        Implements the correct 3-step Gladia V2 process:
+        1. Upload file to get audio_url.
+        2. Request transcription with audio_url to get result_url.
+        3. Poll result_url until the job is done.
+        """
+        if not self.api_key:
+            logger.error("Gladia API key is not configured.")
+            raise ValueError("Gladia API key is missing.")
+
+        headers = {"x-gladia-key": self.api_key}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                
+                # --- STEP 1: Upload the audio file (multipart/form-data) ---
+                logger.info(f"Step 1/3: Uploading {audio_file_path} to Gladia...")
+                with open(audio_file_path, "rb") as f:
+                    files = {"audio": (audio_file_path, f, "audio/webm")}
+                    upload_response = await client.post(
+                        f"{self.base_url}/upload", headers=headers, files=files, timeout=120.0
+                    )
+                upload_response.raise_for_status()
+                audio_url = upload_response.json().get("audio_url")
+                if not audio_url:
+                    raise Exception("Gladia V2 did not return an audio_url.")
+                logger.info(f"Step 1/3: Upload successful. Audio URL: {audio_url}")
+
+                # --- STEP 2: Request transcription with diarization (application/json) ---
+                logger.info("Step 2/3: Requesting transcription with diarization...")
+                payload = {
+                    "audio_url": audio_url,
+                    "diarization": True
+                }
+                transcribe_response = await client.post(
+                    f"{self.base_url}/pre-recorded", headers=headers, json=payload, timeout=60.0
+                )
+                transcribe_response.raise_for_status()
+                result_url = transcribe_response.json().get("result_url")
+                if not result_url:
+                    raise Exception("Gladia V2 did not return a result_url.")
+                logger.info(f"Step 2/3: Transcription started. Polling URL: {result_url}")
+
+                # --- STEP 3: Poll for results ---
+                while True:
+                    await asyncio.sleep(5)
+                    logger.info("Step 3/3: Polling for results...")
+                    
+                    poll_response = await client.get(result_url, headers=headers, timeout=60.0)
+                    poll_response.raise_for_status()
+                    
+                    data = poll_response.json()
+                    status = data.get("status")
+                    
+                    if status == "done":
+                        logger.info("Step 3/3: Transcription complete!")
+                        return self._format_result(data)
+                    elif status == "error":
+                        error_detail = data.get('error', 'Unknown error')
+                        raise Exception(f"Gladia processing failed: {error_detail}")
+                    else:
+                        logger.info(f"Gladia job status: {status}. Waiting...")
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Gladia API request failed: {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"An unexpected error occurred during Gladia processing: {e}")
+            raise
+
+    def _format_result(self, gladia_result: dict) -> dict:
+        """
+        Formats the Gladia V2 API response into the structure our system expects.
+        """
+        transcription = gladia_result.get("result", {}).get("transcription", {})
+        if not transcription:
+            return {"full_text": "", "segments": []}
+
+        full_text = transcription.get("full_transcript", "")
+        segments = []
+        for utterance in transcription.get("utterances", []):
+            segments.append({
+                "speaker": f"Speaker {utterance.get('speaker', 'Unknown')}",
+                "text": utterance.get("text", ""),
+                "start": utterance.get("start", 0.0),
+                "end": utterance.get("end", 0.0),
+            })
+
+        return {
+            "full_text": full_text,
+            "segments": segments
+        }
+gladia_service = GladiaService()

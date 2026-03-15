@@ -13,6 +13,7 @@ import {
   Button,
   IconButton,
   Tooltip,
+  CircularProgress,
 } from "@mui/material";
 import {
   AutoFixHigh as SuggestionIcon,
