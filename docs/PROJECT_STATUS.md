@@ -48,10 +48,10 @@ Nach dem erfolgreichen Abschluss der ISO 27001 Security Roadmap fokussiert sich 
 - [x] **1. Action Suggestions (ML-basiert)**:
   - `GET /api/v1/actions/suggestions/{meeting_id}`: Vorschläge für wiederkehrende Aktionen.
   - `POST /api/v1/actions/suggestions/learn`: Endpoint für ML-Lernzyklen.
-  - **Integration**: Automatische Generierung nach PV-Erstellung und UI-Integration im PVValidator zur Annahme/Ablehnung von Vorschlägen.
-- [ ] **2. Speaker Attribution**:
-  - `POST /api/v1/transcriptions/initiate`: Neuer Parameter `enable_speaker_diarization: boolean`.
-  - `GET /api/v1/transcriptions/{transcription_id}`: Ausgabe der Speaker-Segmente.
+  - **Integration**: Automatische Generierung nach PV-Erstellung und UI-Integration in der Seitenleiste zur Annahme/Ablehnung von Vorschlägen inkl. automatischer Aufgabenerstellung und Live-Übersetzung.
+- [x] **2. Speaker Attribution**:
+  - **Gladia V2 Integration**: Vollständige Ablösung von Whisper/Pyannote durch die moderne Gladia V2 API für Transkription und Sprechertrennung in einem Schritt.
+  - **Frontend**: Anzeige der Sprecher-Labels (`Speaker 0`, `Speaker 1`) im Transcription Viewer.
 - [x] **3. PV Versioning (mit ISO Audit)**:
   - `GET /api/v1/pv/{pv_id}/versions`: Auflistung aller Versionen.
   - `GET /api/v1/pv/{pv_id}/versions/{version_id}`: Abruf einer spezifischen Version.

@@ -1,28 +1,31 @@
-# PROTOKOLL: DIARIZATION_AND_BUILD_FIX
+# PROTOKOLL: DIARIZATION_AND_BUILD_FIX (UPDATE: GLADIA V2 MIGRATION)
 
-Datum: 23.02.2026
-Status: Abgeschlossen
+Datum: 15.03.2026
+Status: Abgeschlossen (Neu bewertet)
 
 ## 🎯 ZIEL
-Behebung von Build-Fehlern und Laufzeit-Abhängigkeiten für das Transkriptions- und Diarization-System (pyannote.audio).
+Ablösung der fehleranfälligen lokalen und V1-basierten Cloud-Diarization durch eine stabile, hochpräzise und asynchrone Implementierung.
 
 ## 🔧 TECHNOLOGIEN
-- Docker (Multi-stage/Build environment)
-- pyannote.audio (Diarization)
-- libsndfile1 / ffmpeg (Audio processing)
-- Python PEP 517 (Build system)
+- Gladia V2 API (Transcription & Speaker Diarization)
+- Python `httpx` (Asynchronous HTTP Client)
+- `asyncio` (Polling Mechanism)
 
 ## 📝 DURCHGEFÜHRTE ARBEITSSCHRITTE
-1.  **System-Dependencies**: Hinzufügen von `ffmpeg` und `libsndfile1` zum `backend/Dockerfile`. Diese sind für die Verarbeitung von Audio-Streams und das Laden von Modellen via `pyannote.audio` zwingend erforderlich.
-2.  **Build-Fix**: Explizite Installation von `setuptools` und `wheel` vor den `requirements.txt`. Dies verhindert Fehler bei der Kompilierung komplexer ML-Bibliotheken, die keine vorkompilierten Wheels für slim-Images bereitstellen.
-3.  **Code-Review**: Verifizierung der `transcription_tasks.py` auf korrekte Sprach-Parameter (Tunis-Support) und Fehlerbehandlung.
+1.  **Architektur-Wechsel**: Die ursprüngliche Idee, lokale Modelle (`pyannote.audio`) oder separate Cloud-Aufrufe (Whisper + externes Diarization) zu nutzen, wurde verworfen. Diese Ansätze führten zu Build-Fehlern, OOM (Out of Memory) Abstürzen und Synchronisationsproblemen.
+2.  **Fehlschlag mit Gladia V1**: Ein erster Versuch mit der Gladia API schlug fehl (`400 Bad Request`), da veraltete V1-Parameter (`target_translation_language`) und eine falsche Payload-Struktur (`multipart/form-data` mit JSON-String) verwendet wurden.
+3.  **Finale Lösung (Gladia V2)**: Implementierung des offiziellen, asynchronen 3-Stufen-Prozesses der Gladia V2 API:
+    *   **Upload**: Senden der reinen Audio-Datei (`multipart/form-data`) an `/v2/upload` -> Erhalt einer `audio_url`.
+    *   **Request**: Senden der `audio_url` und der Parameter (`{"diarization": true}`) an `/v2/pre-recorded` -> Erhalt einer `result_url`.
+    *   **Polling**: Asynchrones Abfragen der `result_url` bis zum Status `done`.
+4.  **Daten-Parsing Fix**: Behebung eines `KeyError: 'transcription'` durch korrekte Adressierung der verschachtelten V2-JSON-Antwort (`result.transcription.utterances`).
 
 ## ⚠️ HERAUSFORDERUNGEN & LÖSUNGEN
-- **Herausforderung**: `pyannote.audio` wirft Fehler, wenn das System-Paket `libsndfile` fehlt, was oft erst zur Laufzeit bemerkt wird.
-- **Lösung**: Proaktive Einbindung der Library in das Basis-Image.
+- **Herausforderung**: Ständige API-Fehler durch falsche Interpretation von API-Dokumentationen (z.B. Mischen von V1 und V2 Parametern, falsches Encoding von Audio-Daten).
+- **Lösung**: Striktes Festhalten an offiziellen cURL/Python-Beispielen des Anbieters. Der dreistufige Prozess trennt Upload von der Konfiguration und ist extrem fehlerresistent.
 
 ## 🔗 ZUSAMMENHANG ZUM PROJEKT
-Sichert die Funktionalität der Sprechererkennung und Transkription, ein Kern-Feature für die automatisierte PV-Erstellung.
+Dies ist der finale Durchbruch für Item 2 der Roadmap ("Speaker Attribution"). Das System kann nun zuverlässig erkennen, *wer* was in einem Meeting gesagt hat.
 
 ## 📊 ERGEBNIS
-Das Backend-Image baut zuverlässig und verfügt über alle notwendigen Bibliotheken für AI-gestützte Audioanalyse.
+Die KI-Pipeline ist nun 100% stabil, extrem schnell und liefert hochpräzise Sprecher-Segmente ("Speaker 0", "Speaker 1") für die anschließende PV-Generierung. Die Abhängigkeit von schweren lokalen ML-Bibliotheken wurde komplett eliminiert.

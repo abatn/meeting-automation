@@ -14,16 +14,14 @@ Ein mehrsprachiges (Arabisch, Französisch, Englisch) Meeting-Management-System,
 *   **Asynchrone Pipeline**: Celery-Worker verwalten langlaufende Prozesse (KI-Aufrufe, E-Mail-Schedules). Die `asyncio`-Event-Loop-Verwaltung in Celery ist manuell abgesichert, um `RuntimeError` zu vermeiden.
 
 ## 3. Die KI-Pipeline (Der Kern-Workflow)
-Die Pipeline wurde auf maximale Zuverlässigkeit getrimmt. **(Deepgram wird NICHT verwendet)**.
-1.  **Audio-Upload**: Frontend streamt Audio-Chunks in Echtzeit zu MinIO.
-2.  **Celery-Trigger**: Nach Abschluss der Aufnahme startet die asynchrone Task `process_recording`.
-3.  **Download**: Der Worker lädt die Gesamtdatei aus MinIO.
-4.  **Diarization**: Der `DiarizationService` (lokales Pyannote) erstellt Sprecher-Segmente (aktuell aus Ressourcengründen ggf. übersprungen, Fallback-Logik vorhanden).
-5.  **Transkription**: `transcription_service.py` sendet das Audio an **OpenAI Whisper (`whisper-1`)** mit `response_format="verbose_json"`, um hochpräzise Texte inklusive Wort-Zeitstempeln zu erhalten.
-6.  **Zusammenführung**: `match_timestamps` verheiratet den Whisper-Text mit den Sprecher-Segmenten.
-7.  **PV-Generierung**: Der formatierte Text geht an den **Mistral AI (`mistral-large-latest`)** Service. Mistral liefert ein striktes JSON mit `summary`, `decisions` und `actions`.
-8.  **Datenbank-Speicherung**: Die Ergebnisse werden explizit und sicher via `db.execute(insert/update)` in die Tabellen `pvs`, `pv_sections` (wichtig für die PDF-Generierung!) und `actions` gespeichert.
-9.  **Webhook**: Das Backend informiert n8n.
+Die Pipeline nutzt den modernen **Gladia V2** Service für maximale Stabilität und Präzision.
+1.  **Audio-Upload**: Frontend streamt Audio-Chunks zu MinIO.
+2.  **Celery-Trigger**: Nach Abschluss startet die Task `process_recording`.
+3.  **Gladia V2 Pipeline**: Der Worker nutzt den `GladiaService` (asynchroner 3-Stufen-Prozess: Upload -> Pre-recorded Request -> Polling). Gladia liefert Transkription und **Speaker Diarization** in einem Schritt.
+4.  **PV-Generierung**: Der formatierte Text (inkl. Sprecher-Labels) geht an **Mistral AI (`mistral-large-latest`)**. Mistral liefert ein striktes JSON.
+5.  **ML Action Suggestions**: Parallel zur PV-Erstellung generiert Mistral implizite Aufgabenvorschläge, die in der Tabelle `action_suggestions` gespeichert werden.
+6.  **Datenbank-Speicherung**: Speicherung in `pvs`, `pv_sections`, `actions` und `action_suggestions`.
+7.  **Webhook**: Das Backend informiert n8n.
 
 ## 4. Die Rolle von n8n (Notification Hub)
 n8n verarbeitet **keine KI-Daten mehr**. Es ist ein reiner Orchestrator für externe Kommunikation:

@@ -66,3 +66,15 @@ class ActionSuggestion(ActionSuggestionBase):
     class Config:
         from_attributes = True
 
+# --- Analytics Schemas ---
+
+class ActionPattern(BaseModel):
+    title: str
+    count: int
+
+class ActionStatistics(BaseModel):
+    suggested_assignee: Optional[str]
+    total_suggestions: int
+    accepted_count: int
+    rejected_count: int
+

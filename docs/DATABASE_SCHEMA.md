@@ -52,8 +52,21 @@ erDiagram
         UUID id PK
         UUID recording_id FK
         VARCHAR language
-        TEXT text
-        VARCHAR status ENUM("in_progress", "completed", "failed")
+        TEXT full_text
+        JSON segments
+        VARCHAR status ENUM("pending", "processing", "completed", "failed")
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    ACTION_SUGGESTIONS {
+        UUID id PK
+        UUID meeting_id FK
+        VARCHAR title
+        TEXT description
+        VARCHAR suggested_assignee
+        FLOAT confidence_score
+        VARCHAR status ENUM("SUGGESTED", "ACCEPTED", "REJECTED")
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
@@ -94,6 +107,7 @@ erDiagram
     MEETINGS ||--o{ PARTICIPANTS : "has_participants"
     MEETINGS ||--o{ RECORDINGS : "has_recording"
     MEETINGS ||--o{ PROCES_VERBAUX : "has_pv"
+    MEETINGS ||--o{ ACTION_SUGGESTIONS : "has_suggestions"
     MEETINGS ||--o{ ACTIONS : "has_actions"
     RECORDINGS ||--o{ TRANSCRIPTIONS : "has_transcription"
     TRANSCRIPTIONS ||--o{ PROCES_VERBAUX : "generates_pv_from"
@@ -155,13 +169,14 @@ erDiagram
 
 ### 2.5. `transcriptions` Table
 
-- **Description**: Stores the transcribed text of meeting recordings.
+- **Description**: Stores the transcribed text of meeting recordings with speaker-specific segments.
 - **Fields**:
     - `id` (UUID, Primary Key): Unique identifier for the transcription.
     - `recording_id` (UUID, Foreign Key to `recordings.id`): The recording this transcription is for.
-    - `language` (VARCHAR): Language of the transcription (e.g., `en`, `fr-TN`, `ar-TN`).
-    - `text` (TEXT): The full transcribed text of the recording.
-    - `status` (VARCHAR, Enum): Current status of the transcription (`in_progress`, `completed`, `failed`).
+    - `language` (VARCHAR): Detected language (e.g., `en`, `fr`, `ar`).
+    - `full_text` (TEXT): The full transcribed text of the recording.
+    - `segments` (JSON): Array of objects containing `speaker`, `text`, `start`, and `end` times.
+    - `status` (VARCHAR, Enum): Current status (`pending`, `processing`, `completed`, `failed`).
     - `created_at` (TIMESTAMP): Timestamp when transcription was initiated.
     - `updated_at` (TIMESTAMP): Timestamp of the last update to the transcription.
 
@@ -191,7 +206,21 @@ erDiagram
     - `created_at` (TIMESTAMP): Timestamp when the action item was created.
     - `updated_at` (TIMESTAMP): Timestamp of the last update to the action.
 
-### 2.8. `audit_logs` Table
+### 2.8. `action_suggestions` Table
+
+- **Description**: Stores AI-generated implicit tasks for user validation (ML Loop).
+- **Fields**:
+    - `id` (UUID, Primary Key): Unique identifier.
+    - `meeting_id` (UUID, Foreign Key to `meetings.id`): Associated meeting.
+    - `title` (VARCHAR): Task title.
+    - `description` (TEXT): Task details.
+    - `suggested_assignee` (VARCHAR, Nullable): Proposed person.
+    - `confidence_score` (FLOAT): AI certainty (0.0 to 1.0).
+    - `status` (VARCHAR, Enum): `SUGGESTED`, `ACCEPTED`, `REJECTED`.
+    - `created_at` (TIMESTAMP): Creation timestamp.
+    - `updated_at` (TIMESTAMP): Last update.
+
+### 2.9. `audit_logs` Table
 
 - **Description**: Records all significant user actions for security and compliance purposes (ISO 27001).
 - **Fields**:

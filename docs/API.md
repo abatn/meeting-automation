@@ -191,26 +191,76 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
         "status": "in_progress"
     }
     ```
-
 ### 4.2. Get Transcription by ID
-- **Endpoint**: `/api/v1/transcriptions/{transcription_id}`
+- **Endpoint**: `/api/v1/transcriptions/meeting/{meeting_id}`
 - **Method**: `GET`
-- **Description**: Retrieves the full transcription text for a recording.
+- **Description**: Retrieves the full transcription text and speaker segments for a meeting.
 - **Response (200 OK)**:
     ```json
     {
         "id": "uuid",
-        "recording_id": "uuid",
-        "language": "ar-TN",
-        "text": "The full transcribed text...",
+        "meeting_id": "uuid",
+        "language": "ar",
+        "full_text": "The full transcribed text...",
+        "segments": [
+            {"speaker": "Speaker 0", "text": "Hello...", "start": 0.0, "end": 2.5},
+            {"speaker": "Speaker 1", "text": "Hi...", "start": 2.6, "end": 4.1}
+        ],
         "status": "completed"
     }
     ```
 
 ## 5. Procès-Verbaux (PV) (`/api/v1/pv`)
+...
+### 6.4. List Actions
+...
+## 7. Action Suggestions (`/api/v1/actions/suggestions`)
 
-### 5.1. Generate PV
-- **Endpoint**: `/api/v1/pv/generate`
+### 7.1. Get Suggestions for Meeting
+- **Endpoint**: `/api/v1/actions/suggestions/{meeting_id}`
+- **Method**: `GET`
+- **Description**: Retrieves AI-suggested actions for a specific meeting.
+- **Response (200 OK)**:
+    ```json
+    [
+        {
+            "id": "uuid",
+            "title": "Proposed Task",
+            "description": "Details...",
+            "suggested_assignee": "John Doe",
+            "confidence_score": 0.95,
+            "status": "SUGGESTED"
+        }
+    ]
+    ```
+
+### 7.2. Submit Suggestion Feedback (Learn)
+- **Endpoint**: `/api/v1/actions/suggestions/learn`
+- **Method**: `POST`
+- **Description**: Records user feedback (accept/reject) on a suggestion. If accepted, a real Action is created.
+- **Request Body**:
+    ```json
+    {
+        "suggestion_id": "uuid",
+        "action": "accept"
+    }
+    ```
+- **Response (200 OK)**: `{"status": "success"}`
+
+### 7.3. Translate Suggestions
+- **Endpoint**: `/api/v1/actions/suggestions/translate`
+- **Method**: `POST`
+- **Description**: Translates a list of suggestions on-the-fly for the UI.
+- **Request Body**:
+    ```json
+    {
+        "suggestions": [...],
+        "target_language": "ar"
+    }
+    ```
+
+## 8. Reports (`/api/v1/reports`)
+
 - **Method**: `POST`
 - **Description**: Generates a PV (meeting minutes) from a transcription.
 - **Request Body**:

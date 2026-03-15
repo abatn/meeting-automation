@@ -5,13 +5,42 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.api import deps
-from app.schemas.action import Action, ActionCreate, ActionSuggestion
+from app.schemas.action import Action, ActionCreate, ActionSuggestion, ActionPattern, ActionStatistics
 from app.models.action import Action as ActionModel, Assignment as AssignmentModel, ActionSuggestion as ActionSuggestionModel
 from app.models.user import User as UserModel, UserRole
 from app.services.action_service import ActionService
 from pydantic import BaseModel
 
 router = APIRouter()
+
+# --- Analytics Endpoints ---
+
+@router.get("/patterns", response_model=List[ActionPattern])
+async def get_action_patterns(
+    limit: int = 5,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG, UserRole.MANAGER])),
+) -> Any:
+    """
+    Returns patterns of pending actions (e.g., frequently delayed tasks).
+    Restricted to DG and Manager roles.
+    """
+    service = ActionService(db)
+    return await service.get_action_patterns(limit)
+
+@router.get("/statistics/recurring", response_model=List[ActionStatistics])
+async def get_recurring_statistics(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG, UserRole.MANAGER])),
+) -> Any:
+    """
+    Returns statistics on AI action suggestions per user.
+    Restricted to DG and Manager roles.
+    """
+    service = ActionService(db)
+    return await service.get_recurring_statistics()
+
+# --- Suggestion Endpoints ---
 
 class FeedbackRequest(BaseModel):
     suggestion_id: str

@@ -1,12 +1,13 @@
 import httpx
 import logging
 import uuid
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, desc
 from sqlalchemy.future import select
 from datetime import datetime, timedelta
 
-from app.models.action import Action, Assignment, ActionSuggestion
+from app.models.action import Action, Assignment, ActionSuggestion, SuggestionStatus, ActionStatus
 from app.models.pv import PV
 from app.models.transcription import Transcription
 import json
@@ -14,10 +15,45 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-
 class ActionService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def get_action_patterns(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """Aggregates pending actions by title to identify patterns."""
+        stmt = (
+            select(Action.title, func.count(Action.id).label("count"))
+            .where(Action.status == ActionStatus.PENDING)
+            .group_by(Action.title)
+            .order_by(desc("count"))
+            .limit(limit)
+        )
+        result = await self.db.execute(stmt)
+        return [{"title": row[0], "count": row[1]} for row in result.all()]
+
+    async def get_recurring_statistics(self) -> List[Dict[str, Any]]:
+        """Calculates ML suggestion statistics per assignee."""
+        stmt = (
+            select(
+                ActionSuggestion.suggested_assignee,
+                func.count(ActionSuggestion.id).label("total"),
+                func.count(ActionSuggestion.id).filter(ActionSuggestion.status == SuggestionStatus.ACCEPTED).label("accepted"),
+                func.count(ActionSuggestion.id).filter(ActionSuggestion.status == SuggestionStatus.REJECTED).label("rejected")
+            )
+            .group_by(ActionSuggestion.suggested_assignee)
+        )
+        result = await self.db.execute(stmt)
+        
+        stats = []
+        for row in result.all():
+            assignee = row[0] if row[0] else "Unassigned"
+            stats.append({
+                "suggested_assignee": assignee,
+                "total_suggestions": row[1],
+                "accepted_count": row[2],
+                "rejected_count": row[3]
+            })
+        return stats
 
     async def generate_suggestions_from_transcription(self, meeting_id: str) -> List[ActionSuggestion]:
         """Analyzes transcription to suggest new actions."""

@@ -41,8 +41,8 @@ graph TD
     end
 
     subgraph "AI Services"
-        Deepgram[Deepgram Nova-2]:::external
-        Mistral[Mistral AI]:::external
+        Gladia[Gladia V2 API]:::external
+        Mistral[Mistral AI API]:::external
     end
 
     subgraph "Automation (n8n)"
@@ -64,8 +64,8 @@ graph TD
     Worker <--> S3
     Worker <--> DB
     
-    Worker -- "Audio -> Text" --> Deepgram
-    Worker -- "Text -> PV" --> Mistral
+    Worker -- "Audio -> Text + Diarization" --> Gladia
+    Worker -- "Text -> PV + Action Suggestions" --> Mistral
     
     API -- "Webhook" --> N8N
     Worker -- "Webhook" --> N8N
@@ -101,19 +101,19 @@ graph TD
 - **Database**: PostgreSQL for relational data.
 - **Caching/Broker**: Redis used as a cache and as a broker for Celery tasks.
 
-### 3.3. AI Services (Python/FastAPI)
+### 3.3. AI Services (Cloud-based APIs)
 
-- **Technology**: FastAPI, Python, PyTorch, Transformers.
+- **Technology**: Integration via asynchronous Python clients (`httpx`).
 - **Purpose**: Provides specialized AI functionalities to the backend.
 - **Services**:
-    - **Whisper (Speech-to-Text)**:
-        - Transcribes audio recordings into text.
-        - Supports multiple languages including French, Arabic, and English, with code-switching capabilities.
-    - **Mistral (NLP for PV Generation)**:
-        - Processes transcribed text to identify key discussion points, decisions, and action items.
-        - Generates structured procès-verbaux (PVs) and summaries.
-        - Optimized for Arabic language understanding.
-- **Deployment**: Each AI service runs in its own Docker container, exposing a REST API.
+    - **Gladia V2 (Transcription & Diarization)**:
+        - Unified service for highly accurate speech-to-text and speaker identification in a single API call.
+        - Supports complex code-switching (Arabic/French/English) and handles multiple speakers seamlessly.
+    - **Mistral (NLP for PV Generation & ML Suggestions)**:
+        - Processes transcribed text to generate summaries, decisions, and official actions.
+        - **ML Action Suggestions**: Identifies implicit tasks for user validation, building a dataset for future model fine-tuning.
+        - Optimized for nuanced understanding of professional meeting contexts.
+- **Deployment**: Both services are utilized via their official REST APIs, significantly reducing the local infrastructure footprint.
 
 ### 3.4. n8n (Workflow Automation)
 
