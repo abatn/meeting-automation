@@ -13,6 +13,7 @@ from app.models.pv import PV as PVModel, PVVersion as PVVersionModel
 from app.models.action import Action as ActionModel
 from app.services.pv_service import PVService
 from app.services.pdf_service import PDFService
+from app.services.docx_service import DOCXService
 from app.schemas.pv import PVUpdate, PVVersion as PVVersionSchema
 
 router = APIRouter()
