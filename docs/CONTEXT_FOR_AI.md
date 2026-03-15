@@ -43,27 +43,19 @@ Beginne mit "Sofort (Phase 1)" der folgenden ISO 27001 Roadmap:
     - JWT-Härtung (Token-Laufzeit auf 30 Min reduziert).
     - Erweitertes Session Management (Auto-Timeout nach 15 Min Inaktivität).
 
-## 6. Zukünftige Entwicklungsziele (Phase 2: Feature Expansion)
-Da die ISO 27001 Security Roadmap erfolgreich abgeschlossen wurde, konzentriert sich die nächste Phase auf folgende funktionale Erweiterungen:
+## 6. Abgeschlossene Entwicklungsziele (Phase 2: Feature Expansion)
+Alle funktionalen Erweiterungen der Phase 2 wurden erfolgreich implementiert:
 
-1. **Action Suggestions (ML-basiert):**
-   - Endpunkte für wiederkehrende Aktionsvorschläge und ML-Lernzyklen.
-2. **Speaker Attribution (Diarization):**
-   - Integration der Sprecherzuordnung in Whisper/Deepgram und im Transkript-Response.
-3. **PV Versioning:**
-   - ISO 27001-konforme Versionierung der Protokolle inklusive Wiederherstellung (Restore).
-4. **Custom Branding für Exporte:**
-   - Konfigurierbare Logos, Wasserzeichen und Kopf-/Fußzeilen für PDF/Excel-Exporte.
-5. **Action History / Patterns:**
-   - Analysen zu wiederkehrenden Aufgaben und Teilnehmer-Statistiken.
-6. **Multilingual Export:**
-   - Mehrsprachige PDF/Word-Ausgabe (AR, FR, EN) unter Berücksichtigung von RTL-Layouts.
-   - **WICHTIG**: Dies beinhaltet die On-the-fly-Übersetzung des Protokoll-Inhalts (Summary/Actions) durch Mistral AI, falls die Zielsprache von der gespeicherten Sprache abweicht.
+- [x] **1. Action Suggestions (ML-basiert)**
+- [x] **2. Speaker Attribution (Diarization)** via Gladia V2.
+- [x] **3. PV Versioning** (ISO 27001 konform).
+- [x] **4. Custom Branding für Exporte**.
+- [x] **5. Action History / Patterns (Analytics Dashboard)**.
+- [x] **6. Multilingual Export** (AR, FR, EN) inkl. RTL-Support und On-the-fly Inhaltsübersetzung.
 
-*(ISO 27001 Audit-Logging für alle neuen Endpunkte ist obligatorisch!)*
-
-## 6. Arbeitsregeln für den Agenten
+## 7. Arbeitsregeln für den Agenten
 *   Prüfe immer zuerst `docs/PROJECT_STATUS.md`.
 *   **Faktenbasiert arbeiten**: Nutze den `codebase_investigator`, um den wahren Zustand des Codes zu verstehen, bevor du Änderungen vorschlägst.
+*   **i18n Management**: Übersetzungen existieren redundant in `frontend/src/i18n/locales` (für Vite) und `frontend/public/locales` (für Nginx/Statik). Änderungen müssen immer an BEIDEN Orten erfolgen oder mittels `scripts/sync_locales.sh` synchronisiert werden.
 *   Teste Container *lokal* (`docker-compose ps`, `docker logs`), bevor du Code committest.
 *   Wenn du Skripte oder Komponenten änderst, verifiziere, dass sie keine Mypy/Flake8/ESLint Fehler in der CI/CD verursachen.

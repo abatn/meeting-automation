@@ -19,8 +19,8 @@ class ActionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_action_patterns(self, limit: int = 5) -> List[Dict[str, Any]]:
-        """Aggregates pending actions by title to identify patterns."""
+    async def get_action_patterns(self, limit: int = 5, target_language: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Aggregates pending actions by title to identify patterns, with optional translation."""
         stmt = (
             select(Action.title, func.count(Action.id).label("count"))
             .where(Action.status == ActionStatus.PENDING)
@@ -29,10 +29,18 @@ class ActionService:
             .limit(limit)
         )
         result = await self.db.execute(stmt)
-        return [{"title": row[0], "count": row[1]} for row in result.all()]
+        patterns = [{"title": row[0], "count": row[1]} for row in result.all()]
+        
+        if target_language and patterns:
+            titles = [p["title"] for p in patterns]
+            translated_titles = await self.translate_texts(titles, target_language)
+            for i, p in enumerate(patterns):
+                p["title"] = translated_titles[i] if i < len(translated_titles) else p["title"]
+        
+        return patterns
 
-    async def get_recurring_statistics(self) -> List[Dict[str, Any]]:
-        """Calculates ML suggestion statistics per assignee."""
+    async def get_recurring_statistics(self, target_language: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Calculates ML suggestion statistics per assignee, with optional translation."""
         stmt = (
             select(
                 ActionSuggestion.suggested_assignee,
@@ -53,7 +61,50 @@ class ActionService:
                 "accepted_count": row[2],
                 "rejected_count": row[3]
             })
+
+        if target_language and stats:
+            assignees = [s["suggested_assignee"] for s in stats]
+            translated_assignees = await self.translate_texts(assignees, target_language)
+            for i, s in enumerate(stats):
+                s["suggested_assignee"] = translated_assignees[i] if i < len(translated_assignees) else s["suggested_assignee"]
+                
         return stats
+
+    async def translate_texts(self, texts: List[str], target_language: str) -> List[str]:
+        """Generic method to translate a list of strings using Mistral."""
+        if not texts or not target_language:
+            return texts
+            
+        headers = {
+            "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        
+        lang_names = {"ar": "Arabic", "fr": "French", "en": "English"}
+        target_lang = lang_names.get(target_language.split('-')[0], "French")
+
+        system_content = f"You are a professional translator. Translate the following list of strings into {target_lang}. Return ONLY a JSON array of strings in the exact same order."
+        
+        payload = {
+            "model": "mistral-large-latest",
+            "messages": [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": json.dumps(texts)}
+            ],
+            "response_format": {"type": "json_object"}
+        }
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post("https://api.mistral.ai/v1/chat/completions", headers=headers, json=payload, timeout=30.0)
+                response.raise_for_status()
+                result = response.json()
+                content_str = result["choices"][0]["message"]["content"]
+                parsed = json.loads(content_str)
+                return parsed if isinstance(parsed, list) else list(parsed.values())[0]
+        except Exception as e:
+            logger.error(f"Failed to translate texts: {e}")
+            return texts
 
     async def generate_suggestions_from_transcription(self, meeting_id: str) -> List[ActionSuggestion]:
         """Analyzes transcription to suggest new actions."""

@@ -78,7 +78,9 @@
     "meeting_status_distribution": "Statut des réunions d'équipe",
     "action_status_distribution": "Statut des actions d'équipe",
     "team_tasks": "Tâches d'équipe",
-    "team_tasks_placeholder": "La liste des tâches d'équipe apparaîtra ici."
+    "team_tasks_placeholder": "La liste des tâches d'équipe apparaîtra ici.",
+    "recurring_patterns": "Modèles de Tâches Récurrentes",
+    "ai_suggestion_stats": "Analyses des Suggestions IA"
   },
   "meetings": {
     "planner_title": "Planificateur de Réunions",

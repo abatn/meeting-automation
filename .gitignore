@@ -76,3 +76,4 @@ uploads/
 *.key
 credentials/
 secrets/
+gha-creds-*.json

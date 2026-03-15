@@ -45,7 +45,7 @@
     "action_summary": "ملخص المهام",
     "recent_activity": "آخر نشاط للنظام",
     "system_health": "حالة النظام",
-    "health_api": "اتصال API",
+    "health_api": "اتصال واجهة البرمجة",
     "health_api_status": "ممتاز (99.9%)",
     "health_ai": "حمل نسخ الذكاء الاصطناعي",
     "health_ai_status": "طبيعي",
@@ -78,7 +78,13 @@
     "meeting_status_distribution": "حالة اجتماع الفريق",
     "action_status_distribution": "حالة مهام الفريق",
     "team_tasks": "مهام الفريق",
-    "team_tasks_placeholder": "ستظهر هنا قائمة مهام الفريق."
+    "team_tasks_placeholder": "ستظهر هنا قائمة مهام الفريق.",
+    "recurring_patterns": "أنماط المهام المتكررة",
+    "ai_suggestion_stats": "إحصائيات مقترحات الذكاء الاصطناعي",
+    "stat_pending": "قيد الانتظار",
+    "stat_total": "الإجمالي",
+    "stat_accepted": "مقبول",
+    "stat_rejected": "مرفوض"
   },
   "meetings": {
     "planner_title": "مخطط الاجتماعات",

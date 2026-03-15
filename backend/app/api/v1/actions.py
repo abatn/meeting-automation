@@ -18,6 +18,7 @@ router = APIRouter()
 @router.get("/patterns", response_model=List[ActionPattern])
 async def get_action_patterns(
     limit: int = 5,
+    lang: Optional[str] = None,
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.check_permissions([UserRole.DG, UserRole.MANAGER])),
 ) -> Any:
@@ -26,10 +27,11 @@ async def get_action_patterns(
     Restricted to DG and Manager roles.
     """
     service = ActionService(db)
-    return await service.get_action_patterns(limit)
+    return await service.get_action_patterns(limit, target_language=lang)
 
 @router.get("/statistics/recurring", response_model=List[ActionStatistics])
 async def get_recurring_statistics(
+    lang: Optional[str] = None,
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.check_permissions([UserRole.DG, UserRole.MANAGER])),
 ) -> Any:
@@ -38,7 +40,7 @@ async def get_recurring_statistics(
     Restricted to DG and Manager roles.
     """
     service = ActionService(db)
-    return await service.get_recurring_statistics()
+    return await service.get_recurring_statistics(target_language=lang)
 
 # --- Suggestion Endpoints ---
 

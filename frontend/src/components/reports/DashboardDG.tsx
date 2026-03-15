@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Grid,
   Paper,
@@ -25,20 +25,50 @@ import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store";
 import { fetchDashboardData } from "../../store/reportSlice";
+import api from "../../services/api";
 
 import MeetingsPieChart from "./MeetingsPieChart";
 import ActionsBarChart from "./ActionsBarChart";
 
+interface ActionPattern {
+  title: string;
+  count: number;
+}
+
+interface ActionStatistics {
+  suggested_assignee: string | null;
+  total_suggestions: number;
+  accepted_count: number;
+  rejected_count: number;
+}
+
 const DashboardDG: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
   const { dashboardData, loading } = useSelector(
     (state: RootState) => state.reports,
   );
 
+  const [patterns, setPatterns] = useState<ActionPattern[]>([]);
+  const [stats, setStats] = useState<ActionStatistics[]>([]);
+
   useEffect(() => {
     dispatch(fetchDashboardData("dg"));
-  }, [dispatch]);
+
+    const fetchAnalytics = async () => {
+      try {
+        const [patRes, statRes] = await Promise.all([
+          api.get(`/actions/patterns?lang=${i18n.language}`),
+          api.get(`/actions/statistics/recurring?lang=${i18n.language}`)
+        ]);
+        setPatterns(patRes.data);
+        setStats(statRes.data);
+      } catch (err) {
+        console.error("Failed to fetch analytics", err);
+      }
+    };
+    fetchAnalytics();
+  }, [dispatch, i18n.language]);
 
   if (loading && !dashboardData) {
     return (
@@ -228,6 +258,62 @@ const DashboardDG: React.FC = () => {
             <Box sx={{ height: 320, width: "100%" }}>
               <ActionsBarChart data={actionData} />
             </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* AI & ML Analytics Section */}
+      <Grid container spacing={4} sx={{ mb: 4 }}>
+        <Grid item xs={12} lg={6}>
+          <Paper sx={{ p: 3, borderRadius: 4, height: "100%", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", display: 'flex', alignItems: 'center' }}>
+              <Warning sx={{ mr: 1, color: 'warning.main' }} /> {t("dashboard.recurring_patterns") || "Frequently Delayed Tasks"}
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            <List>
+              {patterns.map((pat, idx) => (
+                <React.Fragment key={idx}>
+                  <ListItem disableGutters>
+                    <ListItemText primary={pat.title} />
+                    <ListItemSecondaryAction>
+                      <Chip label={`${pat.count} ${t("dashboard.stat_pending")}`} color="warning" size="small" />
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  {idx < patterns.length - 1 && <Divider component="li" />}
+                </React.Fragment>
+              ))}
+              {patterns.length === 0 && <Typography variant="body2" color="textSecondary">No patterns found.</Typography>}
+            </List>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} lg={6}>
+          <Paper sx={{ p: 3, borderRadius: 4, height: "100%", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", display: 'flex', alignItems: 'center' }}>
+              <Assignment sx={{ mr: 1, color: 'secondary.main' }} /> {t("dashboard.ai_suggestion_stats") || "AI Suggestion Analytics"}
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            <List>
+              {stats.map((stat, idx) => (
+                <React.Fragment key={idx}>
+                  <ListItem disableGutters>
+                    <ListItemText 
+                      primary={stat.suggested_assignee || "Unassigned"} 
+                      secondary={`${t("dashboard.stat_total")}: ${stat.total_suggestions} | ${t("dashboard.stat_accepted")}: ${stat.accepted_count} | ${t("dashboard.stat_rejected")}: ${stat.rejected_count}`}
+                    />
+                    <ListItemSecondaryAction>
+                      <Chip 
+                        label={stat.total_suggestions > 0 ? Math.round((stat.accepted_count / stat.total_suggestions) * 100) + `% ${t("dashboard.stat_accepted")}` : "0%"} 
+                        color="success" 
+                        size="small" 
+                        variant="outlined"
+                      />
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                  {idx < stats.length - 1 && <Divider component="li" />}
+                </React.Fragment>
+              ))}
+              {stats.length === 0 && <Typography variant="body2" color="textSecondary">No statistics found.</Typography>}
+            </List>
           </Paper>
         </Grid>
       </Grid>

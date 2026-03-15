@@ -78,7 +78,13 @@
     "meeting_status_distribution": "Team Meeting Status",
     "action_status_distribution": "Team Action Status",
     "team_tasks": "Team Tasks",
-    "team_tasks_placeholder": "Team task list with pagination will go here."
+    "team_tasks_placeholder": "Team task list with pagination will go here.",
+    "recurring_patterns": "Recurring Task Patterns",
+    "ai_suggestion_stats": "AI Suggestion Analytics",
+    "stat_pending": "pending",
+    "stat_total": "Total",
+    "stat_accepted": "Accepted",
+    "stat_rejected": "Rejected"
   },
   "meetings": {
     "planner_title": "Meeting Planner",
