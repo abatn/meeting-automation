@@ -65,6 +65,8 @@ jobs:
     permissions:
       contents: 'read'
       pull-requests: 'write'
+      issues: 'write'
+      id-token: 'write'
     uses: ./.github/workflows/gemini-review.yml
     secrets: inherit
     with:
@@ -73,6 +75,10 @@ jobs:
   triage:
     needs: dispatch
     if: needs.dispatch.outputs.command == '/gemini-triage'
+    permissions:
+      contents: 'read'
+      issues: 'write'
+      id-token: 'write'
     uses: ./.github/workflows/gemini-triage.yml
     secrets: inherit
     with:
