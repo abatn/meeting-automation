@@ -49,6 +49,11 @@ jobs:
   plan:
     needs: dispatch
     if: needs.dispatch.outputs.command == '/gemini-plan'
+    permissions:
+      contents: 'write'
+      issues: 'write'
+      pull-requests: 'write'
+      id-token: 'write'
     uses: ./.github/workflows/gemini-plan-execute.yml
     secrets: inherit
     with:
@@ -57,6 +62,9 @@ jobs:
   review:
     needs: dispatch
     if: needs.dispatch.outputs.command == '/gemini-review'
+    permissions:
+      contents: 'read'
+      pull-requests: 'write'
     uses: ./.github/workflows/gemini-review.yml
     secrets: inherit
     with:
