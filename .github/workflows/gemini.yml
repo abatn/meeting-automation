@@ -46,7 +46,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const settings = fs.readFileSync('.github/commands/gemini-plan-execute.toml', 'utf8');
+            const settings = fs.readFileSync('.github/commands/gemini-settings.json', 'utf8');
             core.setOutput('settings', settings);
           
       - name: 'Run Gemini CLI'
