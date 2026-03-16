@@ -39,6 +39,15 @@ jobs:
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
             echo "PROMPT=${{ github.event.comment.body }}" >> $GITHUB_ENV
           fi
+      
+      - name: 'Read settings file'
+        id: 'read_settings'
+        uses: 'actions/github-script@v7'
+        with:
+          script: |
+            const fs = require('fs');
+            const settings = fs.readFileSync('.github/commands/gemini-plan-execute.toml', 'utf8');
+            core.setOutput('settings', settings);
           
       - name: 'Run Gemini CLI'
         id: 'run_gemini'
@@ -54,5 +63,4 @@ jobs:
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           prompt: ${{ env.PROMPT }}
-          # The settings.toml is now the single source of truth for tool config
-          settings: ".github/commands/gemini-plan-execute.toml"
+          settings: "${{ steps.read_settings.outputs.settings }}"
