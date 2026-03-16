@@ -4,18 +4,22 @@ on:
   issue_comment:
     types: [created]
 
+permissions:
+  contents: 'write'
+  issues: 'write'
+  pull-requests: 'write'
+  id-token: 'write'
+
 jobs:
   dispatch:
     if: |
       startsWith(github.event.comment.body, '/gemini-') &&
-      github.event.comment.author_association == 'OWNER' ||
-      github.event.comment.author_association == 'MEMBER' ||
-      github.event.comment.author_association == 'COLLABORATOR'
+      (
+        github.event.comment.author_association == 'OWNER' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'COLLABORATOR'
+      )
     runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-      issues: 'write'
-      pull-requests: 'write'
     outputs:
       command: ${{ steps.parse.outputs.command }}
       args: ${{ steps.parse.outputs.args }}
@@ -30,9 +34,6 @@ jobs:
           
           echo "command=$command" >> $GITHUB_OUTPUT
           echo "args=$args" >> $GITHUB_OUTPUT
-          
-          echo "Parsed command: $command"
-          echo "Parsed args: $args"
 
       - name: 'Acknowledge request'
         uses: actions/github-script@v7
@@ -43,17 +44,12 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `🤖 Hi @${context.actor}, I've received your command `${{ steps.parse.outputs.command }}` and I'm starting the process. You can track progress [in the logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for more details.`
+              body: `🤖 Hi @${context.actor}, I've received your command `${{ steps.parse.outputs.command }}` and I'm starting the process. You can track progress in the Actions tab.`
             });
   
   plan:
     needs: dispatch
     if: needs.dispatch.outputs.command == '/gemini-plan'
-    permissions:
-      contents: 'write'
-      issues: 'write'
-      pull-requests: 'write'
-      id-token: 'write'
     uses: ./.github/workflows/gemini-plan-execute.yml
     secrets: inherit
     with:
@@ -62,11 +58,6 @@ jobs:
   review:
     needs: dispatch
     if: needs.dispatch.outputs.command == '/gemini-review'
-    permissions:
-      contents: 'read'
-      pull-requests: 'write'
-      issues: 'write'
-      id-token: 'write'
     uses: ./.github/workflows/gemini-review.yml
     secrets: inherit
     with:
@@ -75,10 +66,6 @@ jobs:
   triage:
     needs: dispatch
     if: needs.dispatch.outputs.command == '/gemini-triage'
-    permissions:
-      contents: 'read'
-      issues: 'write'
-      id-token: 'write'
     uses: ./.github/workflows/gemini-triage.yml
     secrets: inherit
     with:
