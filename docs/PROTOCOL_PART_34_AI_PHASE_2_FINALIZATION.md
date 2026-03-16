@@ -24,6 +24,7 @@ Vollständige Implementierung der Phase 2 Roadmap: Integration einer stabilen Sp
 3.  **Analytics Frontend ("Armaturenbrett")**:
     *   Integration von zwei neuen Datenvisualisierungen im DG-Dashboard.
     *   Automatischer Sprach-Sync zwischen UI und Backend-Analysen.
+    *   Vollständige Lokalisierung aller UI-Elemente und Daten in Arabisch, Französisch und Englisch.
 4.  **i18n Stabilisierung**:
     *   Lösung der Redundanz zwischen `src/i18n/locales` und `public/locales`.
     *   Erstellung von `scripts/sync_locales.sh`.
@@ -34,8 +35,8 @@ Vollständige Implementierung der Phase 2 Roadmap: Integration einer stabilen Sp
 ## ⚠️ HERAUSFORDERUNGEN & LÖSUNGEN
 
 - **Gladia V2 Payload-Struktur**: Mehrere Fehlversuche (`400 Bad Request`) durch falsche Interpretation der Dokumentation. Lösung: Striktes Folgen des offiziellen 3-Stufen-Modells (getrennter Upload und Request).
-- **Daten-Parsing**: `KeyError` bei der Verarbeitung der Gladia-Antwort. Lösung: Korrektes Mapping der verschachtelten `result.transcription.utterances` Felder.
-- **Browser-Caching**: Neue Dashboard-Features wurden nicht angezeigt. Lösung: Aufklärung über Hard-Refresh (Ctrl+F5) und Dokumentation in den Arbeitsregeln.
+- **Daten-Parsing**: `KeyError` bei der Verarbeitung der Gladia-Antwort. Lösung: Korrektes Mapping der verschachtelten V2-JSON-Antwort (`result.transcription.utterances`).
+- **Browser-Caching**: Neue Dashboard-Features wurden nicht angezeigt. Lösung: Einsatz von `docker-compose build --no-cache` und Aufklärung über Hard-Refresh (Ctrl+F5).
 
 ## 🔗 ZUSAMMENHANG ZUM PROJEKT
 Mit diesem Protokoll wird die Phase 2 der Feature-Expansion offiziell abgeschlossen. Das System bietet nun nicht nur Automatisierung, sondern auch wertvolle Geschäfts-Insights für die Führungsebene.

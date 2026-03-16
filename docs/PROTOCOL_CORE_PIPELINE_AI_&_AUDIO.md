@@ -1,45 +1,45 @@
-# PROTOKOLL: CORE-PIPELINE - AUDIO-RECORDING & KI-VERARBEITUNG
+# PROTOKOLL: CORE-PIPELINE - AUDIO-RECORDING & KI-VERARBEITUNG (UPDATE: GLADIA V2)
 
-Datum: 21.02.2026 - 03.03.2026
+Datum: 15.03.2026
 Status: Abgeschlossen
 
 🎯 ZIEL
-Implementierung und Stabilisierung der gesamten Wertschöpfungskette: Von der browserbasierten Audioaufnahme über das S3-Streaming bis hin zur mehrsprachigen KI-Analyse und PDF-Generierung.
+Implementierung und Stabilisierung der gesamten Wertschöpfungskette: Von der browserbasierten Audioaufnahme über die KI-gestützte Verarbeitung (Transkription, Sprechererkennung, PV-Generierung, Action Suggestions) bis zum professionellen Export.
 
 🔧 TECHNOLOGIEN
-- **Frontend:** MediaRecorder API, Chunked Streaming
-- **Storage:** Minio / S3 (Multipart Uploads)
-- **Engine:** Celery & RabbitMQ (Async Processing)
-- **KI:** OpenAI Whisper (Transcription), Mistral Large (Analysis & PV)
-- **Export:** Jinja2 & WeasyPrint (PDF)
+- **Frontend**: React, Web Audio API, `ffmpeg.wasm` (für Client-seitiges Remuxing).
+- **Backend**: FastAPI, SQLAlchemy, Celery, `httpx`.
+- **Storage**: MinIO (S3-kompatibel).
+- **Transkription/Diarization**: Gladia V2 API (Cloud-Service).
+- **NLP/PV-Generierung/Übersetzung**: Mistral AI (Cloud-Service).
+- **Automatisierung**: n8n.
 
-📝 ENTWICKLUNGSSTUFEN & MEILENSTEINE
+📝 DURCHGEFÜHRTE ARBEITSSCHRITTE
 
-### 1. KI-Architektur & Cloud-Transition
-- **Übergang zur Cloud-API:** Umstellung von speicherintensiven lokalen Whisper/Mistral-Containern auf OpenAI- und Mistral-SaaS-Schnittstellen zur Ressourcenoptimierung.
-- **Diarization Fallback:** Implementierung einer robusten Single-Speaker-Logik, falls lokale ML-Bibliotheken (pyannote) aufgrund von Systemlimits nicht geladen werden können.
-
-### 2. Audio-Streaming & S3-Integration
-- **Chunked Upload:** Umstellung von unzuverlässigen Voll-Uploads auf ein 10-Sekunden-Streaming-Modell zur Schonung des Browser-Speichers.
-- **Server-side Assembly:** Eintreffende Audio-Chunks werden im Backend gesammelt und als vollständige `.webm` Datei hochgeladen, um das 5MB-S3-Limit (`EntityTooSmall`) zu umgehen.
-
-### 3. KI-Pipeline & Datenintegrität
-- **Robustheit:** Einführung strikter Fehlerbehandlung in Celery. S3-Download-Fehler führen nun zu einem sauberen "Failed"-Status statt zur Verarbeitung von Mock-Daten.
-- **PV-Generierung:** Automatisierte Erstellung von Procès-Verbaux (PV) mit Fokus auf mehrsprachige Kontexte (Arabisch/Französisch/Englisch).
-- **Verschlüsselung:** Sicherstellung der Field-Level Encryption (FERNET) für alle Transkripte und Protokolle in der Datenbank.
-
-### 4. PDF-Export & Finalisierung
-- **Echt-Daten Export:** Vollständige Ablösung von Mock-PDFs durch reale Generierung mittels WeasyPrint.
-- **Rendering-Fixes:** Installation notwendiger System-Bibliotheken (Pango, Cairo) und Noto-Fonts für die korrekte Darstellung arabischer Schriftzeichen.
+1.  **Frontend Recording & Streaming**: Browser erfasst Audio, teilt es in Chunks und lädt diese direkt zu MinIO (S3-kompatibel) hoch.
+2.  **Celery-Pipeline-Trigger**: Nach Abschluss der Aufnahme wird eine asynchrone Celery-Task (`process_recording`) ausgelöst.
+3.  **Gladia V2 Integration**: Der Celery-Worker lädt die komplette Audio-Datei, sendet sie an Gladia V2 (3-Stufen-Prozess: Upload -> Request -> Polling) und erhält eine Transkription mit präziser Sprechererkennung.
+4.  **Mistral AI (PV-Generierung)**: Der verarbeitete Text (inkl. Sprecher-Labels) wird an Mistral AI gesendet, um:
+    *   Ein strukturiertes PV (Protokoll) zu generieren.
+    *   ML-basierte Action Suggestions (Aufgabenvorschläge) zu identifizieren.
+    *   Dynamische Übersetzungen von Meeting-Inhalten für den Export (PDF/DOCX) und das Analytics-Dashboard zu liefern.
+5.  **Datenbank-Speicherung**: Die Ergebnisse werden in PostgreSQL (Tabellen `transcriptions`, `pvs`, `pv_sections`, `actions`, `action_suggestions`) gespeichert.
+6.  **Webhook-Benachrichtigung**: Das Backend informiert n8n über den Abschluss der Verarbeitung.
+7.  **Sicherheit & Stabilität**: Robuste Fehlerbehandlung, Timeout-Management und Wiederholungslogik sind in der gesamten Pipeline implementiert.
 
 ⚠️ HERAUSFORDERUNGEN & LÖSUNGEN
-- **Dependency Conflicts:** Behebung eines kritischen Versionskonflikts zwischen `weasyprint` und `pydyf` durch Pinning.
-- **Frontend-Polling:** Implementierung fehlender API-Routen (`/meeting/{id}`), um dem Frontend Echtzeit-Statusupdates ohne 404-Fehler zu ermöglichen.
+
+- **Asynchrone Verarbeitung**: Sicherstellung der Non-Blocking-Natur der KI-Aufrufe innerhalb der Celery-Worker.
+    - **Lösung**: Umstellung auf `httpx` mit `async/await`.
+- **Gladia API-Komplexität**: Die V2 API erfordert einen mehrstufigen Prozess für Dateiuploads.
+    - **Lösung**: Implementierung des 3-Stufen-Workflows (Upload -> Request -> Polling).
+- **Dynamische Inhalts-Lokalisierung**: Übersetzung von Meeting-Inhalten und Analysedaten in Echtzeit.
+    - **Lösung**: Nutzung von Mistral AI für On-the-fly-Übersetzungen im Backend.
+- **Performance**: Optimierung des Audio-Uploads und der KI-Verarbeitungszeiten.
+    - **Lösung**: Direkter S3-Upload und effiziente API-Integrationen.
+
+🔗 ZUSAMMENHANG ZUM PROJEKT
+Dieses Protokoll beschreibt den zentralen Wertschöpfungsprozess des Systems. Alle Kernfunktionen – von der Aufnahme bis zur fertigen Analyse – sind nun stabil und intelligent automatisiert.
 
 📊 ERGEBNIS
-✅ Funktionierendes Live-Recording mit automatischem Cloud-Upload.
-✅ Vollautomatisierte KI-Transkription und Analyse innerhalb von <30 Sekunden.
-✅ Professioneller PDF-Export mit Support für mehrsprachige Protokolle.
-
----
-*Hinweis: Dieses Dokument fasst die Protokolle ehemals PART 15 (beide), PART 18, LIVE_PIPELINE und PART 24 zusammen.*
+Die gesamte Audio- und KI-Pipeline ist nun vollständig stabil, hochperformant und liefert präzise Transkriptionen mit Sprechererkennung, professionelle Protokolle und wertvolle Management-Analysen. Der Einsatz von Cloud-APIs (Gladia, Mistral) eliminiert lokale Ressourcenengpässe und skaliert das System für den Produktionseinsatz.
