@@ -1,45 +1,64 @@
-name: '🔀 Gemini Dispatch'
+name: '🔀 Gemini Dispatcher'
 
 on:
   issue_comment:
-    types:
-      - 'created'
-
-defaults:
-  run:
-    shell: 'bash'
+    types: [created]
 
 jobs:
   dispatch:
-    if: |-
-      github.event.sender.type == 'User' &&
+    # IMPORTANT: This condition checks if the comment starts with '/gemini-' AND
+    # if the person who commented is a repository collaborator/member/owner.
+    # This prevents unauthorized users from triggering actions.
+    if: |
       startsWith(github.event.comment.body, '/gemini-') &&
-      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-      issues: 'write'
-      pull-requests: 'write'
+      (
+        github.event.comment.author_association == 'COLLABORATOR' ||
+        github.event.comment.author_association == 'MEMBER' ||
+        github.event.comment.author_association == 'OWNER'
+      )
+    runs-on: ubuntu-latest
     outputs:
-      command: '${{ steps.extract_command.outputs.command }}'
-      additional_context: '${{ steps.extract_command.outputs.additional_context }}'
-    steps:
-      - name: 'Extract command'
-        id: 'extract_command'
-        uses: 'actions/github-script@v7'
-        with:
-          script: |
-            const body = context.payload.comment.body;
-            const command = body.split(/\s+/)[0].substring(1);
-            const additionalContext = body.replace(/^\/\w+\s*/, '').trim();
-            core.setOutput('command', command);
-            core.setOutput('additional_context', additionalContext);
+      command: ${{ steps.parse.outputs.command }}
+      args: ${{ steps.parse.outputs.args }}
 
-  plan-execute:
-    needs: 'dispatch'
-    if: |-
-      needs.dispatch.outputs.command == 'gemini-plan'
-    uses: './.github/workflows/gemini-plan-execute.yml'
-    secrets: 'inherit'
+    steps:
+      - name: 'Parse command from comment'
+        id: 'parse'
+        run: |
+          body="${{ github.event.comment.body }}"
+          command=$(echo "$body" | awk '{print $1}')
+          args=$(echo "$body" | sed -E "s/^\S+\s*//")
+          
+          echo "command=$command" >> $GITHUB_OUTPUT
+          echo "args=$args" >> $GITHUB_OUTPUT
+          
+          echo "Parsed command: $command"
+          echo "Parsed args: $args"
+
+      - name: 'Acknowledge request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🤖 Hi @${context.actor}, I've received your command `${{ steps.parse.outputs.command }}` and I'm starting the process. You can track progress in the Actions tab.`
+            });
+  
+  plan:
+    needs: dispatch
+    if: needs.dispatch.outputs.command == '/gemini-plan'
+    uses: ./.github/workflows/gemini-plan-execute.yml
+    secrets: inherit
     with:
-      additional_context: '${{ needs.dispatch.outputs.additional_context }}'
+      additional_context: ${{ needs.dispatch.outputs.args }}
+
+  review:
+    needs: dispatch
+    if: needs.dispatch.outputs.command == '/gemini-review'
+    uses: ./.github/workflows/gemini-review.yml
+    secrets: inherit
+    with:
+      additional_context: ${{ needs.dispatch.outputs.args }}
