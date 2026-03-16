@@ -20,6 +20,11 @@ spec:
         ports:
         - containerPort: 5672
         - containerPort: 15672
+        readinessProbe:
+          exec:
+            command: ["rabbitmq-diagnostics", "check_running"]
+          initialDelaySeconds: 10
+          periodSeconds: 10
         envFrom:
         - secretRef:
             name: rabbitmq-secrets

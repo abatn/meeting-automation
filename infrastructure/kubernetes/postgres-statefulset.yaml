@@ -19,6 +19,16 @@ spec:
         image: postgres:15-alpine
         ports:
         - containerPort: 5432
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "meeting_user", "-d", "meeting_db"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "meeting_user", "-d", "meeting_db"]
+          initialDelaySeconds: 15
+          periodSeconds: 20
         envFrom:
         - secretRef:
             name: postgres-secrets

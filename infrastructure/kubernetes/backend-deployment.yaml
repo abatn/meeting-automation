@@ -19,6 +19,25 @@ spec:
         imagePullPolicy: Never
         ports:
         - containerPort: 8000
+        livenessProbe:
+          httpGet:
+            path: /api/v1/auth/me
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/v1/auth/me
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
         envFrom:
         - secretRef:
             name: backend-secrets
