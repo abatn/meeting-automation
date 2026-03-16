@@ -124,7 +124,7 @@ echo -e "${YELLOW}Seeding enterprise test users...${NC}"
 kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python scripts/seed_users.py" || echo -e "${RED}Warning: Seeding script failed or users already exist.${NC}"
 
 echo -e "${YELLOW}Creating S3 bucket 'meeting-recordings'...${NC}"
-kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python - < scripts/create_s3_bucket.py" || echo -e "${RED}Warning: S3 bucket creation failed or already exists.${NC}"
+kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python -" < scripts/create_s3_bucket.py || echo -e "${RED}Warning: S3 bucket creation failed or already exists.${NC}"
 
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${GREEN}   KUBERNETES SETUP COMPLETED SUCCESSFULLY!        ${NC}"
