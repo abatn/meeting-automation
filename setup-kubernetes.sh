@@ -55,6 +55,10 @@ export SOPS_AGE_KEY_FILE="$SOPS_DIR/keys.txt"
 echo -e "${YELLOW}Applying Namespace and decrypting Secrets...${NC}"
 kubectl apply -f infrastructure/kubernetes/namespace.yaml
 
+# Install Traefik CRDs if they don't exist
+echo -e "${YELLOW}Ensuring Traefik CRDs are installed...${NC}"
+kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.0/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
+
 for secret_file in infrastructure/kubernetes/*-secrets.yaml; do
     echo -e "Decrypting and applying ${secret_file}..."
     $SOPS_CMD --decrypt "$secret_file" | kubectl apply -f -
@@ -94,8 +98,17 @@ echo -e "${YELLOW}Waiting for Backend to be ready...${NC}"
 kubectl wait --for=condition=ready pod -l app=backend -n meeting-automation --timeout=120s
 
 # 6. Database Migrations & Initial Setup
-echo -e "${YELLOW}Running Alembic migrations in Backend Pod...${NC}"
-kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && alembic upgrade head || alembic stamp head"
+echo -e "${YELLOW}Checking database state for Alembic migrations...${NC}"
+TABLE_EXISTS=$(kubectl exec -i statefulset/postgres -n meeting-automation -- psql -U meeting_user -d meeting_db -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename  = 'users');")
+
+if [ "$TABLE_EXISTS" = "t" ]; then
+    echo -e "${BLUE}Tables already auto-created by backend. Syncing Alembic state...${NC}"
+    kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && alembic stamp head"
+else
+    echo -e "${YELLOW}Running Alembic migrations from scratch...${NC}"
+    kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && alembic upgrade head"
+fi
+echo -e "${GREEN}Database schema is up to date.${NC}"
 
 echo -e "${YELLOW}Initializing n8n auxiliary table (n8n_meetings)...${NC}"
 kubectl exec -i statefulset/postgres -n meeting-automation -- psql -U meeting_user -d meeting_db -c "
@@ -108,10 +121,10 @@ CREATE TABLE IF NOT EXISTS n8n_meetings (
 );"
 
 echo -e "${YELLOW}Seeding enterprise test users...${NC}"
-kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python scripts/seed_users.py"
+kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python scripts/seed_users.py" || echo -e "${RED}Warning: Seeding script failed or users already exist.${NC}"
 
 echo -e "${YELLOW}Creating S3 bucket 'meeting-recordings'...${NC}"
-kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python -" < scripts/create_s3_bucket.py
+kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python - < scripts/create_s3_bucket.py" || echo -e "${RED}Warning: S3 bucket creation failed or already exists.${NC}"
 
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${GREEN}   KUBERNETES SETUP COMPLETED SUCCESSFULLY!        ${NC}"
