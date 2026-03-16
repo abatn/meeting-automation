@@ -1,10 +1,14 @@
-# PROTOKOLL: DIARIZATION_AND_BUILD_FIX (ABGELÖST DURCH GLADIA V2)
+# PROTOKOLL: DIARIZATION_AND_BUILD_FIX (HISTORISCH - ABGELÖST DURCH GLADIA V2)
 
 Datum: 23.02.2026
-Status: Abgelöst
+Status: Abgelöst (Veraltet)
 
-## ⚠️ WICHTIGER HINWEIS
-Dieses Protokoll wurde durch die Implementierung von Gladia V2 in **[PROTOCOL_PART_34_AI_PHASE_2_FINALIZATION.md](PROTOCOL_PART_34_AI_PHASE_2_FINALIZATION.md)** ersetzt. Die hier beschriebenen Lösungen für Pyannote.audio sind nicht mehr aktuell.
+## ⚠️ WICHTIGER ARCHITEKTUR-HINWEIS
+Dieses Protokoll dokumentiert die historischen Bemühungen zur Implementierung einer lokalen Sprechererkennung mittels **pyannote.audio**. 
+Aufgrund von Ressourcenengpässen und Stabilitätsproblemen wurde diese gesamte Architektur im März 2026 durch die **Gladia V2 Cloud API** ersetzt.
+
+Details zur aktuellen, stabilen Lösung finden Sie in:
+👉 **[PROTOCOL_PART_34_AI_PHASE_2_FINALIZATION.md](PROTOCOL_PART_34_AI_PHASE_2_FINALIZATION.md)**
 
 ## 🎯 ZIEL (Historisch)
 Behebung von Build-Fehlern und Laufzeit-Abhängigkeiten für das Transkriptions- und Diarization-System (pyannote.audio).

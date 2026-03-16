@@ -1,45 +1,39 @@
-# PROTOKOLL: PART_34 - AI-PHASE 2: GLADIA V2 & ANALYTICS DASHBOARD
+# PROTOKOLL: PART_34 - AI-PHASE 2: GLADIA V2 & ANALYTICS DASHBOARD (FINALISIERUNG)
 
 Datum: 15.03.2026
 Status: Abgeschlossen
 
 ## 🎯 ZIEL
-Vollständige Implementierung der Phase 2 Roadmap: Integration einer stabilen Sprechererkennung und Aufbau eines Analyse-Dashboards für das Management (DG).
+Vollständige Implementierung und Dokumentation der Phase 2 Roadmap: Integration der Gladia V2 API für Sprechererkennung, Aufbau des Analytics-Dashboards für die Geschäftsführung (DG) und Stabilisierung der mehrsprachigen Lokalisierung (i18n).
 
 ## 🔧 TECHNOLOGIEN
-- **Gladia V2 API**: Einheitliche Transkription und Diarization (3-Stufen-Prozess).
-- **Mistral AI**: NLP für PV-Generierung und dynamische Übersetzungen der Analysedaten.
-- **React / MUI**: Frontend-Komponenten für das DG-Dashboard.
-- **SQLAlchemy**: Aggregations-Queries für Task-Muster und KI-Statistiken.
+- **Gladia V2 API**: Ablösung von Whisper/Pyannote durch einen einheitlichen, cloud-basierten Workflow für Transkription und Diarization.
+- **Mistral AI**: Nutzung für On-the-fly Übersetzungen von Analysedaten und PV-Sektionen.
+- **React / MUI**: Umsetzung der Visualisierungen im DG-Dashboard.
+- **Kubernetes / SOPS**: Sichere Speicherung des Gladia API-Keys.
 
 ## 📝 DURCHGEFÜHRTE ARBEITSSCHRITTE
 
-1.  **Gladia V2 Migration**:
-    *   Ablösung der instabilen Whisper/Pyannote-Pipeline.
-    *   Implementierung des asynchronen Workflows (Upload -> Transcribe Request -> Polling).
-    *   Anpassung des `TranscriptionViewer` zur Anzeige von Sprecher-Labels (`Speaker 0`, `Speaker 1`).
-2.  **Analytics Backend**:
-    *   Erstellung der Endpunkte `GET /api/v1/actions/patterns` (Mustererkennung bei Aufgaben) und `GET /api/v1/actions/statistics/recurring` (KI-Akzeptanzraten).
-    *   Implementierung einer Echtzeit-Übersetzungslogik im `ActionService`, damit auch Datenbankinhalte lokalisiert im Dashboard erscheinen.
-3.  **Analytics Frontend ("Armaturenbrett")**:
-    *   Integration von zwei neuen Datenvisualisierungen im DG-Dashboard.
-    *   Automatischer Sprach-Sync zwischen UI und Backend-Analysen.
-    *   Vollständige Lokalisierung aller UI-Elemente und Daten in Arabisch, Französisch und Englisch.
-4.  **i18n Stabilisierung**:
-    *   Lösung der Redundanz zwischen `src/i18n/locales` und `public/locales`.
-    *   Erstellung von `scripts/sync_locales.sh`.
-5.  **System-Hygiene**:
-    *   Löschung veralteter Skripte und redundanter Test-Audiodateien.
-    *   Erhöhung der RabbitMQ-Startzeit auf 300s für stabilere Container-Starts in WSL2.
+1.  **Gladia V2 Integration**:
+    *   Entwicklung des `GladiaService` im Backend zur Abwicklung des 3-Stufen-Prozesses (Upload -> Transcription Request -> Result Polling).
+    *   Umstellung der Celery-Task `process_recording` auf die neue Pipeline.
+    *   Anpassung des Datenbank-Schemas zur Speicherung der von Gladia gelieferten Sprecher-Segmente.
+2.  **Management-Analytics (DG Dashboard)**:
+    *   Implementierung von SQL-Aggregations-Endpunkten (`/patterns`, `/statistics/recurring`) im `ActionService`.
+    *   Entwicklung einer Echtzeit-Übersetzungs-Bridge mittels Mistral AI, um dynamische Datenbankinhalte (z.B. Task-Titel) im Dashboard lokalisiert (Arabisch, Französisch, Englisch) anzuzeigen.
+3.  **i18n & Lokalisierung**:
+    *   Behebung von Synchronisationsfehlern zwischen `src/i18n/locales` und `public/locales`.
+    *   Erstellung des Automatisierungs-Skripts `scripts/sync_locales.sh`.
+4.  **Kubernetes-Härtung**:
+    *   Sichere Aufnahme des `GLADIA_API_KEY` in die verschlüsselten `backend-secrets.yaml` mittels SOPS und age.
 
 ## ⚠️ HERAUSFORDERUNGEN & LÖSUNGEN
 
-- **Gladia V2 Payload-Struktur**: Mehrere Fehlversuche (`400 Bad Request`) durch falsche Interpretation der Dokumentation. Lösung: Striktes Folgen des offiziellen 3-Stufen-Modells (getrennter Upload und Request).
-- **Daten-Parsing**: `KeyError` bei der Verarbeitung der Gladia-Antwort. Lösung: Korrektes Mapping der verschachtelten V2-JSON-Antwort (`result.transcription.utterances`).
-- **Browser-Caching**: Neue Dashboard-Features wurden nicht angezeigt. Lösung: Einsatz von `docker-compose build --no-cache` und Aufklärung über Hard-Refresh (Ctrl+F5).
+- **Gladia API-Struktur**: Die V2 API verlangt strikte Trennung von Dateiupload und Verarbeitungsauftrag. Lösung: Implementierung einer robusten asynchronen Warteschleife (Polling) mit Error-Handling.
+- **Daten-Inkonsistenz bei i18n**: Lokalisierungsdateien wurden an verschiedenen Orten gepflegt. Lösung: Definition einer "Source of Truth" in `src/i18n/` und automatisierter Sync zum statischen Web-Ordner.
 
 ## 🔗 ZUSAMMENHANG ZUM PROJEKT
-Mit diesem Protokoll wird die Phase 2 der Feature-Expansion offiziell abgeschlossen. Das System bietet nun nicht nur Automatisierung, sondern auch wertvolle Geschäfts-Insights für die Führungsebene.
+Dieses Protokoll schließt die funktionale Erweiterung (Phase 2) ab. Das System bietet nun hochpräzise Sprechererkennung und wertvolle Management-Insights, die für die Skalierbarkeit in größeren Organisationen essenziell sind.
 
 ## 📊 ERGEBNIS
-Das System ist technologisch auf dem neuesten Stand. Die Sprechererkennung arbeitet hochpräzise und das Management verfügt über ein vollständig lokalisiertes Analyse-Werkzeug zur Überwachung der KI-Effizienz und Aufgabentrends.
+Die KI-Pipeline ist nun vollständig Cloud-basiert und skalierbar. Das DG-Dashboard liefert präzise Analysen über Aufgabentrends und KI-Effizienz, vollständig lokalisiert für die Zielregionen.
