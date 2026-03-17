@@ -24,8 +24,10 @@ Vollständige Implementierung und Dokumentation der Phase 2 Roadmap: Integration
 3.  **i18n & Lokalisierung**:
     *   Behebung von Synchronisationsfehlern zwischen `src/i18n/locales` und `public/locales`.
     *   Erstellung des Automatisierungs-Skripts `scripts/sync_locales.sh`.
-4.  **Kubernetes-Härtung**:
-    *   Sichere Aufnahme des `GLADIA_API_KEY` in die verschlüsselten `backend-secrets.yaml` mittels SOPS und age.
+4.  **Security & Secret Management (ISO 27001 Compliance)**:
+    *   **Mistral Key Rotation**: Ein kompromittierter Mistral API-Key in der lokalen `.env`-Datei wurde identifiziert und durch einen neuen, sicheren Key ersetzt.
+    *   **SOPS Migration**: Der neue `MISTRAL_API_KEY` sowie der `GLADIA_API_KEY` wurden strikt nach Protokoll 27 aus der Klartext-`.env`-Datei entfernt und in die Kubernetes-Secrets (`infrastructure/kubernetes/backend-secrets.yaml`) migriert.
+    *   **Verschlüsselung**: Die Datei wurde mittels `sops` und `age` sicher verschlüsselt, um die Exposition von Cloud-Credentials in der Versionskontrolle zu verhindern.
 
 ## ⚠️ HERAUSFORDERUNGEN & LÖSUNGEN
 
