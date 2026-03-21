@@ -29,6 +29,7 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
   const recordingIdRef = useRef<string | null>(null);
   const isUploadingRef = useRef<boolean>(false);
   const chunkQueue = useRef<Blob[]>([]);
+  const isStoppingRef = useRef<boolean>(false);
 
   const processChunkQueue = useCallback(async () => {
     if (isUploadingRef.current || chunkQueue.current.length === 0) return;
@@ -39,7 +40,7 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
     if (chunk && uploadIdRef.current && fileKeyRef.current) {
       try {
         const currentPart = partNumberRef.current++;
-        console.log(`Uploading chunk ${currentPart}...`);
+        console.log(`Uploading chunk ${currentPart} (Size: ${chunk.size} bytes)...`);
         const response = await meetingsApi.uploadStreamChunk(
           uploadIdRef.current,
           fileKeyRef.current,
@@ -63,13 +64,14 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
 
     // Process next chunk if available
     if (chunkQueue.current.length > 0) {
-      processChunkQueue();
+      setTimeout(() => processChunkQueue(), 10);
     }
   }, []);
 
   const startRecording = useCallback(
     async (meetingId: string) => {
       try {
+        isStoppingRef.current = false;
         // 1. Start capturing audio
         let stream;
         try {
@@ -104,6 +106,7 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
 
         recorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
+            console.log("Chunk available, size:", event.data.size);
             chunkQueue.current.push(event.data);
             processChunkQueue();
           }
@@ -151,7 +154,11 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
     (meetingId: string): Promise<any | null> => {
       return new Promise((resolve) => {
         if (mediaRecorder.current && isRecording) {
+          isStoppingRef.current = true;
+          
           mediaRecorder.current.onstop = async () => {
+            console.log("MediaRecorder stopped. Finalizing uploads...");
+            
             // Stop all tracks to release microphone
             mediaRecorder.current?.stream
               .getTracks()
@@ -163,19 +170,24 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
             setIsRecording(false);
             setIsPaused(false);
 
-            // Wait for any pending uploads to finish
-            while (isUploadingRef.current || chunkQueue.current.length > 0) {
+            // Give ondataavailable a chance to fire for the last data chunk
+            await new Promise(r => setTimeout(r, 500));
+
+            // Wait for any pending uploads to finish (Wait up to 10 seconds)
+            let waitCount = 0;
+            while ((isUploadingRef.current || chunkQueue.current.length > 0) && waitCount < 20) {
+              console.log("Waiting for last chunks to upload...");
               await new Promise((r) => setTimeout(r, 500));
+              waitCount++;
             }
 
             if (
               recordingIdRef.current &&
               uploadIdRef.current &&
-              fileKeyRef.current &&
-              uploadedPartsRef.current.length > 0
+              fileKeyRef.current
             ) {
               try {
-                console.log("Finalizing stream for meeting:", meetingId);
+                console.log("Finalizing stream for meeting:", meetingId, "Parts:", uploadedPartsRef.current.length);
 
                 const response = await meetingsApi.stopStream(
                   recordingIdRef.current,
@@ -198,7 +210,7 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
                 resolve(null);
               }
             } else {
-              // Handle case where recording was stopped too fast to even send one chunk
+              console.warn("Missing stream identifiers on stop.");
               resolve(null);
             }
           };

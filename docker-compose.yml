@@ -3,6 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: meeting_db
       POSTGRES_USER: meeting_user
@@ -28,6 +29,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     command: redis-server --requirepass redis_password
     volumes:
       - redis_data:/data
@@ -46,6 +48,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management
+    restart: unless-stopped
     user: "0:0"
     hostname: rabbitmq
     command: >
@@ -75,6 +78,7 @@ services:
 
   minio:
     image: minio/minio:latest
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minio_user
@@ -97,6 +101,7 @@ services:
   
   n8n:
     image: n8nio/n8n:latest
+    restart: unless-stopped
     env_file: .env
     environment:
       - DB_TYPE=postgresdb
@@ -120,6 +125,7 @@ services:
 
   backend:
     build: ./backend
+    restart: unless-stopped
     command: >
       bash -c "
       echo 'Waiting 10s for PostgreSQL...' &&
@@ -161,6 +167,7 @@ services:
 
   celery-worker:
     build: ./backend
+    restart: unless-stopped
     command: >
       bash -c "
       echo 'Waiting 10s for RabbitMQ...' &&
@@ -190,6 +197,7 @@ services:
 
   celery-beat:
     build: ./backend
+    restart: unless-stopped
     command: celery -A app.tasks.celery_app beat --loglevel=info
     env_file: .env
     environment:
@@ -217,6 +225,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     image: meeting-automation-frontend:v1.0.0
+    restart: unless-stopped
     ports:
       - "3000:80"
     depends_on:
