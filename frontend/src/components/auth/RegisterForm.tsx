@@ -63,19 +63,16 @@ const RegisterForm: React.FC = () => {
     setLoading(true);
 
     try {
-      // 1. Register User & Client
       await authService.register({
         email: formData.email,
         password: formData.password,
         full_name: formData.full_name,
-        client_id: undefined, // Backend will create a new one based on company_name
+        company_name: formData.company_name,
+        plan: formData.plan
       });
 
-      // 2. Auto-login
       const loginData = await authService.login(formData.email, formData.password);
       dispatch(setCredentials(loginData));
-      
-      // 3. Redirect to dashboard
       navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Une erreur est survenue lors de l\'inscription.');
@@ -85,40 +82,27 @@ const RegisterForm: React.FC = () => {
   };
 
   return (
-    <Box sx={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
-      bgcolor: '#F8FAFC',
-      py: 8
-    }}>
-      <Container maxWidth="sm">
-        <Paper elevation={0} sx={{ p: { xs: 3, md: 6 }, borderRadius: 4, border: '1px solid #E5EAF2' }}>
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Typography variant="h4" fontWeight="800" gutterBottom>Créer votre compte</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Commencez à automatiser vos réunions dès aujourd'hui.
-            </Typography>
+    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', bgcolor: '#F8FAFC', py: 2 }}>
+      <Container maxWidth="xs">
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid #E5EAF2' }}>
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <Typography variant="h5" fontWeight="800">Créer votre compte</Typography>
+            <Typography variant="caption" color="text.secondary">Commencez l'automatisation dès maintenant.</Typography>
           </Box>
 
-          {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mb: 2, py: 0 }}>{error}</Alert>}
 
           <form onSubmit={handleSubmit}>
-            <Stack spacing={2.5}>
+            <Stack spacing={1.5}>
               <TextField
                 label="Nom complet"
                 name="full_name"
                 required
                 fullWidth
+                size="small"
                 value={formData.full_name}
                 onChange={handleChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <PersonIcon color="action" />
-                    </InputAdornment>
-                  ),
-                }}
+                InputProps={{ startAdornment: (<InputAdornment position="start"><PersonIcon fontSize="small" color="action" /></InputAdornment>) }}
               />
 
               <TextField
@@ -126,16 +110,10 @@ const RegisterForm: React.FC = () => {
                 name="company_name"
                 required
                 fullWidth
+                size="small"
                 value={formData.company_name}
                 onChange={handleChange}
-                placeholder="Ex: Ma Société SAS"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <BusinessIcon color="action" />
-                    </InputAdornment>
-                  ),
-                }}
+                InputProps={{ startAdornment: (<InputAdornment position="start"><BusinessIcon fontSize="small" color="action" /></InputAdornment>) }}
               />
 
               <TextField
@@ -144,15 +122,10 @@ const RegisterForm: React.FC = () => {
                 type="email"
                 required
                 fullWidth
+                size="small"
                 value={formData.email}
                 onChange={handleChange}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <EmailIcon color="action" />
-                    </InputAdornment>
-                  ),
-                }}
+                InputProps={{ startAdornment: (<InputAdornment position="start"><EmailIcon fontSize="small" color="action" /></InputAdornment>) }}
               />
 
               <TextField
@@ -161,18 +134,15 @@ const RegisterForm: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 required
                 fullWidth
+                size="small"
                 value={formData.password}
                 onChange={handleChange}
                 InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockIcon color="action" />
-                    </InputAdornment>
-                  ),
+                  startAdornment: (<InputAdornment position="start"><LockIcon fontSize="small" color="action" /></InputAdornment>),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      <IconButton size="small" onClick={() => setShowPassword(!showPassword)} edge="end">
+                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -181,57 +151,36 @@ const RegisterForm: React.FC = () => {
 
               <TextField
                 select
-                label="Forfait choisi"
+                label="Plan"
                 name="plan"
                 fullWidth
+                size="small"
                 value={formData.plan}
                 onChange={handleChange}
               >
-                <MenuItem value="GRATUIT">Gratuit (10 réunions/mois)</MenuItem>
-                <MenuItem value="PRO">Pro (99$/mois - Illimité)</MenuItem>
-                <MenuItem value="ENTREPRISE">Entreprise (499$/mois - Support dédié)</MenuItem>
+                <MenuItem value="GRATUIT">Gratuit</MenuItem>
+                <MenuItem value="PRO">Pro (99$/m)</MenuItem>
+                <MenuItem value="ENTREPRISE">Entreprise (499$/m)</MenuItem>
               </TextField>
 
               <Button
                 type="submit"
                 variant="contained"
                 fullWidth
-                size="large"
                 disabled={loading}
-                sx={{ 
-                  py: 1.5, 
-                  borderRadius: 2, 
-                  fontWeight: 700, 
-                  textTransform: 'none',
-                  fontSize: '1rem',
-                  mt: 2
-                }}
+                sx={{ py: 1, borderRadius: 1.5, fontWeight: 700, textTransform: 'none', mt: 1 }}
               >
-                {loading ? <CircularProgress size={24} color="inherit" /> : 'Créer mon compte'}
+                {loading ? <CircularProgress size={20} color="inherit" /> : 'Créer mon compte'}
               </Button>
 
-              <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Vous avez déjà ein compte ?{' '}
-                  <Link 
-                    component="button" 
-                    type="button"
-                    variant="body2" 
-                    fontWeight="700" 
-                    onClick={() => navigate('/login')}
-                  >
-                    Se connecter
-                  </Link>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">
+                  Déjà un compte ? <Link component="button" type="button" variant="caption" fontWeight="700" onClick={() => navigate('/login')}>Se connecter</Link>
                 </Typography>
               </Box>
             </Stack>
           </form>
         </Paper>
-        
-        <Typography variant="caption" display="block" textAlign="center" sx={{ mt: 4, color: 'text.secondary' }}>
-          En vous inscrivant, vous acceptez nos Conditions d'Utilisation et notre Politique de Confidentialité.
-          Conforme RGPD & ISO 27001.
-        </Typography>
       </Container>
     </Box>
   );

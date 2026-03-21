@@ -37,6 +37,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting Meeting Automation System...")
 
+    # Ensure S3 Buckets exist (Auto-Healing)
+    await ensure_s3_buckets_exist()
+
     # Start Redis WebSocket Listener task
     asyncio.create_task(manager.listen_to_redis())
 
@@ -47,6 +50,37 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Shutting down...")
 
+
+async def ensure_s3_buckets_exist():
+    """Checks for required S3 buckets and creates them if missing."""
+    import boto3
+    from botocore.exceptions import ClientError
+    
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=settings.S3_ENDPOINT,
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY,
+    )
+    
+    buckets = [settings.S3_BUCKET_NAME, "meeting-pdfs"]
+    
+    for bucket in buckets:
+        try:
+            # Check if bucket exists
+            s3_client.head_bucket(Bucket=bucket)
+            logger.info(f"S3 Bucket '{bucket}' exists.")
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code')
+            if error_code == '404' or error_code == 'NoSuchBucket':
+                logger.warning(f"S3 Bucket '{bucket}' missing. Creating...")
+                try:
+                    s3_client.create_bucket(Bucket=bucket)
+                    logger.info(f"S3 Bucket '{bucket}' created successfully.")
+                except Exception as ce:
+                    logger.error(f"Failed to create bucket '{bucket}': {ce}")
+            else:
+                logger.error(f"Error checking S3 bucket '{bucket}': {e}")
 
 app = FastAPI(
     title="Meeting Automation API",

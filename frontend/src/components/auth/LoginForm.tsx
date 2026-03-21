@@ -47,57 +47,40 @@ const LoginForm: React.FC = () => {
       dispatch(setCredentials(data));
       navigate("/");
     } catch (err: any) {
-      setError(
-        err.response?.data?.detail || "Email ou mot de passe incorrect."
-      );
+      setError(err.response?.data?.detail || "Email ou mot de passe incorrect.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Box sx={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
-      bgcolor: '#F8FAFC',
-      py: 8
-    }}>
-      <Container maxWidth="sm">
-        <Box sx={{ textAlign: 'center', mb: 4, cursor: 'pointer' }} onClick={() => navigate('/')}>
-            <Avatar sx={{ bgcolor: 'primary.main', mx: 'auto', mb: 2, width: 48, height: 48 }}>
-                <IAIcon sx={{ fontSize: 30 }} />
+    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', bgcolor: '#F8FAFC', py: 2 }}>
+      <Container maxWidth="xs">
+        <Box sx={{ textAlign: 'center', mb: 2, cursor: 'pointer' }} onClick={() => navigate('/')}>
+            <Avatar sx={{ bgcolor: 'primary.main', mx: 'auto', mb: 1, width: 36, height: 36 }}>
+                <IAIcon sx={{ fontSize: 22 }} />
             </Avatar>
-            <Typography variant="h5" fontWeight="800">
-                Meeting<Box component="span" sx={{ color: 'primary.main' }}>Automation</Box>
-            </Typography>
+            <Typography variant="h6" fontWeight="800">MeetingAutomation</Typography>
         </Box>
 
-        <Paper elevation={0} sx={{ p: { xs: 3, md: 6 }, borderRadius: 4, border: '1px solid #E5EAF2' }}>
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h4" fontWeight="800" gutterBottom>Bon retour !</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Connectez-vous pour accéder à vos réunions.
-            </Typography>
+        <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid #E5EAF2' }}>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h5" fontWeight="800">Bon retour !</Typography>
+            <Typography variant="caption" color="text.secondary">Connectez-vous à votre espace.</Typography>
           </Box>
 
-          {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mb: 2, py: 0 }}>{error}</Alert>}
 
           <form onSubmit={handleSubmit}>
-            <Stack spacing={3}>
+            <Stack spacing={2}>
               <TextField
                 label="Adresse Email"
                 fullWidth
                 required
+                size="small"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <EmailIcon color="action" />
-                    </InputAdornment>
-                  ),
-                }}
+                InputProps={{ startAdornment: (<InputAdornment position="start"><EmailIcon fontSize="small" color="action" /></InputAdornment>) }}
               />
 
               <TextField
@@ -105,18 +88,15 @@ const LoginForm: React.FC = () => {
                 type={showPassword ? "text" : "password"}
                 fullWidth
                 required
+                size="small"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockIcon color="action" />
-                    </InputAdornment>
-                  ),
+                  startAdornment: (<InputAdornment position="start"><LockIcon fontSize="small" color="action" /></InputAdornment>),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      <IconButton size="small" onClick={() => setShowPassword(!showPassword)} edge="end">
+                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -124,39 +104,22 @@ const LoginForm: React.FC = () => {
               />
 
               <Box sx={{ textAlign: 'right' }}>
-                <Link href="#" variant="body2" fontWeight="600">Mot de passe oublié ?</Link>
+                <Link component="button" type="button" variant="caption" fontWeight="600">Mot de passe oublié ?</Link>
               </Box>
 
               <Button
                 type="submit"
                 variant="contained"
                 fullWidth
-                size="large"
                 disabled={loading}
-                sx={{ 
-                  py: 1.5, 
-                  borderRadius: 2, 
-                  fontWeight: 700, 
-                  textTransform: 'none',
-                  fontSize: '1rem',
-                  boxShadow: '0 4px 14px 0 rgba(0,118,255,0.39)'
-                }}
+                sx={{ py: 1, borderRadius: 1.5, fontWeight: 700, textTransform: 'none', mt: 1 }}
               >
-                {loading ? <CircularProgress size={24} color="inherit" /> : "Se connecter"}
+                {loading ? <CircularProgress size={20} color="inherit" /> : "Se connecter"}
               </Button>
 
-              <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  Nouveau sur la plateforme ?{' '}
-                  <Link 
-                    component="button" 
-                    type="button"
-                    variant="body2" 
-                    fontWeight="700" 
-                    onClick={() => navigate('/register')}
-                  >
-                    Créer un compte
-                  </Link>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">
+                  Nouveau ? <Link component="button" type="button" variant="caption" fontWeight="700" onClick={() => navigate('/register')}>Créer un compte</Link>
                 </Typography>
               </Box>
             </Stack>
