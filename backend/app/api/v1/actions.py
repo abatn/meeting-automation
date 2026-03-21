@@ -27,7 +27,7 @@ async def get_action_patterns(
     Restricted to DG and Manager roles.
     """
     service = ActionService(db)
-    return await service.get_action_patterns(limit, target_language=lang)
+    return await service.get_action_patterns(current_user.client_id, limit, target_language=lang)
 
 @router.get("/statistics/recurring", response_model=List[ActionStatistics])
 async def get_recurring_statistics(
@@ -40,7 +40,7 @@ async def get_recurring_statistics(
     Restricted to DG and Manager roles.
     """
     service = ActionService(db)
-    return await service.get_recurring_statistics(target_language=lang)
+    return await service.get_recurring_statistics(current_user.client_id, target_language=lang)
 
 # --- Suggestion Endpoints ---
 
@@ -63,7 +63,11 @@ async def get_action_suggestions(
     Checks DB first, if none exist, calls the AI.
     """
     # Check if we already have suggestions
-    stmt = select(ActionSuggestionModel).where(ActionSuggestionModel.meeting_id == meeting_id)
+    stmt = select(ActionSuggestionModel).where(
+        ActionSuggestionModel.meeting_id == meeting_id
+    ).where(
+        ActionSuggestionModel.client_id == current_user.client_id
+    )
     result = await db.execute(stmt)
     existing_suggestions = result.scalars().all()
     
@@ -72,7 +76,7 @@ async def get_action_suggestions(
 
     # If none exist, generate them
     action_service = ActionService(db)
-    suggestions = await action_service.generate_suggestions_from_transcription(meeting_id)
+    suggestions = await action_service.generate_suggestions_from_transcription(meeting_id, current_user.client_id)
     return suggestions
 
 @router.post("/suggestions/learn")
@@ -89,7 +93,7 @@ async def learn_action_suggestion_feedback(
         raise HTTPException(status_code=400, detail="Action must be 'accept' or 'reject'")
         
     action_service = ActionService(db)
-    await action_service.learn_from_feedback(feedback.suggestion_id, feedback.action)
+    await action_service.learn_from_feedback(feedback.suggestion_id, current_user.client_id, feedback.action)
     return {"status": "success", "message": "Feedback recorded successfully."}
 
 @router.post("/suggestions/translate")
@@ -119,7 +123,7 @@ async def list_actions(
     """
     Retrieve a list of action items, with optional filters.
     """
-    stmt = select(ActionModel)
+    stmt = select(ActionModel).where(ActionModel.client_id == current_user.client_id)
 
     # Optional filters
     if status:
@@ -151,6 +155,7 @@ async def list_my_actions(
     """
     stmt = (
         select(ActionModel)
+        .where(ActionModel.client_id == current_user.client_id)
         .join(AssignmentModel)
         .where(AssignmentModel.user_id == current_user.id)
     )
@@ -181,8 +186,24 @@ async def list_team_actions(
             status_code=403,
             detail="Insufficient permissions. Only managers can access team actions.",
         )
-    # Note: Implementation of filtering by managed users would go here
-    return []
+    
+    managed_user_ids = [report.id for report in current_user.reports]
+    if not managed_user_ids:
+        return []
+
+    stmt = (
+        select(ActionModel)
+        .where(ActionModel.client_id == current_user.client_id)
+        .join(AssignmentModel)
+        .where(AssignmentModel.user_id.in_(managed_user_ids))
+    )
+    
+    if status:
+        stmt = stmt.where(ActionModel.status == status)
+
+    stmt = stmt.offset(skip).limit(limit)
+    result = await db.execute(stmt)
+    return result.scalars().all()
 
 
 @router.get("/pending", response_model=List[Action])
@@ -212,6 +233,7 @@ async def create_action(
     """
     action = ActionModel(
         id=str(uuid.uuid4()),
+        client_id=current_user.client_id,
         title=action_in.title,
         description=action_in.description,
         status=action_in.status,
@@ -244,7 +266,11 @@ async def get_action(
     """
     Retrieves details of a specific action item.
     """
-    result = await db.execute(select(ActionModel).where(ActionModel.id == action_id))
+    result = await db.execute(
+        select(ActionModel)
+        .where(ActionModel.id == action_id)
+        .where(ActionModel.client_id == current_user.client_id)
+    )
     action = result.scalars().first()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
@@ -262,7 +288,11 @@ async def update_action_status(
     """
     Updates the status of an action item.
     """
-    result = await db.execute(select(ActionModel).where(ActionModel.id == action_id))
+    result = await db.execute(
+        select(ActionModel)
+        .where(ActionModel.id == action_id)
+        .where(ActionModel.client_id == current_user.client_id)
+    )
     action = result.scalars().first()
 
     if not action:

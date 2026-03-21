@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 class BrandingSettingsBase(BaseModel):
+    client_id: Optional[str] = None
     organization_name: Optional[str] = None
     logo_url: Optional[str] = None
     header_text: Optional[str] = None

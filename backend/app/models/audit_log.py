@@ -9,12 +9,14 @@ from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.client import Client
 
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
     user_id: Mapped[Optional[str]] = mapped_column(
         String, ForeignKey("users.id"), nullable=True
     )
@@ -37,4 +39,5 @@ class AuditLog(Base):
     )
 
     # Relationships
+    client: Mapped["Client"] = relationship("Client", back_populates="audit_logs")
     user: Mapped["User"] = relationship("User", back_populates="audit_logs")

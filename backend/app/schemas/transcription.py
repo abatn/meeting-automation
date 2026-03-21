@@ -34,6 +34,7 @@ class Segment(SegmentBase):
 
 
 class TranscriptionBase(BaseModel):
+    client_id: Optional[str] = None
     meeting_id: str
     recording_id: str
     full_text: Optional[str] = None

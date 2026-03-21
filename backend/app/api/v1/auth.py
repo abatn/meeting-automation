@@ -39,29 +39,18 @@ async def login(
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
 
+    # Generate token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-
-    # Load roles for the user
-    user_stmt = (
-        select(UserModel)
-        .options(selectinload(UserModel.roles))
-        .where(UserModel.id == user.id)
-    )
-    user_with_roles = (await db.execute(user_stmt)).scalar_one()
-    role_name = (
-        user_with_roles.roles[0].name if user_with_roles.roles else "participant"
-    )
-
     return {
         "access_token": security.create_access_token(
-            {"sub": str(user.id)}, expires_delta=access_token_expires
+            {"sub": str(user.id), "client_id": str(user.client_id), "role": user.role}, expires_delta=access_token_expires
         ),
         "token_type": "bearer",
         "user": {
             "id": user.id,
             "email": user.email,
             "full_name": user.full_name,
-            "role": role_name,
+            "role": user.role,
             "created_at": user.created_at,
         },
     }
@@ -81,16 +70,32 @@ async def register(
             detail="The user with this username already exists in the system.",
         )
 
+    from app.models.client import Client, SubscriptionStatus, SubscriptionPlan
+    
+    client_id = user_in.client_id
+    if not client_id:
+        client_id = str(uuid.uuid4())
+        new_client = Client(
+            id=client_id,
+            company_name=f"{user_in.full_name or user_in.email}'s Company",
+            subscription_plan=SubscriptionPlan.GRATUIT,
+            subscription_status=SubscriptionStatus.ACTIVE,
+            minutes_included=600
+        )
+        db.add(new_client)
+        await db.flush()
+
     # Create user with string ID (UUID)
     db_obj = UserModel(
         id=str(uuid.uuid4()),
+        client_id=client_id,
         email=user_in.email,
         hashed_password=security.get_password_hash(user_in.password),
         full_name=user_in.full_name,
         is_active=True,
         is_superuser=False,
         is_mfa_enabled=False,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(datetime.timezone.utc) if hasattr(datetime, "UTC") else datetime.utcnow(),
     )
     db.add(db_obj)
     await db.flush()
@@ -129,31 +134,19 @@ async def read_user_me(
 
 @router.get("/validate")
 async def validate_token(
-    db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
     Validate the current JWT token and return user details.
     Used for initial App load to prevent redirect loops.
     """
-    # Load roles for the user
-    user_stmt = (
-        select(UserModel)
-        .options(selectinload(UserModel.roles))
-        .where(UserModel.id == current_user.id)
-    )
-    user_with_roles = (await db.execute(user_stmt)).scalar_one()
-    role_name = (
-        user_with_roles.roles[0].name if user_with_roles.roles else "participant"
-    )
-
     return {
         "authenticated": True,
         "user": {
             "id": current_user.id,
             "email": current_user.email,
             "full_name": current_user.full_name,
-            "role": role_name,
+            "role": current_user.role,
         },
     }
 
@@ -182,7 +175,7 @@ async def refresh_token(
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
         "access_token": security.create_access_token(
-            {"sub": str(current_user.id)}, expires_delta=access_token_expires
+            {"sub": str(current_user.id), "client_id": str(current_user.client_id), "role": current_user.role}, expires_delta=access_token_expires
         ),
         "token_type": "bearer",
     }

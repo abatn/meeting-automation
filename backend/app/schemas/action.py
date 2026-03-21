@@ -12,6 +12,7 @@ class ActionStatus(str, Enum):
 
 
 class ActionBase(BaseModel):
+    client_id: Optional[str] = None
     title: str
     description: Optional[str] = None
     status: ActionStatus = ActionStatus.PENDING
@@ -48,6 +49,7 @@ class SuggestionStatus(str, Enum):
     REJECTED = "rejected"
 
 class ActionSuggestionBase(BaseModel):
+    client_id: Optional[str] = None
     title: str
     description: Optional[str] = None
     suggested_assignee: Optional[str] = None

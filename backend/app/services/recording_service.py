@@ -26,7 +26,7 @@ class RecordingService:
         )
 
     async def upload_recording(
-        self, meeting_id: str, file: UploadFile, recording_id: Optional[str] = None
+        self, meeting_id: str, client_id: str, file: UploadFile, recording_id: Optional[str] = None
     ) -> Recording:
         """Audio zu Minio/S3 hochladen und DB aktualisieren/erstellen"""
         file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_{file.filename}"
@@ -43,7 +43,7 @@ class RecordingService:
 
         if recording_id:
             result = await self.db.execute(
-                select(Recording).where(Recording.id == recording_id)
+                select(Recording).where(Recording.id == recording_id).where(Recording.client_id == client_id)
             )
             db_recording = result.scalar_one_or_none()
 
@@ -56,6 +56,7 @@ class RecordingService:
             # Save new to DB
             db_recording = Recording(
                 id=recording_id or str(uuid.uuid4()),
+                client_id=client_id,
                 meeting_id=meeting_id,
                 file_path=file_key,
                 status="uploaded",  # Ensure status is always a string
@@ -75,7 +76,7 @@ class RecordingService:
         return db_recording
 
     async def start_stream(
-        self, meeting_id: str, content_type: str = "audio/webm"
+        self, meeting_id: str, client_id: str, content_type: str = "audio/webm"
     ) -> dict:
         """
         Start a recording session by using a local temporary file to
@@ -87,6 +88,7 @@ class RecordingService:
             # Save placeholder to DB
             db_recording = Recording(
                 id=str(uuid.uuid4()),
+                client_id=client_id,
                 meeting_id=meeting_id,
                 file_path=file_key,
                 status="streaming",
@@ -125,7 +127,7 @@ class RecordingService:
             raise
 
     async def stop_stream(
-        self, recording_id: str, file_key: str, upload_id: str, parts: list
+        self, recording_id: str, client_id: str, file_key: str, upload_id: str, parts: list
     ) -> Recording:
         """Upload the fully assembled local file to S3 and trigger processing."""
         temp_path = f"/tmp/recordings/{upload_id}.webm"
@@ -146,7 +148,7 @@ class RecordingService:
             raise
 
         result = await self.db.execute(
-            select(Recording).where(Recording.id == recording_id)
+            select(Recording).where(Recording.id == recording_id).where(Recording.client_id == client_id)
         )
         db_recording = result.scalar_one_or_none()
 

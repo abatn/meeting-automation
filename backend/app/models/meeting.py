@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.transcription import Transcription
     from app.models.action import Action
     from app.models.pv import PV
+    from app.models.client import Client
 
 
 class MeetingStatus(str, enum.Enum):
@@ -27,6 +28,7 @@ class Meeting(Base):
     __tablename__ = "meetings"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String, index=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -52,6 +54,7 @@ class Meeting(Base):
     )
 
     # Relationships
+    client: Mapped["Client"] = relationship("Client", back_populates="meetings")
     creator: Mapped["User"] = relationship("User", back_populates="created_meetings")
     participants: Mapped[List["Participant"]] = relationship(
         "Participant", back_populates="meeting", cascade="all, delete-orphan"

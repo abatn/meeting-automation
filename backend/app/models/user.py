@@ -13,9 +13,11 @@ from app.core.config import settings
 if TYPE_CHECKING:
     from app.models.meeting import Meeting
     from app.models.audit_log import AuditLog
+    from app.models.client import Client
 
 
 class UserRole(str, enum.Enum):
+    SYSTEM_ADMIN = "system_admin"
     ADMIN = "admin"
     MANAGER = "manager"
     PARTICIPANT = "participant"
@@ -54,6 +56,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     full_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
@@ -80,12 +83,17 @@ class User(Base):
     reports: Mapped[List["User"]] = relationship(back_populates="manager")
     manager: Mapped["User"] = relationship(back_populates="reports", remote_side=[id])
     # Relationships
+    client: Mapped["Client"] = relationship("Client", back_populates="users")
     roles: Mapped[List["Role"]] = relationship(
         secondary=user_roles, back_populates="users", lazy="selectin"
     )
     audit_logs: Mapped[List["AuditLog"]] = relationship(
         "AuditLog", back_populates="user"
     )
+
+    @property
+    def role(self) -> str:
+        return self.roles[0].name if self.roles else "participant"
     created_meetings: Mapped[List["Meeting"]] = relationship(
         "Meeting", back_populates="creator"
     )

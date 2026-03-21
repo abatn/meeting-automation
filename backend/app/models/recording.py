@@ -10,12 +10,14 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.meeting import Meeting
     from app.models.transcription import Transcription
+    from app.models.client import Client
 
 
 class Recording(Base):
     __tablename__ = "recordings"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
     meeting_id: Mapped[str] = mapped_column(
         String, ForeignKey("meetings.id", ondelete="CASCADE")
     )
@@ -32,6 +34,7 @@ class Recording(Base):
     )
 
     # Relationships
+    client: Mapped["Client"] = relationship("Client")
     meeting: Mapped["Meeting"] = relationship("Meeting", back_populates="recordings")
     chunks: Mapped[List["Chunk"]] = relationship(
         "Chunk", back_populates="recording", cascade="all, delete-orphan"

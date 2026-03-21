@@ -11,6 +11,7 @@ from alembic import context
 from app.core.config import settings
 from app.core.database import Base
 # Import models for Autogenerate to work
+from app.models.client import Client
 from app.models.user import User
 from app.models.meeting import Meeting
 from app.models.recording import Recording

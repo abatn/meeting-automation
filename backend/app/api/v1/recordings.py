@@ -24,6 +24,7 @@ async def upload_recording(
     file: UploadFile = File(...),
     recording_id: Optional[str] = Form(None),
     db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
 ):
     """
     Upload an audio recording for a specific meeting.
@@ -32,22 +33,27 @@ async def upload_recording(
         raise HTTPException(status_code=400, detail="File must be an audio recording")
 
     service = RecordingService(db)
-    recording = await service.upload_recording(meeting_id, file, recording_id)
+    recording = await service.upload_recording(meeting_id, current_user.client_id, file, recording_id)
 
     # Reload with selectinload to avoid MissingGreenlet error during serialization
     result = await db.execute(
         select(RecordingModel)
         .options(selectinload(RecordingModel.chunks))
         .where(RecordingModel.id == recording.id)
+        .where(RecordingModel.client_id == current_user.client_id)
     )
     return result.scalars().first()
 
 
 @router.post("/stream/start/{meeting_id}", response_model=StreamStartResponse)
-async def start_stream(meeting_id: str, db: AsyncSession = Depends(deps.get_db)):
+async def start_stream(
+    meeting_id: str, 
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+):
     """Start a chunked audio stream upload."""
     service = RecordingService(db)
-    result = await service.start_stream(meeting_id)
+    result = await service.start_stream(meeting_id, current_user.client_id)
     return StreamStartResponse(**result)
 
 
@@ -58,6 +64,7 @@ async def upload_stream_chunk(
     part_number: int = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
 ):
     """Upload a chunk to an active stream."""
     service = RecordingService(db)
@@ -73,11 +80,12 @@ async def stop_stream(
     file_key: str,
     request: StreamStopRequest,
     db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
 ):
     """Stop the stream and complete the upload."""
     service = RecordingService(db)
     parts = [{"PartNumber": p.PartNumber, "ETag": p.ETag} for p in request.parts]
-    return await service.stop_stream(recording_id, file_key, upload_id, parts)
+    return await service.stop_stream(recording_id, current_user.client_id, file_key, upload_id, parts)
 
 
 @router.get("/{recording_id}", response_model=Recording)
@@ -89,5 +97,13 @@ async def get_recording(
     """
     Get recording details by ID.
     """
-    # Note: Implement get_recording in RecordingService if not exists
-    pass
+    result = await db.execute(
+        select(RecordingModel)
+        .options(selectinload(RecordingModel.chunks))
+        .where(RecordingModel.id == recording_id)
+        .where(RecordingModel.client_id == current_user.client_id)
+    )
+    recording = result.scalars().first()
+    if not recording:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    return recording

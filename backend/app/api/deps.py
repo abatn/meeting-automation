@@ -75,7 +75,10 @@ async def get_current_user(
             detail="Could not validate credentials",
         )
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(User).options(selectinload(User.roles)).where(User.id == user_id)
+    )
     user = result.scalars().first()
 
     if not user:

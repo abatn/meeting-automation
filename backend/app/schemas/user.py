@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr
 
 
 class UserBase(BaseModel):
+    client_id: Optional[str] = None
     email: EmailStr
     full_name: Optional[str] = None
     is_active: Optional[bool] = True

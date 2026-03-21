@@ -19,10 +19,11 @@ class ActionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_action_patterns(self, limit: int = 5, target_language: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_action_patterns(self, client_id: str, limit: int = 5, target_language: Optional[str] = None) -> List[Dict[str, Any]]:
         """Aggregates pending actions by title to identify patterns, with optional translation."""
         stmt = (
             select(Action.title, func.count(Action.id).label("count"))
+            .where(Action.client_id == client_id)
             .where(Action.status == ActionStatus.PENDING)
             .group_by(Action.title)
             .order_by(desc("count"))
@@ -39,7 +40,7 @@ class ActionService:
         
         return patterns
 
-    async def get_recurring_statistics(self, target_language: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def get_recurring_statistics(self, client_id: str, target_language: Optional[str] = None) -> List[Dict[str, Any]]:
         """Calculates ML suggestion statistics per assignee, with optional translation."""
         stmt = (
             select(
@@ -48,6 +49,7 @@ class ActionService:
                 func.count(ActionSuggestion.id).filter(ActionSuggestion.status == SuggestionStatus.ACCEPTED).label("accepted"),
                 func.count(ActionSuggestion.id).filter(ActionSuggestion.status == SuggestionStatus.REJECTED).label("rejected")
             )
+            .where(ActionSuggestion.client_id == client_id)
             .group_by(ActionSuggestion.suggested_assignee)
         )
         result = await self.db.execute(stmt)
@@ -106,10 +108,10 @@ class ActionService:
             logger.error(f"Failed to translate texts: {e}")
             return texts
 
-    async def generate_suggestions_from_transcription(self, meeting_id: str) -> List[ActionSuggestion]:
+    async def generate_suggestions_from_transcription(self, meeting_id: str, client_id: str) -> List[ActionSuggestion]:
         """Analyzes transcription to suggest new actions."""
         # 1. Fetch Transcription
-        stmt = select(Transcription).where(Transcription.meeting_id == meeting_id)
+        stmt = select(Transcription).where(Transcription.meeting_id == meeting_id).where(Transcription.client_id == client_id)
         res = await self.db.execute(stmt)
         transcription = res.scalar_one_or_none()
         
@@ -173,6 +175,7 @@ Return ONLY a JSON array of objects with the following structure:
         for item in suggestions_data:
             suggestion = ActionSuggestion(
                 id=str(uuid.uuid4()),
+                client_id=client_id,
                 meeting_id=meeting_id,
                 title=item.get("title", "Unknown Task"),
                 description=item.get("description", ""),
@@ -187,14 +190,14 @@ Return ONLY a JSON array of objects with the following structure:
         return suggestions
 
     async def extract_actions_from_pv(
-        self, pv_id: str, actions_data: List[dict]
+        self, pv_id: str, client_id: str, actions_data: List[dict]
     ) -> List[Action]:
         """n8n-Callback von Mistral verarbeiten"""
         # Lookup meeting_id from PV
-        pv_res = await self.db.execute(select(PV).where(PV.id == pv_id))
+        pv_res = await self.db.execute(select(PV).where(PV.id == pv_id).where(PV.client_id == client_id))
         pv = pv_res.scalar_one_or_none()
         if not pv:
-            logger.error(f"PV {pv_id} not found. Cannot extract actions.")
+            logger.error(f"PV {pv_id} not found for client {client_id}. Cannot extract actions.")
             return []
 
         meeting_id = pv.meeting_id
@@ -204,6 +207,7 @@ Return ONLY a JSON array of objects with the following structure:
             action_id = str(uuid.uuid4())
             action = Action(
                 id=action_id,
+                client_id=client_id,
                 meeting_id=meeting_id,
                 title=item.get("title", "Untitled Action"),
                 description=item.get("description", ""),
@@ -230,14 +234,14 @@ Return ONLY a JSON array of objects with the following structure:
         for action in new_actions:
             if action.assignments and action.assignments[0].user_id:
                 await self.assign_action(
-                    str(action.id), str(action.assignments[0].user_id)
+                    str(action.id), str(action.assignments[0].user_id), client_id
                 )
 
         return new_actions
 
-    async def assign_action(self, action_id: str, user_id: str) -> Optional[Action]:
+    async def assign_action(self, action_id: str, user_id: str, client_id: str) -> Optional[Action]:
         """Verantwortlichen zuweisen -> WhatsApp Reminder via n8n"""
-        result = await self.db.execute(select(Action).where(Action.id == action_id))
+        result = await self.db.execute(select(Action).where(Action.id == action_id).where(Action.client_id == client_id))
         action = result.scalar_one_or_none()
 
         if not action:
@@ -277,10 +281,10 @@ Return ONLY a JSON array of objects with the following structure:
         return action
 
     async def update_action_status(
-        self, action_id: str, status: str
+        self, action_id: str, client_id: str, status: str
     ) -> Optional[Action]:
         """Status-Änderung -> n8n Notification"""
-        result = await self.db.execute(select(Action).where(Action.id == action_id))
+        result = await self.db.execute(select(Action).where(Action.id == action_id).where(Action.client_id == client_id))
         action = result.scalar_one_or_none()
 
         if not action:
@@ -306,9 +310,9 @@ Return ONLY a JSON array of objects with the following structure:
 
         return action
 
-    async def learn_from_feedback(self, suggestion_id: str, action: str) -> None:
+    async def learn_from_feedback(self, suggestion_id: str, client_id: str, action: str) -> None:
         """Records feedback and creates a real Action if accepted."""
-        stmt = select(ActionSuggestion).where(ActionSuggestion.id == suggestion_id)
+        stmt = select(ActionSuggestion).where(ActionSuggestion.id == suggestion_id).where(ActionSuggestion.client_id == client_id)
         res = await self.db.execute(stmt)
         suggestion = res.scalar_one_or_none()
 
@@ -321,6 +325,7 @@ Return ONLY a JSON array of objects with the following structure:
             # Create the actual action entry so it appears in the PV/PDF
             new_action = Action(
                 id=str(uuid.uuid4()),
+                client_id=client_id,
                 meeting_id=suggestion.meeting_id,
                 title=suggestion.title,
                 description=suggestion.description,

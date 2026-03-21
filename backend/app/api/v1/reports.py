@@ -37,10 +37,10 @@ async def get_dashboard_data(
         # --- ECHTE DATENBANKLOGIK FÜR DG DASHBOARD ---
 
         # 1. Total and Completed Meetings
-        total_meetings_query = select(func.count(MeetingModel.id))
+        total_meetings_query = select(func.count(MeetingModel.id)).where(MeetingModel.client_id == current_user.client_id)
         completed_meetings_query = select(func.count(MeetingModel.id)).where(
             MeetingModel.status == MeetingStatus.COMPLETED
-        )
+        ).where(MeetingModel.client_id == current_user.client_id)
 
         total_meetings_res = await db.execute(total_meetings_query)
         completed_meetings_res = await db.execute(completed_meetings_query)
@@ -51,14 +51,14 @@ async def get_dashboard_data(
         # 2. Pending Actions
         pending_actions_query = select(func.count(ActionModel.id)).where(
             ActionModel.status == ActionStatus.PENDING
-        )
+        ).where(ActionModel.client_id == current_user.client_id)
         pending_actions_res = await db.execute(pending_actions_query)
         pending_actions = pending_actions_res.scalar_one()
 
         # 3. Action Status Distribution
         action_dist_query = select(
             ActionModel.status, func.count(ActionModel.id)
-        ).group_by(ActionModel.status)
+        ).where(ActionModel.client_id == current_user.client_id).group_by(ActionModel.status)
         action_dist_res = await db.execute(action_dist_query)
         action_status_distribution = {
             status.name.lower(): count for status, count in action_dist_res.all()
@@ -92,12 +92,14 @@ async def get_dashboard_data(
         team_meetings_query = (
             select(func.count(MeetingModel.id))
             .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
+            .where(MeetingModel.client_id == current_user.client_id)
             .where(ParticipantModel.user_id.in_(managed_user_ids))
         )
 
         team_completed_meetings_query = (
             select(func.count(MeetingModel.id))
             .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
+            .where(MeetingModel.client_id == current_user.client_id)
             .where(ParticipantModel.user_id.in_(managed_user_ids))
             .where(MeetingModel.status == MeetingStatus.COMPLETED)
         )
@@ -111,6 +113,7 @@ async def get_dashboard_data(
         team_pending_actions_query = (
             select(func.count(ActionModel.id))
             .join(AssignmentModel, ActionModel.id == AssignmentModel.action_id)
+            .where(ActionModel.client_id == current_user.client_id)
             .where(AssignmentModel.user_id.in_(managed_user_ids))
             .where(ActionModel.status == ActionStatus.PENDING)
         )
@@ -123,6 +126,7 @@ async def get_dashboard_data(
         team_completed_actions_query = (
             select(func.count(ActionModel.id))
             .join(AssignmentModel, ActionModel.id == AssignmentModel.action_id)
+            .where(ActionModel.client_id == current_user.client_id)
             .where(AssignmentModel.user_id.in_(managed_user_ids))
             .where(ActionModel.status == ActionStatus.COMPLETED)
         )
@@ -150,6 +154,7 @@ async def get_dashboard_data(
         my_upcoming_meetings_query = (
             select(func.count(MeetingModel.id))
             .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
+            .where(MeetingModel.client_id == current_user.client_id)
             .where(ParticipantModel.user_id == current_user.id)
             .where(MeetingModel.end_time > datetime.utcnow())
         )
@@ -162,6 +167,7 @@ async def get_dashboard_data(
         my_open_actions_query = (
             select(func.count(ActionModel.id))
             .join(AssignmentModel, ActionModel.id == AssignmentModel.action_id)
+            .where(ActionModel.client_id == current_user.client_id)
             .where(AssignmentModel.user_id == current_user.id)
             .where(ActionModel.status == ActionStatus.PENDING)
         )
@@ -186,6 +192,7 @@ async def get_audit_logs(
     """
     result = await db.execute(
         select(AuditLogModel)
+        .where(AuditLogModel.client_id == current_user.client_id)
         .order_by(AuditLogModel.timestamp.desc())
         .offset(skip)
         .limit(limit)

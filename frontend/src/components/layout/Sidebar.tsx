@@ -9,14 +9,19 @@ import {
   Divider,
   Box,
   Toolbar,
+  Typography,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import EventIcon from "@mui/icons-material/Event";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import SecurityIcon from "@mui/icons-material/Security";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import PeopleIcon from "@mui/icons-material/People";
 
 const drawerWidth = 240;
 
@@ -24,12 +29,17 @@ const Sidebar: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useSelector((state: RootState) => state.auth);
 
   const menuItems = [
     { text: t("sidebar.dashboard"), icon: <DashboardIcon />, path: "/" },
     { text: t("sidebar.meetings"), icon: <EventIcon />, path: "/meetings" },
     { text: t("sidebar.actions"), icon: <AssignmentIcon />, path: "/actions" },
     { text: t("sidebar.reports"), icon: <AssessmentIcon />, path: "/reports" },
+  ];
+
+  const adminItems = [
+    { text: "Manage Clients", icon: <PeopleIcon />, path: "/admin/clients" },
   ];
 
   return (
@@ -78,6 +88,46 @@ const Sidebar: React.FC = () => {
             </ListItem>
           ))}
         </List>
+        
+        {user?.role === "system_admin" && (
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="overline" sx={{ px: 3, color: 'text.secondary' }}>
+              System Admin
+            </Typography>
+            <List>
+              {adminItems.map((item) => (
+                <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+                  <ListItemButton
+                    selected={location.pathname === item.path}
+                    onClick={() => navigate(item.path)}
+                    sx={{
+                      mx: 1,
+                      borderRadius: 2,
+                      "&.Mui-selected": {
+                        bgcolor: "secondary.light",
+                        color: "secondary.main",
+                        "& .MuiListItemIcon-root": {
+                          color: "secondary.main",
+                        },
+                      },
+                    }}
+                  >
+                    <ListItemIcon>{item.icon}</ListItemIcon>
+                    <ListItemText
+                      primary={item.text}
+                      primaryTypographyProps={{
+                        fontWeight:
+                          location.pathname === item.path ? "bold" : "normal",
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </>
+        )}
+
         <Divider sx={{ my: 2 }} />
         <List>
           <ListItem disablePadding sx={{ mx: 1 }}>

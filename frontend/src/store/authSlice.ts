@@ -1,7 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-interface User {
+export interface User {
   id: string;
+  client_id: string;
   email: string;
   full_name: string;
   role: string;

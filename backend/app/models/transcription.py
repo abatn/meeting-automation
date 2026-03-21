@@ -10,6 +10,7 @@ class Transcription(Base):
     __tablename__ = "transcriptions"
 
     id = Column(String, primary_key=True, index=True)
+    client_id = Column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
     meeting_id = Column(
         String, ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False
     )
@@ -29,6 +30,7 @@ class Transcription(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
+    client = relationship("Client")
     meeting = relationship("Meeting", back_populates="transcriptions")
     recording = relationship("Recording", back_populates="transcriptions")
 

@@ -18,10 +18,11 @@ class MeetingService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def create_meeting(self, meeting_in: MeetingCreate, owner_id: str) -> Meeting:
+    async def create_meeting(self, meeting_in: MeetingCreate, owner_id: str, client_id: str) -> Meeting:
         """Meeting anlegen + n8n-Webhook triggern"""
         db_meeting = Meeting(
             id=str(uuid.uuid4()),
+            client_id=client_id,
             title=meeting_in.title,
             description=meeting_in.description,
             location=meeting_in.location,
@@ -64,7 +65,7 @@ class MeetingService:
 
         return db_meeting
 
-    async def get_meeting(self, meeting_id: str) -> Optional[Meeting]:
+    async def get_meeting(self, meeting_id: str, client_id: str) -> Optional[Meeting]:
         """Meeting mit allen Relations"""
         from sqlalchemy.orm import selectinload
 
@@ -72,14 +73,15 @@ class MeetingService:
             select(Meeting)
             .options(selectinload(Meeting.participants), selectinload(Meeting.agendas))
             .where(Meeting.id == meeting_id)
+            .where(Meeting.client_id == client_id)
         )
         return result.scalars().first()
 
     async def update_meeting(
-        self, meeting_id: str, meeting_in: MeetingUpdate
+        self, meeting_id: str, client_id: str, meeting_in: MeetingUpdate
     ) -> Optional[Meeting]:
         """Status-Änderungen -> n8n Benachrichtigung"""
-        db_meeting = await self.get_meeting(meeting_id)
+        db_meeting = await self.get_meeting(meeting_id, client_id)
         if not db_meeting:
             return None
 
@@ -96,9 +98,9 @@ class MeetingService:
 
         return db_meeting
 
-    async def delete_meeting(self, meeting_id: str) -> bool:
+    async def delete_meeting(self, meeting_id: str, client_id: str) -> bool:
         """Soft Delete + Audit Log (simplified)"""
-        db_meeting = await self.get_meeting(meeting_id)
+        db_meeting = await self.get_meeting(meeting_id, client_id)
         if not db_meeting:
             return False
 
@@ -106,10 +108,11 @@ class MeetingService:
         await self.db.commit()
         return True
 
-    async def get_upcoming_meetings(self) -> List[Meeting]:
+    async def get_upcoming_meetings(self, client_id: str) -> List[Meeting]:
         """Für Dashboard/Reminders"""
         result = await self.db.execute(
             select(Meeting)
+            .where(Meeting.client_id == client_id)
             .where(Meeting.start_time > datetime.utcnow())
             .order_by(Meeting.start_time)
         )

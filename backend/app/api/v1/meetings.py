@@ -28,6 +28,7 @@ async def read_meetings(
     """
     result = await db.execute(
         select(MeetingModel)
+        .where(MeetingModel.client_id == current_user.client_id)
         .options(
             selectinload(MeetingModel.participants), selectinload(MeetingModel.agendas)
         )
@@ -50,6 +51,7 @@ async def list_my_meetings(
     """
     result = await db.execute(
         select(MeetingModel)
+        .where(MeetingModel.client_id == current_user.client_id)
         .options(
             selectinload(MeetingModel.participants), selectinload(MeetingModel.agendas)
         )
@@ -86,6 +88,7 @@ async def list_team_meetings(
 
     result = await db.execute(
         select(MeetingModel)
+        .where(MeetingModel.client_id == current_user.client_id)
         .options(
             selectinload(MeetingModel.participants), selectinload(MeetingModel.agendas)
         )
@@ -110,7 +113,7 @@ async def create_meeting(
     Create new meeting.
     """
     meeting = await meeting_service.create_meeting(
-        meeting_in=meeting_in, owner_id=current_user.id
+        meeting_in=meeting_in, owner_id=current_user.id, client_id=current_user.client_id
     )
     return meeting
 
@@ -125,7 +128,7 @@ async def get_meeting(
     """
     Get meeting by ID.
     """
-    meeting = await meeting_service.get_meeting(meeting_id)
+    meeting = await meeting_service.get_meeting(meeting_id, current_user.client_id)
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting

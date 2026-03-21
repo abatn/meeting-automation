@@ -166,9 +166,9 @@ ONLY translate the values (text strings)."""
             logger.error(f"Translation API error: {e}")
             raise TranslationError(f"An error occurred during translation: {e}")
 
-    async def validate_pv(self, pv_id: str, user_id: str) -> Optional[PV]:
+    async def validate_pv(self, pv_id: str, user_id: str, client_id: str) -> Optional[PV]:
         """Marks a PV as validated by a specific user."""
-        stmt = select(PV).where(PV.id == pv_id)
+        stmt = select(PV).where(PV.id == pv_id).where(PV.client_id == client_id)
         result = await self.db.execute(stmt)
         pv = result.scalar_one_or_none()
 

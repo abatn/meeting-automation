@@ -53,7 +53,7 @@ class PDFService:
         )
         self.bucket_name = getattr(settings, "S3_BUCKET_NAME", "meeting-pdfs")
 
-    async def generate_pv_pdf(self, pv_id: str, branding_id: Optional[str] = None, watermark: Optional[bool] = None, language: str = "fr") -> str:
+    async def generate_pv_pdf(self, pv_id: str, client_id: str, branding_id: Optional[str] = None, watermark: Optional[bool] = None, language: str = "fr") -> str:
         """Hauptmethode: Generiert PDF und gibt Dateipfad zurück"""
         
         # 0. Localization Strings for Headers
@@ -125,6 +125,7 @@ class PDFService:
                 selectinload(PV.sections),
             )
             .where(PV.id == pv_id)
+            .where(PV.client_id == client_id)
         )
         result = await self.db.execute(stmt)
         pv_obj = result.scalar_one_or_none()
@@ -133,7 +134,7 @@ class PDFService:
             raise HTTPException(status_code=404, detail="PV not found")
 
         # Action items separat laden
-        action_stmt = select(Action).where(Action.meeting_id == pv_obj.meeting_id)
+        action_stmt = select(Action).where(Action.meeting_id == pv_obj.meeting_id).where(Action.client_id == client_id)
         action_result = await self.db.execute(action_stmt)
         actions = action_result.scalars().all()
         
@@ -180,9 +181,9 @@ class PDFService:
 
 
         # 3. Load Branding Settings
-        branding_stmt = select(BrandingSettings).where(BrandingSettings.is_active == True)
+        branding_stmt = select(BrandingSettings).where(BrandingSettings.client_id == client_id).where(BrandingSettings.is_active == True)
         if branding_id:
-            branding_stmt = select(BrandingSettings).where(BrandingSettings.id == branding_id)
+            branding_stmt = select(BrandingSettings).where(BrandingSettings.id == branding_id).where(BrandingSettings.client_id == client_id)
             
         b_result = await self.db.execute(branding_stmt)
         branding_obj = b_result.scalars().first()

@@ -19,7 +19,7 @@ async def get_branding_settings(
     """
     Retrieves the currently active custom branding configuration.
     """
-    stmt = select(BrandingModel).where(BrandingModel.is_active == True)
+    stmt = select(BrandingModel).where(BrandingModel.is_active == True).where(BrandingModel.client_id == current_user.client_id)
     result = await db.execute(stmt)
     branding = result.scalars().first()
 
@@ -27,6 +27,7 @@ async def get_branding_settings(
     if not branding:
         return BrandingSettings(
             id="default",
+            client_id=current_user.client_id,
             organization_name="",
             logo_url="",
             header_text="",
@@ -49,7 +50,7 @@ async def create_or_update_branding_settings(
     Requires audit logging via middleware automatically.
     """
     # Disable previously active settings
-    stmt = select(BrandingModel).where(BrandingModel.is_active == True)
+    stmt = select(BrandingModel).where(BrandingModel.is_active == True).where(BrandingModel.client_id == current_user.client_id)
     result = await db.execute(stmt)
     existing_branding = result.scalars().first()
 
@@ -60,6 +61,7 @@ async def create_or_update_branding_settings(
     # Create new active branding setting
     new_branding = BrandingModel(
         id=str(uuid.uuid4()),
+        client_id=current_user.client_id,
         organization_name=branding_in.organization_name,
         logo_url=branding_in.logo_url,
         header_text=branding_in.header_text,

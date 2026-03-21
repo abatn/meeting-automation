@@ -48,6 +48,7 @@ class Agenda(AgendaBase):
 
 
 class MeetingBase(BaseModel):
+    client_id: Optional[str] = None
     title: str
     description: Optional[str] = None
     location: Optional[str] = None

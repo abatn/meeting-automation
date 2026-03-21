@@ -19,27 +19,30 @@ class AuditMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
 
-        user_id = self._get_user_id(request)
+        user_id, client_id = self._get_token_data(request)
         response = await call_next(request)
-        await self._log_audit(request, user_id)
+        
+        if client_id:
+            await self._log_audit(request, user_id, client_id)
 
         return response
 
-    def _get_user_id(self, request: Request) -> Optional[str]:
+    def _get_token_data(self, request: Request) -> tuple[Optional[str], Optional[str]]:
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
-            return None
+            return None, None
         token = auth_header.split(" ")[1]
         try:
             payload = jwt.decode(
                 token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
             )
             sub = payload.get("sub")
-            return str(sub) if sub else None
+            client_id = payload.get("client_id")
+            return str(sub) if sub else None, str(client_id) if client_id else None
         except JWTError:
-            return None
+            return None, None
 
-    async def _log_audit(self, request: Request, user_id: Optional[str]):
+    async def _log_audit(self, request: Request, user_id: Optional[str], client_id: str):
         try:
             async with AsyncSessionLocal() as db:
                 valid_user_id = None
@@ -48,13 +51,14 @@ class AuditMiddleware(BaseHTTPMiddleware):
                     from app.models.user import User
 
                     user_exists = await db.execute(
-                        select(User.id).where(User.id == user_id)
+                        select(User.id).where(User.id == user_id).where(User.client_id == client_id)
                     )
                     if user_exists.scalar_one_or_none():
                         valid_user_id = user_id
 
                 audit_entry = AuditLog(
                     id=str(uuid.uuid4()),
+                    client_id=client_id,
                     user_id=valid_user_id,
                     action=request.method,
                     table_name=request.url.path.strip("/").split("/")[-1] or "root",

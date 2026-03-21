@@ -4,6 +4,7 @@ from typing import Optional
 
 
 class AuditLogBase(BaseModel):
+    client_id: Optional[str] = None
     action: str
     table_name: Optional[str] = None
     details: Optional[str] = None

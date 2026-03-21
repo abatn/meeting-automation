@@ -11,12 +11,14 @@ from app.utils.db_encryption import EncryptedText
 if TYPE_CHECKING:
     from app.models.meeting import Meeting
     from app.models.user import User
+    from app.models.client import Client
 
 
 class PV(Base):
     __tablename__ = "pvs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
     meeting_id: Mapped[str] = mapped_column(
         String,
         ForeignKey("meetings.id", ondelete="CASCADE"),
@@ -47,6 +49,7 @@ class PV(Base):
     )
 
     # Relationships
+    client: Mapped["Client"] = relationship("Client")
     meeting: Mapped["Meeting"] = relationship("Meeting", back_populates="pv")
     sections: Mapped[List["Section"]] = relationship(
         "Section", back_populates="pv", cascade="all, delete-orphan"

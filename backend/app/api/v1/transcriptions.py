@@ -24,6 +24,13 @@ async def initiate_transcription(
     if not recording_id:
         raise HTTPException(status_code=400, detail="recording_id is required")
 
+    # Verify that the recording belongs to the user's tenant
+    from app.models.recording import Recording
+    rec_stmt = select(Recording.id).where(Recording.id == recording_id).where(Recording.client_id == current_user.client_id)
+    rec_exists = (await db.execute(rec_stmt)).scalar_one_or_none()
+    if not rec_exists:
+        raise HTTPException(status_code=404, detail="Recording not found")
+
     # Trigger the Celery task (which includes Diarization now)
     from app.tasks.transcription_tasks import process_recording
     process_recording.delay(recording_id)
@@ -45,7 +52,11 @@ async def get_transcription_by_meeting(
     """
     Retrieves the transcription associated with a specific meeting.
     """
-    stmt = select(TranscriptionModel).where(TranscriptionModel.meeting_id == meeting_id)
+    stmt = select(TranscriptionModel).where(
+        TranscriptionModel.meeting_id == meeting_id
+    ).where(
+        TranscriptionModel.client_id == current_user.client_id
+    )
     result = await db.execute(stmt)
     transcription = result.scalars().first()
     if not transcription:
@@ -72,7 +83,11 @@ async def get_transcription(
     """
     Retrieves the full transcription text for a recording.
     """
-    stmt = select(TranscriptionModel).where(TranscriptionModel.id == transcription_id)
+    stmt = select(TranscriptionModel).where(
+        TranscriptionModel.id == transcription_id
+    ).where(
+        TranscriptionModel.client_id == current_user.client_id
+    )
 
     result = await db.execute(stmt)
     transcription = result.scalars().first()

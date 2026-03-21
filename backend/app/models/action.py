@@ -11,6 +11,7 @@ from app.core.database import Base
 if TYPE_CHECKING:
     from app.models.meeting import Meeting
     from app.models.user import User
+    from app.models.client import Client
 
 
 class ActionStatus(str, enum.Enum):
@@ -29,6 +30,7 @@ class ActionSuggestion(Base):
     __tablename__ = "action_suggestions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
     meeting_id: Mapped[str] = mapped_column(
         String, ForeignKey("meetings.id", ondelete="CASCADE")
     )
@@ -54,6 +56,7 @@ class Action(Base):
     __tablename__ = "actions"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
     meeting_id: Mapped[str] = mapped_column(
         String, ForeignKey("meetings.id", ondelete="CASCADE")
     )
@@ -80,6 +83,7 @@ class Action(Base):
     )
 
     # Relationships
+    client: Mapped["Client"] = relationship("Client")
     meeting: Mapped["Meeting"] = relationship("Meeting", back_populates="actions")
     assignments: Mapped[List["Assignment"]] = relationship(
         "Assignment", back_populates="action", cascade="all, delete-orphan"

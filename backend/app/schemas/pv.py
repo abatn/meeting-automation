@@ -23,6 +23,7 @@ class Section(SectionBase):
 
 
 class PVBase(BaseModel):
+    client_id: Optional[str] = None
     meeting_id: str
     title: str
     content_html: Optional[str] = None

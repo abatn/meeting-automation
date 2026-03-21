@@ -23,7 +23,7 @@ class DOCXService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def generate_pv_docx(self, pv_id: str, branding_id: Optional[str] = None, language: str = "fr") -> str:
+    async def generate_pv_docx(self, pv_id: str, client_id: str, branding_id: Optional[str] = None, language: str = "fr") -> str:
         """
         Generates a PV as a DOCX file and returns the file path.
         Includes on-the-fly translation via Mistral if languages mismatch.
@@ -93,6 +93,7 @@ class DOCXService:
                 selectinload(PV.sections),
             )
             .where(PV.id == pv_id)
+            .where(PV.client_id == client_id)
         )
         result = await self.db.execute(stmt)
         pv_obj = result.scalar_one_or_none()
@@ -100,7 +101,7 @@ class DOCXService:
         if not pv_obj:
             raise HTTPException(status_code=404, detail="PV not found")
 
-        action_stmt = select(Action).where(Action.meeting_id == pv_obj.meeting_id)
+        action_stmt = select(Action).where(Action.meeting_id == pv_obj.meeting_id).where(Action.client_id == client_id)
         action_result = await self.db.execute(action_stmt)
         actions = action_result.scalars().all()
 

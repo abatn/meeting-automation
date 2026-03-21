@@ -17,6 +17,8 @@ import ActionTracker from "./components/actions/ActionTracker";
 import MFASetup from "./components/auth/MFASetup";
 import ErrorBoundary from "./components/ErrorBoundary";
 import AutoLogout from "./components/auth/AutoLogout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import ClientList from "./pages/admin/ClientList";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -47,6 +49,8 @@ function App() {
   // Dashboard component selection based on role
   const getDashboard = () => {
     switch (user?.role) {
+      case "system_admin":
+        return <AdminDashboard />;
       case "dg":
         return <DashboardDG />;
       case "manager":
@@ -155,6 +159,20 @@ function App() {
                   </MainLayout>
                 ) : (
                   <Navigate to="/login" replace />
+                )
+              }
+            />
+
+            {/* Protected Admin Routes */}
+            <Route
+              path="/admin/clients"
+              element={
+                authState === "authenticated" && user?.role === "system_admin" ? (
+                  <MainLayout>
+                    <ClientList />
+                  </MainLayout>
+                ) : (
+                  <Navigate to="/" replace />
                 )
               }
             />

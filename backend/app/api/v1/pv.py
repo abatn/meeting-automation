@@ -74,6 +74,7 @@ async def download_pv_pdf(
         pdf_service = PDFService(db)
         pdf_path = await pdf_service.generate_pv_pdf(
             pv_id=pv_id, 
+            client_id=current_user.client_id,
             branding_id=branding_id, 
             watermark=watermark,
             language=language
@@ -104,6 +105,7 @@ async def download_pv_docx(
         docx_service = DOCXService(db)
         docx_path = await docx_service.generate_pv_docx(
             pv_id=pv_id, 
+            client_id=current_user.client_id,
             language=language
         )
 
@@ -129,6 +131,7 @@ async def get_pv_by_meeting(
         select(PVModel)
         .options(selectinload(PVModel.sections))
         .where(PVModel.meeting_id == meeting_id)
+        .where(PVModel.client_id == current_user.client_id)
     )
     result = await db.execute(stmt)
     pv = result.scalars().first()
@@ -136,7 +139,7 @@ async def get_pv_by_meeting(
         raise HTTPException(status_code=404, detail="PV for meeting not found")
 
     actions_result = await db.execute(
-        select(ActionModel).where(ActionModel.meeting_id == meeting_id)
+        select(ActionModel).where(ActionModel.meeting_id == meeting_id).where(ActionModel.client_id == current_user.client_id)
     )
     actions = actions_result.scalars().all()
 
@@ -170,6 +173,7 @@ async def get_pv(
         select(PVModel)
         .options(selectinload(PVModel.sections))
         .where(PVModel.id == pv_id)
+        .where(PVModel.client_id == current_user.client_id)
     )
 
     result = await db.execute(stmt)
@@ -180,7 +184,7 @@ async def get_pv(
 
     # Mocking actions related to this meeting
     actions_result = await db.execute(
-        select(ActionModel).where(ActionModel.meeting_id == pv.meeting_id)
+        select(ActionModel).where(ActionModel.meeting_id == pv.meeting_id).where(ActionModel.client_id == current_user.client_id)
     )
     actions = actions_result.scalars().all()
 
@@ -210,7 +214,7 @@ async def validate_pv(
     Marks a PV as validated.
     """
     service = PVService(db)
-    pv = await service.validate_pv(pv_id, current_user.id)
+    pv = await service.validate_pv(pv_id, current_user.id, current_user.client_id)
 
     if not pv:
         raise HTTPException(status_code=404, detail="PV not found")
@@ -228,7 +232,7 @@ async def update_pv(
     """
     Updates a PV and automatically creates an ISO 27001 compliant version snapshot.
     """
-    stmt = select(PVModel).options(selectinload(PVModel.sections)).where(PVModel.id == pv_id)
+    stmt = select(PVModel).options(selectinload(PVModel.sections)).where(PVModel.id == pv_id).where(PVModel.client_id == current_user.client_id)
     result = await db.execute(stmt)
     pv = result.scalars().first()
     
@@ -251,6 +255,7 @@ async def update_pv(
     
     pv_version = PVVersionModel(
         id=str(uuid.uuid4()),
+        client_id=current_user.client_id,
         pv_id=pv.id,
         version_number=next_version_num,
         snapshot_data=json.dumps(snapshot),
@@ -279,7 +284,13 @@ async def list_pv_versions(
     """
     Lists all historical versions of a specific PV.
     """
-    stmt = select(PVVersionModel).where(PVVersionModel.pv_id == pv_id).order_by(desc(PVVersionModel.version_number))
+    # Verify PV ownership
+    pv_stmt = select(PVModel.id).where(PVModel.id == pv_id).where(PVModel.client_id == current_user.client_id)
+    pv_exists = (await db.execute(pv_stmt)).scalar_one_or_none()
+    if not pv_exists:
+        raise HTTPException(status_code=404, detail="PV not found")
+
+    stmt = select(PVVersionModel).where(PVVersionModel.pv_id == pv_id).where(PVVersionModel.client_id == current_user.client_id).order_by(desc(PVVersionModel.version_number))
     result = await db.execute(stmt)
     return result.scalars().all()
 
@@ -294,7 +305,7 @@ async def get_pv_version(
     """
     Gets a specific PV version snapshot by ID.
     """
-    stmt = select(PVVersionModel).where(PVVersionModel.id == version_id, PVVersionModel.pv_id == pv_id)
+    stmt = select(PVVersionModel).where(PVVersionModel.id == version_id, PVVersionModel.pv_id == pv_id).where(PVVersionModel.client_id == current_user.client_id)
     result = await db.execute(stmt)
     version = result.scalars().first()
     if not version:
@@ -313,7 +324,7 @@ async def restore_pv_version(
     Restores a PV to a previous version, logging the recovery as a new state.
     """
     # 1. Fetch Version
-    stmt = select(PVVersionModel).where(PVVersionModel.id == version_id, PVVersionModel.pv_id == pv_id)
+    stmt = select(PVVersionModel).where(PVVersionModel.id == version_id, PVVersionModel.pv_id == pv_id).where(PVVersionModel.client_id == current_user.client_id)
     result = await db.execute(stmt)
     version = result.scalars().first()
     
@@ -321,7 +332,7 @@ async def restore_pv_version(
         raise HTTPException(status_code=404, detail="Version not found")
         
     # 2. Fetch PV
-    pv_stmt = select(PVModel).where(PVModel.id == pv_id)
+    pv_stmt = select(PVModel).where(PVModel.id == pv_id).where(PVModel.client_id == current_user.client_id)
     pv_result = await db.execute(pv_stmt)
     pv = pv_result.scalars().first()
     
@@ -329,7 +340,7 @@ async def restore_pv_version(
         raise HTTPException(status_code=404, detail="PV not found")
         
     # 3. Create a snapshot of the current state before overwriting
-    v_stmt = select(PVVersionModel).where(PVVersionModel.pv_id == pv_id).order_by(desc(PVVersionModel.version_number))
+    v_stmt = select(PVVersionModel).where(PVVersionModel.pv_id == pv_id).where(PVVersionModel.client_id == current_user.client_id).order_by(desc(PVVersionModel.version_number))
     v_result = await db.execute(v_stmt)
     latest_version = v_result.scalars().first()
     next_version_num = latest_version.version_number + 1 if latest_version else 1
@@ -343,6 +354,7 @@ async def restore_pv_version(
     
     backup_version = PVVersionModel(
         id=str(uuid.uuid4()),
+        client_id=current_user.client_id,
         pv_id=pv.id,
         version_number=next_version_num,
         snapshot_data=json.dumps(current_snapshot),
