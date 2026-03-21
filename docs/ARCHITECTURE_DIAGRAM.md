@@ -35,7 +35,7 @@ graph TD
     end
 
     subgraph "KI-Dienste"
-        Deepgram[Deepgram Nova-2]:::external
+        Gladia[Gladia V2 API]:::external
         Mistral[Mistral AI]:::external
     end
 
@@ -58,8 +58,10 @@ graph TD
     Worker <--> S3
     Worker <--> DB
     
-    Worker -- "Audio -> Text" --> Deepgram
-    Worker -- "Text -> PV" --> Mistral
+    Worker -- "Audio -> Text + Diarization" --> Gladia
+    Worker -- "Text -> PV + ML Suggestions" --> Mistral
+    UI -- "Feedback (Accept/Reject)" --> API
+    API -- "Data Flywheel" --> DB
     
     API -- "Webhook" --> N8N
     Worker -- "Webhook" --> N8N
@@ -67,8 +69,9 @@ graph TD
 ```
 
 ### Kurzbeschreibung:
-1. **Frontend**: React-App für Nutzerinteraktion.
-2. **Backend**: FastAPI für Logik und S3-Management.
-3. **Pipeline**: Celery/RabbitMQ für langlaufende KI-Aufgaben.
-4. **KI**: Deepgram (Transkription) & Mistral (Protokollerstellung).
-5. **n8n**: Zentraler Hub für den Versand von E-Mails und Benachrichtigungen.
+1. **Frontend**: React-App für Nutzerinteraktion. Enthält den Feedback-Mechanismus für KI-Vorschläge.
+2. **Backend**: FastAPI für Logik, S3-Management und Verarbeitung des Nutzer-Feedbacks.
+3. **Pipeline**: Celery/RabbitMQ für langlaufende KI-Aufgaben (Gladia/Mistral).
+4. **KI**: **Gladia V2** (Transkription & Sprechererkennung) & **Mistral** (Zusammenfassung & intelligente Aufgabenvorschläge).
+5. **Feedback Loop**: Die Interaktion der Nutzer mit den KI-Vorschlägen wird in der DB gespeichert, um einen Datensatz für zukünftiges Fine-Tuning zu erstellen (ML Feedback Loop).
+6. **n8n**: Zentraler Hub für den Versand von E-Mails und Benachrichtigungen.

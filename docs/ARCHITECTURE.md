@@ -72,6 +72,8 @@ graph TD
     
     Worker -- "Audio -> Text + Diarization" --> Gladia
     Worker -- "Text -> PV + Action Suggestions" --> Mistral
+    UI -- "Accept/Reject" --> API
+    API -- "Feedback" --> DB
     
     API -- "Webhook" --> N8N
     Worker -- "Webhook" --> N8N
@@ -106,22 +108,21 @@ graph TD
     - `app.services`: Business logic for various domains (meeting, transcription, PV, action, report, security).
     - `app.tasks`: Celery tasks for asynchronous operations (email notifications, transcription processing, data retention).
     - `app.middleware`: Custom middleware, including ISO 27001 compliant audit logging.
-- **Database**: PostgreSQL for relational data.
-- **Caching/Broker**: Redis used as a cache and as a broker for Celery tasks.
 
-### 3.3. AI Services (Cloud-based APIs)
+### 3.3. AI Services & ML Feedback Loop
 
 - **Technology**: Integration via asynchronous Python clients (`httpx`).
-- **Purpose**: Provides specialized AI functionalities to the backend.
 - **Services**:
     - **Gladia V2 (Transcription & Diarization)**:
-        - Unified service for highly accurate speech-to-text and speaker identification in a single API call.
-        - Supports complex code-switching (Arabic/French/English) and handles multiple speakers seamlessly.
-    - **Mistral (NLP for PV Generation & ML Suggestions)**:
-        - Processes transcribed text to generate summaries, decisions, and official actions.
-        - **ML Action Suggestions**: Identifies implicit tasks for user validation, building a dataset for future model fine-tuning.
-        - Optimized for nuanced understanding of professional meeting contexts.
-- **Deployment**: Both services are utilized via their official REST APIs, significantly reducing the local infrastructure footprint.
+        - Unified service for highly accurate speech-to-text and speaker identification.
+        - Handles complex code-switching (Arabic/French/English) natively.
+    - **Mistral AI (NLP & Intelligence)**:
+        - **PV Generation**: Summarizes discussions into structured meeting minutes.
+        - **ML Action Suggestions**: Identifies implicit tasks using few-shot prompting. These suggestions are stored separately from confirmed "Actions" to avoid cluttering the official record.
+- **The "ML Feedback Loop" (Data Flywheel)**:
+    - Users can **Accept** or **Reject** AI-suggested tasks in the UI.
+    - This interaction is logged in the `action_suggestions` table with a `status` (SUGGESTED, ACCEPTED, REJECTED).
+    - **Purpose**: This creates a high-quality, human-in-the-loop dataset. In future phases, this data will be used to fine-tune a local Mistral model, making the system increasingly accurate for specific client contexts and regional dialects.
 
 ### 3.4. n8n (Workflow Automation)
 
@@ -137,42 +138,21 @@ graph TD
 ### 3.5. Infrastructure
 
 - **Docker/Docker Compose**: Used for local development and simplified deployment of multi-service applications.
-    - `docker-compose.yml`: Defines all services (PostgreSQL, Redis, RabbitMQ, Minio, n8n, Backend, Celery Workers, Frontend).
 - **Kubernetes**: Orchestrates containerized applications in production environments.
-    - `namespace.yaml`: Defines the Kubernetes namespace.
-    - `backend-deployment.yaml`, `frontend-deployment.yaml`: Deployment configurations for backend and frontend.
-    - `postgres-statefulset.yaml`, `redis-deployment.yaml`: Deployments for stateful services.
-    - `ingress.yaml`: Manages external access to services.
-- **Terraform**: Manages cloud infrastructure (e.g., provision Kubernetes cluster, databases, S3 buckets).
-    - `main.tf`, `variables.tf`, `outputs.tf`: Terraform configuration files.
-- **Minio (S3-compatible Object Storage)**:
-    - **Purpose**: Stores meeting recordings and other large files.
-    - **Integration**: Backend interacts with Minio via the S3 API (Boto3 library).
+- **Minio (S3-compatible Object Storage)**: Stores meeting recordings and other large files.
 
 ## 4. CI/CD Pipelines (.github/workflows)
 
-- **Backend CI (`backend-ci.yml`)**:
-    - Triggers on push/pull request to `main`/`develop` branches within the `backend/` directory.
-    - Runs tests (pytest), linting (flake8), type checking (mypy).
-    - Builds Docker image and performs Trivy vulnerability scanning.
-- **Frontend CI (`frontend-ci.yml`)**:
-    - Triggers on push/pull request to `main`/`develop` branches within the `frontend/` directory.
-    - Installs dependencies, runs linting (ESLint), type checking (TypeScript), and builds the frontend application.
-    - Builds Docker image for the frontend.
-- **Docker Build (`docker-build.yml`)**:
-    - A general workflow for building and potentially pushing Docker images (not fully detailed in the provided schema, but typically handles multi-service image builds and registry pushes).
+- **Backend CI**: Runs tests, linting, type checking, and builds Docker image.
+- **Frontend CI**: Linting, type checking, and builds the static frontend assets.
 
 ## 5. Security & Compliance (ISO 27001)
 
-- **Audit Middleware**: The backend includes middleware to log all significant user actions, forming a comprehensive audit trail.
-- **Data Encryption**: Sensitive data at rest and in transit is encrypted using cryptography.
-- **Authentication**: JWT-based authentication with refresh tokens and multi-factor authentication (MFA).
-- **Access Control**: Role-based access control (RBAC) to ensure users only access authorized resources.
-- **Vulnerability Scanning**: Docker images are scanned for vulnerabilities using Trivy in CI/CD pipelines.
+- **Audit Middleware**: Comprehensive audit trail for all significant actions.
+- **Data Isolation**: Application-level Row Level Security via `client_id` filtering.
+- **Data Encryption**: AES-256 for data at rest, TLS for data in transit.
 
 ## 6. Cultural Adaptations (Tunisia/Maghreb)
 
-- **Multilingual Support**: Frontend and AI services support Arabic (Tunisian and MSA), French, and English, including code-switching in transcription.
-- **RTL Layout**: Frontend implements Right-to-Left (RTL) layout for Arabic languages.
-- **Cultural Calendar**: Frontend incorporates cultural calendar features relevant to the region.
-- **WhatsApp Integration**: Leverages WhatsApp Business API for notifications and reminders, recognizing its high adoption rate in Tunisia.
+- **Multilingual Support**: Arabic (Tunisian/MSA), French, and English support.
+- **WhatsApp Integration**: High-adoption channel for notifications in Tunisia.

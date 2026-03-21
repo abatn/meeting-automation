@@ -182,16 +182,30 @@ erDiagram
     - `meeting_id` (UUID, FK).
     - `content_html` (TEXT).
 
-### 2.6. `actions` Table
+### 2.6. `action_suggestions` Table
 
-- **Description**: Action items from meetings. Isolated by `client_id`.
+- **Description**: AI-generated task suggestions awaiting user validation. Part of the ML Feedback Loop.
+- **Fields**:
+    - `id` (UUID, Primary Key).
+    - `client_id` (UUID, FK).
+    - `meeting_id` (UUID, FK).
+    - `title` (VARCHAR): Suggested task title.
+    - `description` (TEXT).
+    - `status` (VARCHAR): Enum (SUGGESTED, ACCEPTED, REJECTED).
+    - `confidence_score` (FLOAT): AI's certainty level.
+    - `created_at` (TIMESTAMP).
+
+### 2.7. `actions` Table
+
+- **Description**: Confirmed action items from meetings. Isolated by `client_id`.
 - **Fields**:
     - `id` (UUID, Primary Key).
     - `client_id` (UUID, FK).
     - `meeting_id` (UUID, FK).
     - `title` (VARCHAR).
+    - `status` (VARCHAR): Enum (PENDING, COMPLETED, CANCELLED).
 
-### 2.7. `audit_logs` Table
+### 2.8. `audit_logs` Table
 
 - **Description**: ISO 27001 compliant activity logs. Isolated by `client_id`.
 - **Fields**:
