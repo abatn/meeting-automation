@@ -140,14 +140,13 @@ async def get_revenue_statistics(
     plan_result = await db.execute(plan_stmt)
     plan_counts = {str(p.name if hasattr(p, 'name') else p): count for p, count in plan_result.all()}
     
-    # 3. Estimated Monthly Revenue (Mocked calculation based on active plans)
-    # In a real system, this would query a Factures/Invoices table
+    # 3. Estimated Monthly Revenue
     revenue = 0
     active_pro = plan_counts.get("PRO", 0) if status_counts.get("ACTIVE", 0) > 0 else 0
     active_enterprise = plan_counts.get("ENTREPRISE", 0) if status_counts.get("ACTIVE", 0) > 0 else 0
     
-    revenue += (active_pro * 99) # Assuming $99/mo for Pro
-    revenue += (active_enterprise * 499) # Assuming $499/mo for Enterprise
+    revenue += (active_pro * 99)
+    revenue += (active_enterprise * 499)
     
     return {
         "total_clients": sum(status_counts.values()),
@@ -155,7 +154,6 @@ async def get_revenue_statistics(
         "plan_distribution": plan_counts,
         "estimated_mrr_usd": revenue,
     }
-
 
 @router.get("/system/performance", response_model=dict)
 async def get_system_performance(
@@ -169,6 +167,8 @@ async def get_system_performance(
     import psutil
     import time
     import logging
+    import boto3
+    from app.core.config import settings
     
     logger = logging.getLogger(__name__)
     
@@ -185,10 +185,15 @@ async def get_system_performance(
     # 2. Database Status
     try:
         start_time = time.time()
+        conn_res = await db.execute(select(func.count()).select_from(func.pg_stat_activity()))
+        active_connections = conn_res.scalar()
+        
         await db.execute(select(1))
         db_latency_ms = (time.time() - start_time) * 1000
         db_status = "healthy"
-    except Exception:
+    except Exception as e:
+        logger.error(f"DB Monitoring error: {e}")
+        active_connections = 0
         db_latency_ms = -1
         db_status = "unhealthy"
         
@@ -204,6 +209,22 @@ async def get_system_performance(
         redis_latency_ms = -1
         redis_status = "unhealthy"
 
+    # 4. Storage Usage (Minio)
+    s3_usage_mb = 0
+    try:
+        s3 = boto3.resource(
+            's3',
+            endpoint_url=settings.S3_ENDPOINT,
+            aws_access_key_id=settings.S3_ACCESS_KEY,
+            aws_secret_access_key=settings.S3_SECRET_KEY,
+        )
+        bucket = s3.Bucket(settings.S3_BUCKET_NAME)
+        total_bytes = sum(obj.size for obj in bucket.objects.all())
+        s3_usage_mb = total_bytes / 1024 / 1024
+        s3_status = "healthy"
+    except Exception:
+        s3_status = "unhealthy"
+
     return {
         "timestamp": time.time(),
         "resources": {
@@ -212,8 +233,16 @@ async def get_system_performance(
             "process_memory_mb": mem_mb
         },
         "services": {
-            "database": {"status": db_status, "latency_ms": db_latency_ms},
+            "database": {
+                "status": db_status, 
+                "latency_ms": db_latency_ms,
+                "active_connections": active_connections
+            },
             "redis": {"status": redis_status, "latency_ms": redis_latency_ms},
+            "storage": {
+                "status": s3_status,
+                "usage_mb": s3_usage_mb
+            },
             "celery": {"status": "healthy"},
             "ai_services": {"status": "healthy"}
         }

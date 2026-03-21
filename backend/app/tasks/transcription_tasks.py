@@ -118,6 +118,7 @@ async def _handle_ai_results(
 
     db_trans = Transcription(
         id=str(uuid.uuid4()),
+        client_id=str(recording.client_id),
         recording_id=str(recording.id),
         meeting_id=str(recording.meeting_id),
         full_text=gladia_result.get("full_text", ""),
@@ -167,6 +168,7 @@ async def _save_pv_and_actions(
         await db.execute(
             insert(PV).values(
                 id=pv_id,
+                client_id=str(recording.client_id),
                 meeting_id=str(recording.meeting_id),
                 title=pv_data.get("title", "Meeting PV"),
                 content_html=html,
@@ -200,6 +202,7 @@ async def _save_pv_and_actions(
         db.add(
             Action(
                 id=str(uuid.uuid4()),
+                client_id=str(recording.client_id),
                 meeting_id=str(recording.meeting_id),
                 title=action_item.get("description", "N/A"),
                 description=action_item.get("priority_reason", ""),
@@ -214,7 +217,7 @@ async def _save_pv_and_actions(
         from app.services.action_service import ActionService
         logger.info(f"Triggering ML action suggestions for meeting {recording.meeting_id}")
         action_service = ActionService(db)
-        await action_service.generate_suggestions_from_transcription(str(recording.meeting_id))
+        await action_service.generate_suggestions_from_transcription(str(recording.meeting_id), str(recording.client_id))
     except Exception as e:
         logger.error(f"Failed to generate action suggestions: {e}")
         pass

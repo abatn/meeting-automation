@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Grid, Paper, Divider, 
-  CircularProgress, LinearProgress, Stack, Chip
+  CircularProgress, LinearProgress, Stack, Chip,
+  Card, CardContent
 } from '@mui/material';
 import { 
   Storage as DbIcon, 
@@ -9,7 +10,9 @@ import {
   Speed as CpuIcon,
   CloudQueue as ServiceIcon,
   CheckCircle as HealthyIcon,
-  Error as UnhealthyIcon
+  Error as UnhealthyIcon,
+  Cloud as StorageIcon,
+  People as PeopleIcon
 } from '@mui/icons-material';
 import api from '../../services/api';
 
@@ -39,93 +42,115 @@ const TechnikDashboard: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>System Health & Performance</Typography>
+      <Typography variant="h4" gutterBottom fontWeight="bold">System Health & Real-time Metrics</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Monitoring global infrastructure performance and resource allocation.</Typography>
       <Divider sx={{ mb: 4 }} />
 
       <Grid container spacing={3}>
-        {/* Resource Usage */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>Resource Usage</Typography>
+        {/* KPI Row */}
+        <Grid item xs={12} sm={6} md={3}>
+            <Card variant="outlined">
+                <CardContent>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                        <DbIcon color="primary" fontSize="small" />
+                        <Typography variant="subtitle2" color="text.secondary">DB Connections</Typography>
+                    </Stack>
+                    <Typography variant="h4" fontWeight="bold">{metrics.services.database.active_connections}</Typography>
+                </CardContent>
+            </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+            <Card variant="outlined">
+                <CardContent>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                        <StorageIcon color="secondary" fontSize="small" />
+                        <Typography variant="subtitle2" color="text.secondary">S3 Storage Usage</Typography>
+                    </Stack>
+                    <Typography variant="h4" fontWeight="bold">{Math.round(metrics.services.storage.usage_mb)} <Typography component="span" variant="h6">MB</Typography></Typography>
+                </CardContent>
+            </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+            <Card variant="outlined">
+                <CardContent>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                        <CpuIcon color="warning" fontSize="small" />
+                        <Typography variant="subtitle2" color="text.secondary">CPU Load</Typography>
+                    </Stack>
+                    <Typography variant="h4" fontWeight="bold">{metrics.resources.cpu_percent}%</Typography>
+                </CardContent>
+            </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+            <Card variant="outlined">
+                <CardContent>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                        <RamIcon color="info" fontSize="small" />
+                        <Typography variant="subtitle2" color="text.secondary">Process Mem</Typography>
+                    </Stack>
+                    <Typography variant="h4" fontWeight="bold">{Math.round(metrics.resources.process_memory_mb)} <Typography component="span" variant="h6">MB</Typography></Typography>
+                </CardContent>
+            </Card>
+        </Grid>
+
+        {/* Detailed Resource Charts (Simulated) */}
+        <Grid item xs={12} md={7}>
+          <Paper sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h6" gutterBottom>Resource Allocation</Typography>
             
-            <Box sx={{ mb: 3 }}>
+            <Box sx={{ mb: 4, mt: 2 }}>
               <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <CpuIcon fontSize="small" />
-                  <Typography variant="body2">CPU Load</Typography>
-                </Stack>
+                <Typography variant="body2">CPU Core Utilization</Typography>
                 <Typography variant="body2" fontWeight="bold">{metrics.resources.cpu_percent}%</Typography>
               </Stack>
-              <LinearProgress variant="determinate" value={metrics.resources.cpu_percent} />
+              <LinearProgress variant="determinate" value={metrics.resources.cpu_percent} sx={{ height: 10, borderRadius: 5 }} />
+            </Box>
+
+            <Box sx={{ mb: 4 }}>
+              <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography variant="body2">System RAM Usage</Typography>
+                <Typography variant="body2" fontWeight="bold">{metrics.resources.ram_percent}%</Typography>
+              </Stack>
+              <LinearProgress variant="determinate" value={metrics.resources.ram_percent} color="secondary" sx={{ height: 10, borderRadius: 5 }} />
             </Box>
 
             <Box>
-              <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <RamIcon fontSize="small" />
-                  <Typography variant="body2">RAM Usage</Typography>
+                <Typography variant="subtitle2" gutterBottom>Database Latency</Typography>
+                <Stack direction="row" spacing={1} alignItems="flex-end">
+                    <Typography variant="h3" color="primary">{Math.round(metrics.services.database.latency_ms)}</Typography>
+                    <Typography variant="h6" color="text.secondary" sx={{ pb: 1 }}>ms</Typography>
                 </Stack>
-                <Typography variant="body2" fontWeight="bold">{metrics.resources.ram_percent}%</Typography>
-              </Stack>
-              <LinearProgress variant="determinate" value={metrics.resources.ram_percent} color="secondary" />
             </Box>
-            
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
-              Backend Process Memory: {Math.round(metrics.resources.process_memory_mb)} MB
-            </Typography>
           </Paper>
         </Grid>
 
-        {/* Services Status */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>Service Status</Typography>
-            <Stack spacing={2}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <DbIcon color="action" />
-                  <Typography>PostgreSQL Database</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography variant="caption">{Math.round(metrics.services.database.latency_ms)}ms</Typography>
-                  <Chip 
-                    label={metrics.services.database.status} 
-                    color={metrics.services.database.status === 'healthy' ? 'success' : 'error'} 
-                    size="small" 
-                  />
-                </Stack>
-              </Box>
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <ServiceIcon color="action" />
-                  <Typography>Redis Cache</Typography>
-                </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
-                   <Typography variant="caption">{Math.round(metrics.services.redis.latency_ms)}ms</Typography>
-                  <Chip 
-                    label={metrics.services.redis.status} 
-                    color={metrics.services.redis.status === 'healthy' ? 'success' : 'error'} 
-                    size="small" 
-                  />
-                </Stack>
-              </Box>
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <ServiceIcon color="action" />
-                  <Typography>Celery Worker (Queue)</Typography>
-                </Stack>
-                <Chip label="Healthy" color="success" size="small" />
-              </Box>
-
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <ServiceIcon color="action" />
-                  <Typography>AI Services (Whisper/Mistral)</Typography>
-                </Stack>
-                <Chip label="Ready" color="success" size="small" />
-              </Box>
+        {/* Service Grid */}
+        <Grid item xs={12} md={5}>
+          <Paper sx={{ p: 3, height: '100%' }}>
+            <Typography variant="h6" gutterBottom>Infrastructure Health</Typography>
+            <Stack spacing={3} sx={{ mt: 2 }}>
+              {[
+                { name: "PostgreSQL", status: metrics.services.database.status, icon: <DbIcon /> },
+                { name: "Redis Cache", status: metrics.services.redis.status, icon: <ServiceIcon /> },
+                { name: "S3 Object Store", status: metrics.services.storage.status, icon: <StorageIcon /> },
+                { name: "Celery Worker", status: metrics.services.celery.status, icon: <ServiceIcon /> },
+                { name: "AI Engine (Mistral)", status: metrics.services.ai_services.status, icon: <IAIcon /> }
+              ].map((s, i) => (
+                <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Stack direction="row" spacing={2} alignItems="center">
+                        <Avatar sx={{ bgcolor: s.status === 'healthy' ? 'success.light' : 'error.light', width: 40, height: 40 }}>
+                            {s.icon}
+                        </Avatar>
+                        <Typography variant="body1" fontWeight="600">{s.name}</Typography>
+                    </Stack>
+                    <Chip 
+                        label={s.status.toUpperCase()} 
+                        color={s.status === 'healthy' ? 'success' : 'error'} 
+                        size="small"
+                        sx={{ fontWeight: 'bold' }}
+                    />
+                </Box>
+              ))}
             </Stack>
           </Paper>
         </Grid>

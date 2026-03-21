@@ -14,7 +14,8 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Avatar
+  Avatar,
+  alpha
 } from '@mui/material';
 import { 
   AutoFixHigh as IAIcon, 
@@ -24,7 +25,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   Language as LangIcon,
   Security as ShieldIcon,
-  TrendingUp as GrowthIcon
+  TrendingUp as GrowthIcon,
+  PlayArrow as PlayIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 
@@ -36,51 +38,65 @@ const LandingPage: React.FC = () => {
     if (plan) {
       navigate(`/register?plan=${plan}`);
     } else {
-      navigate('/login');
+      navigate('/register');
     }
   };
 
   return (
-    <Box sx={{ bgcolor: '#FFFFFF', minHeight: '100vh', color: '#1A2027' }}>
+    <Box sx={{ bgcolor: '#0B0F19', minHeight: '100vh', color: '#FFFFFF', overflow: 'hidden' }}>
       
+      {/* --- BACKGROUND GLOW EFFECTS --- */}
+      <Box sx={{ 
+        position: 'absolute', top: -200, left: '10%', width: 600, height: 600, 
+        background: `radial-gradient(circle, ${alpha(theme.palette.primary.main, 0.15)} 0%, rgba(0,0,0,0) 70%)`,
+        filter: 'blur(80px)', zIndex: 0
+      }} />
+      <Box sx={{ 
+        position: 'absolute', top: 400, right: '-5%', width: 500, height: 500, 
+        background: `radial-gradient(circle, ${alpha(theme.palette.secondary.main, 0.1)} 0%, rgba(0,0,0,0) 70%)`,
+        filter: 'blur(80px)', zIndex: 0
+      }} />
+
       {/* --- NAVIGATION --- */}
       <AppBar 
-        position="sticky" 
+        position="fixed" 
         elevation={0} 
         sx={{ 
-          bgcolor: 'rgba(255, 255, 255, 0.8)', 
-          backdropFilter: 'blur(20px)',
-          color: '#1A2027', 
-          borderBottom: '1px solid #E5EAF2' 
+          bgcolor: 'rgba(11, 15, 25, 0.7)', 
+          backdropFilter: 'blur(15px)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          zIndex: 10
         }}
       >
         <Container maxWidth="lg">
-          <Toolbar disableGutters sx={{ justifyContent: 'space-between', height: 70 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => window.scrollTo(0,0)}>
-              <Avatar sx={{ bgcolor: theme.palette.primary.main, mr: 1, width: 32, height: 32 }}>
-                <IAIcon sx={{ fontSize: 20 }} />
-              </Avatar>
-              <Typography variant="h6" fontWeight="800" sx={{ letterSpacing: '-0.5px' }}>
-                Meeting<Box component="span" sx={{ color: theme.palette.primary.main }}>Automation</Box>
+          <Toolbar disableGutters sx={{ justifyContent: 'space-between', height: 80 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <Box sx={{ 
+                width: 40, height: 40, bgcolor: 'primary.main', borderRadius: '12px', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 1.5,
+                boxShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.5)}`
+              }}>
+                <IAIcon sx={{ color: 'white' }} />
+              </Box>
+              <Typography variant="h5" fontWeight="900" sx={{ letterSpacing: '-1px' }}>
+                Meeting<Box component="span" sx={{ color: 'primary.main' }}>Automation</Box>
               </Typography>
             </Box>
             
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Button color="inherit" sx={{ fontWeight: 600, display: {xs: 'none', sm: 'block'} }} onClick={() => navigate('/login')}>
+            <Stack direction="row" spacing={3} alignItems="center">
+              <Button color="inherit" sx={{ fontWeight: 600, textTransform: 'none', opacity: 0.8, '&:hover': { opacity: 1 } }} onClick={() => navigate('/login')}>
                 Connexion
               </Button>
               <Button 
                 variant="contained" 
                 sx={{ 
-                  borderRadius: '10px', 
-                  px: 3, 
-                  fontWeight: 700,
-                  textTransform: 'none',
-                  boxShadow: '0 4px 14px 0 rgba(0,118,255,0.39)'
+                  borderRadius: '12px', px: 3, py: 1, fontWeight: 700, textTransform: 'none',
+                  background: 'linear-gradient(90deg, #0070F3 0%, #00A3FF 100%)',
+                  boxShadow: '0 8px 20px rgba(0,112,243,0.3)'
                 }}
                 onClick={() => handleStart()}
               >
-                Essayer gratuitement
+                Commencer l'essai
               </Button>
             </Stack>
           </Toolbar>
@@ -88,322 +104,226 @@ const LandingPage: React.FC = () => {
       </AppBar>
 
       {/* --- HERO SECTION --- */}
-      <Box sx={{ 
-        pt: { xs: 10, md: 15 }, 
-        pb: { xs: 8, md: 12 },
-        background: 'radial-gradient(circle at 50% -20%, #E3F2FD 0%, #FFFFFF 80%)'
-      }}>
-        <Container maxWidth="lg">
-          <Grid container spacing={4} alignItems="center">
-            <Grid item xs={12} md={7}>
-              <Box sx={{ textAlign: { xs: 'center', md: 'left' } }}>
-                <Typography 
-                  variant="overline" 
-                  sx={{ 
-                    color: 'primary.main', 
-                    fontWeight: 800, 
-                    letterSpacing: 2,
-                    bgcolor: 'primary.light',
-                    px: 2, py: 0.5, borderRadius: 2,
-                    opacity: 0.8
-                  }}
-                >
-                  L'INTELLIGENCE ARTIFICIELLE AU SERVICE DE VOS RÉUNIONS
-                </Typography>
-                <Typography 
-                  variant="h1" 
-                  sx={{ 
-                    fontSize: { xs: '2.5rem', md: '4rem' }, 
-                    fontWeight: 900, 
-                    lineHeight: 1.1, 
-                    mt: 3, mb: 3,
-                    letterSpacing: '-1px'
-                  }}
-                >
-                  Générez vos PV de réunion <Box component="span" sx={{ color: 'primary.main' }}>en un clic</Box>
-                </Typography>
-                <Typography variant="h5" color="text.secondary" sx={{ mb: 5, lineHeight: 1.6, maxWidth: 600 }}>
-                  Transformez instantanément vos discussions en comptes-rendus structurés, identifiez les actions et optimisez le suivi de vos projets.
-                </Typography>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent={{ xs: 'center', md: 'flex-start' }}>
-                  <Button 
-                    variant="contained" 
-                    size="large" 
-                    sx={{ borderRadius: '12px', px: 5, py: 2, fontSize: '1.1rem', fontWeight: 700, textTransform: 'none' }}
-                    onClick={() => handleStart('PRO')}
-                  >
-                    Démarrer maintenant
-                  </Button>
-                  <Button 
-                    variant="outlined" 
-                    size="large" 
-                    sx={{ borderRadius: '12px', px: 5, py: 2, fontSize: '1.1rem', fontWeight: 700, textTransform: 'none', borderWidth: 2 }}
-                  >
-                    Voir la démo
-                  </Button>
-                </Stack>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={5}>
-              <Paper 
-                elevation={24} 
-                sx={{ 
-                  p: 1, 
-                  borderRadius: 4, 
-                  overflow: 'hidden', 
-                  transform: { md: 'rotate(2deg)' },
-                  boxShadow: '0 20px 50px rgba(0,0,0,0.1)'
-                }}
-              >
-                <Box 
-                  component="img" 
-                  src="https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=800&q=80" 
-                  sx={{ width: '100%', borderRadius: 3, display: 'block' }}
-                  alt="Application Dashboard Preview"
-                />
+      <Container maxWidth="lg" sx={{ pt: { xs: 20, md: 25 }, pb: 15, position: 'relative', zIndex: 1 }}>
+        <Box sx={{ textAlign: 'center', mb: 10 }}>
+          <Typography 
+            variant="overline" 
+            sx={{ 
+              color: 'primary.main', fontWeight: 800, letterSpacing: 3, 
+              border: '1px solid', borderColor: alpha(theme.palette.primary.main, 0.3),
+              px: 2, py: 0.8, borderRadius: 10, bgcolor: alpha(theme.palette.primary.main, 0.05)
+            }}
+          >
+            L'INTELLIGENCE ARTIFICIELLE AU SERVICE DU MAGHREB
+          </Typography>
+          <Typography 
+            variant="h1" 
+            sx={{ 
+              fontSize: { xs: '3rem', md: '5rem' }, fontWeight: 900, mt: 4, mb: 3,
+              lineHeight: 1, letterSpacing: '-2px',
+              background: 'linear-gradient(to bottom, #FFFFFF 0%, #94A3B8 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
+            }}
+          >
+            Générez vos PV de réunion <br/> <Box component="span" sx={{ color: '#0070F3' }}>en un clic</Box>
+          </Typography>
+          <Typography variant="h5" sx={{ color: '#94A3B8', mb: 6, maxWidth: 800, mx: 'auto', lineHeight: 1.6 }}>
+            Transformez vos discussions en comptes-rendus professionnels, extrayez les actions clés et pilotez votre organisation avec une efficacité inégalée.
+          </Typography>
+          
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="center">
+            <Button 
+              variant="contained" 
+              size="large" 
+              sx={{ borderRadius: '14px', px: 6, py: 2.5, fontSize: '1.1rem', fontWeight: 800, textTransform: 'none', background: '#FFFFFF', color: '#000000', '&:hover': { background: '#E2E8F0' } }}
+              onClick={() => handleStart('PRO')}
+            >
+              Démarrez gratuitement
+            </Button>
+            <Button 
+              variant="outlined" 
+              size="large" 
+              startIcon={<PlayIcon />}
+              sx={{ borderRadius: '14px', px: 6, py: 2.5, fontSize: '1.1rem', fontWeight: 800, textTransform: 'none', color: '#FFFFFF', borderColor: 'rgba(255,255,255,0.2)', borderWidth: 2 }}
+            >
+              Voir la démo
+            </Button>
+          </Stack>
+        </Box>
+
+        {/* --- MODERN DASHBOARD PREVIEW (MOCKUP) --- */}
+        <Box sx={{ position: 'relative', width: '100%', maxWidth: 1100, mx: 'auto', perspective: '1500px' }}>
+          <Paper 
+            elevation={0}
+            sx={{ 
+              p: 1.5, borderRadius: '24px', bgcolor: 'rgba(255,255,255,0.03)', 
+              border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)',
+              transform: 'rotateX(5deg)', boxShadow: '0 50px 100px rgba(0,0,0,0.5)'
+            }}
+          >
+            <Box sx={{ borderRadius: '18px', overflow: 'hidden', position: 'relative' }}>
+              <Box component="img" 
+                src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80"
+                sx={{ width: '100%', display: 'block', opacity: 0.9 }}
+              />
+              {/* Floating AI Status Tag */}
+              <Paper sx={{ 
+                position: 'absolute', top: '20%', left: '5%', p: 2, borderRadius: 3, 
+                bgcolor: 'rgba(0,112,243,0.9)', color: 'white', display: 'flex', alignItems: 'center', gap: 1.5,
+                boxShadow: '0 20px 40px rgba(0,0,0,0.3)', backdropFilter: 'blur(5px)'
+              }}>
+                <IAIcon />
+                <Box>
+                  <Typography variant="caption" fontWeight="bold">PV GENERATION</Typography>
+                  <Typography variant="body2" fontWeight="800">Processing in 3.2s</Typography>
+                </Box>
+              </Paper>
+            </Box>
+          </Paper>
+        </Box>
+      </Container>
+
+      {/* --- FEATURES GRID --- */}
+      <Container maxWidth="lg" sx={{ py: 20, zIndex: 1, position: 'relative' }}>
+        <Grid container spacing={4}>
+          {[
+            { icon: <VoiceIcon />, title: "Audio Multi-locuteurs", desc: "Identification précise des intervenants, même en cas de bruits de fond." },
+            { icon: <IAIcon />, title: "Synthèse Intelligente", desc: "Résumé automatique des décisions, points bloquants et consensus." },
+            { icon: <ActionIcon />, title: "Suivi des Actions", desc: "Extraction des tâches avec assignation et notifications automatiques." },
+            { icon: <LangIcon />, title: "Dialectes Maghrébins", desc: "Support complet du Français et de l'Arabe (Tunisien, Darija)." }
+          ].map((item, index) => (
+            <Grid item xs={12} sm={6} md={3} key={index}>
+              <Paper sx={{ 
+                p: 4, height: '100%', bgcolor: 'rgba(255,255,255,0.02)', 
+                border: '1px solid rgba(255,255,255,0.05)', borderRadius: 5,
+                transition: '0.3s', '&:hover': { bgcolor: 'rgba(255,255,255,0.05)', borderColor: 'primary.main' }
+              }}>
+                <Avatar sx={{ bgcolor: alpha(theme.palette.primary.main, 0.15), color: 'primary.main', mb: 3 }}>
+                  {item.icon}
+                </Avatar>
+                <Typography variant="h6" fontWeight="800" gutterBottom>{item.title}</Typography>
+                <Typography variant="body2" sx={{ color: '#94A3B8', lineHeight: 1.6 }}>{item.desc}</Typography>
               </Paper>
             </Grid>
-          </Grid>
-        </Container>
-      </Box>
-
-      {/* --- HOW IT WORKS --- */}
-      <Container maxWidth="lg" sx={{ py: 12 }}>
-        <Typography variant="h3" textAlign="center" fontWeight="800" gutterBottom>Comment ça marche ?</Typography>
-        <Typography variant="h6" textAlign="center" color="text.secondary" sx={{ mb: 10 }}>Trois étapes simples pour révolutionner votre productivité.</Typography>
-        
-        <Grid container spacing={6}>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ textAlign: 'center' }}>
-              <Avatar sx={{ width: 80, height: 80, bgcolor: 'primary.light', color: 'primary.main', mx: 'auto', mb: 3 }}>
-                <VoiceIcon sx={{ fontSize: 40 }} />
-              </Avatar>
-              <Typography variant="h5" fontWeight="700" gutterBottom>1. Enregistrez</Typography>
-              <Typography color="text.secondary">Lancez l'enregistrement directement depuis votre navigateur ou téléchargez votre fichier audio.</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ textAlign: 'center' }}>
-              <Avatar sx={{ width: 80, height: 80, bgcolor: 'secondary.light', color: 'secondary.main', mx: 'auto', mb: 3 }}>
-                <IAIcon sx={{ fontSize: 40 }} />
-              </Avatar>
-              <Typography variant="h5" fontWeight="700" gutterBottom>2. Analyse IA</Typography>
-              <Typography color="text.secondary">Notre IA transcrit, identifie les interlocuteurs et extrait les points clés en quelques secondes.</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Box sx={{ textAlign: 'center' }}>
-              <Avatar sx={{ width: 80, height: 80, bgcolor: 'success.light', color: 'success.main', mx: 'auto', mb: 3 }}>
-                <ActionIcon sx={{ fontSize: 40 }} />
-              </Avatar>
-              <Typography variant="h5" fontWeight="700" gutterBottom>3. Validez & Suivez</Typography>
-              <Typography color="text.secondary">Générez votre PV PDF/Word et suivez l'exécution des actions assignées dans votre dashboard.</Typography>
-            </Box>
-          </Grid>
+          ))}
         </Grid>
       </Container>
 
       {/* --- PRICING SECTION --- */}
-      <Box sx={{ py: 15, bgcolor: '#F8FAFC' }}>
+      <Box sx={{ py: 20, bgcolor: '#0F172A' }}>
         <Container maxWidth="lg">
-          <Typography variant="h3" textAlign="center" fontWeight="800" gutterBottom>Une offre adaptée à chaque besoin</Typography>
-          <Typography variant="h6" textAlign="center" color="text.secondary" sx={{ mb: 10 }}>Passez à la vitesse supérieure avec nos forfaits Premium.</Typography>
+          <Box sx={{ textAlign: 'center', mb: 10 }}>
+            <Typography variant="h3" fontWeight="900" gutterBottom>Une solution pour chaque équipe</Typography>
+            <Typography variant="h6" sx={{ color: '#94A3B8' }}>Passez à la vitesse supérieure avec nos forfaits.</Typography>
+          </Box>
 
           <Grid container spacing={4} alignItems="stretch">
-            {/* Free */}
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 5, height: '100%', borderRadius: 4, display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { transform: 'translateY(-10px)' } }}>
-                <Typography variant="h6" fontWeight="700">Gratuit</Typography>
-                <Typography variant="h3" fontWeight="800" sx={{ mt: 2, mb: 1 }}>0$</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Pour tester la puissance de l'IA</Typography>
-                <Divider sx={{ mb: 4 }} />
-                <Stack spacing={2} sx={{ flexGrow: 1, mb: 5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">10 réunions / mois</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Transcription Standard</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Génération PV Automatique</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Gestion des actions</Typography></Box>
-                </Stack>
-                <Button fullWidth variant="outlined" size="large" sx={{ borderRadius: 3, py: 1.5, fontWeight: 700 }} onClick={() => handleStart('GRATUIT')}>S'inscrire</Button>
-              </Paper>
-            </Grid>
-
-            {/* Pro */}
-            <Grid item xs={12} md={4}>
-              <Paper 
-                elevation={10}
-                sx={{ 
-                  p: 5, height: '100%', borderRadius: 4, display: 'flex', flexDirection: 'column', 
-                  border: '2px solid', borderColor: 'primary.main', position: 'relative',
-                  transition: '0.3s', '&:hover': { transform: 'translateY(-10px)' }
-                }}
-              >
-                <Box sx={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%) translateY(-50%)', bgcolor: 'primary.main', color: 'white', px: 3, py: 0.5, borderRadius: 10, fontSize: '0.75rem', fontWeight: 800 }}>POPULAIRE</Box>
-                <Typography variant="h6" fontWeight="700" color="primary.main">Pro</Typography>
-                <Typography variant="h3" fontWeight="800" sx={{ mt: 2, mb: 1 }}>99$</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Pour les équipes dynamiques</Typography>
-                <Divider sx={{ mb: 4 }} />
-                <Stack spacing={2} sx={{ flexGrow: 1, mb: 5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2" fontWeight="600">Réunions illimitées</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Transcription Haute Précision</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Suggestions IA Intelligentes</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Export PDF / Word illimité</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Support Prioritaire</Typography></Box>
-                </Stack>
-                <Button fullWidth variant="contained" size="large" sx={{ borderRadius: 3, py: 2, fontWeight: 800, boxShadow: '0 4px 14px 0 rgba(0,118,255,0.39)' }} onClick={() => handleStart('PRO')}>Commencer</Button>
-              </Paper>
-            </Grid>
-
-            {/* Enterprise */}
-            <Grid item xs={12} md={4}>
-              <Paper sx={{ p: 5, height: '100%', borderRadius: 4, display: 'flex', flexDirection: 'column', transition: '0.3s', '&:hover': { transform: 'translateY(-10px)' } }}>
-                <Typography variant="h6" fontWeight="700">Entreprise</Typography>
-                <Typography variant="h3" fontWeight="800" sx={{ mt: 2, mb: 1 }}>499$</Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>Pour les grandes organisations</Typography>
-                <Divider sx={{ mb: 4 }} />
-                <Stack spacing={2} sx={{ flexGrow: 1, mb: 5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Tout le plan Pro</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Account Manager Dédié</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">API & Webhooks Personnalisés</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">SSO & Sécurité Avancée</Typography></Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="success" sx={{ mr: 1.5, fontSize: 20 }} /><Typography variant="body2">Rapports d'Utilisation</Typography></Box>
-                </Stack>
-                <Button fullWidth variant="outlined" size="large" sx={{ borderRadius: 3, py: 1.5, fontWeight: 700 }} onClick={() => handleStart('ENTREPRISE')}>Contacter Ventes</Button>
-              </Paper>
-            </Grid>
+            {/* Standard Plan Card Helper */}
+            {[
+              { name: "Gratuit", price: "0", feat: ["10 réunions / mois", "Transcription Standard", "Support par email"], cta: "Essayer gratuitement", active: false },
+              { name: "Pro", price: "99", feat: ["Réunions illimitées", "IA Haute Précision", "Suggestions de tâches", "Custom Branding"], cta: "Démarrer maintenant", active: true },
+              { name: "Entreprise", price: "499", feat: ["Sécurité ISO 27001", "Account Manager", "API personnalisée", "Rapports avancés"], cta: "Contacter Ventes", active: false }
+            ].map((p, i) => (
+              <Grid item xs={12} md={4} key={i}>
+                <Paper sx={{ 
+                  p: 6, height: '100%', borderRadius: 6, display: 'flex', flexDirection: 'column',
+                  bgcolor: p.active ? 'rgba(255,255,255,0.05)' : 'transparent',
+                  border: '1px solid', borderColor: p.active ? 'primary.main' : 'rgba(255,255,255,0.1)',
+                  position: 'relative'
+                }}>
+                  {p.active && <Box sx={{ position: 'absolute', top: 25, right: 25, bgcolor: 'primary.main', color: 'white', px: 2, py: 0.5, borderRadius: 2, fontSize: '0.7rem', fontWeight: 900 }}>RECOMMANDÉ</Box>}
+                  <Typography variant="h6" fontWeight="800" sx={{ mb: 1 }}>{p.name}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', mb: 4 }}>
+                    <Typography variant="h2" fontWeight="900">${p.price}</Typography>
+                    <Typography variant="subtitle1" sx={{ color: '#94A3B8', ml: 1 }}>/mois</Typography>
+                  </Box>
+                  <Stack spacing={2.5} sx={{ mb: 6, flexGrow: 1 }}>
+                    {p.feat.map((f, j) => (
+                      <Box key={j} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <CheckIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                        <Typography variant="body2" sx={{ opacity: 0.8 }}>{f}</Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                  <Button 
+                    fullWidth 
+                    variant={p.active ? "contained" : "outlined"} 
+                    size="large"
+                    sx={{ borderRadius: 3, py: 2, fontWeight: 800, textTransform: 'none' }}
+                    onClick={() => handleStart(p.name.toUpperCase())}
+                  >
+                    {p.cta}
+                  </Button>
+                </Paper>
+              </Grid>
+            ))}
           </Grid>
         </Container>
       </Box>
 
-      {/* --- FEATURES GRID --- */}
-      <Container maxWidth="lg" sx={{ py: 15 }}>
-        <Grid container spacing={10}>
-          <Grid item xs={12} md={6}>
-            <Avatar sx={{ bgcolor: 'primary.light', mb: 3 }}><ShieldIcon color="primary" /></Avatar>
-            <Typography variant="h4" fontWeight="800" gutterBottom>Sécurité & Conformité ISO 27001</Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4, lineHeight: 1.8 }}>
-              Vos données sont sacrées. Nous appliquons les standards les plus stricts en matière de protection des données, avec un chiffrement de bout en bout et des pistes d'audit complètes.
-            </Typography>
-            <Stack spacing={2}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="primary" sx={{ mr: 1 }} /><Typography variant="body2">Hébergement Sécurisé (Cloud Souverain)</Typography></Box>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="primary" sx={{ mr: 1 }} /><Typography variant="body2">Authentification Multi-Facteurs (MFA)</Typography></Box>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="primary" sx={{ mr: 1 }} /><Typography variant="body2">Isolation Totale des Données Clients</Typography></Box>
-            </Stack>
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <Avatar sx={{ bgcolor: 'secondary.light', mb: 3 }}><LangIcon color="secondary" /></Avatar>
-            <Typography variant="h4" fontWeight="800" gutterBottom>Optimisé pour le Maghreb</Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 4, lineHeight: 1.8 }}>
-              Unique sur le marché, notre moteur gère parfaitement le français, l'anglais et les dialectes locaux (Arabe Tunisien, Darija). Plus besoin de nettoyer vos transcriptions manuellement.
-            </Typography>
-            <Stack spacing={2}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="secondary" sx={{ mr: 1 }} /><Typography variant="body2">Multi-langues Natif (AR, FR, EN)</Typography></Box>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="secondary" sx={{ mr: 1 }} /><Typography variant="body2">Calendrier Culturel & Jours Fériés</Typography></Box>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}><CheckIcon color="secondary" sx={{ mr: 1 }} /><Typography variant="body2">Exportations Format Procès-Verbal Local</Typography></Box>
-            </Stack>
-          </Grid>
-        </Grid>
-      </Container>
-
-      {/* --- FAQ SECTION --- */}
-      <Box sx={{ py: 12, bgcolor: '#FFFFFF' }}>
-        <Container maxWidth="md">
-          <Typography variant="h4" textAlign="center" fontWeight="800" sx={{ mb: 8 }}>Questions fréquentes</Typography>
-          
-          <Accordion elevation={0} sx={{ borderBottom: '1px solid #E5EAF2' }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography fontWeight="700">Comment l'IA identifie-t-elle les différents intervenants ?</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" color="text.secondary">
-                Nous utilisons une technologie de "Diarisation" avancée qui analyse les empreintes vocales uniques de chaque participant pour les distinguer avec précision, même en cas de chevauchement.
-              </Typography>
-            </AccordionDetails>
-          </Accordion>
-
-          <Accordion elevation={0} sx={{ borderBottom: '1px solid #E5EAF2' }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography fontWeight="700">Mes enregistrements audio sont-ils conservés ?</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" color="text.secondary">
-                Vos fichiers sont stockés de manière chiffrée sur nos serveurs. Vous pouvez choisir de les supprimer automatiquement après la génération du PV selon vos politiques internes de rétention.
-              </Typography>
-            </AccordionDetails>
-          </Accordion>
-
-          <Accordion elevation={0} sx={{ borderBottom: '1px solid #E5EAF2' }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography fontWeight="700">Puis-je personnaliser le format des PV exportés ?</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" color="text.secondary">
-                Absolument ! Le plan Pro et Entreprise permettent d'ajouter votre logo, vos en-têtes personnalisés und d'utiliser vos propres templates de documents.
-              </Typography>
-            </AccordionDetails>
-          </Accordion>
-        </Container>
-      </Box>
-
-      {/* --- FINAL CTA --- */}
-      <Box sx={{ py: 15, textAlign: 'center', background: theme.palette.primary.main, color: 'white' }}>
-        <Container maxWidth="sm">
-          <Typography variant="h3" fontWeight="800" gutterBottom>Prêt à transformer vos réunions ?</Typography>
-          <Typography variant="h6" sx={{ mb: 6, opacity: 0.9 }}>Rejoignez les entreprises qui gagnent déjà 5h par semaine grâce à l'IA.</Typography>
-          <Button 
-            variant="contained" 
-            size="large" 
-            sx={{ bgcolor: 'white', color: 'primary.main', borderRadius: 4, px: 8, py: 2, fontSize: '1.2rem', fontWeight: 800, '&:hover': { bgcolor: '#F1F5F9' } }}
-            onClick={() => handleStart('PRO')}
-          >
-            Démarrer l'essai gratuit
-          </Button>
+      {/* --- TRUST SECTION --- */}
+      <Box sx={{ py: 10, textAlign: 'center', opacity: 0.5 }}>
+        <Container maxWidth="lg">
+          <Typography variant="overline" sx={{ letterSpacing: 4, fontWeight: 800 }}>DÉPLOYÉ DANS LES PLUS GRANDES ENTREPRISES</Typography>
+          <Stack direction="row" spacing={8} justifyContent="center" sx={{ mt: 5, flexWrap: 'wrap', gap: 4 }}>
+             {/* Mock Logo Icons */}
+             <Stack direction="row" alignItems="center" spacing={1}><ShieldIcon /> <Typography variant="h6" fontWeight="900">BANK</Typography></Stack>
+             <Stack direction="row" alignItems="center" spacing={1}><GrowthIcon /> <Typography variant="h6" fontWeight="900">TECH</Typography></Stack>
+             <Stack direction="row" alignItems="center" spacing={1}><IAIcon /> <Typography variant="h6" fontWeight="900">AI-CORP</Typography></Stack>
+             <Stack direction="row" alignItems="center" spacing={1}><LangIcon /> <Typography variant="h6" fontWeight="900">GLOBAL</Typography></Stack>
+          </Stack>
         </Container>
       </Box>
 
       {/* --- FOOTER --- */}
-      <Box sx={{ py: 8, bgcolor: '#0F172A', color: '#94A3B8' }}>
+      <Box sx={{ py: 10, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
         <Container maxWidth="lg">
           <Grid container spacing={8}>
-            <Grid item xs={12} md={4}>
-              <Typography variant="h6" color="white" fontWeight="800" sx={{ mb: 3 }}>Meeting Automation</Typography>
-              <Typography variant="body2" sx={{ lineHeight: 1.8 }}>
-                La première plateforme de gestion de réunions optimisée pour le marché maghrébin par l'intelligence artificielle.
+            <Grid item xs={12} md={5}>
+              <Typography variant="h6" fontWeight="900" sx={{ mb: 3 }}>Meeting Automation</Typography>
+              <Typography variant="body2" sx={{ color: '#94A3B8', maxWidth: 300, lineHeight: 1.8 }}>
+                Révolutionner la gestion des réunions grâce à l'IA souveraine optimisée pour le marché local.
               </Typography>
-            </Grid>
-            <Grid item xs={6} md={2}>
-              <Typography variant="subtitle2" color="white" fontWeight="700" sx={{ mb: 2 }}>Produit</Typography>
-              <Stack spacing={1}>
-                <Typography variant="caption" sx={{ cursor: 'pointer', '&:hover': { color: 'white' } }}>Fonctionnalités</Typography>
-                <Typography variant="caption" sx={{ cursor: 'pointer', '&:hover': { color: 'white' } }}>Tarifs</Typography>
-                <Typography variant="caption" sx={{ cursor: 'pointer', '&:hover': { color: 'white' } }}>Démo</Typography>
+              <Stack direction="row" spacing={2} sx={{ mt: 4 }}>
+                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.05)', cursor: 'pointer', '&:hover': { bgcolor: 'primary.main' } }}><ShieldIcon sx={{ fontSize: 20 }} /></Avatar>
+                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.05)', cursor: 'pointer', '&:hover': { bgcolor: 'primary.main' } }}><LangIcon sx={{ fontSize: 20 }} /></Avatar>
               </Stack>
             </Grid>
             <Grid item xs={6} md={2}>
-              <Typography variant="subtitle2" color="white" fontWeight="700" sx={{ mb: 2 }}>Société</Typography>
-              <Stack spacing={1}>
-                <Typography variant="caption" sx={{ cursor: 'pointer', '&:hover': { color: 'white' } }}>Support</Typography>
-                <Typography variant="caption" sx={{ cursor: 'pointer', '&:hover': { color: 'white' } }}>Confidentialité</Typography>
-                <Typography variant="caption" sx={{ cursor: 'pointer', '&:hover': { color: 'white' } }}>Contact</Typography>
+              <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 3 }}>Produit</Typography>
+              <Stack spacing={2}>
+                <Typography variant="caption" sx={{ color: '#94A3B8', cursor: 'pointer', '&:hover': { color: 'white' } }}>Fonctionnalités</Typography>
+                <Typography variant="caption" sx={{ color: '#94A3B8', cursor: 'pointer', '&:hover': { color: 'white' } }}>Tarifs</Typography>
+                <Typography variant="caption" sx={{ color: '#94A3B8', cursor: 'pointer', '&:hover': { color: 'white' } }}>API</Typography>
               </Stack>
             </Grid>
-            <Grid item xs={12} md={4}>
-              <Typography variant="subtitle2" color="white" fontWeight="700" sx={{ mb: 2 }}>Certifications</Typography>
-              <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-                <Paper variant="outlined" sx={{ p: 1, bgcolor: 'transparent', borderColor: '#334155', color: 'white', textAlign: 'center' }}>
-                  <ShieldIcon sx={{ fontSize: 30 }} />
+            <Grid item xs={6} md={2}>
+              <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 3 }}>Société</Typography>
+              <Stack spacing={2}>
+                <Typography variant="caption" sx={{ color: '#94A3B8', cursor: 'pointer', '&:hover': { color: 'white' } }}>Support</Typography>
+                <Typography variant="caption" sx={{ color: '#94A3B8', cursor: 'pointer', '&:hover': { color: 'white' } }}>Privacy</Typography>
+                <Typography variant="caption" sx={{ color: '#94A3B8', cursor: 'pointer', '&:hover': { color: 'white' } }}>Contact</Typography>
+              </Stack>
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <Typography variant="subtitle2" fontWeight="900" sx={{ mb: 3 }}>Sécurité</Typography>
+              <Stack direction="row" spacing={2}>
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', color: 'white', flex: 1, textAlign: 'center' }}>
+                  <ShieldIcon sx={{ mb: 1, color: 'primary.main' }} />
                   <Typography variant="caption" display="block">ISO 27001</Typography>
                 </Paper>
-                <Paper variant="outlined" sx={{ p: 1, bgcolor: 'transparent', borderColor: '#334155', color: 'white', textAlign: 'center' }}>
-                  <ShieldIcon sx={{ fontSize: 30 }} />
-                  <Typography variant="caption" display="block">RGPD</Typography>
+                <Paper variant="outlined" sx={{ p: 2, bgcolor: 'transparent', borderColor: 'rgba(255,255,255,0.1)', color: 'white', flex: 1, textAlign: 'center' }}>
+                  <CheckIcon sx={{ mb: 1, color: 'success.main' }} />
+                  <Typography variant="caption" display="block">RGPD Compliant</Typography>
                 </Paper>
               </Stack>
             </Grid>
           </Grid>
-          <Divider sx={{ my: 6, borderColor: '#1E293B' }} />
-          <Typography variant="caption" textAlign="center" display="block">
-            © 2026 Meeting Automation. Tous droits réservés. Propulsé par Mistral & Whisper.
-          </Typography>
+          <Box sx={{ mt: 10, pt: 4, borderTop: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
+            <Typography variant="caption" sx={{ color: '#475569' }}>
+              © 2026 Meeting Automation. Conçu à Tunis. Propulsé par Mistral AI & Gladia.
+            </Typography>
+          </Box>
         </Container>
       </Box>
     </Box>

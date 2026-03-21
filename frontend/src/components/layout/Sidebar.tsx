@@ -38,12 +38,12 @@ const Sidebar: React.FC = () => {
     { text: t("sidebar.meetings"), icon: <EventIcon />, path: "/meetings" },
     { text: t("sidebar.actions"), icon: <AssignmentIcon />, path: "/actions" },
     { text: t("sidebar.reports"), icon: <AssessmentIcon />, path: "/reports" },
-    { text: "Subscription", icon: <PaymentIcon />, path: "/billing" },
   ];
 
   const adminItems = [
     { text: "Overview", icon: <DashboardIcon />, path: "/" },
     { text: "Manage Clients", icon: <PeopleIcon />, path: "/admin/clients" },
+    { text: "Billing & Invoices", icon: <PaymentIcon />, path: "/billing" },
     { text: "System Health", icon: <SpeedIcon />, path: "/admin/technik" },
   ];
 
