@@ -50,7 +50,17 @@ Das System wurde erfolgreich von einer Single-Tenant in eine Multi-Tenant SaaS-P
 - **Management**: Neues System-Admin Dashboard zur Verwaltung aller Firmen, Status-Steuerung und Umsatz-Monitoring.
 - **Provisioning**: Automatisierte Erstellung von Mandanten bei Neuregistrierung.
 
-## 7. Arbeitsregeln für den Agenten
+- [x] **Phase 4: Billing & Onboarding**: 
+    - Full Billing infrastructure (Invoices, Usage tracking).
+    - High-End SaaS Landing Page (Redesigned with Glassmorphism).
+    - System-Admin "God-Mode" Dashboard (Revenue & Tech metrics).
+    - Corrected registration flow with company creation.
+
+## 7. Bekannte Fixes & Stabilitäts-Hinweise
+- **Transcription Pipeline**: Wurde gefixt, um die `client_id` korrekt zu vererben. Celery-Tasks müssen immer die Tenant-ID des Ursprungs-Records nutzen.
+- **Minio Buckets**: Bei einem `docker compose down` müssen die Buckets `meeting-recordings` und `meeting-pdfs` ggf. manuell neu erstellt werden (via `mc mb`).
+
+## 8. Arbeitsregeln für den Agenten
 *   Prüfe immer zuerst `docs/PROJECT_STATUS.md`.
 *   **Faktenbasiert arbeiten**: Nutze den `codebase_investigator`, um den wahren Zustand des Codes zu verstehen, bevor du Änderungen vorschlägst.
 *   **i18n Management**: Übersetzungen existieren redundant in `frontend/src/i18n/locales` (für Vite) und `frontend/public/locales` (für Nginx/Statik). Änderungen müssen immer an BEIDEN Orten erfolgen oder mittels `scripts/sync_locales.sh` synchronisiert werden.

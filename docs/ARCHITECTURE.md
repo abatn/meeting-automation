@@ -2,7 +2,13 @@
 
 ## 1. Overview
 
-The Meeting Automation System is a microservices-based application designed to automate various aspects of meeting management, including transcription, minute generation (PV - Procès-Verbal), action item tracking, and reporting. It is optimized for the Tunisia/Maghreb market with multilingual support (Arabic, French, English) and WhatsApp integration.
+The Meeting Automation System is a microservices-based, **multi-tenant SaaS platform** designed to automate various aspects of meeting management, including transcription, minute generation (PV - Procès-Verbal), action item tracking, and reporting. It is optimized for the Tunisia/Maghreb market with multilingual support (Arabic, French, English) and WhatsApp integration.
+
+### SaaS Multi-Tenancy Architecture
+The system is built to scale across multiple organizations (tenants):
+- **Data Isolation**: A dedicated `clients` table manages organizational units. All core records are linked via `client_id`.
+- **Backend Filtering**: Every API request is strictly filtered by the `client_id` extracted from the cryptographically signed JWT.
+- **System Administration**: A "God-Mode" dashboard provides global visibility into tenant health, subscriptions, and MRR.
 
 ## 2. High-Level Architecture
 
@@ -91,6 +97,8 @@ graph TD
 - **Technology**: FastAPI, Python 3.11, PostgreSQL, SQLAlchemy, Alembic, Redis, Celery, RabbitMQ.
 - **Purpose**: Core business logic, API endpoints, data persistence, and integration with AI and external services.
 - **Key Modules**:
+    - `app.api.v1.admin`: Platform-wide management for system administrators (Tenant control, MRR tracking, System health).
+    - `app.api.v1.billing`: Subscription management, invoicing, and transcription usage tracking.
     - `app.api.v1`: Defines all REST API endpoints for authentication, meetings, recordings, transcriptions, PV, actions, and reports.
     - `app.core`: Configuration, database connection, security utilities (JWT, password hashing), and logging.
     - `app.models`: SQLAlchemy ORM models defining the database schema.

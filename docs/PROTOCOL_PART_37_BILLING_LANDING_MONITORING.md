@@ -23,13 +23,20 @@
 - **Billing Panel**: Dashboard für Firmen-Admins zum Einsehen des Kontingents und Buchen von Upgrades.
 - **Progress Bar**: Wiederverwendbare Komponente für die Visualisierung des Minutenverbrauchs.
 
-### 3. Public Landing Page
+### 3. Public Landing Page & Onboarding
 - `LandingPage.tsx` erstellt: Vollständiges Marketing-Design (Hero, Features, Multi-language Support, Pricing).
-- Routing-Logik in `App.tsx` angepasst: Besucher landen auf der Landing Page, eingeloggte User im Dashboard.
+- **UI/UX Polish**: Upgrade auf ein High-End SaaS-Design mit Glassmorphism, Glow-Effekten und schwebenden Mockups.
+- **Onboarding Flow**: Korrektur der Routing-Logik, sodass Plan-Buttons direkt zum erweiterten Registrierungsformular führen.
+- **RegisterForm**: Neues Formular zur gleichzeitigen Erstellung von Benutzer und Mandant (Firma).
 
 ### 4. Technik-Dashboard
 - Monitoring-Endpunkt `/api/v1/admin/system/performance` aggregiert Metriken via `psutil`.
-- `/admin/technik` Frontend-Seite visualisiert CPU/RAM Last und Service-Health.
+- `/admin/technik` Frontend-Seite visualisiert CPU/RAM Last, DB-Verbindungen und S3-Speicherverbrauch.
+
+## ⚠️ HERAUSFORDERUNGEN & LÖSUNGEN
+- **Kritischer Bugfix (Transcription Pipeline)**: Identifikation eines `IntegrityError` im Celery-Worker. Die `client_id` wurde beim Speichern von Transkriptionen und PVs nicht gesetzt, was zu Fehlern führte. Behoben in `transcription_tasks.py`.
+- **Docker Volume Reset**: Manuelle Wiederherstellung der Minio-Buckets (`meeting-recordings`, `meeting-pdfs`) nach System-Reset.
+- **Psutil im Container**: Korrektur der `psutil` Abfragen auf nicht-blockierende Aufrufe, um Backend-Hänger zu vermeiden.
 
 ## 📊 ERGEBNIS
-Das System ist nun nicht mehr nur technisch mandantenfähig, sondern auch kommerziell einsatzbereit. Es verfügt über einen automatisierten Onboarding-Flow via Landing Page, ein transparentes Abrechnungssystem und ein professionelles Monitoring-Tool für den Betreiber.
+Das System ist nun nicht mehr nur technisch mandantenfähig, sondern auch kommerziell einsatzbereit. Es verfügt über einen automatisierten Onboarding-Flow via Landing Page, ein transparentes Abrechnungssystem und ein professionelles Monitoring-Tool für den Betreiber. Die gesamte Pipeline vom Klick auf der Landing Page bis zum fertigen PV in der isolierten Instanz funktioniert fehlerfrei.
