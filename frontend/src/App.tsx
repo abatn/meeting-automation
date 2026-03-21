@@ -7,6 +7,7 @@ import { Box, CircularProgress, CssBaseline } from "@mui/material";
 
 import MainLayout from "./components/layout/MainLayout";
 import LoginForm from "./components/auth/LoginForm";
+import RegisterForm from "./components/auth/RegisterForm";
 import DashboardDG from "./components/reports/DashboardDG";
 import DashboardManager from "./components/reports/DashboardManager";
 import DashboardParticipant from "./components/reports/DashboardParticipant";
@@ -19,6 +20,10 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import AutoLogout from "./components/auth/AutoLogout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ClientList from "./pages/admin/ClientList";
+import ClientDetails from "./pages/admin/ClientDetails";
+import TechnikDashboard from "./pages/admin/TechnikDashboard";
+import BillingPanel from "./pages/billing/BillingPanel";
+import LandingPage from "./pages/LandingPage";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -67,26 +72,37 @@ function App() {
         <Box sx={{ minHeight: "100vh" }}>
           <CssBaseline />
           <Routes>
-            {/* Unauthenticated -> Show Login */}
-            <Route
-              path="/login"
-              element={
-                authState === "unauthenticated" ? (
-                  <LoginForm />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-
-            {/* Authenticated -> Base Dashboard Route */}
+            {/* Public Landing Page */}
             <Route
               path="/"
               element={
                 authState === "authenticated" && user ? (
                   <MainLayout>{getDashboard()}</MainLayout>
                 ) : (
-                  <Navigate to="/login" replace />
+                  <LandingPage />
+                )
+              }
+            />
+
+            {/* Auth Routes */}
+            <Route
+              path="/login"
+              element={
+                authState === "authenticated" ? (
+                  <Navigate to="/" replace />
+                ) : (
+                  <LoginForm />
+                )
+              }
+            />
+
+            <Route
+              path="/register"
+              element={
+                authState === "authenticated" ? (
+                  <Navigate to="/" replace />
+                ) : (
+                  <RegisterForm />
                 )
               }
             />
@@ -173,6 +189,43 @@ function App() {
                   </MainLayout>
                 ) : (
                   <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/admin/clients/:id"
+              element={
+                authState === "authenticated" && user?.role === "system_admin" ? (
+                  <MainLayout>
+                    <ClientDetails />
+                  </MainLayout>
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/admin/technik"
+              element={
+                authState === "authenticated" && user?.role === "system_admin" ? (
+                  <MainLayout>
+                    <TechnikDashboard />
+                  </MainLayout>
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+
+            <Route
+              path="/billing"
+              element={
+                authState === "authenticated" ? (
+                  <MainLayout>
+                    <BillingPanel />
+                  </MainLayout>
+                ) : (
+                  <Navigate to="/login" replace />
                 )
               }
             />

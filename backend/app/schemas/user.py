@@ -14,6 +14,8 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
+    company_name: Optional[str] = None
+    plan: Optional[str] = "GRATUIT"
 
 
 class UserUpdate(BaseModel):

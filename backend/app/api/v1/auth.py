@@ -75,12 +75,23 @@ async def register(
     client_id = user_in.client_id
     if not client_id:
         client_id = str(uuid.uuid4())
+        # Determine plan from schema
+        plan_enum = SubscriptionPlan.GRATUIT
+        minutes = 600
+        
+        if user_in.plan == "PRO":
+            plan_enum = SubscriptionPlan.PRO
+            minutes = 3000
+        elif user_in.plan == "ENTREPRISE":
+            plan_enum = SubscriptionPlan.ENTREPRISE
+            minutes = 12000
+            
         new_client = Client(
             id=client_id,
-            company_name=f"{user_in.full_name or user_in.email}'s Company",
-            subscription_plan=SubscriptionPlan.GRATUIT,
+            company_name=user_in.company_name or f"{user_in.full_name or user_in.email}'s Company",
+            subscription_plan=plan_enum,
             subscription_status=SubscriptionStatus.ACTIVE,
-            minutes_included=600
+            minutes_included=minutes
         )
         db.add(new_client)
         await db.flush()

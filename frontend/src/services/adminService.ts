@@ -46,6 +46,19 @@ const adminService = {
   getRevenueStats: async () => {
     const response = await api.get('/admin/revenue');
     return response.data;
+  },
+
+  getClientInvoices: async (clientId: string) => {
+    const response = await api.get(`/billing/admin/client/${clientId}/invoices`);
+    return response.data;
+  },
+
+  getClientUsage: async (clientId: string) => {
+    // Note: This endpoint is handled via billing/usage if we are logged in as that user, 
+    // but for admin we might need a specific admin/clients/{id}/usage endpoint later.
+    // For now we query the general usage if permitted or mock.
+    const response = await api.get(`/billing/usage?client_id=${clientId}`);
+    return response.data;
   }
 };
 

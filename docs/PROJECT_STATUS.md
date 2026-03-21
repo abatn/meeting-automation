@@ -24,12 +24,30 @@ Nach dem erfolgreichen Abschluss der ISO 27001 Security Roadmap fokussiert sich 
 - [x] **5. Action History / Patterns (Analytics Dashboard)**.
 - [x] **6. Multilingual Export** (AR, FR, EN) inkl. RTL-Support und On-the-fly Inhaltsübersetzung.
 
+## Phase 3: SaaS Transformation & Multi-Tenancy
+
+Diese Phase transformiert das System in eine kommerziell skalierbare SaaS-Plattform.
+
+- [x] **Daten-Isolation**: Einführung der `clients` Tabelle und `client_id` in allen Kern-Entitäten. Strikte Filterung auf DB-Ebene.
+- [x] **Multi-Tenant Auth**: JWT-Erweiterung um Mandanten-Identifikatoren.
+- [x] **System-Admin Dashboard**: Zentrales Management aller Firmen, MRR-Tracking und Account-Steuerung.
+- [x] **Automatisches Provisioning**: Automatische Erstellung von Mandanten bei User-Registrierung.
+
+## Phase 4: Billing, Landing Page & Monitoring
+
+Diese Phase finalisiert die Plattform für den kommerziellen Betrieb.
+
+- [x] **Billing & Payment**: Integration von Rechnungen, Minutenverbrauch-Tracking und Stripe-Logik.
+- [x] **Public Landing Page**: Öffentliche Produktpräsentation und Onboarding-Flow.
+- [x] **Technik-Dashboard**: System-Monitoring für den Betreiber.
 
 ## Historie & Protokolle
 
 Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilensteine ist in den folgenden konsolidierten Protokollen zu finden:
 
-1. **[Kubernetes Stabilität & Ressourcen](PROTOCOL_PART_35_KUBERNETES_STABILITY_AND_RESOURCES.md)**: Härtung der K8s-Infrastruktur, Optimierung des Ressourcenverbrauchs und Implementierung von Health-Checks.
+1. **[Billing, Landing Page & Monitoring](PROTOCOL_PART_37_BILLING_LANDING_MONITORING.md)**: Einführung des Abrechnungssystems, der Marketing-Seite und des technischen Monitorings.
+2. **[SaaS Multi-Tenant Transformation](PROTOCOL_PART_36_SAAS_MULTI_TENANT_TRANSFORMATION.md)**: Vollständiger Umbau zur mandantenfähigen Plattform inkl. Daten-Isolation, System-Admin API und Frontend Dashboards.
+2. **[Kubernetes Stabilität & Ressourcen](PROTOCOL_PART_35_KUBERNETES_STABILITY_AND_RESOURCES.md)**: Härtung der K8s-Infrastruktur, Optimierung des Ressourcenverbrauchs und Implementierung von Health-Checks.
 2. **[SSL/TLS Encryption](PROTOCOL_PART_33_SSL_TLS_ENCRYPTION.md)**: Konfiguration von Traefik für erzwungenes HTTPS mit selbstsignierten Zertifikaten.
 3. **[Session Management & JWT](PROTOCOL_PART_32_SESSION_MANAGEMENT.md)**: Implementierung von Auto-Logout und Token-Härtung (30 Minuten).
 4. **[Traefik Rate Limiting](PROTOCOL_PART_31_TRAEFIK_RATE_LIMITING.md)**: Einführung von Traefik als API Gateway mit Rate Limiting (DDoS Schutz).

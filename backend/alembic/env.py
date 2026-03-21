@@ -17,6 +17,8 @@ from app.models.meeting import Meeting
 from app.models.recording import Recording
 from app.models.transcription import Transcription
 from app.models.pv import PV
+from app.models.facture import Facture
+from app.models.usage_minute import UsageMinute
 from app.models.action import Action
 from app.models.audit_log import AuditLog
 

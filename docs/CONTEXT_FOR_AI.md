@@ -43,15 +43,12 @@ Beginne mit "Sofort (Phase 1)" der folgenden ISO 27001 Roadmap:
     - JWT-Härtung (Token-Laufzeit auf 30 Min reduziert).
     - Erweitertes Session Management (Auto-Timeout nach 15 Min Inaktivität).
 
-## 6. Abgeschlossene Entwicklungsziele (Phase 2: Feature Expansion)
-Alle funktionalen Erweiterungen der Phase 2 wurden erfolgreich implementiert:
-
-- [x] **1. Action Suggestions (ML-basiert)**
-- [x] **2. Speaker Attribution (Diarization)** via Gladia V2.
-- [x] **3. PV Versioning** (ISO 27001 konform).
-- [x] **4. Custom Branding für Exporte**.
-- [x] **5. Action History / Patterns (Analytics Dashboard)**.
-- [x] **6. Multilingual Export** (AR, FR, EN) inkl. RTL-Support und On-the-fly Inhaltsübersetzung.
+## 6. Phase 3: SaaS Transformation & Multi-Tenancy (Abgeschlossen ✅)
+Das System wurde erfolgreich von einer Single-Tenant in eine Multi-Tenant SaaS-Plattform transformiert:
+- **Daten-Isolation**: Strikte Trennung aller Datensätze (Meetings, Actions, PVs) via `client_id` auf Datenbank- und API-Ebene.
+- **Multi-Tenant Auth**: JWT-Payload enthält nun `client_id` und spezifische Rollen (inkl. `system_admin`).
+- **Management**: Neues System-Admin Dashboard zur Verwaltung aller Firmen, Status-Steuerung und Umsatz-Monitoring.
+- **Provisioning**: Automatisierte Erstellung von Mandanten bei Neuregistrierung.
 
 ## 7. Arbeitsregeln für den Agenten
 *   Prüfe immer zuerst `docs/PROJECT_STATUS.md`.

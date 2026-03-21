@@ -21,7 +21,13 @@ from app.models.audit_log import AuditLog as AuditLogModel
 from app.schemas.audit_log import AuditLog as AuditLogSchema
 from app.schemas.report import ActionStats, ManagerDashboard, MeetingStats
 
+from app.services.billing_service import BillingService
+
 router = APIRouter()
+
+async def get_client_usage_info(db: AsyncSession, client_id: str) -> dict:
+    billing_service = BillingService(db)
+    return await billing_service.get_usage_summary(client_id)
 
 
 @router.get("/dashboard/{role}", response_model=Any)
@@ -33,6 +39,8 @@ async def get_dashboard_data(
     """
     Get dashboard data based on user role.
     """
+    usage_info = await get_client_usage_info(db, current_user.client_id)
+    
     if role == "dg":
         # --- ECHTE DATENBANKLOGIK FÜR DG DASHBOARD ---
 
@@ -73,6 +81,7 @@ async def get_dashboard_data(
                 "in_progress": action_status_distribution.get("in_progress", 0),
                 "open": action_status_distribution.get("pending", 0),
             },
+            "client_usage": usage_info
         }
 
     elif role == "manager":
@@ -135,7 +144,7 @@ async def get_dashboard_data(
             await db.execute(team_completed_actions_query)
         ).scalar_one()
 
-        return ManagerDashboard(
+        data = ManagerDashboard(
             meeting_stats=MeetingStats(
                 completed=completed_team_meetings,
                 scheduled=total_team_meetings - completed_team_meetings,
@@ -146,6 +155,10 @@ async def get_dashboard_data(
             team_productivity=[],
             efficiency_trend=[],
         )
+        
+        result = data.model_dump()
+        result["client_usage"] = usage_info
+        return result
 
     else:  # role == 'participant'
         # --- DATENBANKLOGIK FÜR PARTICIPANT DASHBOARD ---
@@ -177,6 +190,7 @@ async def get_dashboard_data(
         return {
             "my_upcoming_meetings": my_upcoming_meetings,
             "my_open_actions": my_open_actions,
+            "client_usage": usage_info
         }
 
 

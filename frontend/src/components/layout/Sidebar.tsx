@@ -20,6 +20,8 @@ import EventIcon from "@mui/icons-material/Event";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import SecurityIcon from "@mui/icons-material/Security";
+import PaymentIcon from "@mui/icons-material/Payment";
+import SpeedIcon from "@mui/icons-material/Speed";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import PeopleIcon from "@mui/icons-material/People";
 
@@ -36,10 +38,13 @@ const Sidebar: React.FC = () => {
     { text: t("sidebar.meetings"), icon: <EventIcon />, path: "/meetings" },
     { text: t("sidebar.actions"), icon: <AssignmentIcon />, path: "/actions" },
     { text: t("sidebar.reports"), icon: <AssessmentIcon />, path: "/reports" },
+    { text: "Subscription", icon: <PaymentIcon />, path: "/billing" },
   ];
 
   const adminItems = [
+    { text: "Overview", icon: <DashboardIcon />, path: "/" },
     { text: "Manage Clients", icon: <PeopleIcon />, path: "/admin/clients" },
+    { text: "System Health", icon: <SpeedIcon />, path: "/admin/technik" },
   ];
 
   return (

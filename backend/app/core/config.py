@@ -65,6 +65,15 @@ class Settings(BaseSettings):
     INTERNAL_API_SECRET: str = "super-secret-automation-key-2026"
     BACKEND_CALLBACK_URL: str = "http://backend:8000/api/v1/webhooks"
 
+    # Stripe
+    STRIPE_API_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PUBLISHABLE_KEY: str = ""
+    
+    # Plan Prices (Stripe Price IDs)
+    STRIPE_PRICE_ID_PRO: str = "price_..."
+    STRIPE_PRICE_ID_ENTREPRISE: str = "price_..."
+
     # Celery
     CELERY_BROKER_URL: str = "amqp://rabbit_user:rabbit_password@rabbitmq:5672//"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"

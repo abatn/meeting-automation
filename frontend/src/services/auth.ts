@@ -14,6 +14,10 @@ export const authService = {
     });
     return response.data;
   },
+  register: async (userData: any) => {
+    const response = await api.post("/auth/register", userData);
+    return response.data;
+  },
   logout: async () => {
     try {
       await api.post("/auth/logout");

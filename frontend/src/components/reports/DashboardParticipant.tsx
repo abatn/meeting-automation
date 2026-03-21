@@ -18,11 +18,20 @@ import { fetchParticipantDashboardData } from "../../store/dashboardSlice";
 import KPICard from "../common/KPICard"; // Annahme: Existiert oder muss erstellt werden
 import EventIcon from "@mui/icons-material/Event";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
+import UsageProgressBar from "../common/UsageProgressBar";
 
 // Interfaces from dashboardSlice.ts for type safety
+interface UsageInfo {
+  period: string;
+  minutes_used: number;
+  minutes_included: number;
+  remaining: number;
+}
+
 interface ParticipantDashboardData {
   my_upcoming_meetings: number;
   my_open_actions: number;
+  client_usage: UsageInfo;
 }
 
 const DashboardParticipant: React.FC = () => {
@@ -64,9 +73,19 @@ const DashboardParticipant: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        {t("dashboard.participant_title")}
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant="h4">
+          {t("dashboard.participant_title")}
+        </Typography>
+        {data.client_usage && (
+          <Box sx={{ width: 300 }}>
+            <UsageProgressBar 
+              used={data.client_usage.minutes_used} 
+              total={data.client_usage.minutes_included} 
+            />
+          </Box>
+        )}
+      </Box>
 
       <Grid container spacing={3} sx={{ mt: 2 }}>
         {/* KPI Cards */}

@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { 
   Box, Typography, Paper, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Chip, CircularProgress,
-  Button
+  Button, Link
 } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 import adminService, { Client } from '../../services/adminService';
 
 const ClientList: React.FC = () => {
@@ -55,7 +56,11 @@ const ClientList: React.FC = () => {
           <TableBody>
             {clients.map((client) => (
               <TableRow key={client.id}>
-                <TableCell>{client.company_name}</TableCell>
+                <TableCell>
+                  <Link component={RouterLink} to={`/admin/clients/${client.id}`} underline="hover" fontWeight="bold">
+                    {client.company_name}
+                  </Link>
+                </TableCell>
                 <TableCell>{client.subscription_plan}</TableCell>
                 <TableCell>
                   <Chip 

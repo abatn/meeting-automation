@@ -13,15 +13,24 @@ interface ActionStats {
   completed: number;
 }
 
+interface UsageInfo {
+  period: string;
+  minutes_used: number;
+  minutes_included: number;
+  remaining: number;
+}
+
 interface ManagerDashboardData {
   meeting_stats: MeetingStats;
   action_stats: ActionStats;
   team_members_count: number;
+  client_usage: UsageInfo;
 }
 
 interface ParticipantDashboardData {
   my_upcoming_meetings: number;
   my_open_actions: number;
+  client_usage: UsageInfo;
 }
 
 // Interfaces for slice state

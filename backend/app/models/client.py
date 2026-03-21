@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     from app.models.meeting import Meeting
     from app.models.audit_log import AuditLog
     from app.models.setting import BrandingSettings
+    from app.models.facture import Facture
+    from app.models.usage_minute import UsageMinute
 
 class SubscriptionPlan(str, enum.Enum):
     GRATUIT = "GRATUIT"
@@ -72,3 +74,5 @@ class Client(Base):
     branding_settings: Mapped[Optional["BrandingSettings"]] = relationship(
         "BrandingSettings", back_populates="client", uselist=False, cascade="all, delete-orphan"
     )
+    factures: Mapped[List["Facture"]] = relationship("Facture", back_populates="client", cascade="all, delete-orphan")
+    usage_history: Mapped[List["UsageMinute"]] = relationship("UsageMinute", back_populates="client", cascade="all, delete-orphan")
