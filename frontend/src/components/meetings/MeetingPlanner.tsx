@@ -21,6 +21,7 @@ import {
   FormControl,
   OutlinedInput,
   Divider,
+  Autocomplete,
 } from "@mui/material";
 import {
   CalendarMonth as CalendarIcon,
@@ -40,45 +41,34 @@ const MeetingPlanner: React.FC = () => {
 
   const [title, setTitle] = useState("");
   const [meetingDate, setMeetingDate] = useState("2026-03-03");
-  const [selectedParticipants, setSelectedParticipants] = useState<number[]>(
-    [],
-  );
+  const [meetingTime, setMeetingTime] = useState("10:00");
+  const [selectedParticipants, setSelectedParticipants] = useState<any[]>([]);
+  const [dbUsers, setDbUsers] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recentMeetings, setRecentMeetings] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchRecentMeetings = async () => {
+    const fetchRecentMeetingsAndUsers = async () => {
       try {
-        const data = await meetingsApi.getMeetings();
+        const [meetingsData, usersData] = await Promise.all([
+          meetingsApi.getMeetings(),
+          meetingsApi.getUsers()
+        ]);
+        
         // Sort by start_time descending, limit to 10
-        const sorted = data.sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+        const sorted = meetingsData.sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
         setRecentMeetings(sorted.slice(0, 10));
+        setDbUsers(usersData);
       } catch (err) {
-        console.error("Failed to fetch meetings", err);
+        console.error("Failed to fetch data", err);
       }
     };
-    fetchRecentMeetings();
+    fetchRecentMeetingsAndUsers();
   }, []);
 
   const holidays = [
     { date: "2026-03-20", name: t("meetings.holiday_independence") },
     { date: "2026-04-09", name: t("meetings.holiday_martyrs") },
-  ];
-
-  const participantOptions = [
-    { id: 1, name: "Sami Ben Ali", email: "dg@meeting.tn", role: "DG" },
-    {
-      id: 2,
-      name: "Amel Trabelsi",
-      email: "manager@meeting.tn",
-      role: "Manager",
-    },
-    {
-      id: 3,
-      name: "Mohamed Mahmoud",
-      email: "user@meeting.tn",
-      role: "Participant",
-    },
   ];
 
   const holidayWarning = isHoliday(meetingDate)
@@ -89,18 +79,26 @@ const MeetingPlanner: React.FC = () => {
     if (!title || !!holidayWarning) return;
     setIsSubmitting(true);
     try {
-      const participants = selectedParticipants.map((id) => {
-        const opt = participantOptions.find((p) => p.id === id);
-        return { email: opt?.email || "", name: opt?.name, role: opt?.role };
+      const participants = selectedParticipants.map((p) => {
+        if (typeof p === 'string') {
+          // Free text email entered by user
+          return { email: p, name: p, role: "Guest" };
+        }
+        // User object from DB
+        return { email: p.email, name: p.full_name || p.email, role: p.role || "Participant", user_id: p.id };
       });
+
+      // Format start and end times
+      const startTime = new Date(`${meetingDate}T${meetingTime}:00`);
+      const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // Add 1 hour
 
       const meetingData = {
         title,
         description: "Scheduled via UI",
         location: "Virtual",
         status: "planned",
-        start_time: `${meetingDate}T10:00:00Z`,
-        end_time: `${meetingDate}T11:00:00Z`,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
         participants,
         agendas: [],
       };
@@ -140,14 +138,28 @@ const MeetingPlanner: React.FC = () => {
               />
 
               <Box>
-                <TextField
-                  fullWidth
-                  type="date"
-                  label={t("meetings.date")}
-                  value={meetingDate}
-                  onChange={(e) => setMeetingDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="date"
+                      label={t("meetings.date")}
+                      value={meetingDate}
+                      onChange={(e) => setMeetingDate(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="time"
+                      label="Time"
+                      value={meetingTime}
+                      onChange={(e) => setMeetingTime(e.target.value)}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                  </Grid>
+                </Grid>
                 {holidayWarning && (
                   <Alert
                     severity="warning"
@@ -159,26 +171,37 @@ const MeetingPlanner: React.FC = () => {
                 )}
               </Box>
 
-              <FormControl fullWidth>
-                <InputLabel id="participants-label">
-                  {t("meetings.participants")}
-                </InputLabel>
-                <Select
-                  labelId="participants-label"
-                  multiple
-                  value={selectedParticipants}
-                  onChange={(e) =>
-                    setSelectedParticipants(e.target.value as number[])
-                  }
-                  input={<OutlinedInput label={t("meetings.participants")} />}
-                >
-                  {participantOptions.map((opt) => (
-                    <MenuItem key={opt.id} value={opt.id}>
-                      {opt.name} ({opt.role})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                multiple
+                freeSolo
+                options={dbUsers}
+                getOptionLabel={(option) => {
+                  if (typeof option === 'string') return option;
+                  return `${option.full_name || 'No Name'} (${option.email})`;
+                }}
+                value={selectedParticipants}
+                onChange={(event, newValue) => {
+                  setSelectedParticipants(newValue);
+                }}
+                renderTags={(value, getTagProps) =>
+                  value.map((option, index) => (
+                    <Chip
+                      variant="outlined"
+                      color="primary"
+                      label={typeof option === 'string' ? option : (option.full_name || option.email)}
+                      {...getTagProps({ index })}
+                    />
+                  ))
+                }
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    variant="outlined"
+                    label={t("meetings.participants")}
+                    placeholder="Search users or type email..."
+                  />
+                )}
+              />
 
               <Button
                 variant="contained"

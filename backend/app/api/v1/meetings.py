@@ -11,9 +11,26 @@ from app.models.meeting import Participant as ParticipantModel
 from app.models.user import User as UserModel
 from app.models.user import UserRole
 from app.schemas.meeting import Meeting, MeetingCreate
+from app.schemas.user import User
 from app.services.meeting_service import MeetingService
 
 router = APIRouter()
+
+
+@router.get("/users", response_model=List[User])
+async def list_client_users(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Retrieve all active users for the current client to populate the participant dropdown.
+    """
+    result = await db.execute(
+        select(UserModel)
+        .where(UserModel.client_id == current_user.client_id)
+        .where(UserModel.is_active == True)
+    )
+    return result.scalars().all()
 
 
 @router.get("/", response_model=List[Meeting])

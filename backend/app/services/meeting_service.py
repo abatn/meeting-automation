@@ -121,7 +121,7 @@ class MeetingService:
     async def _trigger_n8n_meeting_created(self, meeting: Meeting):
         """Triggert n8n Webhook: meeting-created"""
         participants_payload = [
-            {"id": p.id, "user_id": p.user_id, "email": p.user_id}
+            {"id": p.id, "user_id": p.user_id, "email": p.email, "name": p.name}
             for p in meeting.participants
         ]
 

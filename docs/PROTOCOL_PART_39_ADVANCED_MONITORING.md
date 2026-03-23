@@ -50,6 +50,12 @@ Die `Mission Control` (Technik-Dashboard) sollte tiefgehende, verlässliche Syst
   - **Lösung**: Umbau der `get_team_productivity` SQL-Query. Nutzung von `COALESCE(UserModel.full_name, Assignment.external_name)`, um registrierte Nutzer und externe KI-Teilnehmer gleichwertig zu aggregieren und im Report anzuzeigen.
 - **Frontend Docker Build Cache (Phantom Bugs)**: Code-Änderungen an den React-Komponenten kamen im Browser nicht an, da Docker die alten JS-Bundles aus dem Cache wiederverwendete.
   - **Lösung**: Forcierter Rebuild mittels `docker compose build --no-cache frontend` und `--force-recreate` zur endgültigen Vernichtung der veralteten JavaScript-Dateien.
+- **Meeting Planner: Dynamische Teilnehmer & Gäste**: Die Liste der Teilnehmer im Meeting-Planer war bisher hartkodiert.
+  - **Lösung**: Einführung einer dynamischen `Autocomplete`-Komponente in `MeetingPlanner.tsx`. Es werden nun alle aktiven, registrierten Nutzer des aktuellen Mandanten aus der Datenbank geladen. Zusätzlich können per Tastendruck ("Enter") externe E-Mail-Adressen für Gäste frei eingetippt und hinzugefügt werden.
+- **Meeting Planner: Statische Uhrzeit**: Meetings wurden im Backend hart auf 10:00 Uhr (UTC) terminiert, das UI fragte nur das Datum ab.
+  - **Lösung**: Hinzufügen eines dynamischen Time-Pickers neben dem Datum. Die Startzeit und die berechnete Endzeit (+1 Stunde) werden nun exakt an das Backend übermittelt.
+- **E-Mail-Einladungen via n8n (Payload Bug)**: Externe Gäste erhielten keine Einladungen, da der n8n-Webhook (`meeting-created`) fehlerhaft die `user_id` anstelle der tatsächlichen `email` übertrug.
+  - **Lösung**: Korrektur in `meeting_service.py` (`_trigger_n8n_meeting_created`), sodass nun explizit `p.email` und `p.name` für jeden Teilnehmer (ob registriert oder Gast) an das Automatisierungs-Tool gesendet werden.
 
 ## 📊 ERGEBNIS
 Das System-Dashboard liefert nun hochauflösende Einblicke in die gesamte Architektur und ermöglicht dem Betreiber sofortiges Eingreifen bei Latenzen oder Speicher-Engpässen. Gleichzeitig sind die Benutzer-Dashboards nun vollständig mit echten, mandantenfähigen Datenbank-Metriken synchronisiert und frei von Dummy-Daten. Damit ist der erste Meilenstein von Phase 5 vollständig abgeschlossen.

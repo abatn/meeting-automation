@@ -1,6 +1,11 @@
 import api from "./api";
 
 export const meetingsApi = {
+  getUsers: async () => {
+    const response = await api.get("/meetings/users");
+    return response.data;
+  },
+
   getMeetings: async () => {
     const response = await api.get("/meetings/");
     return response.data;
