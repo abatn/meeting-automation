@@ -1,4 +1,5 @@
 from typing import Any, List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -7,7 +8,9 @@ from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User as UserModel, UserRole
 from app.models.client import Client as ClientModel, SubscriptionStatus
+from app.models.usage_minute import UsageMinute
 from app.schemas.client import Client, ClientUpdate
+from app.services.audit_service import AuditService
 
 router = APIRouter()
 
@@ -24,7 +27,7 @@ def get_system_admin(current_user: UserModel = Depends(deps.get_current_user)) -
         )
     return current_user
 
-@router.get("/clients", response_model=List[Client])
+@router.get("/clients", response_model=List[dict])
 async def list_all_clients(
     status: Optional[SubscriptionStatus] = None,
     plan: Optional[str] = None,
@@ -34,7 +37,7 @@ async def list_all_clients(
     admin: UserModel = Depends(get_system_admin),
 ) -> Any:
     """
-    Retrieve all clients/tenants (System Admin only).
+    Retrieve all clients with usage stats (System Admin only).
     """
     stmt = select(ClientModel)
     
@@ -45,7 +48,33 @@ async def list_all_clients(
         
     stmt = stmt.offset(skip).limit(limit)
     result = await db.execute(stmt)
-    return result.scalars().all()
+    clients = result.scalars().all()
+    
+    # Enrich with current month usage
+    period = datetime.now().strftime("%Y-%m")
+    enriched_clients = []
+    
+    for c in clients:
+        usage_stmt = select(func.sum(UsageMinute.minutes)).where(
+            UsageMinute.client_id == c.id,
+            UsageMinute.period == period
+        )
+        usage_res = await db.execute(usage_stmt)
+        monthly_mins = usage_res.scalar() or 0
+        
+        c_dict = {
+            "id": c.id,
+            "company_name": c.company_name,
+            "subscription_plan": c.subscription_plan,
+            "subscription_status": c.subscription_status,
+            "minutes_included": c.minutes_included,
+            "minutes_used_total": c.minutes_used or 0,
+            "minutes_used_month": monthly_mins,
+            "created_at": c.created_at
+        }
+        enriched_clients.append(c_dict)
+        
+    return enriched_clients
 
 
 @router.get("/clients/{client_id}", response_model=Client)
@@ -84,10 +113,23 @@ async def update_client_status(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found")
         
+    old_status = client.subscription_status
     client.subscription_status = status_update.status
     db.add(client)
     await db.commit()
     await db.refresh(client)
+    
+    # Log to Audit Trail
+    await AuditService.log_action(
+        db=db,
+        client_id=client_id,
+        user_id=admin.id,
+        action="UPDATE_CLIENT_STATUS",
+        table_name="clients",
+        record_id=client_id,
+        old_values={"status": old_status},
+        new_values={"status": status_update.status}
+    )
     
     return client
 
@@ -163,87 +205,30 @@ async def get_system_performance(
     """
     Get system health and performance metrics (System Admin only).
     """
-    import os
-    import psutil
     import time
-    import logging
-    import boto3
-    from app.core.config import settings
+    from app.services.monitoring_service import MonitoringService
     
-    logger = logging.getLogger(__name__)
-    
-    # 1. Resource Metrics (Safe fallback)
-    try:
-        cpu_usage = psutil.cpu_percent(interval=None)
-        ram_usage = psutil.virtual_memory().percent
-        process = psutil.Process(os.getpid())
-        mem_mb = process.memory_info().rss / 1024 / 1024
-    except Exception as e:
-        logger.error(f"Metrics error: {e}")
-        cpu_usage, ram_usage, mem_mb = 0, 0, 0
-    
-    # 2. Database Status
-    try:
-        start_time = time.time()
-        conn_res = await db.execute(select(func.count()).select_from(func.pg_stat_activity()))
-        active_connections = conn_res.scalar()
-        
-        await db.execute(select(1))
-        db_latency_ms = (time.time() - start_time) * 1000
-        db_status = "healthy"
-    except Exception as e:
-        logger.error(f"DB Monitoring error: {e}")
-        active_connections = 0
-        db_latency_ms = -1
-        db_status = "unhealthy"
-        
-    # 3. Redis Status
-    from app.core.redis_client import get_redis_client
-    try:
-        redis_start = time.time()
-        r_client = await get_redis_client()
-        await r_client.ping()
-        redis_latency_ms = (time.time() - redis_start) * 1000
-        redis_status = "healthy"
-    except Exception:
-        redis_latency_ms = -1
-        redis_status = "unhealthy"
-
-    # 4. Storage Usage (Minio)
-    s3_usage_mb = 0
-    try:
-        s3 = boto3.resource(
-            's3',
-            endpoint_url=settings.S3_ENDPOINT,
-            aws_access_key_id=settings.S3_ACCESS_KEY,
-            aws_secret_access_key=settings.S3_SECRET_KEY,
-        )
-        bucket = s3.Bucket(settings.S3_BUCKET_NAME)
-        total_bytes = sum(obj.size for obj in bucket.objects.all())
-        s3_usage_mb = total_bytes / 1024 / 1024
-        s3_status = "healthy"
-    except Exception:
-        s3_status = "unhealthy"
+    # Run independent checks concurrently
+    import asyncio
+    container_metrics, db_metrics, redis_metrics, minio_metrics, rmq_metrics, ai_metrics, n8n_metrics = await asyncio.gather(
+        MonitoringService.get_container_metrics(),
+        MonitoringService.get_database_metrics(db),
+        MonitoringService.get_redis_metrics(),
+        MonitoringService.get_minio_metrics(),
+        MonitoringService.get_rabbitmq_metrics(),
+        MonitoringService.get_ai_metrics(),
+        MonitoringService.get_n8n_metrics()
+    )
 
     return {
         "timestamp": time.time(),
-        "resources": {
-            "cpu_percent": cpu_usage,
-            "ram_percent": ram_usage,
-            "process_memory_mb": mem_mb
-        },
+        "containers": container_metrics,
         "services": {
-            "database": {
-                "status": db_status, 
-                "latency_ms": db_latency_ms,
-                "active_connections": active_connections
-            },
-            "redis": {"status": redis_status, "latency_ms": redis_latency_ms},
-            "storage": {
-                "status": s3_status,
-                "usage_mb": s3_usage_mb
-            },
-            "celery": {"status": "healthy"},
-            "ai_services": {"status": "healthy"}
+            "database": db_metrics,
+            "redis": redis_metrics,
+            "rabbitmq": rmq_metrics,
+            "storage": minio_metrics,
+            "n8n": n8n_metrics,
+            "ai_services": ai_metrics
         }
     }

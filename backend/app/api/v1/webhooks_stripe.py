@@ -1,4 +1,5 @@
 import logging
+import stripe
 from fastapi import APIRouter, Depends, Request, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -6,11 +7,11 @@ from app.api import deps
 from app.services.billing_service import BillingService
 from app.core.config import settings
 
-# Potential for actual Stripe integration
-# import stripe
-
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Configure Stripe
+stripe.api_key = settings.STRIPE_API_KEY
 
 @router.post("/")
 async def stripe_webhook(
@@ -24,24 +25,29 @@ async def stripe_webhook(
     """
     payload = await request.body()
     
-    # In production, verify signature:
-    # try:
-    #     event = stripe.Webhook.construct_event(payload, stripe_signature, settings.STRIPE_WEBHOOK_SECRET)
-    # except Exception as e:
-    #     raise HTTPException(status_code=400, detail=str(e))
-    
-    # For now, we allow manual triggering for testing (Mock mode)
-    import json
-    try:
-        event = json.loads(payload)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+    # 1. Verify Signature (Only if secret is configured)
+    if settings.STRIPE_WEBHOOK_SECRET:
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, stripe_signature, settings.STRIPE_WEBHOOK_SECRET
+            )
+        except Exception as e:
+            logger.error(f"Stripe Webhook Signature Verification failed: {e}")
+            raise HTTPException(status_code=400, detail="Invalid signature")
+    else:
+        # Fallback for dev/testing without webhook secret
+        import json
+        try:
+            event = json.loads(payload)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON")
 
     service = BillingService(db)
-
-    # Handle the event
     event_type = event.get("type")
     
+    logger.info(f"Received Stripe Webhook: {event_type}")
+
+    # 2. Handle the event
     if event_type == "checkout.session.completed":
         session = event.get("data", {}).get("object", {})
         client_id = session.get("client_reference_id") or session.get("metadata", {}).get("client_id")
@@ -50,10 +56,13 @@ async def stripe_webhook(
         
         if client_id and plan:
             await service.handle_stripe_webhook_success(session_id, client_id, plan)
-            logger.info(f"Stripe Webhook: Checkout completed for client {client_id}")
+            logger.info(f"Stripe Webhook: Subscription activated for client {client_id}")
+        else:
+            logger.warning(f"Stripe Webhook: Missing client_id or plan in session {session_id}")
             
     elif event_type == "invoice.paid":
-        # Handle recurring payments
+        # This can be used for recurring subscription payments
+        # We can implement invoice PDF generation here too for monthly renewals
         pass
         
     return {"status": "success"}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -12,6 +12,7 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
+  ListItemButton,
   Chip,
   Alert,
   Stack,
@@ -19,12 +20,14 @@ import {
   InputLabel,
   FormControl,
   OutlinedInput,
+  Divider,
 } from "@mui/material";
 import {
   CalendarMonth as CalendarIcon,
   EventNote as EventIcon,
   Add as AddIcon,
   Warning as WarningIcon,
+  MeetingRoom as MeetingRoomIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useCulturalCalendar } from "../../hooks/useCulturalCalendar";
@@ -41,6 +44,21 @@ const MeetingPlanner: React.FC = () => {
     [],
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [recentMeetings, setRecentMeetings] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchRecentMeetings = async () => {
+      try {
+        const data = await meetingsApi.getMeetings();
+        // Sort by start_time descending, limit to 10
+        const sorted = data.sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+        setRecentMeetings(sorted.slice(0, 10));
+      } catch (err) {
+        console.error("Failed to fetch meetings", err);
+      }
+    };
+    fetchRecentMeetings();
+  }, []);
 
   const holidays = [
     { date: "2026-03-20", name: t("meetings.holiday_independence") },
@@ -176,6 +194,37 @@ const MeetingPlanner: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} md={5}>
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+              <MeetingRoomIcon sx={{ mr: 1, verticalAlign: "middle", color: 'primary.main' }} />
+              Recent Meetings
+            </Typography>
+            <Divider sx={{ mb: 1 }} />
+            {recentMeetings.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+                No recent meetings found. Create one to get started!
+              </Typography>
+            ) : (
+              <List dense>
+                {recentMeetings.map((meeting) => (
+                  <ListItem disablePadding key={meeting.id}>
+                    <ListItemButton onClick={() => navigate(`/meetings/live/${meeting.id}`)} sx={{ borderRadius: 1 }}>
+                      <ListItemIcon>
+                        <EventIcon color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={meeting.title} 
+                        secondary={new Date(meeting.start_time).toLocaleString()} 
+                        primaryTypographyProps={{ fontWeight: '500' }}
+                      />
+                      <Chip label={meeting.status} size="small" variant="outlined" color={meeting.status === 'completed' ? 'success' : 'default'} />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Paper>
+
           <Paper sx={{ p: 2, bgcolor: "action.hover" }}>
             <Typography variant="subtitle1" gutterBottom>
               <CalendarIcon sx={{ mr: 1, verticalAlign: "middle" }} />

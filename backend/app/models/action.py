@@ -41,6 +41,7 @@ class ActionSuggestion(Base):
     status: Mapped[SuggestionStatus] = mapped_column(
         SQLEnum(SuggestionStatus), default=SuggestionStatus.SUGGESTED
     )
+    language: Mapped[str] = mapped_column(String, default="en")
     
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

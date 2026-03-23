@@ -21,8 +21,6 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import SecurityIcon from "@mui/icons-material/Security";
 import PaymentIcon from "@mui/icons-material/Payment";
-import SpeedIcon from "@mui/icons-material/Speed";
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import PeopleIcon from "@mui/icons-material/People";
 
 const drawerWidth = 240;
@@ -33,19 +31,23 @@ const Sidebar: React.FC = () => {
   const location = useLocation();
   const { user } = useSelector((state: RootState) => state.auth);
 
+  const isBusinessAdmin = user?.role === "system_admin";
+
   const menuItems = [
     { text: t("sidebar.dashboard"), icon: <DashboardIcon />, path: "/" },
     { text: t("sidebar.meetings"), icon: <EventIcon />, path: "/meetings" },
     { text: t("sidebar.actions"), icon: <AssignmentIcon />, path: "/actions" },
     { text: t("sidebar.reports"), icon: <AssessmentIcon />, path: "/reports" },
+    { text: "Billing", icon: <PaymentIcon />, path: "/billing" },
   ];
 
   const adminItems = [
-    { text: "Overview", icon: <DashboardIcon />, path: "/" },
-    { text: "Manage Clients", icon: <PeopleIcon />, path: "/admin/clients" },
-    { text: "Billing & Invoices", icon: <PaymentIcon />, path: "/billing" },
-    { text: "System Health", icon: <SpeedIcon />, path: "/admin/technik" },
+    { text: t("admin.businessOverview"), icon: <DashboardIcon />, path: "/" },
+    { text: t("admin.manageClients"), icon: <PeopleIcon />, path: "/admin/clients" },
+    { text: t("admin.revenueBilling"), icon: <PaymentIcon />, path: "/billing" },
   ];
+
+  const currentItems = isBusinessAdmin ? adminItems : menuItems;
 
   return (
     <Drawer
@@ -64,7 +66,7 @@ const Sidebar: React.FC = () => {
       <Toolbar />
       <Box sx={{ overflow: "auto" }}>
         <List sx={{ pt: 2 }}>
-          {menuItems.map((item) => (
+          {currentItems.map((item) => (
             <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
               <ListItemButton
                 selected={location.pathname === item.path}
@@ -73,10 +75,10 @@ const Sidebar: React.FC = () => {
                   mx: 1,
                   borderRadius: 2,
                   "&.Mui-selected": {
-                    bgcolor: "primary.light",
-                    color: "primary.main",
+                    bgcolor: isBusinessAdmin ? "secondary.light" : "primary.light",
+                    color: isBusinessAdmin ? "secondary.main" : "primary.main",
                     "& .MuiListItemIcon-root": {
-                      color: "primary.main",
+                      color: isBusinessAdmin ? "secondary.main" : "primary.main",
                     },
                   },
                 }}
@@ -94,45 +96,6 @@ const Sidebar: React.FC = () => {
           ))}
         </List>
         
-        {user?.role === "system_admin" && (
-          <>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="overline" sx={{ px: 3, color: 'text.secondary' }}>
-              System Admin
-            </Typography>
-            <List>
-              {adminItems.map((item) => (
-                <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
-                  <ListItemButton
-                    selected={location.pathname === item.path}
-                    onClick={() => navigate(item.path)}
-                    sx={{
-                      mx: 1,
-                      borderRadius: 2,
-                      "&.Mui-selected": {
-                        bgcolor: "secondary.light",
-                        color: "secondary.main",
-                        "& .MuiListItemIcon-root": {
-                          color: "secondary.main",
-                        },
-                      },
-                    }}
-                  >
-                    <ListItemIcon>{item.icon}</ListItemIcon>
-                    <ListItemText
-                      primary={item.text}
-                      primaryTypographyProps={{
-                        fontWeight:
-                          location.pathname === item.path ? "bold" : "normal",
-                      }}
-                    />
-                  </ListItemButton>
-                </ListItem>
-              ))}
-            </List>
-          </>
-        )}
-
         <Divider sx={{ my: 2 }} />
         <List>
           <ListItem disablePadding sx={{ mx: 1 }}>

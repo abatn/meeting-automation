@@ -1,9 +1,23 @@
 import httpx
 import logging
 import asyncio
+import time
 from app.core.config import settings
+from app.core.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
+
+async def track_gladia_call(latency: float, success: bool):
+    try:
+        r = await get_redis_client()
+        await r.incr("ai:gladia:calls")
+        if not success:
+            await r.incr("ai:gladia:errors")
+        if latency > 0:
+            await r.lpush("ai:gladia:latencies", latency)
+            await r.ltrim("ai:gladia:latencies", 0, 99)
+    except Exception as e:
+        logger.error(f"Failed to track Gladia metrics: {e}")
 
 class GladiaService:
     def __init__(self):
@@ -22,6 +36,8 @@ class GladiaService:
             raise ValueError("Gladia API key is missing.")
 
         headers = {"x-gladia-key": self.api_key}
+        start_time = time.time()
+        success = False
 
         try:
             async with httpx.AsyncClient() as client:
@@ -67,6 +83,7 @@ class GladiaService:
                     
                     if status == "done":
                         logger.info("Step 3/3: Transcription complete!")
+                        success = True
                         return self._format_result(data)
                     elif status == "error":
                         error_detail = data.get('error', 'Unknown error')
@@ -80,6 +97,8 @@ class GladiaService:
         except Exception as e:
             logger.error(f"An unexpected error occurred during Gladia processing: {e}")
             raise
+        finally:
+            await track_gladia_call(time.time() - start_time, success)
 
     def _format_result(self, gladia_result: dict) -> dict:
         """

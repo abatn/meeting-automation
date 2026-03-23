@@ -55,14 +55,15 @@ class TranslateSuggestionsRequest(BaseModel):
 @router.get("/suggestions/{meeting_id}", response_model=List[ActionSuggestion])
 async def get_action_suggestions(
     meeting_id: str,
+    lang: Optional[str] = "fr",
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
     Analyzes the transcription of a meeting using ML (Mistral) to suggest potential action items.
-    Checks DB first, if none exist, calls the AI.
+    Checks DB first. If suggestions exist in a different language, it translates them on-the-fly.
     """
-    # Check if we already have suggestions
+    # 1. Check if we already have suggestions
     stmt = select(ActionSuggestionModel).where(
         ActionSuggestionModel.meeting_id == meeting_id
     ).where(
@@ -71,12 +72,37 @@ async def get_action_suggestions(
     result = await db.execute(stmt)
     existing_suggestions = result.scalars().all()
     
-    if existing_suggestions:
-        return existing_suggestions
-
-    # If none exist, generate them
     action_service = ActionService(db)
-    suggestions = await action_service.generate_suggestions_from_transcription(meeting_id, current_user.client_id)
+
+    if existing_suggestions:
+        # Check if we need to translate based on the language field
+        base_lang = lang.split('-')[0] if lang else "fr"
+        
+        # Convert to Pydantic schemas first to avoid in-place SQLAlchemy modifications
+        from app.schemas.action import ActionSuggestion as ActionSuggestionSchema
+        schemas = [ActionSuggestionSchema.model_validate(s) for s in existing_suggestions]
+
+        if existing_suggestions[0].language != base_lang:
+            suggestions_data = [
+                {"id": s.id, "title": s.title, "description": s.description} 
+                for s in existing_suggestions
+            ]
+            
+            translated_data = await action_service.translate_suggestions(suggestions_data, base_lang)
+            
+            # Merge translated strings back into the schemas
+            for i, s in enumerate(schemas):
+                # Ensure we don't index out of bounds if translation returned fewer items
+                if i < len(translated_data):
+                    s.title = translated_data[i].get("title", s.title)
+                    s.description = translated_data[i].get("description", s.description)
+            
+        return schemas
+
+    # 3. If none exist, generate them initially in the target language
+    suggestions = await action_service.generate_suggestions_from_transcription(
+        meeting_id, current_user.client_id, target_language=lang
+    )
     return suggestions
 
 @router.post("/suggestions/learn")
@@ -93,7 +119,12 @@ async def learn_action_suggestion_feedback(
         raise HTTPException(status_code=400, detail="Action must be 'accept' or 'reject'")
         
     action_service = ActionService(db)
-    await action_service.learn_from_feedback(feedback.suggestion_id, current_user.client_id, feedback.action)
+    await action_service.learn_from_feedback(
+        feedback.suggestion_id, 
+        current_user.client_id, 
+        feedback.action,
+        user_id=current_user.id
+    )
     return {"status": "success", "message": "Feedback recorded successfully."}
 
 @router.post("/suggestions/translate")

@@ -30,6 +30,8 @@ interface ManagerDashboardData {
 interface ParticipantDashboardData {
   my_upcoming_meetings: number;
   my_open_actions: number;
+  upcoming_meetings_list: any[];
+  open_actions_list: any[];
   client_usage: UsageInfo;
 }
 

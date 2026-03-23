@@ -8,10 +8,10 @@ export const createAppTheme = (direction: Direction) => {
         main: "#1976d2",
       },
       secondary: {
-        main: "#dc004e",
+        main: "#475569", // Professional slate grey instead of aggressive red
       },
       background: {
-        default: "#f5f5f5",
+        default: "#f8fafc", // Slightly lighter professional background
       },
     },
     typography: {
@@ -23,6 +23,14 @@ export const createAppTheme = (direction: Direction) => {
         styleOverrides: {
           root: {
             textTransform: "none",
+            borderRadius: 8,
+          },
+        },
+      },
+      MuiPaper: {
+        styleOverrides: {
+          root: {
+            borderRadius: 12,
           },
         },
       },

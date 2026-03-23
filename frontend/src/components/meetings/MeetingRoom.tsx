@@ -36,10 +36,10 @@ interface ActionSuggestion {
 
 const MeetingRoom: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [activeTab, setActiveTab] = useState(0);
   const [suggestions, setSuggestions] = useState<ActionSuggestion[]>([]);
-  const [exportLanguage, setExportLanguage] = useState<string>("fr");
+  const [exportLanguage, setExportLanguage] = useState<string>(i18n.language.split('-')[0] || "fr");
   const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
@@ -47,7 +47,8 @@ const MeetingRoom: React.FC = () => {
     
     const fetchSuggestions = async () => {
       try {
-        const suggestionsRes = await api.get(`/actions/suggestions/${id}`);
+        const lang = i18n.language.split('-')[0] || "fr";
+        const suggestionsRes = await api.get(`/actions/suggestions/${id}?lang=${lang}`);
         if (suggestionsRes.data) {
           setSuggestions(suggestionsRes.data.filter((s: ActionSuggestion) => s.status.toLowerCase() === "suggested"));
         }
@@ -60,35 +61,7 @@ const MeetingRoom: React.FC = () => {
     const interval = setInterval(fetchSuggestions, 30000); // Polling suggestions less frequently
 
     return () => clearInterval(interval);
-  }, [id]);
-
-  // Auto-translate suggestions when export language changes
-  useEffect(() => {
-    const translateSidebar = async () => {
-      if (suggestions.length === 0 || translating) return;
-      
-      setTranslating(true);
-      try {
-        const res = await api.post("/actions/suggestions/translate", {
-          suggestions: suggestions.map(s => ({ id: s.id, title: s.title, description: s.description })),
-          target_language: exportLanguage
-        });
-        if (Array.isArray(res.data)) {
-          // Merge translated content back into suggestions
-          setSuggestions(prev => prev.map(s => {
-            const trans = res.data.find((t: any) => t.id === s.id);
-            return trans ? { ...s, title: trans.title, description: trans.description } : s;
-          }));
-        }
-      } catch (err) {
-        console.error("Failed to translate sidebar suggestions", err);
-      } finally {
-        setTranslating(false);
-      }
-    };
-
-    translateSidebar();
-  }, [exportLanguage, id]);
+  }, [id, i18n.language]);
 
   const handleSuggestionFeedback = async (suggestionId: string, action: "accept" | "reject") => {
     try {

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -14,6 +14,7 @@ import {
   InputAdornment,
   Button,
   IconButton,
+  CircularProgress,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -23,49 +24,48 @@ import {
   CheckCircle as CompleteIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store";
+import api from "../../services/api";
 import StatusBadge from "./StatusBadge";
 
 const ActionTracker: React.FC = () => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
+  const [actions, setActions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useSelector((state: RootState) => state.auth);
 
-  const actions: Array<{
-    id: number;
-    title: string;
-    owner: string;
-    priority: "High" | "Medium" | "Low";
-    status: "pending" | "completed" | "in_progress";
-    due: string;
-  }> = [
-    {
-      id: 1,
-      title: t("actions.mock_fix_bug"),
-      owner: "Sami Ben Ali",
-      priority: "High",
-      status: "pending",
-      due: "2026-02-21",
-    },
-    {
-      id: 2,
-      title: t("actions.mock_update_docs"),
-      owner: "Amel Trabelsi",
-      priority: "Medium",
-      status: "completed",
-      due: "2026-02-25",
-    },
-    {
-      id: 3,
-      title: t("actions.mock_client_prep"),
-      owner: "Mohamed Mahmoud",
-      priority: "High",
-      status: "pending",
-      due: "2026-02-19",
-    },
-  ];
+  useEffect(() => {
+    const fetchActions = async () => {
+      try {
+        const response = await api.get('/actions/my-actions');
+        setActions(response.data);
+      } catch (error) {
+        console.error('Failed to fetch actions:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchActions();
+  }, []);
 
   const handleWhatsAppReminder = (owner: string) => {
     console.log(`Sending WhatsApp reminder to ${owner}`);
   };
+
+  const handleComplete = async (id: string) => {
+    try {
+      await api.patch(`/actions/${id}/status`, { status: "completed" });
+      setActions(actions.map(a => a.id === id ? { ...a, status: "completed" } : a));
+    } catch (error) {
+      console.error('Failed to complete action:', error);
+    }
+  };
+
+  const filteredActions = actions.filter((action) =>
+    action.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <Box sx={{ p: 3 }}>
@@ -98,56 +98,75 @@ const ActionTracker: React.FC = () => {
         </Button>
       </Paper>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead sx={{ bgcolor: "action.hover" }}>
-            <TableRow>
-              <TableCell>{t("actions.title")}</TableCell>
-              <TableCell>{t("actions.owner")}</TableCell>
-              <TableCell>{t("actions.priority")}</TableCell>
-              <TableCell>{t("actions.status")}</TableCell>
-              <TableCell>{t("actions.due_date")}</TableCell>
-              <TableCell align="right">{t("common.actions")}</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {actions.map((action) => (
-              <TableRow key={action.id} hover>
-                <TableCell sx={{ fontWeight: "medium" }}>
-                  {action.title}
-                </TableCell>
-                <TableCell>{action.owner}</TableCell>
-                <TableCell>
-                  <Chip
-                    label={t(`actions.priority_${action.priority.toLowerCase()}`)}
-                    size="small"
-                    color={action.priority === "High" ? "error" : "warning"}
-                  />
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={action.status} />
-                </TableCell>
-                <TableCell>{action.due}</TableCell>
-                <TableCell align="right">
-                  <IconButton
-                    color="success"
-                    onClick={() => handleWhatsAppReminder(action.owner)}
-                    title={t("common.actions")}
-                  >
-                    <WhatsAppIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton color="primary">
-                    <CompleteIcon fontSize="small" />
-                  </IconButton>
-                  <IconButton>
-                    <MoreIcon fontSize="small" />
-                  </IconButton>
-                </TableCell>
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 5 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead sx={{ bgcolor: "action.hover" }}>
+              <TableRow>
+                <TableCell>{t("actions.title")}</TableCell>
+                <TableCell>{t("actions.owner")}</TableCell>
+                <TableCell>{t("actions.priority")}</TableCell>
+                <TableCell>{t("actions.status")}</TableCell>
+                <TableCell>{t("actions.due_date")}</TableCell>
+                <TableCell align="right">{t("common.actions")}</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <TableBody>
+              {filteredActions.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                    {t('dashboard.no_actions_found') || "No actions found."}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredActions.map((action) => (
+                  <TableRow key={action.id} hover>
+                    <TableCell sx={{ fontWeight: "medium" }}>
+                      {action.title}
+                    </TableCell>
+                    <TableCell>{user?.full_name || t('common.me')}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={action.priority || 'Medium'}
+                        size="small"
+                        color={action.priority?.toLowerCase() === "high" ? "error" : "warning"}
+                        sx={{ textTransform: 'capitalize' }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={action.status || 'pending'} />
+                    </TableCell>
+                    <TableCell>{action.due_date ? new Date(action.due_date).toLocaleDateString() : 'N/A'}</TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        color="success"
+                        onClick={() => handleWhatsAppReminder(user?.full_name || 'Me')}
+                        title={t("common.actions")}
+                      >
+                        <WhatsAppIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton 
+                        color="primary" 
+                        onClick={() => handleComplete(action.id)}
+                        disabled={action.status === 'completed'}
+                      >
+                        <CompleteIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton>
+                        <MoreIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
     </Box>
   );
 };

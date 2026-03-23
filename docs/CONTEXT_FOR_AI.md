@@ -56,13 +56,21 @@ Das System wurde erfolgreich von einer Single-Tenant in eine Multi-Tenant SaaS-P
     - System-Admin "God-Mode" Dashboard (Revenue & Tech metrics).
     - Corrected registration flow with company creation.
 
-## 7. Bekannte Fixes & Stabilitäts-Hinweise
+## 7. Multilingual AI & Dynamic Localization
+The system is designed for high-end professional environments where users may switch between Arabic, French, and English.
+- **Dynamic Suggestions**: AI Action Suggestions are never "static" in a single language. 
+- **User Language Sync**: The backend must detect the user's current dashboard language (provided via API calls) and use Mistral to translate suggestions on-the-fly if they don't match the active UI language.
+- **Context Injection**: During PV and Action generation, the backend injects the list of real meeting participants into the AI prompt to ensure precise attribution and avoid name hallucinations (like using the company name instead of a person).
+
+## 8. Bekannte Fixes & Stabilitäts-Hinweise
 - **Transcription Pipeline**: Wurde gefixt, um die `client_id` korrekt zu vererben. Celery-Tasks müssen immer die Tenant-ID des Ursprungs-Records nutzen.
 - **Minio Buckets**: Bei einem `docker compose down` müssen die Buckets `meeting-recordings` und `meeting-pdfs` ggf. manuell neu erstellt werden (via `mc mb`).
+- **Arabic Rendering**: PDFs use native HarfBuzz/Pango support. Manual reshaping (arabic-reshaper) is forbidden as it breaks text extraction (copy-paste).
 
-## 8. Arbeitsregeln für den Agenten
+## 9. Arbeitsregeln für den Agenten
 *   Prüfe immer zuerst `docs/PROJECT_STATUS.md`.
 *   **Faktenbasiert arbeiten**: Nutze den `codebase_investigator`, um den wahren Zustand des Codes zu verstehen, bevor du Änderungen vorschlägst.
 *   **i18n Management**: Übersetzungen existieren redundant in `frontend/src/i18n/locales` (für Vite) und `frontend/public/locales` (für Nginx/Statik). Änderungen müssen immer an BEIDEN Orten erfolgen oder mittels `scripts/sync_locales.sh` synchronisiert werden.
+*   **Erst erklären, dann einsetzen**: Erkläre dem Nutzer immer erst den Plan und die technische Begründung, bevor du Dateien modifizierst.
 *   Teste Container *lokal* (`docker-compose ps`, `docker logs`), bevor du Code committest.
 *   Wenn du Skripte oder Komponenten änderst, verifiziere, dass sie keine Mypy/Flake8/ESLint Fehler in der CI/CD verursachen.

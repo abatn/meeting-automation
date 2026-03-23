@@ -108,8 +108,8 @@ class ActionService:
             logger.error(f"Failed to translate texts: {e}")
             return texts
 
-    async def generate_suggestions_from_transcription(self, meeting_id: str, client_id: str) -> List[ActionSuggestion]:
-        """Analyzes transcription to suggest new actions."""
+    async def generate_suggestions_from_transcription(self, meeting_id: str, client_id: str, target_language: str = "fr") -> List[ActionSuggestion]:
+        """Analyzes transcription to suggest new actions in the specified language."""
         # 1. Fetch Transcription
         stmt = select(Transcription).where(Transcription.meeting_id == meeting_id).where(Transcription.client_id == client_id)
         res = await self.db.execute(stmt)
@@ -125,23 +125,27 @@ class ActionService:
             "Content-Type": "application/json",
         }
         
-        system_content = """You are an AI assistant that analyzes meeting transcripts to identify potential action items, tasks, or follow-ups that were discussed but might not have been formally decided yet.
+        lang_names = {"ar": "Arabic", "fr": "French", "en": "English"}
+        language_name = lang_names.get(target_language, "French")
+
+        system_content = f"""You are an AI assistant that analyzes meeting transcripts to identify potential action items, tasks, or follow-ups.
 Extract these implicit suggestions.
+CRITICAL: The 'title' and 'description' fields MUST be written in {language_name}.
 Return ONLY a JSON array of objects with the following structure:
 [
-  {
-    "title": "Short title of the task",
-    "description": "More detailed description",
+  {{
+    "title": "Short title of the task in {language_name}",
+    "description": "More detailed description in {language_name}",
     "suggested_assignee": "Name of the person if mentioned, else null",
     "confidence_score": 0.0 to 1.0 indicating how likely this is a real task
-  }
+  }}
 ]"""
 
         payload = {
             "model": "mistral-large-latest",
             "messages": [
                 {"role": "system", "content": system_content},
-                {"role": "user", "content": f"Analyze this transcript:\n\n{transcription.full_text}"}
+                {"role": "user", "content": f"Analyze this transcript and extract tasks in {language_name}:\n\n{transcription.full_text}"}
             ],
             "response_format": {"type": "json_object"}
         }
@@ -152,7 +156,7 @@ Return ONLY a JSON array of objects with the following structure:
                     "https://api.mistral.ai/v1/chat/completions",
                     headers=headers,
                     json=payload,
-                    timeout=30.0,
+                    timeout=45.0,
                 )
                 response.raise_for_status()
                 result = response.json()
@@ -170,18 +174,18 @@ Return ONLY a JSON array of objects with the following structure:
             logger.error(f"Failed to generate suggestions via Mistral: {e}")
             return []
 
-        # 3. Store in DB
         suggestions = []
         for item in suggestions_data:
             suggestion = ActionSuggestion(
                 id=str(uuid.uuid4()),
-                client_id=client_id,
                 meeting_id=meeting_id,
+                client_id=client_id,
                 title=item.get("title", "Unknown Task"),
                 description=item.get("description", ""),
                 suggested_assignee=item.get("suggested_assignee"),
-                confidence_score=item.get("confidence_score", 0.5),
-                status="suggested"
+                confidence_score=item.get("confidence_score", 0.8),
+                status=SuggestionStatus.SUGGESTED,
+                language=target_language
             )
             self.db.add(suggestion)
             suggestions.append(suggestion)
@@ -309,10 +313,16 @@ Return ONLY a JSON array of objects with the following structure:
             logger.error(f"Failed to trigger n8n status notification: {e}")
 
         return action
-
-    async def learn_from_feedback(self, suggestion_id: str, client_id: str, action: str) -> None:
+    async def learn_from_feedback(self, suggestion_id: str, client_id: str, action: str, user_id: Optional[str] = None) -> None:
         """Records feedback and creates a real Action if accepted."""
-        stmt = select(ActionSuggestion).where(ActionSuggestion.id == suggestion_id).where(ActionSuggestion.client_id == client_id)
+        from sqlalchemy.orm import selectinload
+        from app.models.meeting import Meeting
+        stmt = (
+            select(ActionSuggestion)
+            .options(selectinload(ActionSuggestion.meeting).selectinload(Meeting.participants))
+            .where(ActionSuggestion.id == suggestion_id)
+            .where(ActionSuggestion.client_id == client_id)
+        )
         res = await self.db.execute(stmt)
         suggestion = res.scalar_one_or_none()
 
@@ -323,8 +333,9 @@ Return ONLY a JSON array of objects with the following structure:
         if action == "accept":
             suggestion.status = "accepted"
             # Create the actual action entry so it appears in the PV/PDF
+            new_action_id = str(uuid.uuid4())
             new_action = Action(
-                id=str(uuid.uuid4()),
+                id=new_action_id,
                 client_id=client_id,
                 meeting_id=suggestion.meeting_id,
                 title=suggestion.title,
@@ -333,6 +344,16 @@ Return ONLY a JSON array of objects with the following structure:
                 priority="medium"
             )
             self.db.add(new_action)
+            
+            # Auto-assign only if the AI suggested a specific person
+            if suggestion.suggested_assignee and suggestion.suggested_assignee.lower() not in ["null", "n/a", "non défini"]:
+                assignment = Assignment(
+                    id=str(uuid.uuid4()),
+                    action_id=new_action_id,
+                    external_name=suggestion.suggested_assignee.strip()
+                )
+                self.db.add(assignment)
+                
             logger.info(f"Suggestion {suggestion_id} accepted and converted to Action {new_action.id}")
         elif action == "reject":
             suggestion.status = "rejected"
@@ -350,9 +371,17 @@ Return ONLY a JSON array of objects with the following structure:
         }
         
         lang_names = {"ar": "Arabic", "fr": "French", "en": "English"}
-        target_lang = lang_names.get(target_language, "French")
+        base_lang = target_language.split('-')[0] if target_language else "fr"
+        target_lang_name = lang_names.get(base_lang, "French")
 
-        system_content = f"You are a professional translator. Translate the following list of action suggestions into {target_lang}. Return ONLY a JSON array of objects with 'id', 'title', and 'description'."
+        system_content = f"""You are a professional translator. Translate the 'title' and 'description' of the following action suggestions into {target_lang_name}. 
+CRITICAL: Return ONLY a valid JSON object with a single key "suggestions" containing the array of translated objects.
+Example format:
+{{
+  "suggestions": [
+    {{ "id": "...", "title": "translated...", "description": "translated..." }}
+  ]
+}}"""
         
         payload = {
             "model": "mistral-large-latest",
@@ -365,13 +394,20 @@ Return ONLY a JSON array of objects with the following structure:
 
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.post("https://api.mistral.ai/v1/chat/completions", headers=headers, json=payload, timeout=30.0)
+                response = await client.post("https://api.mistral.ai/v1/chat/completions", headers=headers, json=payload, timeout=45.0)
                 response.raise_for_status()
                 result = response.json()
                 content_str = result["choices"][0]["message"]["content"]
                 parsed = json.loads(content_str)
-                # Handle Mistral's potential dict wrapper
-                return parsed if isinstance(parsed, list) else list(parsed.values())[0]
+                
+                # Robustly extract the array
+                if "suggestions" in parsed and isinstance(parsed["suggestions"], list):
+                    return parsed["suggestions"]
+                elif isinstance(parsed, list):
+                    return parsed
+                else:
+                    logger.error(f"Unexpected JSON structure from Mistral translation: {parsed}")
+                    return suggestions_data
         except Exception as e:
             logger.error(f"Failed to translate suggestions: {e}")
             return suggestions_data

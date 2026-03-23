@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "./store";
 import { initializeAuth } from "./store/authActions";
@@ -30,211 +30,105 @@ function App() {
   const { authState, user } = useSelector((state: RootState) => state.auth);
 
   useEffect(() => {
-    // Initial check on mount
     dispatch(initializeAuth());
   }, [dispatch]);
 
-  // Loading screen during token validation
   if (authState === "loading") {
     return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-          bgcolor: "background.default",
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", bgcolor: "background.default" }}>
         <CircularProgress />
       </Box>
     );
   }
 
-  // Dashboard component selection based on role
-  const getDashboard = () => {
+  // Helper function to check roles
+  const isBusinessAdmin = user?.role === "system_admin";
+  const isTechAdmin = user?.role === "tech_admin";
+  const isRegularUser = user && !isBusinessAdmin && !isTechAdmin;
+
+  // Define components for regular users
+  const getRegularDashboard = () => {
     switch (user?.role) {
-      case "system_admin":
-        return <AdminDashboard />;
-      case "dg":
-        return <DashboardDG />;
-      case "manager":
-        return <DashboardManager />;
-      case "participant":
-      default:
-        return <DashboardParticipant />;
+      case "dg": return <DashboardDG />;
+      case "manager": return <DashboardManager />;
+      case "participant": return <DashboardParticipant />;
+      default: return <DashboardParticipant />;
     }
   };
 
+  // TECH ADMIN ROUTES (Exclusive to tech_admin, no MainLayout)
+  if (authState === "authenticated" && isTechAdmin) {
+    return (
+      <ErrorBoundary>
+        <AutoLogout>
+          <Box sx={{ minHeight: "100vh", bgcolor: "#0a1929" }}>
+            <CssBaseline />
+            <Routes>
+              <Route path="/admin/technik" element={<TechnikDashboard />} />
+              <Route path="*" element={<Navigate to="/admin/technik" replace />} />
+            </Routes>
+          </Box>
+        </AutoLogout>
+      </ErrorBoundary>
+    );
+  }
+
+  // BUSINESS ADMIN ROUTES (Exclusive to system_admin, with MainLayout)
+  if (authState === "authenticated" && isBusinessAdmin) {
+    return (
+      <ErrorBoundary>
+        <AutoLogout>
+          <Box sx={{ minHeight: "100vh" }}>
+            <CssBaseline />
+            <Routes>
+              <Route path="/" element={<MainLayout><AdminDashboard /></MainLayout>} />
+              <Route path="/admin/clients" element={<MainLayout><ClientList /></MainLayout>} />
+              <Route path="/admin/clients/:id" element={<MainLayout><ClientDetails /></MainLayout>} />
+              <Route path="/billing" element={<MainLayout><BillingPanel /></MainLayout>} />
+              <Route path="/settings" element={<MainLayout><Box sx={{ p: 3 }}><MFASetup qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ExampleSecret" secret="JBSWY3DPEHPK3PXP" /></Box></MainLayout>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Box>
+        </AutoLogout>
+      </ErrorBoundary>
+    );
+  }
+
+  // REGULAR USER ROUTES (Exclusive to non-admins, with MainLayout)
+  if (authState === "authenticated" && isRegularUser) {
+    return (
+      <ErrorBoundary>
+        <AutoLogout>
+          <Box sx={{ minHeight: "100vh" }}>
+            <CssBaseline />
+            <Routes>
+              <Route path="/" element={<MainLayout>{getRegularDashboard()}</MainLayout>} />
+              <Route path="/meetings" element={<MainLayout><MeetingPlanner /></MainLayout>} />
+              <Route path="/meetings/live/:id" element={<MainLayout><MeetingRoom /></MainLayout>} />
+              <Route path="/actions" element={<MainLayout><ActionTracker /></MainLayout>} />
+              <Route path="/reports" element={<MainLayout><AnalyticalReports /></MainLayout>} />
+              <Route path="/billing" element={<MainLayout><BillingPanel /></MainLayout>} />
+              <Route path="/settings" element={<MainLayout><Box sx={{ p: 3 }}><MFASetup qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ExampleSecret" secret="JBSWY3DPEHPK3PXP" /></Box></MainLayout>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Box>
+        </AutoLogout>
+      </ErrorBoundary>
+    );
+  }
+
+  // PUBLIC ROUTES
   return (
     <ErrorBoundary>
-      <AutoLogout>
-        <Box sx={{ minHeight: "100vh" }}>
-          <CssBaseline />
-          <Routes>
-            {/* Public Landing Page */}
-            <Route
-              path="/"
-              element={
-                authState === "authenticated" && user ? (
-                  <MainLayout>{getDashboard()}</MainLayout>
-                ) : (
-                  <LandingPage />
-                )
-              }
-            />
-
-            {/* Auth Routes */}
-            <Route
-              path="/login"
-              element={
-                authState === "authenticated" ? (
-                  <Navigate to="/" replace />
-                ) : (
-                  <LoginForm />
-                )
-              }
-            />
-
-            <Route
-              path="/register"
-              element={
-                authState === "authenticated" ? (
-                  <Navigate to="/" replace />
-                ) : (
-                  <RegisterForm />
-                )
-              }
-            />
-
-            {/* Protected Feature Routes */}
-            <Route
-              path="/meetings"
-              element={
-                authState === "authenticated" && user ? (
-                  <MainLayout>
-                    <MeetingPlanner />
-                  </MainLayout>
-                ) : (
-                  <Navigate to="/login" replace />
-                )
-              }
-            />
-
-            {/* Live Meeting Room Test Route */}
-            <Route
-              path="/meetings/live/:id"
-              element={
-                authState === "authenticated" && user ? (
-                  <MainLayout>
-                    <MeetingRoom />
-                  </MainLayout>
-                ) : (
-                  <Navigate to="/login" replace />
-                )
-              }
-            />
-
-            <Route
-              path="/actions"
-              element={
-                authState === "authenticated" && user ? (
-                  <MainLayout>
-                    <ActionTracker />
-                  </MainLayout>
-                ) : (
-                  <Navigate to="/login" replace />
-                )
-              }
-            />
-
-            <Route
-              path="/reports"
-              element={
-                authState === "authenticated" && user ? (
-                  <MainLayout>
-                    <AnalyticalReports />
-                  </MainLayout>
-                ) : (
-                  <Navigate to="/login" replace />
-                )
-              }
-            />
-
-            <Route
-              path="/settings"
-              element={
-                authState === "authenticated" && user ? (
-                  <MainLayout>
-                    <Box sx={{ p: 3 }}>
-                      <MFASetup
-                        qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ExampleSecret"
-                        secret="JBSWY3DPEHPK3PXP"
-                      />
-                    </Box>
-                  </MainLayout>
-                ) : (
-                  <Navigate to="/login" replace />
-                )
-              }
-            />
-
-            {/* Protected Admin Routes */}
-            <Route
-              path="/admin/clients"
-              element={
-                authState === "authenticated" && user?.role === "system_admin" ? (
-                  <MainLayout>
-                    <ClientList />
-                  </MainLayout>
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/admin/clients/:id"
-              element={
-                authState === "authenticated" && user?.role === "system_admin" ? (
-                  <MainLayout>
-                    <ClientDetails />
-                  </MainLayout>
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/admin/technik"
-              element={
-                authState === "authenticated" && user?.role === "system_admin" ? (
-                  <MainLayout>
-                    <TechnikDashboard />
-                  </MainLayout>
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-
-            <Route
-              path="/billing"
-              element={
-                authState === "authenticated" ? (
-                  <MainLayout>
-                    <BillingPanel />
-                  </MainLayout>
-                ) : (
-                  <Navigate to="/login" replace />
-                )
-              }
-            />
-
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Box>
-      </AutoLogout>
+      <Box sx={{ minHeight: "100vh" }}>
+        <CssBaseline />
+        <Routes>
+          <Route path="/login" element={<LoginForm />} />
+          <Route path="/register" element={<RegisterForm />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Box>
     </ErrorBoundary>
   );
 }

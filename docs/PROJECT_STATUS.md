@@ -1,3 +1,12 @@
+# Meeting Automation System - Project Status
+
+> [!CAUTION]
+> ### 🚨 KRITISCHE WARTUNGSNOTIZ: FRONTEND BUILD-PROZESS (März 2026)
+> **STATUS:** Temporäre Anpassung für Stabilität.
+> **ÄNDERUNG:** Die `builder`-Stage im `frontend/Dockerfile` wurde von `node:20-alpine` auf `node:20` (Debian-basiert) umgestellt.
+> **GRUND:** Behebung von `Bus error (core dumped)` Abstürzen während des `npm run build` (Vite/esbuild) in ressourcenbeschränkten Umgebungen (WSL2, Low RAM).
+> **PRODUKTIONSHINWEIS:** Die finale Runtime-Stage bleibt `nginx:alpine` (sicher & klein). Für die finale Produktions-Härtung (ISO 27001) sollte geprüft werden, ob der Builder wieder auf Alpine zurückgeführt werden kann, sobald die Host-Ressourcen stabilisiert sind.
+
 ## Priorisierte Roadmap für Produktion (Security & ISO 27001)
 
 Basierend auf dem jüngsten Security-Audit (ISO 27001:2022) wurden folgende Architektur-Erweiterungen und Maßnahmen als kritisch eingestuft und umgesetzt:
@@ -41,12 +50,30 @@ Diese Phase finalisiert die Plattform für den kommerziellen Betrieb.
 - [x] **Public Landing Page**: Öffentliche Produktpräsentation und Onboarding-Flow.
 - [x] **Technik-Dashboard**: System-Monitoring für den Betreiber.
 
+## Phase 5: Production Operations & Global Optimization (Next)
+
+Diese Phase konzentriert sich auf den stabilen Betrieb unter Last, die Benutzererfahrung und detailliertes Monitoring.
+
+- [x] **Erweitertes Monitoring & System-Telemetrie**:
+  - **Container-Ebene**: CPU/RAM pro Service (Frontend, Backend, Celery), Disk I/O (MinIO, PostgreSQL), Uptime.
+  - **PostgreSQL**: Aktive Verbindungen, Langsame Queries (> 100ms), DB Cache Hit Ratio.
+  - **Redis**: Exakte Cache Hit Ratio, Speicherbelegung, Evicted Keys.
+  - **RabbitMQ**: Queue-Tiefe über Zeit (Trend), Unacknowledged Messages.
+  - **KI-Services**: Response-Zeit (Mistral PV-Generierung), Fehlerquote, Anfragen pro Minute.
+  - **MinIO/S3**: Korrekte Speicherplatzberechnung, Anzahl Objekte, Upload/Download Rate.
+  - **n8n**: Workflow-Fehler der letzten 24h, Durchschnittliche Ausführungszeit.
+- [ ] **Auto-Scaling**: Konfiguration von Horizontal Pod Autoscaler (HPA) in Kubernetes für die AI-Worker (Gladia/Mistral Proxy).
+- [ ] **Mobile App Applikation**: Entwicklung einer progressiven Web App (PWA) oder nativen App für Meeting-Aufnahmen via Smartphone.
+- [ ] **Finetuning AI**: Optimierung der Mistral-Prompts für noch präzisere tunesische Dialekt-Zusammenfassungen.
+- [ ] **Disaster Recovery**: Validierung und Automatisierung der täglichen Offsite-Backups.
+
 ## Historie & Protokolle
 
 Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilensteine ist in den folgenden konsolidierten Protokollen zu finden:
 
-1. **[Billing, Landing Page & Monitoring](PROTOCOL_PART_37_BILLING_LANDING_MONITORING.md)**: Einführung des Abrechnungssystems, der Marketing-Seite und des technischen Monitorings.
-2. **[SaaS Multi-Tenant Transformation](PROTOCOL_PART_36_SAAS_MULTI_TENANT_TRANSFORMATION.md)**: Vollständiger Umbau zur mandantenfähigen Plattform inkl. Daten-Isolation, System-Admin API und Frontend Dashboards.
+1. **[Admin Dashboards & Separation](PROTOCOL_PART_38_ADMIN_DASHBOARDS_FINALIZATION.md)**: Strikte Trennung der Rollen (Tech vs. Business), Einführung von `tech_admin`, echtes Stripe-Payment und vollständige i18n-Bereinigung.
+2. **[Billing, Landing Page & Monitoring](PROTOCOL_PART_37_BILLING_LANDING_MONITORING.md)**: Einführung des Abrechnungssystems, der Marketing-Seite und des technischen Monitorings.
+3. **[SaaS Multi-Tenant Transformation](PROTOCOL_PART_36_SAAS_MULTI_TENANT_TRANSFORMATION.md)**: Vollständiger Umbau zur mandantenfähigen Plattform inkl. Daten-Isolation, System-Admin API und Frontend Dashboards.
 2. **[Kubernetes Stabilität & Ressourcen](PROTOCOL_PART_35_KUBERNETES_STABILITY_AND_RESOURCES.md)**: Härtung der K8s-Infrastruktur, Optimierung des Ressourcenverbrauchs und Implementierung von Health-Checks.
 2. **[SSL/TLS Encryption](PROTOCOL_PART_33_SSL_TLS_ENCRYPTION.md)**: Konfiguration von Traefik für erzwungenes HTTPS mit selbstsignierten Zertifikaten.
 3. **[Session Management & JWT](PROTOCOL_PART_32_SESSION_MANAGEMENT.md)**: Implementierung von Auto-Logout und Token-Härtung (30 Minuten).

@@ -3,6 +3,7 @@ import uuid
 import logging
 import re
 import json
+from datetime import datetime
 from typing import Optional, Dict, Any
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -101,9 +102,23 @@ class DOCXService:
         if not pv_obj:
             raise HTTPException(status_code=404, detail="PV not found")
 
-        action_stmt = select(Action).where(Action.meeting_id == pv_obj.meeting_id).where(Action.client_id == client_id)
+        from app.models.action import Assignment
+        action_stmt = (
+            select(Action)
+            .options(selectinload(Action.assignments).selectinload(Assignment.user))
+            .where(Action.meeting_id == pv_obj.meeting_id)
+            .where(Action.client_id == client_id)
+        )
         action_result = await self.db.execute(action_stmt)
         actions = action_result.scalars().all()
+
+        # 0. Localization Strings
+        LOCALES = {
+            "ar": {"not_assigned": "غير محدد"},
+            "fr": {"not_assigned": "Non défini"},
+            "en": {"not_assigned": "N/A"}
+        }
+        strings = LOCALES.get(language, LOCALES["fr"])
 
         # 2. Translation Logic
         display_title = pv_obj.title
@@ -111,10 +126,18 @@ class DOCXService:
         display_decisions = [s.content for s in pv_obj.sections if s.type == "decision"]
         display_actions = []
         for a in actions:
+            assignee_name = strings["not_assigned"]
+            if a.assignments and len(a.assignments) > 0:
+                assignment = a.assignments[0]
+                if assignment.user and assignment.user.full_name:
+                    assignee_name = assignment.user.full_name
+                elif assignment.external_name:
+                    assignee_name = assignment.external_name
+                    
             display_actions.append({
                 "description": a.title,
-                "assignee": a.description.split("Assigned to: ")[-1] if "Assigned to: " in a.description else "N/A",
-                "due_date": a.due_date.strftime("%Y-%m-%d") if a.due_date else "N/A"
+                "assignee": assignee_name,
+                "due_date": a.due_date.strftime("%Y-%m-%d") if a.due_date else datetime.now().strftime("%Y-%m-%d")
             })
 
         from app.services.pv_service import PVService, TranslationError

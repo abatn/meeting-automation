@@ -129,7 +129,18 @@ async def _handle_ai_results(
     recording.status = "analyzing"
     await db.commit()
 
-    pv_data = await PVService.generate_pv(mistral_text, target_language="fr")
+    # Get participant names for AI context
+    from app.models.meeting import Meeting, Participant
+    from sqlalchemy.orm import selectinload
+    stmt = select(Meeting).options(selectinload(Meeting.participants)).where(Meeting.id == recording.meeting_id)
+    meeting_res = await db.execute(stmt)
+    meeting = meeting_res.scalar_one_or_none()
+    
+    participant_names = []
+    if meeting:
+        participant_names = [p.name for p in meeting.participants if p.name]
+
+    pv_data = await PVService.generate_pv(mistral_text, target_language="fr", participant_names=participant_names)
     await _save_pv_and_actions(db, recording, pv_data, language="fr")
     recording.status = "completed"
     await db.commit()
@@ -140,8 +151,13 @@ async def _save_pv_and_actions(
 ) -> None:
     summary = pv_data.get("summary", "")
     decisions_list = pv_data.get("decisions", [])
-    decisions_html = "<br/>".join([f"- {d}" for d in decisions_list])
-    html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><p>{decisions_html}</p>"
+    
+    if decisions_list:
+        decisions_html = "<ul>" + "".join([f"<li>{d}</li>" for d in decisions_list]) + "</ul>"
+    else:
+        decisions_html = "<p>Aucune décision n'a été enregistrée.</p>"
+        
+    html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3>{decisions_html}"
 
     existing_pv_res = await db.execute(
         select(PV).where(PV.meeting_id == recording.meeting_id)
@@ -199,16 +215,44 @@ async def _save_pv_and_actions(
         ))
 
     for action_item in pv_data.get("actions", []):
-        db.add(
-            Action(
-                id=str(uuid.uuid4()),
-                client_id=str(recording.client_id),
-                meeting_id=str(recording.meeting_id),
-                title=action_item.get("description", "N/A"),
-                description=action_item.get("priority_reason", ""),
-                status="pending",
-            )
+        action_id = str(uuid.uuid4())
+        
+        # Handle deadline parsing gracefully
+        due_date = datetime.utcnow()
+        deadline_str = action_item.get("deadline")
+        if deadline_str and deadline_str != "null" and deadline_str.strip():
+            try:
+                # Try standard ISO format
+                due_date = datetime.fromisoformat(deadline_str.replace("Z", "+00:00"))
+            except ValueError:
+                try:
+                    # Try basic YYYY-MM-DD
+                    due_date = datetime.strptime(deadline_str.split("T")[0], "%Y-%m-%d")
+                except ValueError:
+                    pass
+
+        action = Action(
+            id=action_id,
+            client_id=str(recording.client_id),
+            meeting_id=str(recording.meeting_id),
+            title=action_item.get("description", "N/A"),
+            description=action_item.get("priority_reason", ""),
+            priority=action_item.get("priority", "medium"),
+            status="pending",
+            due_date=due_date
         )
+        db.add(action)
+        
+        # Create Assignment so the PDF/DOCX generator can find the responsible person
+        assignee_name = action_item.get("assignee")
+        if assignee_name and assignee_name.strip() and assignee_name.lower() != "null" and assignee_name.lower() != "n/a":
+            from app.models.action import Assignment
+            assignment = Assignment(
+                id=str(uuid.uuid4()),
+                action_id=action_id,
+                external_name=assignee_name.strip()
+            )
+            db.add(assignment)
     
     await db.flush()
 
@@ -217,7 +261,7 @@ async def _save_pv_and_actions(
         from app.services.action_service import ActionService
         logger.info(f"Triggering ML action suggestions for meeting {recording.meeting_id}")
         action_service = ActionService(db)
-        await action_service.generate_suggestions_from_transcription(str(recording.meeting_id), str(recording.client_id))
+        await action_service.generate_suggestions_from_transcription(str(recording.meeting_id), str(recording.client_id), target_language=language)
     except Exception as e:
         logger.error(f"Failed to generate action suggestions: {e}")
         pass

@@ -1,16 +1,29 @@
 import httpx
 import logging
 import json
-from typing import Dict, Any, Optional
+import time
+from typing import Dict, Any, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
 
 from app.core.config import settings
 from app.models.pv import PV
+from app.core.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
+async def track_mistral_call(latency: float, success: bool):
+    try:
+        r = await get_redis_client()
+        await r.incr("ai:mistral:calls")
+        if not success:
+            await r.incr("ai:mistral:errors")
+        if latency > 0:
+            await r.lpush("ai:mistral:latencies", latency)
+            await r.ltrim("ai:mistral:latencies", 0, 99)
+    except Exception as e:
+        logger.error(f"Failed to track Mistral metrics: {e}")
 
 class TranslationError(Exception):
     """Custom exception for translation failures."""
@@ -22,11 +35,13 @@ class PVService:
         self.db = db
 
     @staticmethod
-    async def generate_pv(transcription_text: str, target_language: str = "fr") -> Dict[str, Any]:
+    async def generate_pv(transcription_text: str, target_language: str = "fr", participant_names: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Generates a Procès-Verbal (PV) from transcription text using Mistral.
         Supports Arabic (ar), French (fr), English (en).
         """
+        start_time = time.time()
+        success = False
         try:
             headers = {
                 "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
@@ -40,9 +55,16 @@ class PVService:
             }
             target_lang_name = lang_names.get(target_language, "French (Français)")
 
+            current_year = datetime.now().year
+            
+            participants_context = ""
+            if participant_names:
+                participants_context = f"The valid participants for this meeting are: {', '.join(participant_names)}."
+
             system_content = f"""You are a professional secretary creating a 'Procès-Verbal' (PV) from meeting transcriptions.
 Analyze the provided text and create a structured summary.
 CRITICAL: All content (titles, summaries, descriptions) MUST be written in {target_lang_name}.
+{participants_context}
 The JSON keys MUST remain exactly as follows:
 
 {{
@@ -54,8 +76,8 @@ The JSON keys MUST remain exactly as follows:
       "description": "Task description",
       "priority": "high/medium/low",
       "priority_reason": "Short justification",
-      "assignee": "Responsible person",
-      "deadline": "YYYY-MM-DD or null"
+      "assignee": "Name of the responsible person EXACTLY as mentioned in the transcript (prefer matching against the participant list if provided). If no specific person is assigned, return null.",
+      "deadline": "YYYY-MM-DD or null (Only return null if NO timeframe or date is mentioned. The current year is {current_year}.)"
     }}
   ]
 }}
@@ -90,6 +112,7 @@ Answer only in valid JSON format."""
                 try:
                     parsed_content = json.loads(content_str)
                     if isinstance(parsed_content, dict):
+                        success = True
                         return parsed_content
                     else:
                         logger.warning(f"Mistral API (generate_pv) returned a non-dictionary: {parsed_content}")
@@ -101,6 +124,8 @@ Answer only in valid JSON format."""
         except Exception as e:
             logger.error(f"PV generation error: {e}")
             raise RuntimeError(f"Mistral API error during PV generation: {e}")
+        finally:
+            await track_mistral_call(time.time() - start_time, success)
 
     @staticmethod
     async def translate_content(content_dict: Dict[str, Any], target_language: str) -> Dict[str, Any]:
@@ -108,6 +133,8 @@ Answer only in valid JSON format."""
         Translates existing PV content into a target language using Mistral.
         This is used for multilingual exports when the requested language differs from stored data.
         """
+        start_time = time.time()
+        success = False
         try:
             headers = {
                 "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
@@ -154,6 +181,7 @@ ONLY translate the values (text strings)."""
                 try:
                     parsed_content = json.loads(content_str)
                     if isinstance(parsed_content, dict):
+                        success = True
                         return parsed_content
                     else:
                         logger.warning(f"Mistral AI (translate) returned a non-dictionary: {parsed_content}")
@@ -165,6 +193,8 @@ ONLY translate the values (text strings)."""
         except Exception as e:
             logger.error(f"Translation API error: {e}")
             raise TranslationError(f"An error occurred during translation: {e}")
+        finally:
+            await track_mistral_call(time.time() - start_time, success)
 
     async def validate_pv(self, pv_id: str, user_id: str, client_id: str) -> Optional[PV]:
         """Marks a PV as validated by a specific user."""

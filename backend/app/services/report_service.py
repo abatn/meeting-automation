@@ -2,7 +2,7 @@ import logging
 import json
 from datetime import datetime, timedelta
 from typing import List, Any
-import redis
+import redis.asyncio as redis
 from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,11 +17,8 @@ logger = logging.getLogger(__name__)
 class ReportService:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.redis_client = redis.Redis(
-            host=settings.REDIS_URL.split("//")[1].split(":")[0],
-            port=int(settings.REDIS_URL.split(":")[2].split("/")[0]),
-            db=1,
-        )
+        # Initialize redis asynchronously, from_url is safer
+        self.redis_client = redis.from_url(settings.REDIS_URL, db=1)
 
     async def _get_cached_or_compute(
         self, key: str, compute_func, ttl: int = 1800
@@ -43,7 +40,7 @@ class ReportService:
 
         return data
 
-    async def get_meeting_stats(self, period: str = "month") -> dict:
+    async def get_meeting_stats(self, client_id: str, period: str = "month") -> dict:
         """Aggregiert Meetings nach Status (cached)"""
 
         async def compute():
@@ -52,6 +49,7 @@ class ReportService:
             )
             query = (
                 select(Meeting.status, func.count(Meeting.id))
+                .where(Meeting.client_id == client_id)
                 .where(Meeting.start_time >= date_filter)
                 .group_by(Meeting.status)
             )
@@ -64,22 +62,22 @@ class ReportService:
                 "cancelled": counts.get("cancelled", 0),
             }
 
-        return await self._get_cached_or_compute(f"reports_meetings_{period}", compute)
+        return await self._get_cached_or_compute(f"reports_meetings_{client_id}_{period}", compute)
 
-    async def get_action_completion_rate(self, days: int = 30) -> dict:
+    async def get_action_completion_rate(self, client_id: str, days: int = 30) -> dict:
         """Berechnet Aufgaben-Zustände (cached)"""
 
         async def compute():
             # overdue ist, wenn status = pending und due_date < NOW()
             now = datetime.utcnow()
             query = select(
-                func.sum(case((Action.status == "completed", 1), else_=0)).label(
+                func.sum(case((Action.status == "COMPLETED", 1), else_=0)).label(
                     "completed"
                 ),
                 func.sum(
                     case(
                         (
-                            Action.status == "pending",
+                            Action.status == "PENDING",
                             case((Action.due_date < now, 1), else_=0),
                         ),
                         else_=0,
@@ -88,13 +86,13 @@ class ReportService:
                 func.sum(
                     case(
                         (
-                            Action.status == "pending",
-                            case((Action.due_date >= now, 1), else_=0),
+                            Action.status == "PENDING",
+                            case((Action.due_date >= now, 1), (Action.due_date.is_(None), 1), else_=0),
                         ),
                         else_=0,
                     )
                 ).label("pending"),
-            )
+            ).where(Action.client_id == client_id)
             result = await self.db.execute(query)
             row = result.first()
             return {
@@ -103,24 +101,25 @@ class ReportService:
                 "pending": int(row.pending or 0),
             }
 
-        return await self._get_cached_or_compute(f"reports_actions_{days}", compute)
+        return await self._get_cached_or_compute(f"reports_actions_{client_id}_{days}", compute)
 
-    async def get_team_productivity(self) -> List[dict]:
+    async def get_team_productivity(self, client_id: str) -> List[dict]:
         """Leistung pro Mitarbeiter (cached)"""
 
         async def compute():
             now = datetime.utcnow()
+            from app.models.action import Assignment
             query = (
                 select(
                     UserModel.id,
                     UserModel.full_name,
-                    func.sum(case((Action.status == "completed", 1), else_=0)).label(
+                    func.sum(case((Action.status == "COMPLETED", 1), else_=0)).label(
                         "completed"
                     ),
                     func.sum(
                         case(
                             (
-                                Action.status == "pending",
+                                Action.status == "PENDING",
                                 case((Action.due_date < now, 1), else_=0),
                             ),
                             else_=0,
@@ -129,14 +128,16 @@ class ReportService:
                     func.sum(
                         case(
                             (
-                                Action.status == "pending",
-                                case((Action.due_date >= now, 1), else_=0),
+                                Action.status == "PENDING",
+                                case((Action.due_date >= now, 1), (Action.due_date.is_(None), 1), else_=0),
                             ),
                             else_=0,
                         )
                     ).label("pending"),
                 )
-                .join(Action, UserModel.id == Action.assignee_id)
+                .join(Assignment, UserModel.id == Assignment.user_id)
+                .join(Action, Action.id == Assignment.action_id)
+                .where(UserModel.client_id == client_id)
                 .group_by(UserModel.id)
             )
 
@@ -154,9 +155,9 @@ class ReportService:
                 )
             return data
 
-        return await self._get_cached_or_compute("reports_team_prod", compute, ttl=3600)
+        return await self._get_cached_or_compute(f"reports_team_prod_{client_id}", compute, ttl=3600)
 
-    async def get_efficiency_trend(self, months: int = 6) -> List[dict]:
+    async def get_efficiency_trend(self, client_id: str, months: int = 6) -> List[dict]:
         """Trend der Effizienz (cached)"""
 
         async def compute():
@@ -175,15 +176,15 @@ class ReportService:
             return trend
 
         return await self._get_cached_or_compute(
-            f"reports_efficiency_{months}", compute, ttl=86400
+            f"reports_efficiency_{client_id}_{months}", compute, ttl=86400
         )
 
-    async def get_manager_dashboard(self, manager_id: int) -> dict:
+    async def get_manager_dashboard(self, manager_id: str, client_id: str) -> dict:
         """Haupt-Dashboard zusammenstellen"""
-        meeting_stats = await self.get_meeting_stats()
-        action_stats = await self.get_action_completion_rate()
-        team_prod = await self.get_team_productivity()
-        trend = await self.get_efficiency_trend()
+        meeting_stats = await self.get_meeting_stats(client_id)
+        action_stats = await self.get_action_completion_rate(client_id)
+        team_prod = await self.get_team_productivity(client_id)
+        trend = await self.get_efficiency_trend(client_id)
 
         return {
             "meeting_stats": meeting_stats,
@@ -191,3 +192,60 @@ class ReportService:
             "team_productivity": team_prod,
             "efficiency_trend": trend,
         }
+
+    async def get_upcoming_meetings(self, user_id: str, client_id: str, limit: int = 5) -> List[dict]:
+        from app.models.meeting import Participant
+        from sqlalchemy import or_
+        now = datetime.utcnow()
+        # Meetings where user is participant OR creator
+        query = (
+            select(Meeting)
+            .outerjoin(Participant)
+            .where(
+                Meeting.client_id == client_id,
+                Meeting.start_time >= now,
+                or_(Participant.user_id == user_id, Meeting.creator_id == user_id)
+            )
+            .order_by(Meeting.start_time.asc())
+            .distinct()
+            .limit(limit)
+        )
+        result = await self.db.execute(query)
+        meetings = result.scalars().all()
+        return [
+            {
+                "id": m.id,
+                "title": m.title,
+                "start_time": m.start_time.isoformat(),
+                "status": m.status
+            } for m in meetings
+        ]
+
+    async def get_open_actions(self, user_id: str, client_id: str, limit: int = 5) -> List[dict]:
+        from app.models.action import Assignment
+        from sqlalchemy import or_
+        # For the personal dashboard, show actions assigned to me 
+        # OR unassigned actions in meetings I created/participated in? 
+        # Let's keep it simple: Actions assigned to me. 
+        # To see the newly created AI actions, they MUST be assigned.
+        query = (
+            select(Action)
+            .join(Assignment)
+            .where(
+                Action.client_id == client_id,
+                Action.status == "pending",
+                Assignment.user_id == user_id
+            )
+            .order_by(Action.due_date.asc().nulls_last())
+            .limit(limit)
+        )
+        result = await self.db.execute(query)
+        actions = result.scalars().all()
+        return [
+            {
+                "id": a.id,
+                "title": a.title,
+                "due_date": a.due_date.isoformat() if a.due_date else None,
+                "priority": a.priority
+            } for a in actions
+        ]

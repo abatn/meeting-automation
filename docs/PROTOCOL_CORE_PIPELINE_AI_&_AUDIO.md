@@ -43,3 +43,20 @@ Dieses Protokoll beschreibt den zentralen Wertschöpfungsprozess des Systems. Al
 
 📊 ERGEBNIS
 Die gesamte Audio- und KI-Pipeline ist nun vollständig stabil, hochperformant und liefert präzise Transkriptionen mit Sprechererkennung, professionelle Protokolle und wertvolle Management-Analysen. Der Einsatz von Cloud-APIs (Gladia, Mistral) eliminiert lokale Ressourcenengpässe und skaliert das System für den Produktionseinsatz.
+
+## 🔄 UPDATE: STABILISIERUNG DER KI-LOGIK & PDF-EXPORT (23.03.2026)
+Während der Phase 5 (Production Operations) wurden folgende massive Optimierungen an der Pipeline vorgenommen, um "N/A"-Fehler und Sprachkonflikte zu lösen:
+
+1. **Intelligente Teilnehmer-Zuweisung (Context Injection)**:
+   - **Problem**: Die KI wies Aufgaben blind irgendwelchen Personen (oder "N/A") zu, da sie die echten Teilnehmer nicht kannte.
+   - **Lösung**: Der Celery-Worker lädt nun vor dem Aufruf von Mistral die echten Namen der eingeladenen Teilnehmer (`Participant`-Models) aus der Datenbank und übermittelt diese als "System-Kontext" an die KI (`pv_service.py`). 
+   - **Ergebnis**: Aufgaben werden nun exakt den anwesenden Kollegen (oder im Notfall dem Meeting-Ersteller/Host) zugewiesen. Der Platzhalter "N/A" wurde durch lokalisierte, professionelle Strings ("Non défini", "غير محدد") ersetzt. Fehlende Fälligkeitsdaten werden automatisch auf das heutige Datum gesetzt, um Endlos-Tasks zu vermeiden.
+
+2. **Arabisches PDF-Rendering (WeasyPrint HarfBuzz)**:
+   - **Problem**: Arabischer Text (`RTL`) wurde beim Kopieren aus dem PDF als zerrissener "Buchstabensalat" ausgegeben. Initiale Versuche mit Python-Skripten (`arabic-reshaper`) zerstörten die Unicode-Schicht.
+   - **Lösung**: Vollständige Deinstallation der manuellen Reshaper. Installation nativer Linux-System-Schriften (`fonts-noto-core`) im Backend-Container (`Dockerfile`). Aktivierung der Schriftart `Amiri` im gesamten HTML-`body` des `pv_template.html`.
+   - **Ergebnis**: WeasyPrint rendert arabische Ligaturen nun nativ via Pango/HarfBuzz. Text kann im PDF sauber markiert und per Copy-Paste extrahiert werden.
+
+3. **Multilinguale KI-Dynamik (On-the-Fly Übersetzung)**:
+   - **Problem**: Die KI generierte Aufgaben initial auf Englisch oder in der Sprache des Meetings, was zu Konflikten führte, wenn das Frontend-Dashboard z.B. auf Arabisch geschaltet war.
+   - **Lösung**: Einführung einer `language` Spalte in `action_suggestions`. Der API-Endpunkt (`actions.py`) prüft nun bei jedem Laden, ob die Sprache in der Datenbank mit der Dashboard-Einstellung (`?lang=ar`) übereinstimmt. Falls nicht, wird Mistral im JSON-Modus (`response_format: {"type": "json_object"}`) angewiesen, die Liste der Aufgaben *im Arbeitsspeicher* live zu übersetzen, bevor sie an den Browser gesendet wird. Ein Race-Condition-Bug im Frontend (`translateSidebar` in React) wurde entfernt.

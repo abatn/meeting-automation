@@ -26,18 +26,8 @@ const AnalyticalReports: React.FC = () => {
     dispatch(fetchDashboardData("dg"));
   }, [dispatch]);
 
-  // Mock team data if not in dashboardData
-  const teamData = dashboardData?.team_productivity || [
-    { user_id: 1, name: "Sami Ben Ali", completed: 12, pending: 3, overdue: 1 },
-    { user_id: 2, name: "Amel Trabelsi", completed: 8, pending: 5, overdue: 0 },
-    {
-      user_id: 3,
-      name: "Mohamed Mahmoud",
-      completed: 15,
-      pending: 2,
-      overdue: 2,
-    },
-  ];
+  // Real team data from dashboardData
+  const teamData = dashboardData?.team_productivity || [];
 
   if (loading && !dashboardData) {
     return (
@@ -61,7 +51,15 @@ const AnalyticalReports: React.FC = () => {
               {t("dashboard.dept_performance")}
             </Typography>
             <Divider sx={{ mb: 2 }} />
-            <ProductivityTable data={teamData} />
+            {teamData.length === 0 ? (
+              <Box sx={{ p: 4, textAlign: 'center' }}>
+                <Typography color="textSecondary">
+                  {t("dashboard.no_team_data") || "No productivity data available yet. Start completing actions to see results."}
+                </Typography>
+              </Box>
+            ) : (
+              <ProductivityTable data={teamData} />
+            )}
           </Paper>
         </Grid>
 

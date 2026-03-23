@@ -68,7 +68,7 @@ const ClientDetails: React.FC = () => {
               <Typography variant="h4">{client.company_name}</Typography>
               <Chip 
                 label={client.subscription_status} 
-                color={client.subscription_status === 'ACTIVE' ? 'success' : 'error'} 
+                color={client.subscription_status === 'ACTIVE' ? 'success' : client.subscription_status === 'PENDING' ? 'warning' : 'default'} 
               />
             </Box>
             <Divider sx={{ my: 2 }} />

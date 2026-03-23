@@ -145,6 +145,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -198,7 +199,12 @@ services:
   celery-beat:
     build: ./backend
     restart: unless-stopped
-    command: celery -A app.tasks.celery_app beat --loglevel=info
+    command: >
+      bash -c "
+      echo 'Waiting 15s for Backend...' &&
+      sleep 15 &&
+      celery -A app.tasks.celery_app beat --loglevel=info
+      "
     env_file: .env
     environment:
       - PYTHONPATH=/app

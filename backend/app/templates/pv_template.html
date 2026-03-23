@@ -7,7 +7,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&family=Amiri:wght@400;700&display=swap');
         
         body {
-            font-family: 'Cairo', sans-serif;
+            font-family: 'Cairo', 'Amiri', sans-serif;
             margin: 40px;
             color: #333;
             line-height: 1.6;
@@ -159,19 +159,9 @@
     </div>
     
     <div class="section">
-        <h3 class="section-title">{{ strings.discussion }}</h3>
         <div style="font-family: 'Amiri', serif;">
             {{ pv.discussion | safe }}
         </div>
-    </div>
-    
-    <div class="section">
-        <h3 class="section-title">{{ strings.decisions }}</h3>
-        <ul>
-            {% for decision in pv.decisions %}
-            <li>{{ decision }}</li>
-            {% endfor %}
-        </ul>
     </div>
     
     <div class="section">

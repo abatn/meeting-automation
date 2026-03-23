@@ -1,5 +1,13 @@
 # Deployment Guide for Meeting Automation System
 
+> [!CAUTION]
+> ### 🚨 KRITISCHE WARTUNGSNOTIZ: FRONTEND BUILD-PROZESS (März 2026)
+> **STATUS:** Temporäre Anpassung für Stabilität.
+> **ÄNDERUNG:** Die `builder`-Stage im `frontend/Dockerfile` wurde von `node:20-alpine` auf `node:20` (Debian-basiert) umgestellt.
+> **GRUND:** Behebung von `Bus error (core dumped)` Abstürzen während des `npm run build` (Vite/esbuild) in ressourcenbeschränkten Umgebungen (WSL2, Low RAM).
+> **PRODUKTIONSHINWEIS:** Die finale Runtime-Stage bleibt `nginx:alpine` (sicher & klein). Für die finale Produktions-Härtung (ISO 27001) sollte geprüft werden, ob der Builder wieder auf Alpine zurückgeführt werden kann, sobald die Host-Ressourcen stabilisiert sind.
+> **KEINE ÄNDERUNG OHNE RÜCKSPRACHE!**
+
 This document provides a step-by-step guide for deploying the Meeting Automation System. It covers both local development with Docker Compose and outlines considerations for production environments using Kubernetes and Terraform.
 
 ## 1. Local Development Deployment (Docker Compose)

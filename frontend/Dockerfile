@@ -1,6 +1,6 @@
-# Stage 1: Build mit Node
-FROM node:20-alpine as builder
-RUN apk add --no-cache python3 make g++ cairo-dev jpeg-dev pango-dev
+# Stage 1: Build mit Node (Using Debian based to prevent esbuild bus errors)
+FROM node:20 as builder
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci

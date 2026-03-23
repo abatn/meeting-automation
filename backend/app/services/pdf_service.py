@@ -3,8 +3,10 @@ import uuid
 import logging
 import traceback
 import json
+from datetime import datetime
 from typing import Optional, Dict, Any
 import jinja2
+from jinja2 import Environment, FileSystemLoader
 import boto3
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
@@ -30,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class PDFService:
-    def __init__(self, db: AsyncSession, s3_client=None):
+    def __init__(self, db: AsyncSession = None, s3_client=None):
         self.db = db
         # Fallback auf mock-client, falls keine S3 credentials existieren
         try:
@@ -48,8 +50,8 @@ class PDFService:
         template_dir = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "templates"
         )
-        self.template_env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(template_dir), autoescape=True
+        self.template_env = Environment(
+            loader=FileSystemLoader(template_dir), autoescape=True
         )
         self.bucket_name = getattr(settings, "S3_BUCKET_NAME", "meeting-pdfs")
 
@@ -74,7 +76,8 @@ class PDFService:
                 "signature": "الاعتماد",
                 "director": "المدير العام",
                 "page": "صفحة",
-                "default_footer": "محضر اجتماع تم إنشاؤه آلياً | Meeting Automation System"
+                "default_footer": "محضر اجتماع تم إنشاؤه آلياً | Meeting Automation System",
+                "not_assigned": "غير محدد"
             },
             "fr": {
                 "title": "Procès-Verbal",
@@ -92,7 +95,8 @@ class PDFService:
                 "signature": "Approbation (Signature)",
                 "director": "Directeur Général (DG)",
                 "page": "Page",
-                "default_footer": "Procès-verbal généré automatiquement | Meeting Automation System"
+                "default_footer": "Procès-verbal généré automatiquement | Meeting Automation System",
+                "not_assigned": "Non défini"
             },
             "en": {
                 "title": "Meeting Minutes",
@@ -110,7 +114,8 @@ class PDFService:
                 "signature": "Approval (Signature)",
                 "director": "General Manager (DG)",
                 "page": "Page",
-                "default_footer": "Automatically generated minutes | Meeting Automation System"
+                "default_footer": "Automatically generated minutes | Meeting Automation System",
+                "not_assigned": "N/A"
             }
         }
         
@@ -134,7 +139,13 @@ class PDFService:
             raise HTTPException(status_code=404, detail="PV not found")
 
         # Action items separat laden
-        action_stmt = select(Action).where(Action.meeting_id == pv_obj.meeting_id).where(Action.client_id == client_id)
+        from app.models.action import Assignment
+        action_stmt = (
+            select(Action)
+            .options(selectinload(Action.assignments).selectinload(Assignment.user))
+            .where(Action.meeting_id == pv_obj.meeting_id)
+            .where(Action.client_id == client_id)
+        )
         action_result = await self.db.execute(action_stmt)
         actions = action_result.scalars().all()
         
@@ -145,15 +156,19 @@ class PDFService:
         display_decisions = [s.content for s in pv_obj.sections if s.type == "decision"]
         display_actions = []
         for a in actions:
+            assignee_name = strings["not_assigned"]
+            if a.assignments and len(a.assignments) > 0:
+                assignment = a.assignments[0]
+                if assignment.user and assignment.user.full_name:
+                    assignee_name = assignment.user.full_name
+                elif assignment.external_name:
+                    assignee_name = assignment.external_name
+
             display_actions.append({
                 "description": a.title,
-                "assignee": (
-                    a.description.split("Assigned to: ")[-1]
-                    if a.description and "Assigned to: " in a.description
-                    else "N/A"
-                ),
+                "assignee": assignee_name,
                 "due_date": (
-                    a.due_date.strftime("%Y-%m-%d") if a.due_date else "N/A"
+                    a.due_date.strftime("%Y-%m-%d") if a.due_date else datetime.now().strftime("%Y-%m-%d")
                 ),
             })
 
@@ -171,14 +186,21 @@ class PDFService:
                 display_title = translated.get("title", display_title)
                 display_discussion = translated.get("summary", display_discussion)
                 display_decisions = translated.get("decisions", display_decisions)
+                
                 display_actions = translated.get("actions", display_actions)
+                # Ensure missing fields have defaults
+                for act in display_actions:
+                    if "assignee" not in act or act["assignee"] is None or act["assignee"] == "null":
+                        act["assignee"] = strings["not_assigned"]
+                    if "due_date" not in act or act["due_date"] is None or act["due_date"] == "null":
+                        act["due_date"] = strings["not_assigned"]
+
             except TranslationError as e:
                 logger.error(f"Translation failed for PDF pv_id={pv_id}: {e}")
                 raise HTTPException(
                     status_code=502,
                     detail="AI translation service failed. Please try again later.",
                 )
-
 
         # 3. Load Branding Settings
         branding_stmt = select(BrandingSettings).where(BrandingSettings.client_id == client_id).where(BrandingSettings.is_active == True)
@@ -288,3 +310,33 @@ class PDFService:
         """Bestehendes PDF aus Minio holen"""
         # Implementierung für produktiven Einsatz (TBD)
         return None
+
+    def generate_invoice_pdf(self, invoice_data: Dict[str, Any]) -> str:
+        """
+        Generates an invoice PDF and uploads it to S3.
+        Returns the S3 URL of the generated PDF.
+        """
+        try:
+            template = self.template_env.get_template("invoice_template.html")
+            html_content = template.render(**invoice_data)
+            
+            # Generate PDF in memory
+            pdf_bytes = HTML(string=html_content).write_pdf()
+            
+            # Define S3 path
+            file_name = f"invoices/facture_{invoice_data['invoice_id']}.pdf"
+            
+            # Upload to S3
+            if self.s3:
+                self.s3.put_object(
+                    Bucket=self.bucket_name,
+                    Key=file_name,
+                    Body=pdf_bytes,
+                    ContentType='application/pdf'
+                )
+            
+            return f"/api/v1/billing/invoices/download/{invoice_data['invoice_id']}"
+            
+        except Exception as e:
+            logger.error(f"Failed to generate invoice PDF: {e}")
+            raise e

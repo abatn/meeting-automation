@@ -10,12 +10,15 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
+  ListItemButton,
+  Chip,
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { RootState, AppDispatch } from "../../store";
 import { fetchParticipantDashboardData } from "../../store/dashboardSlice";
-import KPICard from "../common/KPICard"; // Annahme: Existiert oder muss erstellt werden
+import KPICard from "../common/KPICard";
 import EventIcon from "@mui/icons-material/Event";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import UsageProgressBar from "../common/UsageProgressBar";
@@ -31,12 +34,15 @@ interface UsageInfo {
 interface ParticipantDashboardData {
   my_upcoming_meetings: number;
   my_open_actions: number;
+  upcoming_meetings_list: any[];
+  open_actions_list: any[];
   client_usage: UsageInfo;
 }
 
 const DashboardParticipant: React.FC = () => {
   const { t } = useTranslation();
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const { data, loading, error } = useSelector(
     (state: RootState) => state.dashboard.participantDashboard,
   );
@@ -104,70 +110,64 @@ const DashboardParticipant: React.FC = () => {
           />
         </Grid>
 
-        {/* TODO: Implement Personal Action Items List with Virtualization */}
+        {/* Real Action Items List */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>
               {t("dashboard.my_actions")}
             </Typography>
             <Box sx={{ height: 300, overflow: "auto" }}>
-              <Typography>{t("dashboard.my_actions_placeholder")}</Typography>
-              {/* Hier würde die Virtualisierung für die Aufgabenliste implementiert */}
-              <List>
-                {/* Beispiel für Listeneinträge, die dynamisch geladen werden würden */}
-                <ListItem>
-                  <ListItemIcon>
-                    <TaskAltIcon />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary="Action 1"
-                    secondary="Due: 28.02.2026"
-                  />
-                </ListItem>
-                <ListItem>
-                  <ListItemIcon>
-                    <TaskAltIcon />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary="Action 2"
-                    secondary="Due: 01.03.2026"
-                  />
-                </ListItem>
-              </List>
+              {data.open_actions_list?.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>{t("dashboard.no_actions_found") || "No open actions found."}</Typography>
+              ) : (
+                <List>
+                  {data.open_actions_list?.map((action) => (
+                    <ListItem key={action.id} disablePadding>
+                      <ListItemButton onClick={() => navigate("/actions")}>
+                        <ListItemIcon>
+                          <TaskAltIcon color={action.priority === 'high' ? 'error' : 'primary'} />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={action.title}
+                          secondary={`Due: ${action.due_date ? new Date(action.due_date).toLocaleDateString() : 'N/A'}`}
+                        />
+                        <Chip label={action.priority} size="small" variant="outlined" />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
             </Box>
           </Paper>
         </Grid>
 
-        {/* TODO: Implement My Upcoming Meetings List with Virtualization */}
+        {/* Real Upcoming Meetings List */}
         <Grid item xs={12} md={6}>
           <Paper sx={{ p: 2 }}>
             <Typography variant="h6" gutterBottom>
               {t("dashboard.my_meetings")}
             </Typography>
             <Box sx={{ height: 300, overflow: "auto" }}>
-              <Typography>{t("dashboard.my_meetings_placeholder")}</Typography>
-              {/* Hier würde die Virtualisierung für die Meeting-Liste implementiert */}
-              <List>
-                {/* Beispiel für Listeneinträge */}
-                <ListItem>
-                  <ListItemIcon>
-                    <EventIcon />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary="Team Standup"
-                    secondary="Today 10:00 AM"
-                  />
-                </ListItem>
-                <ListItem>
-                  <ListItemIcon>
-                    <EventIcon />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary="Project Sync"
-                    secondary="Tomorrow 02:00 PM"
-                  />
-                </ListItem>
-              </List>
+              {data.upcoming_meetings_list?.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>{t("dashboard.no_meetings_found") || "No upcoming meetings found."}</Typography>
+              ) : (
+                <List>
+                  {data.upcoming_meetings_list?.map((meeting) => (
+                    <ListItem key={meeting.id} disablePadding>
+                      <ListItemButton onClick={() => navigate(`/meetings/live/${meeting.id}`)}>
+                        <ListItemIcon>
+                          <EventIcon color="primary" />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={meeting.title}
+                          secondary={new Date(meeting.start_time).toLocaleString()}
+                        />
+                        <Chip label={meeting.status} size="small" variant="outlined" />
+                      </ListItemButton>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
             </Box>
           </Paper>
         </Grid>

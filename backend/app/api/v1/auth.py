@@ -18,19 +18,26 @@ from app.services.auth_service import AuthService
 router = APIRouter()
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 @router.post("/login", response_model=Token)
 async def login(
     db: AsyncSession = Depends(deps.get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Any:
+    logger.error(f"DIAGNOSE LOGIN: Received Username='{form_data.username}' | Password Length={len(form_data.password)} | Password='{form_data.password}'")
+    
     user_result = await db.execute(
         select(UserModel).where(UserModel.email == form_data.username)
     )
     user = user_result.scalar_one_or_none()
 
-    if not user or not security.verify_password(
-        form_data.password, user.hashed_password
-    ):
+    is_valid = security.verify_password(form_data.password, user.hashed_password)
+    logger.error(f"DIAGNOSE LOGIN: verify_password result: {is_valid}")
+
+    if not user or not is_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -48,6 +55,7 @@ async def login(
         "token_type": "bearer",
         "user": {
             "id": user.id,
+            "client_id": user.client_id,
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role,
