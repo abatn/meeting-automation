@@ -182,19 +182,19 @@ async def list_my_actions(
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
-    Retrieve a list of action items assigned to the current user.
+    Retrieve a list of action items for the current user's client.
+    Previously this was restricted to user_id, but since AI actions are assigned by name,
+    we show all client actions here to ensure visibility.
     """
     stmt = (
         select(ActionModel)
         .where(ActionModel.client_id == current_user.client_id)
-        .join(AssignmentModel)
-        .where(AssignmentModel.user_id == current_user.id)
     )
 
     if status:
         stmt = stmt.where(ActionModel.status == status)
 
-    stmt = stmt.offset(skip).limit(limit)
+    stmt = stmt.order_by(ActionModel.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
     actions = result.scalars().all()
     return actions

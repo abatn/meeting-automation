@@ -44,6 +44,12 @@ Die `Mission Control` (Technik-Dashboard) sollte tiefgehende, verlässliche Syst
   - **Lösung**: Vollständige Anbindung an Backend-Endpoints (`/reports/dashboard/participant`, `/actions/my-actions`), Implementierung von echten SQL-Queries im `ReportService` (inkl. Multi-Tenant Filterung) und Hinzufügen der dynamischen Liste "Recent Meetings" im Planer.
 - **Aggressive UI-Farben**: Zu viele Elemente nutzten die Signalfarbe Rot (`error`), was unprofessionell wirkte.
   - **Lösung**: Umstellung der `secondary` Palette im Theme auf ein professionelles Schiefergrau (`#475569`) und logische Status-Badges (z.B. PENDING = warning, DISABLED = default).
+- **Action Tracker Unsichtbarkeit (AI Zuweisungen)**: Akzeptierte KI-Aufgaben tauchten im Tracker nicht auf, da die SQL-Abfrage strikt nach `user_id` des eingeloggten Nutzers suchte. Die KI weist Aufgaben aber externen Namen ("Amal", "Sami") zu, die keine IDs haben. Zusätzlich blieben erledigte Aufgaben für immer in der Tracker-Liste sichtbar.
+  - **Lösung**: Der Tracker-Endpunkt `/my-actions` lädt nun alle Mandanten-Aufgaben (`client_id`). Im Frontend (`ActionTracker.tsx`) wurde ein Filter ergänzt, der erledigte Aufgaben ("Completed") live ausblendet, um die To-Do-Liste sauber zu halten.
+- **Team Productivity Statistik (Ghost Users)**: Im Analytik-Dashboard wurden nur erledigte Aufgaben registrierter Nutzer (z.B. Abdelkader) gezählt, Aufgaben von KI-identifizierten Teilnehmern fielen aus der SQL-Gruppierung.
+  - **Lösung**: Umbau der `get_team_productivity` SQL-Query. Nutzung von `COALESCE(UserModel.full_name, Assignment.external_name)`, um registrierte Nutzer und externe KI-Teilnehmer gleichwertig zu aggregieren und im Report anzuzeigen.
+- **Frontend Docker Build Cache (Phantom Bugs)**: Code-Änderungen an den React-Komponenten kamen im Browser nicht an, da Docker die alten JS-Bundles aus dem Cache wiederverwendete.
+  - **Lösung**: Forcierter Rebuild mittels `docker compose build --no-cache frontend` und `--force-recreate` zur endgültigen Vernichtung der veralteten JavaScript-Dateien.
 
 ## 📊 ERGEBNIS
 Das System-Dashboard liefert nun hochauflösende Einblicke in die gesamte Architektur und ermöglicht dem Betreiber sofortiges Eingreifen bei Latenzen oder Speicher-Engpässen. Gleichzeitig sind die Benutzer-Dashboards nun vollständig mit echten, mandantenfähigen Datenbank-Metriken synchronisiert und frei von Dummy-Daten. Damit ist der erste Meilenstein von Phase 5 vollständig abgeschlossen.

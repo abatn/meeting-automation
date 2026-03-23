@@ -64,7 +64,8 @@ const ActionTracker: React.FC = () => {
   };
 
   const filteredActions = actions.filter((action) =>
-    action.title.toLowerCase().includes(searchTerm.toLowerCase())
+    action.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
+    action.status?.toLowerCase() !== "completed"
   );
 
   return (

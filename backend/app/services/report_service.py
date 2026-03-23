@@ -1,5 +1,6 @@
 import logging
 import json
+import uuid
 from datetime import datetime, timedelta
 from typing import List, Any
 import redis.asyncio as redis
@@ -109,17 +110,17 @@ class ReportService:
         async def compute():
             now = datetime.utcnow()
             from app.models.action import Assignment
+            # Use distinct names from both assignments and users
             query = (
                 select(
-                    UserModel.id,
-                    UserModel.full_name,
-                    func.sum(case((Action.status == "COMPLETED", 1), else_=0)).label(
+                    func.coalesce(UserModel.full_name, Assignment.external_name).label("name"),
+                    func.sum(case((Action.status == "completed", 1), else_=0)).label(
                         "completed"
                     ),
                     func.sum(
                         case(
                             (
-                                Action.status == "PENDING",
+                                Action.status == "pending",
                                 case((Action.due_date < now, 1), else_=0),
                             ),
                             else_=0,
@@ -128,26 +129,28 @@ class ReportService:
                     func.sum(
                         case(
                             (
-                                Action.status == "PENDING",
+                                Action.status == "pending",
                                 case((Action.due_date >= now, 1), (Action.due_date.is_(None), 1), else_=0),
                             ),
                             else_=0,
                         )
                     ).label("pending"),
                 )
-                .join(Assignment, UserModel.id == Assignment.user_id)
+                .select_from(Assignment)
                 .join(Action, Action.id == Assignment.action_id)
-                .where(UserModel.client_id == client_id)
-                .group_by(UserModel.id)
+                .outerjoin(UserModel, UserModel.id == Assignment.user_id)
+                .where(Action.client_id == client_id)
+                .group_by(func.coalesce(UserModel.full_name, Assignment.external_name))
             )
 
             result = await self.db.execute(query)
             data = []
             for row in result.all():
+                if not row.name: continue
                 data.append(
                     {
-                        "user_id": row.id,
-                        "name": row.full_name,
+                        "user_id": str(uuid.uuid4()),
+                        "name": row.name,
                         "completed": int(row.completed or 0),
                         "overdue": int(row.overdue or 0),
                         "pending": int(row.pending or 0),
