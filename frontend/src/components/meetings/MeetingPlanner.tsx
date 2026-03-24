@@ -29,12 +29,16 @@ import {
   Add as AddIcon,
   Warning as WarningIcon,
   MeetingRoom as MeetingRoomIcon,
+  Edit as EditIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
+import { Link, useNavigate } from "react-router-dom";
 import { useCulturalCalendar } from "../../hooks/useCulturalCalendar";
 import { meetingsApi } from "../../services/meetings";
 import { teamApi } from "../../services/team";
 import { roomsApi } from "../../services/rooms";
+import DocumentExportMenu from "./DocumentExportMenu";
+import api from "../../services/api";
 
 const MeetingPlanner: React.FC = () => {
   const { t } = useTranslation();
@@ -59,6 +63,8 @@ const MeetingPlanner: React.FC = () => {
   // General UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recentMeetings, setRecentMeetings] = useState<any[]>([]);
+  const [pvMap, setPvMap] = useState<Record<string, string>>({}); // mapping meetingId -> pvId
+  const [exportLanguage, setExportLanguage] = useState("fr");
   
   // Fetch initial data (recent meetings and available rooms)
   useEffect(() => {
@@ -70,13 +76,36 @@ const MeetingPlanner: React.FC = () => {
         ]);
         
         const sorted = meetingsData.sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
-        setRecentMeetings(sorted.slice(0, 10));
+        const limited = sorted.slice(0, 10);
+        setRecentMeetings(limited);
         setAvailableRooms(roomsData);
+
+        // Check for PVs for completed meetings to enable smart export
+        const completedMeetings = limited.filter((m: any) => m.status === 'completed');
+        if (completedMeetings.length > 0) {
+          const pvs: Record<string, string> = {};
+          await Promise.all(completedMeetings.map(async (m: any) => {
+            try {
+              const res = await api.get(`/pv/meeting/${m.id}`);
+              if (res.data && res.data.id) {
+                pvs[m.id] = res.data.id;
+              }
+            } catch (e) {
+              // No PV yet
+            }
+          }));
+          setPvMap(pvs);
+        }
       } catch (err) {
         console.error("Failed to fetch initial data", err);
       }
     };
     fetchInitialData();
+  }, []);
+
+  // Set default end_time to start_time + 60 mins
+  useEffect(() => {
+    // This effect is not strictly needed if handleCreate handles it, but let's ensure consistency
   }, []);
 
   // Debounced search for participants
@@ -242,10 +271,26 @@ const MeetingPlanner: React.FC = () => {
         
         <Grid item xs={12} md={5}>
           <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-              <MeetingRoomIcon sx={{ mr: 1, verticalAlign: "middle", color: 'primary.main' }} />
-              {t("meetings.recent_meetings")}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
+                <MeetingRoomIcon sx={{ mr: 1, color: 'primary.main' }} />
+                {t("meetings.recent_meetings")}
+              </Typography>
+              
+              <FormControl size="small" sx={{ minWidth: 100 }}>
+                <Select
+                  value={exportLanguage}
+                  onChange={(e) => setExportLanguage(e.target.value)}
+                  variant="standard"
+                  sx={{ fontSize: '0.8rem' }}
+                >
+                  <MenuItem value="ar">العربية</MenuItem>
+                  <MenuItem value="fr">Français</MenuItem>
+                  <MenuItem value="en">English</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+            
             <Divider sx={{ mb: 1 }} />
             {recentMeetings.length === 0 ? (
               <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
@@ -254,7 +299,32 @@ const MeetingPlanner: React.FC = () => {
             ) : (
               <List dense>
                 {recentMeetings.map((meeting) => (
-                  <ListItem disablePadding key={meeting.id}>
+                  <ListItem 
+                    disablePadding 
+                    key={meeting.id}
+                    secondaryAction={
+                      pvMap[meeting.id] && (
+                        <Stack direction="row" spacing={1}>
+                          <IconButton 
+                            size="small" 
+                            color="primary" 
+                            component={Link}
+                            to={`/editor/${pvMap[meeting.id]}?lang=${exportLanguage}`}
+                            target="_blank"
+                            title={t("pv.edit_online")}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <DocumentExportMenu 
+                            pvId={pvMap[meeting.id]} 
+                            language={exportLanguage} 
+                            variant="text" 
+                            showDocx={false}
+                          />
+                        </Stack>
+                      )
+                    }
+                  >
                     <ListItemButton onClick={() => navigate(`/meetings/live/${meeting.id}`)} sx={{ borderRadius: 1 }}>
                       <ListItemIcon>
                         <EventIcon color="primary" />
@@ -301,3 +371,4 @@ const MeetingPlanner: React.FC = () => {
 };
 
 export default MeetingPlanner;
+

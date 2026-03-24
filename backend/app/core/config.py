@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "amqp://rabbit_user:rabbit_password@rabbitmq:5672//"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
 
+    # OnlyOffice
+    ONLYOFFICE_SECRET: str = "super_secret_jwt_key_onlyoffice_2026"
+    ONLYOFFICE_URL: str = "http://localhost:8080"
+    # Internal URL for Docker-to-Docker communication
+    ONLYOFFICE_BACKEND_URL: str = "http://backend:8000"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

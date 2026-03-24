@@ -16,6 +16,7 @@ import MeetingPlanner from "./components/meetings/MeetingPlanner";
 import MeetingRoom from "./components/meetings/MeetingRoom";
 import ActionTracker from "./components/actions/ActionTracker";
 import TeamManagement from "./pages/team/TeamManagement";
+import OnlyOfficePage from "./pages/OnlyOfficePage";
 import MFASetup from "./components/auth/MFASetup";
 import ErrorBoundary from "./components/ErrorBoundary";
 import AutoLogout from "./components/auth/AutoLogout";
@@ -85,6 +86,7 @@ function App() {
               <Route path="/" element={<MainLayout><AdminDashboard /></MainLayout>} />
               <Route path="/admin/clients" element={<MainLayout><ClientList /></MainLayout>} />
               <Route path="/admin/clients/:id" element={<MainLayout><ClientDetails /></MainLayout>} />
+              <Route path="/editor/:pvId" element={<OnlyOfficePage />} />
               <Route path="/billing" element={<MainLayout><BillingPanel /></MainLayout>} />
               <Route path="/settings" element={<MainLayout><Box sx={{ p: 3 }}><MFASetup qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ExampleSecret" secret="JBSWY3DPEHPK3PXP" /></Box></MainLayout>} />
               <Route path="*" element={<Navigate to="/" replace />} />
@@ -106,6 +108,7 @@ function App() {
               <Route path="/" element={<MainLayout>{getRegularDashboard()}</MainLayout>} />
               <Route path="/meetings" element={<MainLayout><MeetingPlanner /></MainLayout>} />
               <Route path="/meetings/live/:id" element={<MainLayout><MeetingRoom /></MainLayout>} />
+              <Route path="/editor/:pvId" element={<OnlyOfficePage />} />
               <Route path="/actions" element={<MainLayout><ActionTracker /></MainLayout>} />
               <Route path="/reports" element={<MainLayout><AnalyticalReports /></MainLayout>} />
               <Route path="/team" element={<MainLayout><TeamManagement /></MainLayout>} />

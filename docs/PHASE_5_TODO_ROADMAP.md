@@ -25,6 +25,11 @@ Dieses Dokument dient als zentrale Checkliste für die noch ausstehenden Aufgabe
   - **Ziel:** Sicherung der PostgreSQL-Datenbank und des MinIO-Storages an einem geografisch getrennten Standort.
   - **Nutzen:** Erfüllung der ISO 27001 Vorgaben zur Ausfallsicherheit und Schutz vor Datenverlust bei Rechenzentrum-Ausfall.
 
+- [ ] **Online Document Editing (OnlyOffice)**
+  - **Aufgabe:** Integration des *OnlyOffice Document Servers* in die Docker-Umgebung und Anbindung über eine Callback-API an das Backend.
+  - **Ziel:** Ermöglicht Benutzern, generierte Word-Protokolle (PVs) direkt im Browser zu bearbeiten, bevor sie finalisiert werden.
+  - **Nutzen:** Hohe Benutzerfreundlichkeit bei 100%iger Einhaltung der Datensouveränität (ISO 27001), da keine externen Cloud-Dienste (wie Microsoft 365) genutzt werden.
+
 ---
 
 ## 🧠 2. KI-OPTIMIERUNG (LOKALER FOKUS)

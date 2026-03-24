@@ -167,7 +167,10 @@
     "versions": "Versions",
     "signature_placeholder": "Zone de signature électronique (ISO 27001)",
     "download_pdf": "Télécharger le PDF",
-    "download_error": "Erreur lors du téléchargement du PDF"
+    "download_error": "Erreur lors du téléchargement du PDF",
+    "edit_online": "Modifier en ligne",
+    "edit_online_title": "Modifier le PV en ligne",
+    "loading_editor": "Chargement de l'éditeur de documents..."
   },
   "admin": {
     "clientManagement": "Gestion des Clients (Admin)",

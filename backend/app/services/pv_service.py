@@ -150,8 +150,10 @@ Answer only in valid JSON format."""
 
             system_content = f"""You are a professional translator. 
 Translate the provided meeting minutes JSON into {target_lang_name}.
-KEEP the exact same JSON structure and keys. 
-ONLY translate the values (text strings)."""
+CRITICAL: KEEP the exact same JSON keys (e.g., "title", "summary", "decisions", "actions", "description", "assignee", "due_date"). 
+ONLY translate the text values (strings). 
+DO NOT translate the keys themselves. 
+The output MUST be a valid JSON object with the identical structure as the input."""
 
             payload = {
                 "model": "mistral-large-latest",

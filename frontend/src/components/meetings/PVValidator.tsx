@@ -16,14 +16,17 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Dialog,
 } from "@mui/material";
 import {
   CheckCircle as ApproveIcon,
   Edit as EditIcon,
   History as HistoryIcon,
   Save as SaveIcon,
+  Language as LanguageIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 import DocumentExportMenu from "./DocumentExportMenu";
 import api from "../../services/api";
 
@@ -126,7 +129,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
       )}
 
       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2, alignItems: "center" }}>
-        <Typography variant="h5">{t("pv.validator_title")}</Typography>
+        <Typography variant="h5" fontWeight="bold">{t("pv.validator_title")}</Typography>
         <Stack direction="row" spacing={2} alignItems="center">
           <FormControl size="small" sx={{ minWidth: 120 }}>
             <InputLabel id="export-lang-label">{t("common.language") || "Language"}</InputLabel>
@@ -135,6 +138,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
               value={exportLanguage}
               label={t("common.language") || "Language"}
               onChange={(e) => onLanguageChange(e.target.value as string)}
+              startIcon={<LanguageIcon fontSize="small" />}
             >
               <MenuItem value="ar">العربية</MenuItem>
               <MenuItem value="fr">Français</MenuItem>
@@ -145,12 +149,25 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
           <Button variant="outlined" startIcon={<HistoryIcon />}>
             {t("pv.versions")}
           </Button>
+
+          <Button 
+            component={Link}
+            to={`/editor/${pvId}?lang=${exportLanguage}`}
+            target="_blank"
+            variant="contained" 
+            color="primary" 
+            startIcon={<EditIcon />}
+            disabled={!pvId}
+          >
+            {t("pv.edit_online") || "Edit Online"}
+          </Button>
           
           {pvId && (
             <DocumentExportMenu 
               pvId={pvId} 
               language={exportLanguage} 
               variant="outlined" 
+              showDocx={false}
             />
           )}
 

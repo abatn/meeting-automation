@@ -123,6 +123,24 @@ services:
           memory: 1G
           cpus: '0.5'
 
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    restart: unless-stopped
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=${ONLYOFFICE_SECRET:-super_secret_jwt_key_onlyoffice_2026}
+      - JWT_HEADER=Authorization
+      - ALLOW_PRIVATE_IP_ADDRESS=true
+    ports:
+      - "8080:80"
+    volumes:
+      - onlyoffice_data:/var/www/onlyoffice/Data
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
   backend:
     build: ./backend
     restart: unless-stopped
@@ -141,6 +159,8 @@ services:
       - S3_ENDPOINT=http://minio:9000
       - S3_ACCESS_KEY=minio_user
       - S3_SECRET_KEY=minio_password
+      - ONLYOFFICE_SECRET=${ONLYOFFICE_SECRET:-super_secret_jwt_key_onlyoffice_2026}
+      - ONLYOFFICE_URL=${ONLYOFFICE_URL:-http://localhost:8080}
     ports:
       - "8000:8000"
     volumes:
@@ -249,3 +269,4 @@ volumes:
   rabbitmq_data:
   minio_data:
   n8n_data:
+  onlyoffice_data:

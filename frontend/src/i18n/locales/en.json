@@ -171,7 +171,10 @@
     "versions": "Versions",
     "signature_placeholder": "Electronic Signature Area (ISO 27001)",
     "download_pdf": "Download PDF",
-    "download_error": "Error downloading PDF"
+    "download_error": "Error downloading PDF",
+    "edit_online": "Edit Online",
+    "edit_online_title": "Edit Minutes Online",
+    "loading_editor": "Loading Document Editor..."
   },
   "admin": {
     "clientManagement": "Client Management (Admin)",

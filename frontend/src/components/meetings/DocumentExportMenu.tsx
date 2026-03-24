@@ -9,6 +9,7 @@ interface Props {
   language: string;
   fileName?: string;
   variant?: "contained" | "outlined" | "text";
+  showDocx?: boolean;
 }
 
 const DocumentExportMenu: React.FC<Props> = ({
@@ -16,6 +17,7 @@ const DocumentExportMenu: React.FC<Props> = ({
   language,
   fileName,
   variant = "contained",
+  showDocx = true,
 }) => {
   const { t } = useTranslation();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -68,15 +70,17 @@ const DocumentExportMenu: React.FC<Props> = ({
         PDF
       </Button>
 
-      <Button
-        variant={variant}
-        color="primary"
-        onClick={() => handleDownload("docx")}
-        disabled={downloadingPdf || downloadingDocx}
-        startIcon={downloadingDocx ? <CircularProgress size={20} color="inherit" /> : <DocxIcon />}
-      >
-        Word
-      </Button>
+      {showDocx && (
+        <Button
+          variant={variant}
+          color="primary"
+          onClick={() => handleDownload("docx")}
+          disabled={downloadingPdf || downloadingDocx}
+          startIcon={downloadingDocx ? <CircularProgress size={20} color="inherit" /> : <DocxIcon />}
+        >
+          Word
+        </Button>
+      )}
 
       <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)}>
         <Alert onClose={() => setError(null)} severity="error" sx={{ width: "100%" }}>
