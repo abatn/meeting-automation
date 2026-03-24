@@ -46,6 +46,7 @@ class DOCXService:
                 "due_date": "الموعد النهائي",
                 "signature": "الاعتماد",
                 "director": "المدير العام",
+                "not_assigned": "غير محدد",
             },
             "fr": {
                 "title": "Procès-Verbal",
@@ -62,6 +63,7 @@ class DOCXService:
                 "due_date": "Échéance",
                 "signature": "Approbation (Signature)",
                 "director": "Directeur Général (DG)",
+                "not_assigned": "Non défini",
             },
             "en": {
                 "title": "Meeting Minutes",
@@ -78,6 +80,7 @@ class DOCXService:
                 "due_date": "Due Date",
                 "signature": "Approval (Signature)",
                 "director": "General Manager (DG)",
+                "not_assigned": "N/A",
             }
         }
         
@@ -111,14 +114,6 @@ class DOCXService:
         )
         action_result = await self.db.execute(action_stmt)
         actions = action_result.scalars().all()
-
-        # 0. Localization Strings
-        LOCALES = {
-            "ar": {"not_assigned": "غير محدد"},
-            "fr": {"not_assigned": "Non défini"},
-            "en": {"not_assigned": "N/A"}
-        }
-        strings = LOCALES.get(language, LOCALES["fr"])
 
         # 2. Translation Logic
         display_title = pv_obj.title
@@ -156,12 +151,8 @@ class DOCXService:
                 display_decisions = translated.get("decisions", display_decisions)
                 display_actions = translated.get("actions", display_actions)
             except TranslationError as e:
-                logger.error(f"Translation failed for DOCX pv_id={pv_id}: {e}")
-                raise HTTPException(
-                    status_code=502,
-                    detail="AI translation service failed. Please try again later.",
-                )
-
+                logger.error(f"Translation failed for DOCX pv_id={pv_id}, falling back to original: {e}")
+                # Resilience: Continue with original content instead of crashing
 
         # 3. Create Document
         doc = Document()
@@ -172,7 +163,8 @@ class DOCXService:
         
         p_pv_title = doc.add_paragraph(display_title)
         p_pv_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p_pv_title.runs[0].bold = True
+        if p_pv_title.runs:
+            p_pv_title.runs[0].bold = True
 
         doc.add_paragraph("_" * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
 
@@ -224,9 +216,9 @@ class DOCXService:
             
             for action in display_actions:
                 row_cells = table.add_row().cells
-                row_cells[0].text = action.get("description", "N/A")
-                row_cells[1].text = action.get("assignee", "N/A")
-                row_cells[2].text = action.get("due_date", "N/A")
+                row_cells[0].text = str(action.get("description", "N/A"))
+                row_cells[1].text = str(action.get("assignee", "N/A"))
+                row_cells[2].text = str(action.get("due_date", "N/A"))
 
         # Signature
         doc.add_paragraph("\n" * 3)
