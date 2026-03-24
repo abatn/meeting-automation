@@ -43,6 +43,7 @@ async def client(db_session: AsyncSession) -> Generator:
     async def override_get_current_user():
         return UserModel(
             id="test-user-id",
+            client_id="test-client-id",
             email="dg@example.com",
             full_name="Test DG",
             is_active=True,

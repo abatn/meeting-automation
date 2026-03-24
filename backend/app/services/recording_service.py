@@ -10,6 +10,7 @@ from sqlalchemy import select
 from fastapi import UploadFile
 
 from app.models.recording import Recording
+from app.models.meeting import Meeting
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -156,6 +157,16 @@ class RecordingService:
             raise Exception("Recording not found in DB")
 
         db_recording.status = "uploaded"
+
+        # Update Meeting end_time
+        meeting_result = await self.db.execute(
+            select(Meeting).where(Meeting.id == db_recording.meeting_id)
+        )
+        meeting = meeting_result.scalar_one_or_none()
+        if meeting:
+            meeting.end_time = datetime.utcnow()
+            logger.info(f"Updated meeting {meeting.id} end_time to {meeting.end_time}")
+
         await self.db.commit()
 
         # Trigger Celery Pipeline

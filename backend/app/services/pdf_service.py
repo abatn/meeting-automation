@@ -25,6 +25,7 @@ except (ImportError, OSError):
 from app.core.config import settings
 from app.models.pv import PV
 from app.models.meeting import Meeting
+from app.models.meeting_room import MeetingRoom
 from app.models.action import Action
 from app.models.setting import BrandingSettings
 
@@ -127,6 +128,7 @@ class PDFService:
             .options(
                 selectinload(PV.meeting).selectinload(Meeting.participants),
                 selectinload(PV.meeting).selectinload(Meeting.agendas),
+                selectinload(PV.meeting).selectinload(Meeting.room),
                 selectinload(PV.sections),
             )
             .where(PV.id == pv_id)
@@ -225,10 +227,17 @@ class PDFService:
         if start_time and end_time:
             duration = str(int((end_time - start_time).total_seconds() / 60))
 
+        # Location logic: room name if room_id exists, else location text
+        display_location = "N/A"
+        if pv_obj.meeting.room:
+            display_location = pv_obj.meeting.room.name
+        elif pv_obj.meeting.location:
+            display_location = pv_obj.meeting.location
+
         pv_data = {
             "title": display_title,
             "date": (start_time.strftime("%Y-%m-%d") if start_time else "N/A"),
-            "location": pv_obj.meeting.location or "N/A",
+            "location": display_location,
             "duration": duration,
             "participants": [p.name or p.email for p in pv_obj.meeting.participants],
             "agenda": "\n".join(

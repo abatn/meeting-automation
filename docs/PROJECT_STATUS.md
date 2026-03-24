@@ -90,3 +90,4 @@ Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilenste
 14. **[Umfassender System-Audit 2026](PROTOCOL_COMPREHENSIVE_SYSTEM_AUDIT_2026.md)**: Dokumentation des 100% Audits (Phasen 1-5), der Netzwerk-Fixes und der Test-Validierung.
 15. **[Security UI & QA](PROTOCOL_SECURITY_UI_&_QA.md)**: ISO 27001 Compliance, sicherer Logout, Audit-Logging und rollenbasierte Dashboards.
 16. **[n8n Automation & SMTP](PROTOCOL_N8N_AUTOMATION_&_SMTP.md)**: Konfiguration der Workflow-Engine, SMTP-Migration und Webhook-Härtung.
+17. **[Meeting Planner Extension](PROTOCOL_PART_40_MEETING_PLANNER_EXTENSION.md)**: Intelligentes Location-Mapping (Rooms) und automatische Meeting-Endzeit beim Stoppen der Aufnahme.

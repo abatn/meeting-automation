@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.pv import PV
 from app.models.meeting import Meeting
+from app.models.meeting_room import MeetingRoom
 from app.models.action import Action
 from app.models.setting import BrandingSettings
 
@@ -94,6 +95,7 @@ class DOCXService:
             .options(
                 selectinload(PV.meeting).selectinload(Meeting.participants),
                 selectinload(PV.meeting).selectinload(Meeting.agendas),
+                selectinload(PV.meeting).selectinload(Meeting.room),
                 selectinload(PV.sections),
             )
             .where(PV.id == pv_id)
@@ -177,7 +179,15 @@ class DOCXService:
         meta.add_run(f"{strings['date']}: ").bold = True
         meta.add_run(f"{date_str}\t")
         meta.add_run(f"{strings['location']}: ").bold = True
-        meta.add_run(f"{pv_obj.meeting.location or 'N/A'}")
+
+        # Location logic: room name if room_id exists, else location text
+        display_location = "N/A"
+        if pv_obj.meeting.room:
+            display_location = pv_obj.meeting.room.name
+        elif pv_obj.meeting.location:
+            display_location = pv_obj.meeting.location
+            
+        meta.add_run(f"{display_location}")
 
         # Participants
         p_part = doc.add_paragraph()

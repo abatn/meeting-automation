@@ -19,7 +19,6 @@ import {
   Select,
   InputLabel,
   FormControl,
-  OutlinedInput,
   Divider,
   Autocomplete,
   SelectChangeEvent
@@ -30,7 +29,6 @@ import {
   Add as AddIcon,
   Warning as WarningIcon,
   MeetingRoom as MeetingRoomIcon,
-  AccessTime as TimeIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useCulturalCalendar } from "../../hooks/useCulturalCalendar";
@@ -243,7 +241,59 @@ const MeetingPlanner: React.FC = () => {
         </Grid>
         
         <Grid item xs={12} md={5}>
-          {/* ... (Recent Meetings and Holidays sections remain the same) ... */}
+          <Paper sx={{ p: 2, mb: 3 }}>
+            <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+              <MeetingRoomIcon sx={{ mr: 1, verticalAlign: "middle", color: 'primary.main' }} />
+              {t("meetings.recent_meetings")}
+            </Typography>
+            <Divider sx={{ mb: 1 }} />
+            {recentMeetings.length === 0 ? (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
+                {t("meetings.no_recent_meetings")}
+              </Typography>
+            ) : (
+              <List dense>
+                {recentMeetings.map((meeting) => (
+                  <ListItem disablePadding key={meeting.id}>
+                    <ListItemButton onClick={() => navigate(`/meetings/live/${meeting.id}`)} sx={{ borderRadius: 1 }}>
+                      <ListItemIcon>
+                        <EventIcon color="primary" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={meeting.title} 
+                        secondary={new Date(meeting.start_time).toLocaleString()} 
+                        primaryTypographyProps={{ fontWeight: '500' }}
+                      />
+                      <Chip label={meeting.status} size="small" variant="outlined" color={meeting.status === 'completed' ? 'success' : 'default'} />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Paper>
+
+          <Paper sx={{ p: 2, bgcolor: "action.hover" }}>
+            <Typography variant="subtitle1" gutterBottom>
+              <CalendarIcon sx={{ mr: 1, verticalAlign: "middle" }} />
+              {t("meetings.upcoming_holidays")}
+            </Typography>
+            <List dense>
+              {holidays.map((h, i) => (
+                <ListItem key={i}>
+                  <ListItemIcon>
+                    <EventIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText primary={h.name} secondary={h.date} />
+                  <Chip
+                    label={t("meetings.holiday")}
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </Paper>
         </Grid>
       </Grid>
     </Box>
