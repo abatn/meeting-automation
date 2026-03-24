@@ -52,6 +52,7 @@ class MeetingBase(BaseModel):
     title: str
     description: Optional[str] = None
     location: Optional[str] = None
+    room_id: Optional[str] = None
     status: Optional[MeetingStatus] = MeetingStatus.PLANNED
     start_time: datetime
     end_time: Optional[datetime] = None
@@ -66,6 +67,7 @@ class MeetingUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     location: Optional[str] = None
+    room_id: Optional[str] = None
     status: Optional[MeetingStatus] = None
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None

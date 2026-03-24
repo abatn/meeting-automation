@@ -49,7 +49,19 @@
     "delete_confirm": "Are you sure you want to delete this member?",
     "save_success": "Member saved successfully",
     "delete_success": "Member deleted successfully",
-    "no_members": "No team members found. Add your first member to start."
+    "no_members": "No team members found. Add your first member to start.",
+    "members_tab": "Members",
+    "rooms_tab": "Rooms",
+    "add_room": "Add Room",
+    "edit_room": "Edit Room",
+    "room_name": "Room Name",
+    "room_location": "Location / Description",
+    "room_capacity": "Capacity",
+    "room_delete_confirm": "Are you sure you want to delete this room?",
+    "room_save_success": "Room saved successfully",
+    "room_delete_success": "Room deleted successfully",
+    "no_rooms": "No meeting rooms found. Add your first room to start.",
+    "members_list": "Team Directory"
   },
   "dashboard": {
     "dg_title": "General Manager Dashboard",

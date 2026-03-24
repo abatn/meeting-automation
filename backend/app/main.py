@@ -22,6 +22,7 @@ from app.api.v1 import (
     billing,
     webhooks_stripe,
     team,
+    rooms,
 )
 from app.core.websocket import manager
 import asyncio
@@ -134,6 +135,7 @@ app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["Set
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["System Admin"])
 app.include_router(billing.router, prefix="/api/v1/billing", tags=["Billing"])
 app.include_router(team.router, prefix="/api/v1/team", tags=["Team Management"])
+app.include_router(rooms.router, prefix="/api/v1/rooms", tags=["Meeting Rooms"])
 app.include_router(webhooks_stripe.router, prefix="/api/v1/webhooks/stripe", tags=["Stripe Webhooks"])
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from app.models.action import Action
     from app.models.pv import PV
     from app.models.client import Client
+    from app.models.meeting_room import MeetingRoom
 
 
 class MeetingStatus(str, enum.Enum):
@@ -32,6 +33,9 @@ class Meeting(Base):
     title: Mapped[str] = mapped_column(String, index=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    room_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("meeting_rooms.id"), nullable=True
+    )
     status: Mapped[MeetingStatus] = mapped_column(
         SQLEnum(MeetingStatus), default=MeetingStatus.PLANNED
     )
@@ -55,6 +59,7 @@ class Meeting(Base):
 
     # Relationships
     client: Mapped["Client"] = relationship("Client", back_populates="meetings")
+    room: Mapped[Optional["MeetingRoom"]] = relationship("MeetingRoom")
     creator: Mapped["User"] = relationship("User", back_populates="created_meetings")
     participants: Mapped[List["Participant"]] = relationship(
         "Participant", back_populates="meeting", cascade="all, delete-orphan"

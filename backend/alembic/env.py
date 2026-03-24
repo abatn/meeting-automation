@@ -21,6 +21,8 @@ from app.models.facture import Facture
 from app.models.usage_minute import UsageMinute
 from app.models.action import Action
 from app.models.audit_log import AuditLog
+from app.models.team import TeamMember
+from app.models.meeting_room import MeetingRoom
 
 # this is the Alembic Config object, which provides access to the values within the .ini file in use.
 config = context.config
@@ -32,6 +34,15 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata
+
+def include_object(obj, name, type_, reflected, compare_to):
+    """
+    Filter objects to ignore n8n and other external tables.
+    Only include tables that are defined in our Base.metadata.
+    """
+    if type_ == "table":
+        return name in target_metadata.tables
+    return True
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -51,6 +62,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -58,7 +70,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection, 
+        target_metadata=target_metadata,
+        include_object=include_object,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

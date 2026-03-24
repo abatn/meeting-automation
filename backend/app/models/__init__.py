@@ -9,4 +9,6 @@ from . import recording  # noqa: F401
 from . import transcription  # noqa: F401
 from . import facture  # noqa: F401
 from . import usage_minute  # noqa: F401
+from . import team  # noqa: F401
+from . import meeting_room  # noqa: F401
 from app.models.setting import BrandingSettings

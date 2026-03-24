@@ -49,7 +49,19 @@
     "delete_confirm": "Êtes-vous sûr de vouloir supprimer ce membre ?",
     "save_success": "Membre enregistré avec succès",
     "delete_success": "Membre supprimé avec succès",
-    "no_members": "Aucun membre de l'équipe trouvé. Ajoutez votre ersten membre pour commencer."
+    "no_members": "Aucun membre de l'équipe trouvé. Ajoutez votre premier membre pour commencer.",
+    "members_tab": "Membres",
+    "rooms_tab": "Salles",
+    "add_room": "Ajouter une Salle",
+    "edit_room": "Modifier la Salle",
+    "room_name": "Nom de la Salle",
+    "room_location": "Emplacement / Description",
+    "room_capacity": "Capacité",
+    "room_delete_confirm": "Êtes-vous sûr de vouloir supprimer cette salle ?",
+    "room_save_success": "Salle enregistrée avec succès",
+    "room_delete_success": "Salle supprimée avec succès",
+    "no_rooms": "Aucune salle de réunion trouvée. Ajoutez votre première salle pour commencer.",
+    "members_list": "Annuaire de l'Équipe"
   },
   "dashboard": {
     "dg_title": "Tableau de Bord DG",

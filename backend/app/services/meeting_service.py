@@ -26,6 +26,7 @@ class MeetingService:
             title=meeting_in.title,
             description=meeting_in.description,
             location=meeting_in.location,
+            room_id=meeting_in.room_id,
             start_time=meeting_in.start_time,
             end_time=meeting_in.end_time,
             status=meeting_in.status,
