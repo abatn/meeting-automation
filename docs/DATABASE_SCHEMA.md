@@ -107,6 +107,18 @@ erDiagram
         TIMESTAMP timestamp
     }
 
+    TEAM_MEMBERS {
+        UUID id PK
+        UUID client_id FK
+        VARCHAR full_name
+        VARCHAR email
+        VARCHAR phone_number
+        VARCHAR position
+        VARCHAR department
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
     CLIENTS ||--o{ USERS : "has"
     CLIENTS ||--o{ MEETINGS : "has"
     CLIENTS ||--o{ RECORDINGS : "has"
@@ -114,6 +126,7 @@ erDiagram
     CLIENTS ||--o{ PVS : "has"
     CLIENTS ||--o{ ACTIONS : "has"
     CLIENTS ||--o{ AUDIT_LOGS : "has"
+    CLIENTS ||--o{ TEAM_MEMBERS : "has"
 
     USERS ||--o{ MEETINGS : "creates"
     MEETINGS ||--o{ RECORDINGS : "has"
@@ -215,3 +228,17 @@ erDiagram
     - `action` (VARCHAR): Request method (POST, PUT, DELETE).
     - `table_name` (VARCHAR).
     - `timestamp` (TIMESTAMP).
+
+### 2.9. `team_members` Table
+
+- **Description**: Centralized company directory for managing employees and frequent meeting participants. Isolated by `client_id`.
+- **Fields**:
+    - `id` (UUID, Primary Key).
+    - `client_id` (UUID, FK to `clients.id`).
+    - `full_name` (VARCHAR).
+    - `email` (VARCHAR).
+    - `phone_number` (VARCHAR, Optional): For WhatsApp notifications.
+    - `position` (VARCHAR).
+    - `department` (VARCHAR).
+    - `created_at` (TIMESTAMP).
+    - `updated_at` (TIMESTAMP).

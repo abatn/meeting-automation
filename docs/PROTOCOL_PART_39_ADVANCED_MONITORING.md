@@ -56,6 +56,12 @@ Die `Mission Control` (Technik-Dashboard) sollte tiefgehende, verlässliche Syst
   - **Lösung**: Hinzufügen eines dynamischen Time-Pickers neben dem Datum. Die Startzeit und die berechnete Endzeit (+1 Stunde) werden nun exakt an das Backend übermittelt.
 - **E-Mail-Einladungen via n8n (Payload Bug)**: Externe Gäste erhielten keine Einladungen, da der n8n-Webhook (`meeting-created`) fehlerhaft die `user_id` anstelle der tatsächlichen `email` übertrug.
   - **Lösung**: Korrektur in `meeting_service.py` (`_trigger_n8n_meeting_created`), sodass nun explizit `p.email` und `p.name` für jeden Teilnehmer (ob registriert oder Gast) an das Automatisierungs-Tool gesendet werden.
+- **Professionelles Team Management (Mitarbeiter-Verzeichnis)**: Teilnehmer mussten bisher manuell per E-Mail im Meeting-Planer eingetippt werden, was unprofessionell und fehleranfällig war.
+  - **Lösung**: Implementierung eines zentralen Team-Managements. Einführung der Tabelle `team_members`, einer neuen Management-Seite im Frontend und einer intelligenten Suche im Meeting-Planer, die sowohl registrierte Nutzer als auch gespeicherte Team-Mitglieder vorschlägt.
+- **Audit-Log Absturz (TypeError)**: Beim Anlegen/Löschen von Team-Mitgliedern kam es zu einem "Internal Server Error", da der `AuditService` mit dem falschen Keyword `details` statt `new_values` aufgerufen wurde.
+  - **Lösung**: Korrektur aller `log_action` Aufrufe im `TeamService`, um die ISO 27001 Konformität ohne Systemabstürze zu gewährleisten.
+- **Word-Download (DOCX) Crash**: Der Export schlug mit einem 500-Fehler fehl, wenn die Mistral-KI überlastet war oder Lokalisierungs-Keys durch Code-Fehler überschrieben wurden.
+  - **Lösung**: Saubere Zusammenführung der `LOCALES` Datenstruktur in `docx_service.py` zur Vermeidung von `KeyErrors`. Implementierung einer "Sicherheits-Leine": Schlägt die KI-Übersetzung fehl (z.B. HTTP 503), wird das Dokument nun automatisch in der Originalsprache generiert, anstatt den Download abzubrechen.
 
 ## 📊 ERGEBNIS
 Das System-Dashboard liefert nun hochauflösende Einblicke in die gesamte Architektur und ermöglicht dem Betreiber sofortiges Eingreifen bei Latenzen oder Speicher-Engpässen. Gleichzeitig sind die Benutzer-Dashboards nun vollständig mit echten, mandantenfähigen Datenbank-Metriken synchronisiert und frei von Dummy-Daten. Damit ist der erste Meilenstein von Phase 5 vollständig abgeschlossen.

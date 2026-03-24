@@ -38,6 +38,7 @@ const Sidebar: React.FC = () => {
     { text: t("sidebar.meetings"), icon: <EventIcon />, path: "/meetings" },
     { text: t("sidebar.actions"), icon: <AssignmentIcon />, path: "/actions" },
     { text: t("sidebar.reports"), icon: <AssessmentIcon />, path: "/reports" },
+    { text: t("sidebar.team"), icon: <PeopleIcon />, path: "/team" },
     { text: "Billing", icon: <PaymentIcon />, path: "/billing" },
   ];
 

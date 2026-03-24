@@ -33,6 +33,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useCulturalCalendar } from "../../hooks/useCulturalCalendar";
 import { meetingsApi } from "../../services/meetings";
+import { teamApi } from "../../services/team";
 
 const MeetingPlanner: React.FC = () => {
   const { t } = useTranslation();
@@ -43,28 +44,40 @@ const MeetingPlanner: React.FC = () => {
   const [meetingDate, setMeetingDate] = useState("2026-03-03");
   const [meetingTime, setMeetingTime] = useState("10:00");
   const [selectedParticipants, setSelectedParticipants] = useState<any[]>([]);
-  const [dbUsers, setDbUsers] = useState<any[]>([]);
+  const [dbResults, setDbResults] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recentMeetings, setRecentMeetings] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    const fetchRecentMeetingsAndUsers = async () => {
+    const fetchRecentMeetings = async () => {
       try {
-        const [meetingsData, usersData] = await Promise.all([
-          meetingsApi.getMeetings(),
-          meetingsApi.getUsers()
-        ]);
-        
+        const meetingsData = await meetingsApi.getMeetings();
         // Sort by start_time descending, limit to 10
         const sorted = meetingsData.sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
         setRecentMeetings(sorted.slice(0, 10));
-        setDbUsers(usersData);
       } catch (err) {
-        console.error("Failed to fetch data", err);
+        console.error("Failed to fetch meetings", err);
       }
     };
-    fetchRecentMeetingsAndUsers();
+    fetchRecentMeetings();
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchQuery.length >= 2) {
+        try {
+          const results = await teamApi.searchTeam(searchQuery);
+          setDbResults(results);
+        } catch (err) {
+          console.error("Search failed", err);
+        }
+      } else {
+        setDbResults([]);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const holidays = [
     { date: "2026-03-20", name: t("meetings.holiday_independence") },
@@ -84,8 +97,13 @@ const MeetingPlanner: React.FC = () => {
           // Free text email entered by user
           return { email: p, name: p, role: "Guest" };
         }
-        // User object from DB
-        return { email: p.email, name: p.full_name || p.email, role: p.role || "Participant", user_id: p.id };
+        // User/TeamMember object from search API
+        return { 
+          email: p.email, 
+          name: p.full_name || p.email, 
+          role: p.position || "Participant", 
+          user_id: p.source === "user" ? p.id : null 
+        };
       });
 
       // Format start and end times
@@ -174,12 +192,16 @@ const MeetingPlanner: React.FC = () => {
               <Autocomplete
                 multiple
                 freeSolo
-                options={dbUsers}
+                options={dbResults}
                 getOptionLabel={(option) => {
                   if (typeof option === 'string') return option;
-                  return `${option.full_name || 'No Name'} (${option.email})`;
+                  const suffix = option.department ? ` - ${option.department}` : '';
+                  return `${option.full_name} (${option.email})${suffix}`;
                 }}
                 value={selectedParticipants}
+                onInputChange={(event, newInputValue) => {
+                  setSearchQuery(newInputValue);
+                }}
                 onChange={(event, newValue) => {
                   setSelectedParticipants(newValue);
                 }}
@@ -188,7 +210,7 @@ const MeetingPlanner: React.FC = () => {
                     <Chip
                       variant="outlined"
                       color="primary"
-                      label={typeof option === 'string' ? option : (option.full_name || option.email)}
+                      label={typeof option === 'string' ? option : option.full_name}
                       {...getTagProps({ index })}
                     />
                   ))
@@ -198,7 +220,7 @@ const MeetingPlanner: React.FC = () => {
                     {...params}
                     variant="outlined"
                     label={t("meetings.participants")}
-                    placeholder="Search users or type email..."
+                    placeholder={t("common.search")}
                   />
                 )}
               />

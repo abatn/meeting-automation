@@ -15,6 +15,7 @@ import AnalyticalReports from "./components/reports/AnalyticalReports";
 import MeetingPlanner from "./components/meetings/MeetingPlanner";
 import MeetingRoom from "./components/meetings/MeetingRoom";
 import ActionTracker from "./components/actions/ActionTracker";
+import TeamManagement from "./pages/team/TeamManagement";
 import MFASetup from "./components/auth/MFASetup";
 import ErrorBoundary from "./components/ErrorBoundary";
 import AutoLogout from "./components/auth/AutoLogout";
@@ -107,6 +108,7 @@ function App() {
               <Route path="/meetings/live/:id" element={<MainLayout><MeetingRoom /></MainLayout>} />
               <Route path="/actions" element={<MainLayout><ActionTracker /></MainLayout>} />
               <Route path="/reports" element={<MainLayout><AnalyticalReports /></MainLayout>} />
+              <Route path="/team" element={<MainLayout><TeamManagement /></MainLayout>} />
               <Route path="/billing" element={<MainLayout><BillingPanel /></MainLayout>} />
               <Route path="/settings" element={<MainLayout><Box sx={{ p: 3 }}><MFASetup qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ExampleSecret" secret="JBSWY3DPEHPK3PXP" /></Box></MainLayout>} />
               <Route path="*" element={<Navigate to="/" replace />} />

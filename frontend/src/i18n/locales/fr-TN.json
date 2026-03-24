@@ -32,7 +32,24 @@
     "meetings": "Réunions",
     "actions": "Actions",
     "reports": "Rapports d'Analyse",
+    "team": "Gestion d'Équipe",
     "security": "Sécurité & Authentification"
+  },
+  "team": {
+    "title": "Gestion d'Équipe",
+    "subtitle": "Gérez l'annuaire de votre entreprise et les participants fréquents aux réunions.",
+    "add_member": "Ajouter un membre",
+    "edit_member": "Modifier le membre",
+    "full_name": "Nom complet",
+    "email": "Adresse E-mail",
+    "phone": "Numéro de téléphone",
+    "position": "Poste",
+    "department": "Département",
+    "actions": "Actions",
+    "delete_confirm": "Êtes-vous sûr de vouloir supprimer ce membre ?",
+    "save_success": "Membre enregistré avec succès",
+    "delete_success": "Membre supprimé avec succès",
+    "no_members": "Aucun membre de l'équipe trouvé. Ajoutez votre ersten membre pour commencer."
   },
   "dashboard": {
     "dg_title": "Tableau de Bord DG",
