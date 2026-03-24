@@ -33,7 +33,8 @@
     "actions": "Actions",
     "reports": "Rapports d'Analyse",
     "team": "Gestion d'Équipe",
-    "security": "Sécurité & Authentification"
+    "security": "Sécurité & Authentification",
+    "billing": "Abonnement & Facturation"
   },
   "team": {
     "title": "Gestion d'Équipe",

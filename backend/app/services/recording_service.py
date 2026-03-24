@@ -86,6 +86,15 @@ class RecordingService:
         file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_stream.webm"
         upload_id = str(uuid.uuid4())  # Use UUID as local temp file identifier
         try:
+            # Update Meeting start_time to the exact moment recording starts
+            meeting_result = await self.db.execute(
+                select(Meeting).where(Meeting.id == meeting_id)
+            )
+            meeting = meeting_result.scalar_one_or_none()
+            if meeting:
+                meeting.start_time = datetime.utcnow()
+                logger.info(f"Updated meeting {meeting.id} start_time to {meeting.start_time}")
+
             # Save placeholder to DB
             db_recording = Recording(
                 id=str(uuid.uuid4()),

@@ -33,7 +33,8 @@
     "actions": "Action Items",
     "reports": "Analytical Reports",
     "team": "Team Management",
-    "security": "Security & MFA"
+    "security": "Security & MFA",
+    "billing": "Subscription & Billing"
   },
   "team": {
     "title": "Team Management",
