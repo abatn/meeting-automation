@@ -62,6 +62,7 @@ Diese Phase konzentriert sich auf den stabilen Betrieb unter Last, die Benutzere
   - **KI-Services**: Response-Zeit (Mistral PV-Generierung), Fehlerquote, Anfragen pro Minute.
   - **MinIO/S3**: Korrekte Speicherplatzberechnung, Anzahl Objekte, Upload/Download Rate.
   - **n8n**: Workflow-Fehler der letzten 24h, Durchschnittliche Ausführungszeit.
+- [x] **Online Document Editing (OnlyOffice)**: Integration für ISO-27001-konforme Online-Bearbeitung von KI-Protokollen.
 - [ ] **Auto-Scaling**: Konfiguration von Horizontal Pod Autoscaler (HPA) in Kubernetes für die AI-Worker (Gladia/Mistral Proxy).
 - [ ] **Mobile App Applikation**: Entwicklung einer progressiven Web App (PWA) oder nativen App für Meeting-Aufnahmen via Smartphone.
 - [ ] **Finetuning AI**: Optimierung der Mistral-Prompts für noch präzisere tunesische Dialekt-Zusammenfassungen.
