@@ -29,37 +29,27 @@ class DOCXService:
 
     def _set_rtl(self, p):
         """
-        Applies RTL formatting to a paragraph and all its current runs.
-        Ensures both paragraph direction and run-level complex script settings.
+        Sets the paragraph and all its runs to RTL for OnlyOffice compatibility.
         """
-        # 1. Paragraph-level RTL
-        pPr = p._element.get_or_add_pPr()
-        bidi = pPr.xpath('./w:bidi')
-        if not bidi:
-            bidi_el = OxmlElement('w:bidi')
-            bidi_el.set(qn('w:val'), '1')
-            pPr.append(bidi_el)
-        
-        # Set alignment to right for RTL
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        pPr = p._element.get_or_add_pPr()
         
-        # 2. Run-level RTL (for existing runs)
+        # Paragraph level: w:bidi
+        bidi = OxmlElement('w:bidi')
+        bidi.set(qn('w:val'), '1')
+        pPr.append(bidi)
+        
+        # Run level: w:rtl and w:cs
         for run in p.runs:
             rPr = run._element.get_or_add_rPr()
             
-            # w:rtl for right-to-left text direction
-            rtl = rPr.xpath('./w:rtl')
-            if not rtl:
-                rtl_el = OxmlElement('w:rtl')
-                rtl_el.set(qn('w:val'), '1')
-                rPr.append(rtl_el)
-                
-            # w:cs for complex script (Arabic) support
-            cs = rPr.xpath('./w:cs')
-            if not cs:
-                cs_el = OxmlElement('w:cs')
-                cs_el.set(qn('w:val'), '1')
-                rPr.append(cs_el)
+            rtl = OxmlElement('w:rtl')
+            rtl.set(qn('w:val'), '1')
+            rPr.append(rtl)
+            
+            cs = OxmlElement('w:cs')
+            cs.set(qn('w:val'), '1')
+            rPr.append(cs)
 
     async def generate_pv_docx(self, pv_id: str, client_id: str, branding_id: Optional[str] = None, language: str = "fr") -> str:
         """
@@ -177,7 +167,6 @@ class DOCXService:
             })
 
         from app.services.pv_service import PVService, TranslationError
-        # Check if stored PV language matches the requested export language
         if pv_obj.language != language:
             logger.info(f"Translating DOCX content from {pv_obj.language} to {language} via Mistral...")
             content_to_translate = {
@@ -198,15 +187,13 @@ class DOCXService:
         # 3. Create Document
         doc = Document()
         
-        # Force Document-wide RTL for Arabic in Section Properties
+        # Section RTL (Visual Table alignment and Margins)
         if is_rtl:
             for section in doc.sections:
                 sectPr = section._sectPr
-                bidi = sectPr.xpath('./w:bidi')
-                if not bidi:
-                    bidi_el = OxmlElement('w:bidi')
-                    bidi_el.set(qn('w:val'), '1')
-                    sectPr.append(bidi_el)
+                bidi = OxmlElement('w:bidi')
+                bidi.set(qn('w:val'), '1')
+                sectPr.append(bidi)
 
         # Title
         title_para = doc.add_heading(strings["title"], 0)
@@ -227,20 +214,20 @@ class DOCXService:
         end_time = pv_obj.meeting.end_time
         date_str = start_time.strftime("%Y-%m-%d") if start_time else "N/A"
         duration_val = "N/A"
+        
         if start_time and end_time:
-            duration_val = str(int((end_time - start_time).total_seconds() / 60))
+            diff = end_time - start_time
+            duration_val = str(max(1, int(diff.total_seconds() / 60)))
 
         meta = doc.add_paragraph()
-        meta.alignment = alignment
         meta.add_run(f"{strings['date']}: ").bold = True
-        meta.add_run(f"{date_str}\t")
+        meta.add_run(f"{date_str}    ")
         meta.add_run(f"{strings['duration']}: ").bold = True
-        meta.add_run(f"{duration_val} {strings['minutes']}\t")
+        meta.add_run(f"{duration_val} {strings['minutes']}    ")
         meta.add_run(f"{strings['location']}: ").bold = True
-
-        # Location logic
+        
         display_location = "N/A"
-        if pv_obj.meeting.room:
+        if pv_obj.meeting.room and pv_obj.meeting.room.name:
             display_location = pv_obj.meeting.room.name
         elif pv_obj.meeting.location:
             display_location = pv_obj.meeting.location
@@ -250,54 +237,46 @@ class DOCXService:
 
         # Participants
         p_part = doc.add_paragraph()
-        p_part.alignment = alignment
         p_part.add_run(f"{strings['participants']}: ").bold = True
         p_part.add_run(", ".join([p.name or p.email for p in pv_obj.meeting.participants]))
         if is_rtl: self._set_rtl(p_part)
 
         # Agenda
         h_agenda = doc.add_heading(strings["agenda"], level=1)
-        h_agenda.alignment = alignment
         if is_rtl: self._set_rtl(h_agenda)
         for a in sorted(pv_obj.meeting.agendas, key=lambda x: x.order):
             p = doc.add_paragraph(a.title, style='List Bullet')
-            p.alignment = alignment
             if is_rtl: self._set_rtl(p)
 
         # Discussion
         h_disc = doc.add_heading(strings["discussion"], level=1)
-        h_disc.alignment = alignment
         if is_rtl: self._set_rtl(h_disc)
+        
         clean_text = re.sub('<[^<]+?>', '', display_discussion or "")
-        p_disc = doc.add_paragraph(clean_text)
-        p_disc.alignment = alignment
-        if is_rtl: self._set_rtl(p_disc)
+        for line in clean_text.split('\n'):
+            if line.strip():
+                p_disc = doc.add_paragraph(line.strip())
+                if is_rtl: self._set_rtl(p_disc)
 
         # Decisions
         if display_decisions:
             h_dec = doc.add_heading(strings["decisions"], level=1)
-            h_dec.alignment = alignment
             if is_rtl: self._set_rtl(h_dec)
             for d in display_decisions:
                 p = doc.add_paragraph(d, style='List Bullet')
-                p.alignment = alignment
                 if is_rtl: self._set_rtl(p)
 
         # Actions
         if display_actions:
             h_act = doc.add_heading(strings["actions"], level=1)
-            h_act.alignment = alignment
             if is_rtl: self._set_rtl(h_act)
             table = doc.add_table(rows=1, cols=3)
             table.style = 'Table Grid'
             
-            # Force table to be Visual RTL
             if is_rtl:
                 tblPr = table._element.xpath('w:tblPr')[0]
-                bidiVisual = tblPr.xpath('./w:bidiVisual')
-                if not bidiVisual:
-                    bidiVisual_el = OxmlElement('w:bidiVisual')
-                    tblPr.append(bidiVisual_el)
+                bidiVisual = OxmlElement('w:bidiVisual')
+                tblPr.append(bidiVisual)
 
             hdr_cells = table.rows[0].cells
             hdr_cells[0].text = strings["task"]
@@ -321,25 +300,18 @@ class DOCXService:
 
         # Signature
         doc.add_paragraph("\n" * 3)
-        # For RTL, we'll keep it consistent with the overall alignment.
-        sig_alignment = alignment
-        
         sig = doc.add_paragraph(f"{strings['signature']}:")
-        sig.alignment = sig_alignment
         if is_rtl: self._set_rtl(sig)
         
         line = doc.add_paragraph("___________________________")
-        line.alignment = sig_alignment
         if is_rtl: self._set_rtl(line)
         
         dir_p = doc.add_paragraph(strings["director"])
-        dir_p.alignment = sig_alignment
         if is_rtl: self._set_rtl(dir_p)
 
-        # 4. Metadata: Add meeting duration to Core Properties
+        # Metadata
         if duration_val != "N/A":
             doc.core_properties.comments = f"Meeting Duration: {duration_val} minutes"
-            doc.core_properties.subject = f"PV for {pv_obj.title} - Duration: {duration_val} min"
 
         # Save
         filename = f"pv_{pv_id}_{uuid.uuid4().hex[:8]}.docx"
