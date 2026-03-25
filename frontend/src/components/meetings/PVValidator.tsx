@@ -151,9 +151,14 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
           </Button>
 
           <Button 
-            component={Link}
-            to={`/editor/${pvId}?lang=${exportLanguage}`}
+            href={`/editor/${pvId}?lang=${exportLanguage}`}
             target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              window.open(`/editor/${pvId}?lang=${exportLanguage}`, '_blank');
+            }}
             variant="contained" 
             color="primary" 
             startIcon={<EditIcon />}

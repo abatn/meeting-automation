@@ -32,7 +32,7 @@ import {
   Edit as EditIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useCulturalCalendar } from "../../hooks/useCulturalCalendar";
 import { meetingsApi } from "../../services/meetings";
 import { teamApi } from "../../services/team";
@@ -308,9 +308,14 @@ const MeetingPlanner: React.FC = () => {
                           <IconButton 
                             size="small" 
                             color="primary" 
-                            component={Link}
-                            to={`/editor/${pvMap[meeting.id]}?lang=${exportLanguage}`}
+                            href={`/editor/${pvMap[meeting.id]}?lang=${exportLanguage}`}
                             target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.open(`/editor/${pvMap[meeting.id]}?lang=${exportLanguage}`, '_blank');
+                            }}
                             title={t("pv.edit_online")}
                           >
                             <EditIcon fontSize="small" />
