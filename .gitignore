@@ -77,3 +77,4 @@ uploads/
 credentials/
 secrets/
 gha-creds-*.json
+*.gguf

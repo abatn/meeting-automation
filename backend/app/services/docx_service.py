@@ -29,32 +29,49 @@ class DOCXService:
 
     def _set_rtl(self, p):
         """
-        Sets the paragraph and all its runs to RTL for OnlyOffice compatibility.
+        Light RTL: Sets right alignment and professional Arabic font.
+        Keeps logical LTR flow to prevent 'backwards text' issues in OnlyOffice.
         """
         p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        pPr = p._element.get_or_add_pPr()
         
-        # Paragraph level: w:bidi
-        bidi = OxmlElement('w:bidi')
-        bidi.set(qn('w:val'), '1')
-        pPr.append(bidi)
-        
-        # Run level: w:rtl and w:cs
         for run in p.runs:
+            # FreeSerif is installed and looks great for Arabic
+            run.font.name = 'FreeSerif'
             rPr = run._element.get_or_add_rPr()
+            rFonts = rPr.find(qn('w:rFonts'))
+            if rFonts is None:
+                rFonts = OxmlElement('w:rFonts')
+                rPr.insert(0, rFonts)
             
-            rtl = OxmlElement('w:rtl')
-            rtl.set(qn('w:val'), '1')
-            rPr.append(rtl)
-            
-            cs = OxmlElement('w:cs')
-            cs.set(qn('w:val'), '1')
-            rPr.append(cs)
+            # Set complex script font and basic font for compatibility
+            rFonts.set(qn('w:cs'), 'FreeSerif')
+            rFonts.set(qn('w:ascii'), 'FreeSerif')
+            rFonts.set(qn('w:hAnsi'), 'FreeSerif')
+
+            # Ensure font size is consistent (24 half-points = 12pt)
+            sz = rPr.find(qn('w:sz'))
+            if sz is None:
+                sz = OxmlElement('w:sz')
+                sz.set(qn('w:val'), '24')
+                rPr.append(sz)
+            szCs = rPr.find(qn('w:szCs'))
+            if szCs is None:
+                szCs = OxmlElement('w:szCs')
+                szCs.set(qn('w:val'), '24')
+                rPr.append(szCs)
+
+    def _set_document_rtl(self, doc):
+        """
+        Light Document RTL: Sets default fonts and some document-wide styles.
+        """
+        if 'Normal' in doc.styles:
+            style = doc.styles['Normal']
+            style.font.name = 'FreeSerif'
+            style.font.size = Pt(12)
 
     async def generate_pv_docx(self, pv_id: str, client_id: str, branding_id: Optional[str] = None, language: str = "fr") -> str:
         """
         Generates a PV as a DOCX file and returns the file path.
-        Includes on-the-fly translation via Mistral if languages mismatch.
         """
         # 0. Localization Strings
         LOCALES = {
@@ -116,7 +133,6 @@ class DOCXService:
         
         strings = LOCALES.get(language, LOCALES["fr"])
         is_rtl = (language == "ar")
-        alignment = WD_ALIGN_PARAGRAPH.RIGHT if is_rtl else WD_ALIGN_PARAGRAPH.LEFT
 
         # 1. Load Data
         stmt = (
@@ -187,22 +203,12 @@ class DOCXService:
         # 3. Create Document
         doc = Document()
         
-        # Section RTL (Visual Table alignment and Margins)
-        if is_rtl:
-            for section in doc.sections:
-                sectPr = section._sectPr
-                bidi = OxmlElement('w:bidi')
-                bidi.set(qn('w:val'), '1')
-                sectPr.append(bidi)
-
         # Title
         title_para = doc.add_heading(strings["title"], 0)
         title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        if is_rtl: self._set_rtl(title_para)
         
         p_pv_title = doc.add_paragraph(display_title)
         p_pv_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        if is_rtl: self._set_rtl(p_pv_title)
         if p_pv_title.runs:
             p_pv_title.runs[0].bold = True
 
@@ -233,85 +239,73 @@ class DOCXService:
             display_location = pv_obj.meeting.location
             
         meta.add_run(f"{display_location}")
-        if is_rtl: self._set_rtl(meta)
 
         # Participants
         p_part = doc.add_paragraph()
         p_part.add_run(f"{strings['participants']}: ").bold = True
         p_part.add_run(", ".join([p.name or p.email for p in pv_obj.meeting.participants]))
-        if is_rtl: self._set_rtl(p_part)
 
         # Agenda
         h_agenda = doc.add_heading(strings["agenda"], level=1)
-        if is_rtl: self._set_rtl(h_agenda)
         for a in sorted(pv_obj.meeting.agendas, key=lambda x: x.order):
-            p = doc.add_paragraph(a.title, style='List Bullet')
-            if is_rtl: self._set_rtl(p)
+            doc.add_paragraph(a.title, style='List Bullet')
 
         # Discussion
         h_disc = doc.add_heading(strings["discussion"], level=1)
-        if is_rtl: self._set_rtl(h_disc)
         
         clean_text = re.sub('<[^<]+?>', '', display_discussion or "")
         for line in clean_text.split('\n'):
             if line.strip():
-                p_disc = doc.add_paragraph(line.strip())
-                if is_rtl: self._set_rtl(p_disc)
+                doc.add_paragraph(line.strip())
 
         # Decisions
         if display_decisions:
             h_dec = doc.add_heading(strings["decisions"], level=1)
-            if is_rtl: self._set_rtl(h_dec)
             for d in display_decisions:
-                p = doc.add_paragraph(d, style='List Bullet')
-                if is_rtl: self._set_rtl(p)
+                doc.add_paragraph(d, style='List Bullet')
 
         # Actions
         if display_actions:
             h_act = doc.add_heading(strings["actions"], level=1)
-            if is_rtl: self._set_rtl(h_act)
             table = doc.add_table(rows=1, cols=3)
             table.style = 'Table Grid'
             
-            if is_rtl:
-                tblPr = table._element.xpath('w:tblPr')[0]
-                bidiVisual = OxmlElement('w:bidiVisual')
-                tblPr.append(bidiVisual)
-
             hdr_cells = table.rows[0].cells
             hdr_cells[0].text = strings["task"]
             hdr_cells[1].text = strings["assignee"]
             hdr_cells[2].text = strings["due_date"]
-            
-            if is_rtl:
-                for cell in hdr_cells:
-                    for p in cell.paragraphs:
-                        self._set_rtl(p)
 
             for action in display_actions:
                 row_cells = table.add_row().cells
                 row_cells[0].text = str(action.get("description", "N/A"))
                 row_cells[1].text = str(action.get("assignee", "N/A"))
                 row_cells[2].text = str(action.get("due_date", "N/A"))
-                if is_rtl:
-                    for cell in row_cells:
-                        for p in cell.paragraphs:
-                            self._set_rtl(p)
 
         # Signature
         doc.add_paragraph("\n" * 3)
-        sig = doc.add_paragraph(f"{strings['signature']}:")
-        if is_rtl: self._set_rtl(sig)
-        
-        line = doc.add_paragraph("___________________________")
-        if is_rtl: self._set_rtl(line)
-        
-        dir_p = doc.add_paragraph(strings["director"])
-        if is_rtl: self._set_rtl(dir_p)
+        doc.add_paragraph(f"{strings['signature']}:")
+        doc.add_paragraph("___________________________")
+        doc.add_paragraph(strings["director"])
 
         # Metadata
         if duration_val != "N/A":
             doc.core_properties.comments = f"Meeting Duration: {duration_val} minutes"
+
+        # FINAL LIGHT PASS: Apply Alignment and Font for Arabic
+        if is_rtl:
+            # 1. Global Document adjustments
+            self._set_document_rtl(doc)
+            
+            # 2. All Paragraphs
+            for p in doc.paragraphs:
+                self._set_rtl(p)
+                
+            # 3. All Tables
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        for p in cell.paragraphs:
+                            self._set_rtl(p)
 
         # Save
         filename = f"pv_{pv_id}_{uuid.uuid4().hex[:8]}.docx"

@@ -26,9 +26,9 @@ Dieses Dokument dient als zentrale Checkliste für die noch ausstehenden Aufgabe
   - **Nutzen:** Erfüllung der ISO 27001 Vorgaben zur Ausfallsicherheit und Schutz vor Datenverlust bei Rechenzentrum-Ausfall.
 
 - [x] **Online Document Editing (OnlyOffice)**
-  - **Aufgabe:** Integration des *OnlyOffice Document Servers* in die Docker-Umgebung und Anbindung über eine Callback-API an das Backend.
-  - **Ziel:** Ermöglicht Benutzern, generierte Word-Protokolle (PVs) direkt im Browser zu bearbeiten, bevor sie finalisiert werden.
-  - **Nutzen:** Hohe Benutzerfreundlichkeit bei 100%iger Einhaltung der Datensouveränität (ISO 27001), da keine externen Cloud-Dienste (wie Microsoft 365) genutzt werden.
+  - **Aufgabe:** Integration des *OnlyOffice Document Servers* und Font-Optimierung (Noto-Fonts).
+  - **Status:** Abgeschlossen ✅ (Inkl. RTL-Rendering Fixes und Font-Cache Rebuild).
+  - **Nutzen:** Hohe Benutzerfreundlichkeit bei 100%iger Einhaltung der Datensouveränität (ISO 27001).
 
 ---
 

@@ -48,7 +48,7 @@ const OnlyOfficeEditor: React.FC<Props> = ({ pvId, language, onClose }) => {
 
     const initEditor = () => {
       if (window.DocsAPI && editorRef.current) {
-        // Destroy existing editor if any (OnlyOffice handles this via container ID)
+        // Use config as is from backend (Stable LTR-wrap for Arabic)
         new window.DocsAPI.DocEditor("onlyoffice-editor-container", config);
       }
     };

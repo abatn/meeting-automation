@@ -62,7 +62,7 @@ Diese Phase konzentriert sich auf den stabilen Betrieb unter Last, die Benutzere
   - **KI-Services**: Response-Zeit (Mistral PV-Generierung), Fehlerquote, Anfragen pro Minute.
   - **MinIO/S3**: Korrekte Speicherplatzberechnung, Anzahl Objekte, Upload/Download Rate.
   - **n8n**: Workflow-Fehler der letzten 24h, Durchschnittliche Ausführungszeit.
-- [x] **Online Document Editing (OnlyOffice)**: Integration für ISO-27001-konforme Online-Bearbeitung von KI-Protokollen.
+- [x] **Online Document Editing (OnlyOffice)**: Integration für ISO-27001-konforme Online-Bearbeitung von KI-Protokollen. (Optimiert: PDF-Sync-Staleness behoben via Forcesave-Callback & Redis-Sync).
 - [ ] **Auto-Scaling**: Konfiguration von Horizontal Pod Autoscaler (HPA) in Kubernetes für die AI-Worker (Gladia/Mistral Proxy).
 - [ ] **Mobile App Applikation**: Entwicklung einer progressiven Web App (PWA) oder nativen App für Meeting-Aufnahmen via Smartphone.
 - [ ] **Finetuning AI**: Optimierung der Mistral-Prompts für noch präzisere tunesische Dialekt-Zusammenfassungen.
@@ -93,3 +93,4 @@ Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilenste
 16. **[n8n Automation & SMTP](PROTOCOL_N8N_AUTOMATION_&_SMTP.md)**: Konfiguration der Workflow-Engine, SMTP-Migration und Webhook-Härtung.
 17. **[Meeting Planner Extension](PROTOCOL_PART_40_MEETING_PLANNER_EXTENSION.md)**: Intelligentes Location-Mapping (Rooms) und automatische Meeting-Endzeit beim Stoppen der Aufnahme.
 18. **[OnlyOffice Integration](PROTOCOL_PART_41_ONLYOFFICE_INTEGRATION.md)**: Einführung eines selbst gehosteten OnlyOffice Document Servers für die Online-Bearbeitung von KI-Protokollen im Browser (ISO 27001).
+19. **[ISS Map-Reduce Pipeline Final Validation](PROTOCOL_ISS_FINAL_VALIDATION.md)**: Live-Test und Validierung der asynchronen Audio-Synthese-Pipeline (S3 -> Gladia -> Qwen-1.5B -> Mistral).
