@@ -47,7 +47,7 @@ Diese Phase transformiert das System in eine kommerziell skalierbare SaaS-Plattf
 Diese Phase finalisiert die Plattform für den kommerziellen Betrieb.
 
 - [x] **Billing & Payment**: Integration von Rechnungen, Minutenverbrauch-Tracking und Stripe-Logik.
-- [x] **Public Landing Page**: Öffentliche Produktpräsentation und Onboarding-Flow.
+- [x] **Public Landing Page**: Modernisierung im "Modern Enterprise"-Stil (Linear/Stripe) mit voller Trilingualität (AR, FR, EN), RTL-Support und Noto Sans Arabic.
 - [x] **Technik-Dashboard**: System-Monitoring für den Betreiber.
 
 ## Phase 5: Production Operations & Global Optimization (Next)

@@ -38,7 +38,7 @@ Diese beiden Dashboards sind interne Administrations-Werkzeuge (nur für System-
 
 ## 🎯 BEREITS ERREICHTE ZIELE
 - **Billing Infrastruktur (Basis)**: Integration von Rechnungen (`Facture`) und Minuten-Tracking (`UsageMinute`).
-- **Public Landing Page**: Moderne Startseite mit Hero-Section, Features, Pricing und CTA für unauthenticated Besucher.
+- **Public Landing Page**: Hochkonvertierendes Design im Stil von Stripe/Linear. Kompakte Typografie, Bento-Grid Features, animierte Pipeline und vollständige i18n-Striktheit (keine Fallbacks, 100% lokalisiert).
 
 ## 📝 DURCHGEFÜHRTE ARBEITSSCHRITTE
 

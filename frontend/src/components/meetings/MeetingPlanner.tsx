@@ -32,7 +32,6 @@ import {
   Edit as EditIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
 import { useCulturalCalendar } from "../../hooks/useCulturalCalendar";
 import { meetingsApi } from "../../services/meetings";
 import { teamApi } from "../../services/team";

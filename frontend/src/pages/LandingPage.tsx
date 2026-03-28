@@ -169,10 +169,26 @@ const LandingPage: React.FC = () => {
             </Grid>
             <Grid item xs={12} md={6}>
               <Box sx={{ p: 1, borderRadius: '24px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 40px 100px rgba(0,0,0,0.5)' }}>
-                <Box component="img" src="/assets/landing/Automated_Meeting.png" sx={{ width: '100%', borderRadius: '16px', display: 'block' }} alt="SaaS Hub" />
+                <Box component="img" src="/assets/landing/Automated_Meeting.png" sx={{ width: '100%', borderRadius: '16px', display: 'block' }} alt={t('landing.hero.alt_dashboard')} />
               </Box>
             </Grid>
           </Grid>
+        </Container>
+      </Box>
+
+      {/* --- TRUST SECTION --- */}
+      <Box sx={{ py: '48px', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)', bgcolor: 'rgba(255,255,255,0.01)' }}>
+        <Container maxWidth="lg">
+          <Stack direction={{xs: 'column', md: 'row'}} spacing={4} alignItems="center" justifyContent="center">
+            <Typography variant="body2" sx={{ color: '#71717A', fontWeight: 600, letterSpacing: '0.05em', fontSize: '14px' }}>
+              {t('landing.trust.title')}
+            </Typography>
+            <Stack direction="row" spacing={3} alignItems="center">
+               <Chip label={t('landing.trust.iso')} size="small" variant="outlined" sx={{ color: '#FFF', borderColor: 'rgba(255,255,255,0.1)' }} />
+               <Chip label={t('landing.trust.aes')} size="small" variant="outlined" sx={{ color: '#FFF', borderColor: 'rgba(255,255,255,0.1)' }} />
+               <Chip label={t('landing.trust.gdpr')} size="small" variant="outlined" sx={{ color: '#FFF', borderColor: 'rgba(255,255,255,0.1)' }} />
+            </Stack>
+          </Stack>
         </Container>
       </Box>
 
@@ -212,15 +228,15 @@ const LandingPage: React.FC = () => {
           
           <Grid container spacing={3} justifyContent="center">
             {[
-              { icon: <VoiceIcon />, text: t('landing.pipeline.step1') },
-              { icon: <ChipIcon />, text: t('landing.pipeline.step2') },
-              { icon: <EditIcon />, text: t('landing.pipeline.step3') },
-              { icon: <WhatsAppIcon />, text: t('landing.pipeline.step4') }
+              { icon: <VoiceIcon />, textKey: 'landing.pipeline.step1' },
+              { icon: <ChipIcon />, textKey: 'landing.pipeline.step2' },
+              { icon: <EditIcon />, textKey: 'landing.pipeline.step3' },
+              { icon: <WhatsAppIcon />, textKey: 'landing.pipeline.step4' }
             ].map((s, i) => (
               <Grid item xs={6} md={2.5} key={i}>
                 <Box sx={{ textAlign: 'center' }}>
                   <Box sx={{ width: 48, height: 48, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2, border: '1px solid rgba(255,255,255,0.08)' }}>{s.icon}</Box>
-                  <Typography variant="body2" fontWeight="700">{s.text}</Typography>
+                  <Typography variant="body2" fontWeight="700">{t(s.textKey)}</Typography>
                 </Box>
               </Grid>
             ))}
@@ -234,16 +250,16 @@ const LandingPage: React.FC = () => {
           <Typography variant="h3" fontWeight="800" textAlign="center" sx={{ mb: 8, fontSize: '2rem' }}>{t('landing.pricing.title')}</Typography>
           <Grid container spacing={4} justifyContent="center">
             {[
-              { name: t('landing.pricing.free_name'), price: "0", feats: t('landing.pricing.starter_feats', { returnObjects: true }) as string[], h: false },
-              { name: t('landing.pricing.pro_name'), price: "99", feats: t('landing.pricing.pro_feats', { returnObjects: true }) as string[], h: true },
-              { name: t('landing.pricing.ent_name'), price: "499", feats: t('landing.pricing.ent_feats', { returnObjects: true }) as string[], h: false }
+              { nameKey: 'landing.pricing.free_name', price: "0", featsKey: 'landing.pricing.starter_feats', h: false },
+              { nameKey: 'landing.pricing.pro_name', price: "99", featsKey: 'landing.pricing.pro_feats', h: true },
+              { nameKey: 'landing.pricing.ent_name', price: "499", featsKey: 'landing.pricing.ent_feats', h: false }
             ].map((p, i) => (
               <Grid item xs={12} md={4} key={i}>
                 <Box className="glass-card" sx={{ p: 5, height: '100%', display: 'flex', flexDirection: 'column', borderColor: p.h ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.06)' }}>
-                  <Typography variant="h6" fontWeight="700" sx={{ mb: 1 }}>{p.name}</Typography>
+                  <Typography variant="h6" fontWeight="700" sx={{ mb: 1 }}>{t(p.nameKey)}</Typography>
                   <Typography variant="h3" fontWeight="800" sx={{ mb: 4 }}>${p.price}<Box component="span" sx={{ fontSize: '1rem', color: '#71717A', ml: 1 }}>/{t('landing.pricing.monthly')}</Box></Typography>
                   <Stack spacing={2} sx={{ mb: 6, flexGrow: 1 }}>
-                    {p.feats.map((feat, j) => (
+                    {Array.isArray(t(p.featsKey, { returnObjects: true })) && (t(p.featsKey, { returnObjects: true }) as string[]).map((feat, j) => (
                       <Stack direction="row" spacing={2} key={j} alignItems="center">
                         <CheckIcon sx={{ fontSize: 16, color: '#71717A' }} />
                         <Typography variant="body2" sx={{ color: '#A1A1AA' }}>{feat}</Typography>
@@ -263,7 +279,9 @@ const LandingPage: React.FC = () => {
         <Container maxWidth="lg">
           <Stack direction={{xs: 'column', md: 'row'}} justifyContent="space-between" alignItems="center" spacing={4}>
             <Box textAlign={{xs: 'center', md: 'left'}}>
-              <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 1 }}>MeetingAutomation</Typography>
+              <Typography variant="subtitle1" fontWeight="700" sx={{ mb: 1 }}>
+                {t('common.appNamePart1')}{t('common.appNamePart2')}
+              </Typography>
               <Typography variant="body2" sx={{ color: '#52525B' }}>{t('landing.footer.copyright')}</Typography>
             </Box>
             <Stack direction="row" spacing={4}>
