@@ -27,6 +27,7 @@ class PV(Base):
     )
 
     title: Mapped[str] = mapped_column(String, nullable=False)
+    tags: Mapped[Optional[str]] = mapped_column(String, nullable=True) # AI-generated keywords
     content_html: Mapped[Optional[str]] = mapped_column(EncryptedText, nullable=True)
     status: Mapped[str] = mapped_column(
         String, default="draft"

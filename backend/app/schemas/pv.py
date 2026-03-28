@@ -26,6 +26,7 @@ class PVBase(BaseModel):
     client_id: Optional[str] = None
     meeting_id: str
     title: str
+    tags: Optional[str] = None
     content_html: Optional[str] = None
     status: Optional[str] = "draft"
     language: Optional[str] = "fr"
@@ -38,10 +39,20 @@ class PVCreate(PVBase):
 
 class PVUpdate(BaseModel):
     title: Optional[str] = None
+    tags: Optional[str] = None
     content_html: Optional[str] = None
     status: Optional[str] = None
     language: Optional[str] = None
     is_validated: Optional[bool] = None
+
+
+class PVSummary(BaseModel):
+    id: str
+    tags: Optional[str] = None
+    status: str
+    
+    class Config:
+        from_attributes = True
 
 
 class PV(PVBase):

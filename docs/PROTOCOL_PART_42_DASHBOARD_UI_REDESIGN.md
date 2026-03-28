@@ -47,5 +47,19 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
 - **Eliminierung von "Müll":** Entfernung aller hartgecodeten englischen Strings und Fallbacks aus dem JSX-Code. Korrektur von Tippfehlern in der arabischen Übersetzung. Hinzufügen von Status-Schlüsseln (`late`, `overdue`, `expired`, `cancelled`, `completed`).
 - **RTL-Support:** Validierung der Layout-Spiegelung für das gesamte Dashboard.
 
+
+### 6. Protocol Archive & Intelligent AI Search (Library)
+- **Neues Modul `MeetingArchive.tsx`:** Eine dedizierte Seite für das Durchsuchen vergangener Meetings, zugänglich über die Sidebar ("Bibliothèque" / "الأرشيف").
+- **AI Tagging (Backend):**
+  - Erweiterung des `PV`-Modells und der Datenbank (`pvs` Tabelle) um ein unverschlüsseltes `tags`-Feld.
+  - Der Mistral-Prompt im `PVService` wurde so modifiziert, dass er automatisch 3-5 thematische Schlagworte aus dem Protokoll extrahiert.
+  - Die Tags werden vom Celery-Worker gespeichert und über das Schema `MeetingWithPV` (ohne Lazy-Loading-Fehler) an das Frontend geliefert.
+- **Smart Filter UI:**
+  - Die Archiv-Tabelle bietet Filter für Datum, Raum und "AI Topics".
+  - **Datensouveränität (ISO 27001):** Die Suche nach "Themen" filtert über die unverschlüsselten Mistral-Tags, während der eigentliche Protokollinhalt verschlüsselt bleibt.
+- **i18n & Datumsformatierung:**
+  - Ersatz von nativen HTML-Datumsfeldern durch den **MUI DatePicker** (`@mui/x-date-pickers`).
+  - Strikte Koppelung des `AdapterDayjs` an die aktive Sprache (`i18n.language`), sodass Kalender-Popups, Wochentage und Platzhalter (z.B. `JJ/MM/AAAA` für FR, arabische Formate für AR) vollautomatisch und nativ gerendert werden.
+
 ## 📊 ERGEBNIS
 Die Applikation wirkt nun wie aus einem Guss. Vom ersten Besuch der Landing Page bis zur Bearbeitung eines Protokolls im Meeting Room herrscht eine konsistente, hochprofessionelle Design-Sprache. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.

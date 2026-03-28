@@ -69,6 +69,7 @@ The JSON keys MUST remain exactly as follows:
 
 {{
   "title": "Meeting Title",
+  "tags": "keyword1, keyword2, keyword3",
   "summary": "Detailed summary of discussions",
   "decisions": ["Decision 1", "Decision 2"],
   "actions": [

@@ -72,7 +72,11 @@ class MeetingService:
 
         result = await self.db.execute(
             select(Meeting)
-            .options(selectinload(Meeting.participants), selectinload(Meeting.agendas))
+            .options(
+                selectinload(Meeting.participants), 
+                selectinload(Meeting.agendas),
+                selectinload(Meeting.pv)
+            )
             .where(Meeting.id == meeting_id)
             .where(Meeting.client_id == client_id)
         )

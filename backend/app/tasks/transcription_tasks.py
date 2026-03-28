@@ -125,7 +125,9 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr"):
     # Ensure is_validated is False by default for ISO integrity
     await db.execute(insert(PV).values(
         id=pv_id, client_id=str(recording.client_id), meeting_id=str(recording.meeting_id),
-        title=pv_data.get("title", "Meeting PV"), content_html=html, language=language, status="draft", is_validated=False
+        title=pv_data.get("title", "Meeting PV"), 
+        tags=pv_data.get("tags"),
+        content_html=html, language=language, status="draft", is_validated=False
     ))
     # ... (rest of action mapping logic remains as in stable version)
     await db.flush()

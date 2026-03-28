@@ -10,7 +10,7 @@ from app.models.meeting import Meeting as MeetingModel
 from app.models.meeting import Participant as ParticipantModel
 from app.models.user import User as UserModel
 from app.models.user import UserRole
-from app.schemas.meeting import Meeting, MeetingCreate
+from app.schemas.meeting import Meeting, MeetingCreate, MeetingWithPV
 from app.schemas.user import User
 from app.services.meeting_service import MeetingService
 
@@ -33,7 +33,7 @@ async def list_client_users(
     return result.scalars().all()
 
 
-@router.get("/", response_model=List[Meeting])
+@router.get("/", response_model=List[MeetingWithPV])
 async def read_meetings(
     db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
@@ -47,7 +47,9 @@ async def read_meetings(
         select(MeetingModel)
         .where(MeetingModel.client_id == current_user.client_id)
         .options(
-            selectinload(MeetingModel.participants), selectinload(MeetingModel.agendas)
+            selectinload(MeetingModel.participants), 
+            selectinload(MeetingModel.agendas),
+            selectinload(MeetingModel.pv)
         )
         .offset(skip)
         .limit(limit)
@@ -56,7 +58,7 @@ async def read_meetings(
     return meetings
 
 
-@router.get("/my-meetings", response_model=List[Meeting])
+@router.get("/my-meetings", response_model=List[MeetingWithPV])
 async def list_my_meetings(
     db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
@@ -70,7 +72,9 @@ async def list_my_meetings(
         select(MeetingModel)
         .where(MeetingModel.client_id == current_user.client_id)
         .options(
-            selectinload(MeetingModel.participants), selectinload(MeetingModel.agendas)
+            selectinload(MeetingModel.participants), 
+            selectinload(MeetingModel.agendas),
+            selectinload(MeetingModel.pv)
         )
         .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
         .where(ParticipantModel.user_id == current_user.id)
@@ -81,7 +85,7 @@ async def list_my_meetings(
     return meetings
 
 
-@router.get("/team-meetings", response_model=List[Meeting])
+@router.get("/team-meetings", response_model=List[MeetingWithPV])
 async def list_team_meetings(
     db: AsyncSession = Depends(deps.get_db),
     skip: int = 0,
@@ -107,7 +111,9 @@ async def list_team_meetings(
         select(MeetingModel)
         .where(MeetingModel.client_id == current_user.client_id)
         .options(
-            selectinload(MeetingModel.participants), selectinload(MeetingModel.agendas)
+            selectinload(MeetingModel.participants), 
+            selectinload(MeetingModel.agendas),
+            selectinload(MeetingModel.pv)
         )
         .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
         .where(ParticipantModel.user_id.in_(managed_user_ids))

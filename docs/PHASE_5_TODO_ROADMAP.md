@@ -62,3 +62,29 @@ Dieses Dokument dient als zentrale Checkliste für die noch ausstehenden Aufgabe
 - [x] Intelligente Teilnehmer-Zuweisung (Context Injection)
 - [x] Natives Arabisches PDF-Rendering (HarfBuzz/Pango)
 - [x] Dynamischer Meeting Planner (Teilnehmer & Zeitwahl)
+
+
+## 🧠 NEU: ENTERPRISE AI SEARCH & KNOWLEDGE BASE (Ollama RAG)
+**Status:** Geplant 📅
+**Ziel:** Transformation des starren Meeting-Archivs in ein interaktives, semantisch durchsuchbares "Firmen-Gedächtnis", das zu 100% lokal und ISO 27001-konform läuft.
+
+### 1. Backend-Architektur (Local RAG Pipeline)
+- [ ] **PostgreSQL `pgvector` Setup:** Erweiterung der Datenbank für die Speicherung von hochdimensionalen Vektoren.
+- [ ] **Embedding-Service:** Integration eines lokalen Ollama-Embedding-Modells (z. B. `nomic-embed-text`).
+- [ ] **Auto-Vektorisierung:** Workflow implementieren: Bei Klick auf `Approve & Sign` (`/pv/{id}/validate`) wird der PV-Text automatisch vektorisiert und in der DB gespeichert.
+- [ ] **Semantic Search API:** Neuer Endpunkt `/api/v1/search/semantic`, der Suchanfragen (User-Prompts) vektorisiert und die Top-3-relevantesten PV-Ausschnitte (Context) via Kosinus-Ähnlichkeit zurückgibt.
+- [ ] **LLM Answer Synthesis:** Der extrahierte Kontext wird an das lokale LLM (z. B. Qwen-1.5B) übergeben, um eine natürliche Antwort zu generieren (z. B. "Im Meeting vom 12.03. wurde beschlossen, dass...").
+
+### 2. Frontend-Architektur ("Command Palette" & Library)
+- [ ] **Global Command Palette (Navbar):** 
+  - Ein prominenter "Ask AI" Button (`✨ Ask your Meetings`) im Header.
+  - Tastenkürzel-Unterstützung (`Strg + K` / `Cmd + K`), um ein Mac-Spotlight/Raycast-ähnliches Overlay zu öffnen.
+  - Live-Streaming der LLM-Antwort direkt in das UI mit Quellen-Verlinkung auf die originalen PVs.
+- [ ] **PV Archive / Knowledge Base (Sidebar):** 
+  - Neuer Menüpunkt in der Sidebar für die klassische Recherche.
+  - Hochperformante Tabelle (Virtualisierung für tausende Einträge) mit Filtern für Datum, Raum und Teilnehmer.
+  - **Smart Filters:** Automatische Extraktion von Themenwolken/Tags (z. B. `#Budget`, `#HR`) durch Mistral, nach denen gefiltert werden kann.
+
+### 3. Infrastruktur & Compliance (ISO 27001)
+- [ ] **Ressourcen-Monitoring:** Überwachung des RAM/GPU-Verbrauchs des Embedding-Modells im Mission Control Dashboard.
+- [ ] **Multi-Tenant-Isolation (RLS):** Striktes Row-Level-Security-Enforcement in `pgvector`: Ein Tenant darf niemals Embeddings oder Suchergebnisse aus den PVs eines anderen Tenants erhalten.

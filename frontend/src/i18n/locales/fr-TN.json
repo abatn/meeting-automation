@@ -5,7 +5,7 @@
     "export": "Exporter le Rapport",
     "save": "Enregistrer",
     "cancel": "Annuler",
-    "search": "Rechercher...",
+    "search": "Rechercher",
     "filter": "Filtrer",
     "error": "Erreur",
     "success": "Succès",
@@ -20,7 +20,11 @@
     "actions": "Actions",
     "appNamePart1": "Meeting",
     "appNamePart2": "Automation",
-    "delete": "Effacer"
+    "delete": "Effacer",
+    "all": "Tous",
+    "view": "Voir",
+    "date_format": "LL",
+    "date_placeholder": "JJ/MM/AAAA"
   },
   "auth": {
     "loginTitle": "Connexion Entreprise",
@@ -37,7 +41,8 @@
     "reports": "Rapports d'Analyse",
     "team": "Gestion d'Équipe",
     "security": "Sécurité & Authentification",
-    "billing": "Abonnement & Facturation"
+    "billing": "Abonnement & Facturation",
+    "archive": "Bibliothèque"
   },
   "team": {
     "title": "Gestion d'Équipe",
@@ -257,7 +262,8 @@
       "pricing": "Tarifs",
       "faq": "FAQ",
       "login": "Connexion",
-      "start": "Démarrer"
+      "start": "Démarrer",
+      "archive": "Archives"
     },
     "hero": {
       "badge": "🚀 PIPELINE IA ENTERPRISE",
@@ -330,5 +336,14 @@
     "draft_card": "Brouillon IA",
     "complete": "Terminer & Enregistrer",
     "info": "Détails de la réunion"
+  },
+  "archive": {
+    "subtitle": "Parcourez et recherchez dans l'historique des réunions de votre entreprise.",
+    "date_from": "Du",
+    "date_to": "Au",
+    "no_results": "Aucune réunion archivée ne correspond à vos critères.",
+    "filter_topic": "Filtrer par sujet...",
+    "topics": "Sujets IA",
+    "search_placeholder": "ex. Planification du Budget"
   }
 }

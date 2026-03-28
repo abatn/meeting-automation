@@ -15,6 +15,7 @@ import AnalyticalReports from "./components/reports/AnalyticalReports";
 import MeetingPlanner from "./components/meetings/MeetingPlanner";
 import MeetingRoom from "./components/meetings/MeetingRoom";
 import ActionTracker from "./components/actions/ActionTracker";
+import MeetingArchive from "./components/archive/MeetingArchive";
 import TeamManagement from "./pages/team/TeamManagement";
 import OnlyOfficePage from "./pages/OnlyOfficePage";
 import MFASetup from "./components/auth/MFASetup";
@@ -106,6 +107,7 @@ function App() {
             <CssBaseline />
             <Routes>
               <Route path="/" element={<MainLayout>{getRegularDashboard()}</MainLayout>} />
+              <Route path="/archive" element={<MainLayout><MeetingArchive /></MainLayout>} />
               <Route path="/meetings" element={<MainLayout><MeetingPlanner /></MainLayout>} />
               <Route path="/meetings/live/:id" element={<MainLayout><MeetingRoom /></MainLayout>} />
               <Route path="/editor/:pvId" element={<OnlyOfficePage />} />

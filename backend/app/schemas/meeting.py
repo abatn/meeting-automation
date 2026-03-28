@@ -72,7 +72,6 @@ class MeetingUpdate(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 
-
 class Meeting(MeetingBase):
     id: str
     creator_id: str
@@ -84,3 +83,8 @@ class Meeting(MeetingBase):
 
     class Config:
         from_attributes = True
+
+from app.schemas.pv import PVSummary
+
+class MeetingWithPV(Meeting):
+    pv: Optional[PVSummary] = None

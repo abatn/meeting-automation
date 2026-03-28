@@ -242,7 +242,15 @@ async def get_pv_by_meeting(meeting_id: str, db: AsyncSession = Depends(deps.get
     if not pv: raise HTTPException(status_code=404, detail="PV for meeting not found")
     actions_result = await db.execute(select(ActionModel).where(ActionModel.meeting_id == meeting_id, ActionModel.client_id == current_user.client_id))
     actions = actions_result.scalars().all()
-    return {"id": pv.id, "meeting_id": pv.meeting_id, "content": pv.content_html, "status": pv.status, "actions": [{"id": a.id, "description": a.title, "priority": a.priority, "status": a.status} for a in actions]}
+    return {
+        "id": pv.id, 
+        "meeting_id": pv.meeting_id, 
+        "title": pv.title,
+        "tags": pv.tags,
+        "content": pv.content_html, 
+        "status": pv.status, 
+        "actions": [{"id": a.id, "description": a.title, "priority": a.priority, "status": a.status} for a in actions]
+    }
 
 
 @router.get("/{pv_id}")
@@ -253,7 +261,15 @@ async def get_pv(pv_id: str, db: AsyncSession = Depends(deps.get_db), current_us
     if not pv: raise HTTPException(status_code=404, detail="PV not found")
     actions_result = await db.execute(select(ActionModel).where(ActionModel.meeting_id == pv.meeting_id, ActionModel.client_id == current_user.client_id))
     actions = actions_result.scalars().all()
-    return {"id": pv.id, "meeting_id": pv.meeting_id, "content": pv.content_html, "status": pv.status, "actions": [{"id": a.id, "description": a.description, "assigned_to": "Mocked User"} for a in actions]}
+    return {
+        "id": pv.id, 
+        "meeting_id": pv.meeting_id, 
+        "title": pv.title,
+        "tags": pv.tags,
+        "content": pv.content_html, 
+        "status": pv.status, 
+        "actions": [{"id": a.id, "description": a.description, "assigned_to": "Mocked User"} for a in actions]
+    }
 
 
 @router.post("/{pv_id}/validate")

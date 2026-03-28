@@ -5,7 +5,7 @@
     "export": "Export Report",
     "save": "Save",
     "cancel": "Cancel",
-    "search": "Search...",
+    "search": "Search Meetings",
     "filter": "Filter",
     "error": "Error",
     "success": "Success",
@@ -20,7 +20,11 @@
     "actions": "Actions",
     "appNamePart1": "Meeting",
     "appNamePart2": "Automation",
-    "delete": "Delete"
+    "delete": "Delete",
+    "all": "All",
+    "view": "View",
+    "date_format": "LL",
+    "date_placeholder": "DD/MM/YYYY"
   },
   "auth": {
     "loginTitle": "Enterprise Login",
@@ -37,7 +41,8 @@
     "reports": "Analytical Reports",
     "team": "Team Management",
     "security": "Security & MFA",
-    "billing": "Subscription & Billing"
+    "billing": "Subscription & Billing",
+    "archive": "Library"
   },
   "team": {
     "title": "Team Management",
@@ -260,7 +265,8 @@
       "pricing": "Pricing",
       "faq": "FAQ",
       "login": "Login",
-      "start": "Start Free Trial"
+      "start": "Start Free Trial",
+      "archive": "Archive"
     },
     "hero": {
       "badge": "🚀 ENTERPRISE AI PIPELINE",
@@ -333,5 +339,14 @@
     "draft_card": "AI-Generated Draft",
     "complete": "Complete & Save",
     "info": "Meeting Details"
+  },
+  "archive": {
+    "subtitle": "Browse and search through your company's meeting history.",
+    "date_from": "From",
+    "date_to": "To",
+    "no_results": "No archived meetings found matching your criteria.",
+    "filter_topic": "Filter by Topic...",
+    "topics": "AI Topics",
+    "search_placeholder": "e.g. Budget Planning"
   }
 }

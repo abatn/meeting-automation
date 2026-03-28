@@ -15,6 +15,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../store";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import EventIcon from "@mui/icons-material/Event";
+import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import PeopleIcon from "@mui/icons-material/People";
@@ -33,6 +34,7 @@ const Sidebar: React.FC = () => {
   const coreItems = [
     { text: t("sidebar.dashboard"), icon: <DashboardIcon fontSize="small" />, path: "/" },
     { text: t("sidebar.meetings"), icon: <EventIcon fontSize="small" />, path: "/meetings" },
+    { text: t("sidebar.archive"), icon: <CollectionsBookmarkIcon fontSize="small" />, path: "/archive" },
     { text: t("sidebar.actions"), icon: <AssignmentIcon fontSize="small" />, path: "/actions" },
     { text: t("sidebar.reports"), icon: <AssessmentIcon fontSize="small" />, path: "/reports" },
   ];
