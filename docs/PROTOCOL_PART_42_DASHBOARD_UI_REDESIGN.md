@@ -21,11 +21,22 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
 - **Workflow-Optimierung:** 
     - "Edit Online" Button mit automatischer `pvId`-Abfrage (Polling) zur nahtlosen OnlyOffice-Anbindung.
     - Export-Optionen (PDF) direkt in der Dokumenten-Toolbar neben der Sprachwahl positioniert.
+    - Der "Approve & Sign" Button löst nun den korrekten Endpunkt `/validate` für den n8n-Webhook aus und ist durch Doppelklick-Schutz (`isApproving`) gesichert.
 - **Visuelles Feedback:** Pulsierender "LIVE"-Badge und rote Record-Indikatoren.
 
 ### 3. Meeting Planner (MeetingPlanner.tsx)
-- **Struktur:** 7/5 Grid-Layout. Links kompaktes Planungs-Formular mit gruppierten Zeit/Datum-Feldern. Rechts dichte Liste der letzten Meetings und Kultur-Kalender.
+- **Struktur:** 7/5 Grid-Layout. Links kompaktes Planungs-Formular mit gruppierten Zeit/Datum-Feldern. Rechts dynamische und dichte Liste der letzten Meetings und Kultur-Kalender.
 - **Design:** Flache Outline-Karten, `borderRadius: 3`, keine Elevation.
+- **Smart Navigation:** 
+    - Automatische Erkennung, ob ein Meeting in `<= 15 Minuten` startet (Sprung in den Live Room) oder in der Zukunft liegt (Formular-Reset mit Bestätigung).
+- **Intelligente Meeting-Liste (Recent Meetings):**
+    - Filtern von abgesagten (`cancelled`) Meetings aus der Schnellauswahl.
+    - Dringlichkeits-Sortierung: `in_progress` > `planned` (nach Nähe) > `completed`.
+    - Phasengesteuerte Buttons: Geplante Meetings zeigen `Start Now` und `Cancel`. Der `Join Room` Button wird erst 15 Minuten vor Start leuchtend grün. Überfällige Meetings wechseln auf den Status `late`. Abgelaufene Meetings (`expired`) werden durchgestrichen und zeigen nur noch `Delete`.
+- **Soft Cancel:** Implementierung eines neuen Backend-Endpunkts `PATCH /api/v1/meetings/{id}/cancel` zur Statusänderung (ISO 27001 Audit-Trail) ohne Hard Delete.
+- **Logik-Restaurierung:** 
+    - Die asynchrone Live-Suche im Team-Directory (`teamApi.searchTeam`) bei der Teilnehmer-Auswahl wurde wiederhergestellt.
+    - Der *Tunisian Cultural Calendar* (Feiertags-Sperre und Warnungen) wurde in das neue flache Design integriert.
 
 ### 4. Action Tracker & Berichte
 - **Tracker:** Kompakte Tabelle mit `12px` Header (uppercase) und `14px` Inhalten. Subtile Hover-Effekte und eckige Action-Buttons (`borderRadius: 2`).
@@ -33,27 +44,8 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
 
 ### 5. Internationalisierung (i18n) & Korrekturen
 - **Harmonisierung:** Alle 3 JSON-Dateien (EN, FR, AR) auf exakt gleiche Struktur gebracht.
-- **Eliminierung von "Müll":** Entfernung aller hartgecodeten englischen Strings und Fallbacks aus dem JSX-Code. Korrektur von Tippfehlern in der arabischen Übersetzung.
+- **Eliminierung von "Müll":** Entfernung aller hartgecodeten englischen Strings und Fallbacks aus dem JSX-Code. Korrektur von Tippfehlern in der arabischen Übersetzung. Hinzufügen von Status-Schlüsseln (`late`, `overdue`, `expired`, `cancelled`, `completed`).
 - **RTL-Support:** Validierung der Layout-Spiegelung für das gesamte Dashboard.
-
-
-### 4. Redesign & Logik-Fix: MeetingRoom.tsx (Live Assistant)
-- **2-Spalten-Architektur:** Kompaktes Control Center links (Timer, AI Recommendations) und PV Validation Workflow rechts (Transcription vs. Draft).
-- **i18n Striktheit:** Entfernung aller hartgecodeten englischen Texte. Neue Sektion `meeting_assistant` in allen JSON-Dateien eingeführt.
-- **Workflow-Optimierung:** 
-  - Integration von OnlyOffice (`pv.edit_online`) und PDF-Export in eine saubere Toolbar neben der Sprachauswahl.
-  - Der "Approve & Sign" Button sendet nun den korrekten `POST /api/v1/pv/{pvId}/validate` Request an das Backend, um den **n8n Webhook** auszulösen.
-  - Doppel-Klick-Schutz und visuelles Feedback (Ladekringel, grünes "Validated" Häkchen) für den Approve-Button implementiert.
-
-### 5. Logik-Fix: MeetingPlanner.tsx (Smart Navigation & Soft Cancel)
-- **Smart Navigation:** Bei der Meeting-Erstellung prüft das System nun, ob das Meeting in <= 15 Minuten startet. Zukunfts-Meetings navigieren nicht mehr fälschlicherweise in den Live-Raum, sondern zeigen eine Erfolgsmeldung und leeren das Formular.
-- **Interaktive Meeting-Liste:**
-  - Jedes Meeting in der Liste hat nun kontext-sensitive Buttons.
-  - Zukunfts-Meetings zeigen einen grauen "Scheduled" Button. Startet das Meeting in <= 15 Minuten, wird der Button zu einem grünen "Join Room" CTA.
-  - "Start Now" erlaubt Managern jederzeit den erzwungenen Start.
-- **Soft Cancel (Backend & Frontend):** 
-  - Implementierung des neuen Endpunkts `PATCH /api/v1/meetings/{id}/cancel` im Backend.
-  - Das Frontend ermöglicht nun das sichere Absagen (Cancel) von Meetings. Abgesagte oder abgelaufene ("Expired") Meetings werden in der Liste ausgegraut und durchgestrichen dargestellt. Die Datenbank-Integrität (ISO 27001 Audit-Trail) bleibt erhalten (kein Hard-Delete).
 
 ## 📊 ERGEBNIS
 Die Applikation wirkt nun wie aus einem Guss. Vom ersten Besuch der Landing Page bis zur Bearbeitung eines Protokolls im Meeting Room herrscht eine konsistente, hochprofessionelle Design-Sprache. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.

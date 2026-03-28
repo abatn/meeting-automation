@@ -19,7 +19,8 @@
     "downloading": "جاري التحميل...",
     "actions": "إجراءات",
     "appNamePart1": "أتمتة",
-    "appNamePart2": "الاجتماعات"
+    "appNamePart2": "الاجتماعات",
+    "delete": "حذف"
   },
   "auth": {
     "loginTitle": "تسجيل دخول المؤسسة",
@@ -148,7 +149,18 @@
     "start_recording": "بدء",
     "uploading": "جاري رفع الصوت إلى S3 الآمن...",
     "transcription_started": "تم تفعيل خدمة النسخ بنجاح.",
-    "upload_file": "رفع ملف صوتي/فيديو موجود"
+    "upload_file": "رفع ملف صوتي/فيديو موجود",
+    "start_now": "بدء",
+    "join_room": "انضمام",
+    "scheduled": "مجدول",
+    "created_success": "تم جدولة الاجتماع بنجاح للمستقبل.",
+    "late": "متأخر",
+    "overdue": "تجاوز الوقت",
+    "planned": "مجدول",
+    "cancelled": "ملغى",
+    "completed": "مكتمل",
+    "expired": "منتهي",
+    "in_progress": "جاري الآن"
   },
   "actions": {
     "tracker_title": "متتبع المهام",

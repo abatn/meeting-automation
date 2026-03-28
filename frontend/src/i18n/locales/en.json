@@ -19,7 +19,8 @@
     "downloading": "Downloading...",
     "actions": "Actions",
     "appNamePart1": "Meeting",
-    "appNamePart2": "Automation"
+    "appNamePart2": "Automation",
+    "delete": "Delete"
   },
   "auth": {
     "loginTitle": "Enterprise Login",
@@ -148,7 +149,17 @@
     "start_recording": "Start",
     "uploading": "Uploading Audio to Secure S3...",
     "transcription_started": "Transcription service triggered successfully.",
-    "upload_file": "Upload existing audio/video"
+    "upload_file": "Upload existing audio/video",
+    "start_now": "Start",
+    "join_room": "Join",
+    "scheduled": "Planned",
+    "late": "Late",
+    "overdue": "Overdue",
+    "planned": "Planned",
+    "cancelled": "Cancelled",
+    "completed": "Completed",
+    "expired": "Expired",
+    "in_progress": "Live"
   },
   "actions": {
     "tracker_title": "Action Items Tracker",

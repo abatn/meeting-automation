@@ -19,7 +19,8 @@
     "downloading": "Téléchargement...",
     "actions": "Actions",
     "appNamePart1": "Meeting",
-    "appNamePart2": "Automation"
+    "appNamePart2": "Automation",
+    "delete": "Effacer"
   },
   "auth": {
     "loginTitle": "Connexion Entreprise",
@@ -144,7 +145,18 @@
     "start_recording": "Démarrer",
     "uploading": "Téléchargement audio vers S3 sécurisé...",
     "transcription_started": "Service de transcription déclenché avec succès.",
-    "upload_file": "Télécharger un fichier audio/vidéo existant"
+    "upload_file": "Télécharger un fichier audio/vidéo existant",
+    "start_now": "Lancer",
+    "join_room": "Entrer",
+    "scheduled": "Prévu",
+    "created_success": "Séance planifiée avec succès.",
+    "late": "En retard",
+    "overdue": "Échu",
+    "planned": "Programmé",
+    "cancelled": "Annulé",
+    "completed": "Terminé",
+    "expired": "Expiré",
+    "in_progress": "En cours"
   },
   "actions": {
     "tracker_title": "Suivi des Actions",
