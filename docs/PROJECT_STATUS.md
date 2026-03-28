@@ -48,6 +48,7 @@ Diese Phase finalisiert die Plattform für den kommerziellen Betrieb.
 
 - [x] **Billing & Payment**: Integration von Rechnungen, Minutenverbrauch-Tracking und Stripe-Logik.
 - [x] **Public Landing Page**: Modernisierung im "Modern Enterprise"-Stil (Linear/Stripe) mit voller Trilingualität (AR, FR, EN), RTL-Support und Noto Sans Arabic.
+- [x] **Dashboard & Meeting Room Redesign**: Vollständige visuelle Überarbeitung der internen App (Cockpit, Planner, Assistant) für ein konsistentes Enterprise-Gefühl. 100% i18n Striktheit ohne Fallbacks.
 - [x] **Technik-Dashboard**: System-Monitoring für den Betreiber.
 
 ## Phase 5: Production Operations & Global Optimization (Next)

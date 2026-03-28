@@ -6,10 +6,8 @@ import {
   ListItemIcon,
   ListItemText,
   ListItemButton,
-  Divider,
   Box,
   Toolbar,
-  Typography,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -19,36 +17,34 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import EventIcon from "@mui/icons-material/Event";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import AssessmentIcon from "@mui/icons-material/Assessment";
-import SecurityIcon from "@mui/icons-material/Security";
-import PaymentIcon from "@mui/icons-material/Payment";
 import PeopleIcon from "@mui/icons-material/People";
+import PaymentIcon from "@mui/icons-material/Payment";
 
 const drawerWidth = 240;
 
 const Sidebar: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useSelector((state: RootState) => state.auth);
 
   const isBusinessAdmin = user?.role === "system_admin";
 
-  const menuItems = [
-    { text: t("sidebar.dashboard"), icon: <DashboardIcon />, path: "/" },
-    { text: t("sidebar.meetings"), icon: <EventIcon />, path: "/meetings" },
-    { text: t("sidebar.actions"), icon: <AssignmentIcon />, path: "/actions" },
-    { text: t("sidebar.reports"), icon: <AssessmentIcon />, path: "/reports" },
-    { text: t("sidebar.team"), icon: <PeopleIcon />, path: "/team" },
-    { text: t("sidebar.billing"), icon: <PaymentIcon />, path: "/billing" },
+  const coreItems = [
+    { text: t("sidebar.dashboard"), icon: <DashboardIcon fontSize="small" />, path: "/" },
+    { text: t("sidebar.meetings"), icon: <EventIcon fontSize="small" />, path: "/meetings" },
+    { text: t("sidebar.actions"), icon: <AssignmentIcon fontSize="small" />, path: "/actions" },
+    { text: t("sidebar.reports"), icon: <AssessmentIcon fontSize="small" />, path: "/reports" },
   ];
 
   const adminItems = [
-    { text: t("admin.businessOverview"), icon: <DashboardIcon />, path: "/" },
-    { text: t("admin.manageClients"), icon: <PeopleIcon />, path: "/admin/clients" },
-    { text: t("admin.revenueBilling"), icon: <PaymentIcon />, path: "/billing" },
+    { text: t("admin.businessOverview"), icon: <DashboardIcon fontSize="small" />, path: "/" },
+    { text: t("admin.manageClients"), icon: <PeopleIcon fontSize="small" />, path: "/admin/clients" },
+    { text: t("admin.revenueBilling"), icon: <PaymentIcon fontSize="small" />, path: "/billing" },
   ];
 
-  const currentItems = isBusinessAdmin ? adminItems : menuItems;
+  const currentItems = isBusinessAdmin ? adminItems : coreItems;
+  const isRtl = i18n.dir() === "rtl";
 
   return (
     <Drawer
@@ -59,57 +55,50 @@ const Sidebar: React.FC = () => {
         [`& .MuiDrawer-paper`]: {
           width: drawerWidth,
           boxSizing: "border-box",
-          bgcolor: "background.paper",
-          borderRight: "1px solid rgba(0, 0, 0, 0.12)",
+          bgcolor: "#F9FAFB",
+          borderRight: isRtl ? "none" : "1px solid rgba(0, 0, 0, 0.05)",
+          borderLeft: isRtl ? "1px solid rgba(0, 0, 0, 0.05)" : "none",
         },
       }}
     >
       <Toolbar />
-      <Box sx={{ overflow: "auto" }}>
-        <List sx={{ pt: 2 }}>
-          {currentItems.map((item) => (
-            <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
-              <ListItemButton
-                selected={location.pathname === item.path}
-                onClick={() => navigate(item.path)}
-                sx={{
-                  mx: 1,
-                  borderRadius: 2,
-                  "&.Mui-selected": {
-                    bgcolor: isBusinessAdmin ? "secondary.light" : "primary.light",
-                    color: isBusinessAdmin ? "secondary.main" : "primary.main",
-                    "& .MuiListItemIcon-root": {
-                      color: isBusinessAdmin ? "secondary.main" : "primary.main",
-                    },
-                  },
-                }}
-              >
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                <ListItemText
-                  primary={item.text}
-                  primaryTypographyProps={{
-                    fontWeight:
-                      location.pathname === item.path ? "bold" : "normal",
-                  }}
-                />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
-        
-        <Divider sx={{ my: 2 }} />
+      <Box sx={{ overflow: "auto", px: 2, pt: 3 }}>
         <List>
-          <ListItem disablePadding sx={{ mx: 1 }}>
-            <ListItemButton
-              onClick={() => navigate("/settings")}
-              sx={{ borderRadius: 2 }}
-            >
-              <ListItemIcon>
-                <SecurityIcon />
-              </ListItemIcon>
-              <ListItemText primary={t("sidebar.security")} />
-            </ListItemButton>
-          </ListItem>
+          {currentItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+                <ListItemButton
+                  onClick={() => navigate(item.path)}
+                  sx={{
+                    borderRadius: "8px",
+                    py: 1,
+                    px: 1.5,
+                    bgcolor: isActive ? "rgba(0, 0, 0, 0.04)" : "transparent",
+                    color: isActive ? "#000" : "#52525B",
+                    "&:hover": {
+                      bgcolor: isActive ? "rgba(0, 0, 0, 0.04)" : "rgba(0, 0, 0, 0.02)",
+                      color: "#000",
+                    },
+                    "& .MuiListItemIcon-root": {
+                      color: isActive ? "#000" : "#71717A",
+                      minWidth: "32px",
+                    },
+                  }}
+                >
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  <ListItemText
+                    primary={item.text}
+                    primaryTypographyProps={{
+                      fontWeight: isActive ? 600 : 500,
+                      fontSize: "14px",
+                      letterSpacing: "-0.01em",
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            );
+          })}
         </List>
       </Box>
     </Drawer>

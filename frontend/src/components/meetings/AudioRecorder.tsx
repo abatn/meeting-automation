@@ -112,10 +112,17 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
           {!isRecording && !isFinishing && (
             <Button
               variant="contained"
-              color="primary"
               startIcon={<MicIcon />}
               onClick={handleStart}
               size="large"
+              sx={{ 
+                bgcolor: "#10B981", 
+                color: "#FFF", 
+                boxShadow: "none", 
+                textTransform: "none",
+                fontWeight: 600,
+                "&:hover": { bgcolor: "#059669", boxShadow: "none" } 
+              }}
             >
               Start Meeting
             </Button>
@@ -127,12 +134,26 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
                 color="secondary"
                 onClick={isPaused ? resumeRecording : pauseRecording}
                 size="large"
+                sx={{ border: "1px solid", borderColor: "divider" }}
               >
                 {isPaused ? <PlayArrowIcon /> : <PauseIcon />}
               </IconButton>
-              <IconButton color="error" onClick={handleStop} size="large">
-                <StopIcon />
-              </IconButton>
+              <Button
+                variant="contained"
+                startIcon={<StopIcon />}
+                onClick={handleStop}
+                size="large"
+                sx={{ 
+                  bgcolor: "#EF4444", 
+                  color: "#FFF", 
+                  boxShadow: "none", 
+                  textTransform: "none",
+                  fontWeight: 600,
+                  "&:hover": { bgcolor: "#DC2626", boxShadow: "none" } 
+                }}
+              >
+                Finish Meeting
+              </Button>
             </>
           )}
         </Box>

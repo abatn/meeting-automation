@@ -14,6 +14,7 @@ import {
   IconButton,
   Tooltip,
   CircularProgress,
+  alpha,
 } from "@mui/material";
 import {
   AutoFixHigh as SuggestionIcon,
@@ -80,118 +81,152 @@ const MeetingRoom: React.FC = () => {
   };
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <Typography variant="h4" gutterBottom>
-        Meeting Room: {id}
-      </Typography>
+    <Box sx={{ p: { xs: 2, md: 6 }, maxWidth: 1600, mx: "auto" }}>
+      
+      {/* HEADER */}
+      <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 4 }}>
+        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#3B82F6", animation: "pulse 2s infinite" }} />
+        <Typography sx={{ fontSize: 18, fontWeight: 600, color: "text.primary" }}>
+          Meeting Room: {id}
+        </Typography>
+        <style>
+          {`@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }`}
+        </style>
+      </Stack>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={4}>
         {/* Left Column: Live Recording Controls & Meeting Info */}
         <Grid item xs={12} md={4}>
-          <Box sx={{ mb: 3 }}>
-            <AudioRecorder
-              meetingId={id!}
-              onUploadSuccess={() => setActiveTab(1)}
-            />
-          </Box>
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Meeting Info
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Typography variant="body2">
-              <strong>ID:</strong> {id}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Status:</strong> Live
-            </Typography>
-          </Paper>
+          <Stack spacing={3}>
+            <Box>
+              <AudioRecorder
+                meetingId={id!}
+                onUploadSuccess={() => setActiveTab(1)}
+              />
+            </Box>
 
-          {/* AI Recommendations under Meeting Info */}
-          <Paper 
-            sx={{ 
-              p: 2, 
-              bgcolor: "#fff9f0", 
-              borderColor: "#ffe0b2", 
-              border: "1px solid",
-              minHeight: '200px',
-              display: 'flex',
-              flexDirection: 'column',
-              position: 'relative'
-            }}
-          >
-            {translating && (
-              <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, bgcolor: 'rgba(255,255,255,0.5)', zIndex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <CircularProgress size={24} color="secondary" />
-              </Box>
-            )}
-            <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 'bold', color: 'secondary.main' }}>
-              <SuggestionIcon /> AI Recommendations
-              <Badge badgeContent={suggestions.length} color="error" sx={{ ml: 1 }} />
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            
-            {suggestions.length === 0 ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1, color: 'text.secondary', textAlign: 'center' }}>
-                <Typography variant="body2">
-                  No suggestions yet. Once the meeting is processed, AI will recommend tasks here.
+            <Box sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
+              <Typography sx={{ fontSize: 15, fontWeight: 600, mb: 2 }}>
+                Meeting Info
+              </Typography>
+              <Stack spacing={1}>
+                <Typography sx={{ fontSize: 13, color: "text.secondary", display: 'flex', justifyContent: 'space-between' }}>
+                  <span>ID:</span> <strong style={{ color: '#000' }}>{id}</strong>
                 </Typography>
-              </Box>
-            ) : (
-              <Stack spacing={2} sx={{ maxHeight: "500px", overflowY: "auto", pr: 1 }}>
-                {suggestions.map((suggestion) => (
-                  <Box key={suggestion.id} sx={{ p: 1.5, bgcolor: "white", borderRadius: 1, boxShadow: 1, border: '1px solid #eee' }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: "bold" }}>{suggestion.title}</Typography>
-                    <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 1 }}>{suggestion.description}</Typography>
-                    {suggestion.suggested_assignee && (
-                      <Typography variant="caption" sx={{ display: 'inline-block', bgcolor: '#f5f5f5', px: 1, py: 0.5, borderRadius: 1, mb: 1 }}>
-                        👤 For: <strong>{suggestion.suggested_assignee}</strong>
-                      </Typography>
-                    )}
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button 
-                        size="small" 
-                        color="success" 
-                        variant="contained" 
-                        startIcon={<AddIcon />}
-                        onClick={() => handleSuggestionFeedback(suggestion.id, "accept")}
-                      >
-                        Accept
-                      </Button>
-                      <Button 
-                        size="small" 
-                        color="error" 
-                        variant="outlined" 
-                        startIcon={<RejectIcon />}
-                        onClick={() => handleSuggestionFeedback(suggestion.id, "reject")}
-                      >
-                        Reject
-                      </Button>
-                    </Stack>
-                  </Box>
-                ))}
+                <Typography sx={{ fontSize: 13, color: "text.secondary", display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Status:</span> <strong style={{ color: '#3B82F6' }}>Live</strong>
+                </Typography>
               </Stack>
-            )}
-          </Paper>
+            </Box>
+
+            {/* AI Recommendations under Meeting Info */}
+            <Box 
+              sx={{ 
+                p: 3, 
+                borderRadius: 3, 
+                border: "1px solid",
+                borderColor: "divider",
+                bgcolor: alpha("#000", 0.01),
+                minHeight: '300px',
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'relative'
+              }}
+            >
+              {translating && (
+                <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, bgcolor: 'rgba(255,255,255,0.7)', zIndex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: 3 }}>
+                  <CircularProgress size={24} sx={{ color: "#000" }} />
+                </Box>
+              )}
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2.5 }}>
+                <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 15, fontWeight: 600, color: "text.primary" }}>
+                  <SuggestionIcon sx={{ fontSize: 20 }} /> AI Recommendations
+                </Typography>
+                <Badge 
+                  badgeContent={suggestions.length} 
+                  sx={{ 
+                    "& .MuiBadge-badge": { bgcolor: "#000", color: "#FFF", fontSize: 10, fontWeight: 700 } 
+                  }} 
+                />
+              </Stack>
+              
+              {suggestions.length === 0 ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1, color: 'text.secondary', textAlign: 'center', p: 4 }}>
+                  <Typography sx={{ fontSize: 13 }}>
+                    No suggestions yet. Once the meeting is processed, AI will recommend tasks here.
+                  </Typography>
+                </Box>
+              ) : (
+                <Stack spacing={2} sx={{ maxHeight: "600px", overflowY: "auto", pr: 1 }}>
+                  {suggestions.map((suggestion) => (
+                    <Box key={suggestion.id} sx={{ p: 2, bgcolor: "#FFF", borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                      <Typography sx={{ fontSize: 14, fontWeight: 600, color: "text.primary", mb: 0.5 }}>{suggestion.title}</Typography>
+                      <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 2, display: 'block', lineHeight: 1.5 }}>{suggestion.description}</Typography>
+                      {suggestion.suggested_assignee && (
+                        <Typography sx={{ display: 'inline-block', bgcolor: alpha("#000", 0.04), px: 1, py: 0.5, borderRadius: 1, fontSize: 11, fontWeight: 500, mb: 2 }}>
+                          👤 For: <strong>{suggestion.suggested_assignee}</strong>
+                        </Typography>
+                      )}
+                      <Stack direction="row" spacing={1}>
+                        <Button 
+                          size="small" 
+                          variant="contained" 
+                          disableElevation
+                          onClick={() => handleSuggestionFeedback(suggestion.id, "accept")}
+                          sx={{ 
+                            flexGrow: 1, bgcolor: "#000", color: "#FFF", borderRadius: 1.5, textTransform: "none", fontSize: 12, fontWeight: 600, py: 0.8,
+                            "&:hover": { bgcolor: "#27272A" }
+                          }}
+                        >
+                          Accept
+                        </Button>
+                        <Button 
+                          size="small" 
+                          variant="outlined" 
+                          onClick={() => handleSuggestionFeedback(suggestion.id, "reject")}
+                          sx={{ 
+                            borderRadius: 1.5, textTransform: "none", fontSize: 12, fontWeight: 600, py: 0.8, borderColor: "divider", color: "text.primary",
+                            "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
+                          }}
+                        >
+                          Reject
+                        </Button>
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+          </Stack>
         </Grid>
 
         {/* Right Column: Dynamic Content (Transcription / PV) */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ width: "100%", mb: 2 }}>
-            <Tabs value={activeTab} onChange={handleTabChange} centered>
+          <Box sx={{ width: "100%", mb: 4, borderBottom: 1, borderColor: "divider" }}>
+            <Tabs 
+              value={activeTab} 
+              onChange={handleTabChange}
+              sx={{
+                "& .MuiTabs-indicator": { bgcolor: "#000", height: 2 },
+                "& .MuiTab-root": { textTransform: "none", fontSize: 14, fontWeight: 600, color: "text.secondary", py: 2 },
+                "& .Mui-selected": { color: "#000 !important" }
+              }}
+            >
               <Tab label={t("meetings.live_transcription")} />
               <Tab label={t("meetings.protocol_pv")} />
             </Tabs>
-          </Paper>
+          </Box>
 
-          {activeTab === 0 && <TranscriptionViewer meetingId={id!} />}
+          <Box sx={{ minHeight: '70vh' }}>
+            {activeTab === 0 && <TranscriptionViewer meetingId={id!} />}
 
-          {activeTab === 1 && (
-            <PVValidator 
-              exportLanguage={exportLanguage} 
-              onLanguageChange={setExportLanguage} 
-            />
-          )}
+            {activeTab === 1 && (
+              <PVValidator 
+                exportLanguage={exportLanguage} 
+                onLanguageChange={setExportLanguage} 
+              />
+            )}
+          </Box>
         </Grid>
       </Grid>
     </Box>

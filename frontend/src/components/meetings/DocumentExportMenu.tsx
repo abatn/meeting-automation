@@ -5,11 +5,12 @@ import { useTranslation } from "react-i18next";
 import api from "../../services/api";
 
 interface Props {
-  pvId: string;
+  pvId: string | null;
   language: string;
   fileName?: string;
   variant?: "contained" | "outlined" | "text";
   showDocx?: boolean;
+  disabled?: boolean;
 }
 
 const DocumentExportMenu: React.FC<Props> = ({
@@ -18,6 +19,7 @@ const DocumentExportMenu: React.FC<Props> = ({
   fileName,
   variant = "contained",
   showDocx = true,
+  disabled = false,
 }) => {
   const { t } = useTranslation();
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -25,6 +27,7 @@ const DocumentExportMenu: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
 
   const handleDownload = async (format: "pdf" | "docx") => {
+    if (!pvId) return;
     try {
       if (format === "pdf") setDownloadingPdf(true);
       else setDownloadingDocx(true);
@@ -59,13 +62,23 @@ const DocumentExportMenu: React.FC<Props> = ({
   };
 
   return (
-    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
       <Button
         variant={variant}
-        color="error"
+        color="inherit"
         onClick={() => handleDownload("pdf")}
-        disabled={downloadingPdf || downloadingDocx}
+        disabled={disabled || downloadingPdf || downloadingDocx || !pvId}
         startIcon={downloadingPdf ? <CircularProgress size={20} color="inherit" /> : <PdfIcon />}
+        sx={{ 
+          borderRadius: 2, 
+          textTransform: "none", 
+          fontWeight: 600, 
+          fontSize: 14, 
+          borderColor: "divider", 
+          color: "text.primary",
+          px: 2,
+          "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
+        }}
       >
         PDF
       </Button>
@@ -73,10 +86,20 @@ const DocumentExportMenu: React.FC<Props> = ({
       {showDocx && (
         <Button
           variant={variant}
-          color="primary"
+          color="inherit"
           onClick={() => handleDownload("docx")}
-          disabled={downloadingPdf || downloadingDocx}
+          disabled={disabled || downloadingPdf || downloadingDocx || !pvId}
           startIcon={downloadingDocx ? <CircularProgress size={20} color="inherit" /> : <DocxIcon />}
+          sx={{ 
+            borderRadius: 2, 
+            textTransform: "none", 
+            fontWeight: 600, 
+            fontSize: 14, 
+            borderColor: "divider", 
+            color: "text.primary",
+            px: 2,
+            "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
+          }}
         >
           Word
         </Button>

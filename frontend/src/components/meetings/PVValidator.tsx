@@ -17,6 +17,7 @@ import {
   FormControl,
   InputLabel,
   Dialog,
+  alpha,
 } from "@mui/material";
 import {
   CheckCircle as ApproveIcon,
@@ -121,84 +122,70 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
   }
 
   return (
-    <Box sx={{ p: 3, height: "calc(100vh - 100px)" }}>
+    <Box sx={{ p: 3, height: "calc(100vh - 100px)", display: "flex", flexDirection: "column" }}>
       {error && !pvContent && (
         <Alert severity="info" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
 
-      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2, alignItems: "center" }}>
-        <Typography variant="h5" fontWeight="bold">{t("pv.validator_title")}</Typography>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel id="export-lang-label">{t("common.language") || "Language"}</InputLabel>
+      {/* Header with Tools */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3, alignItems: "center", flexWrap: "wrap", gap: 2 }}>
+        <Typography sx={{ fontSize: 18, fontWeight: 600, color: "text.primary" }}>
+          {t("pv.validator_title")}
+        </Typography>
+        
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel id="export-lang-label" sx={{ fontSize: 14 }}>{t("common.language") || "Language"}</InputLabel>
             <Select
               labelId="export-lang-label"
               value={exportLanguage}
               label={t("common.language") || "Language"}
               onChange={(e) => onLanguageChange(e.target.value as string)}
-              startIcon={<LanguageIcon fontSize="small" />}
+              sx={{ borderRadius: 2, bgcolor: "background.paper" }}
             >
               <MenuItem value="ar">العربية</MenuItem>
               <MenuItem value="fr">Français</MenuItem>
               <MenuItem value="en">English</MenuItem>
             </Select>
           </FormControl>
-
-          <Button variant="outlined" startIcon={<HistoryIcon />}>
-            {t("pv.versions")}
-          </Button>
-
-          <Button 
-            href={`/editor/${pvId}?lang=${exportLanguage}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.open(`/editor/${pvId}?lang=${exportLanguage}`, '_blank');
-            }}
-            variant="contained" 
-            color="primary" 
-            startIcon={<EditIcon />}
-            disabled={!pvId}
-          >
-            {t("pv.edit_online") || "Edit Online"}
-          </Button>
           
-          {pvId && (
-            <DocumentExportMenu 
-              pvId={pvId} 
-              language={exportLanguage} 
-              variant="outlined" 
-              showDocx={false}
-            />
-          )}
-
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<ApproveIcon />}
-            onClick={handleApprove}
+          <Button 
+            variant="outlined" 
+            size="medium" 
+            startIcon={<EditIcon />} 
+            disabled={!pvId || !originalTranscript}
+            sx={{ borderRadius: 2, textTransform: "none", color: "text.primary", borderColor: "divider", bgcolor: "background.paper", "&:hover": { bgcolor: "action.hover" } }}
+            onClick={() => {
+              if (pvId) window.open(`/editor/${pvId}?lang=${exportLanguage}`, '_blank');
+            }}
           >
-            {t("pv.approve")}
+            {t("pv.edit_online")}
           </Button>
+
+          <DocumentExportMenu 
+            pvId={pvId || ""} 
+            language={exportLanguage} 
+            disabled={!pvId || !originalTranscript}
+            variant="outlined"
+          />
         </Stack>
       </Box>
 
-      <Grid container spacing={2} sx={{ height: "90%" }}>
+      <Grid container spacing={3} sx={{ flexGrow: 1, overflow: 'hidden', mb: 3 }}>
         {/* Left: Original Transcript */}
         <Grid item xs={12} md={5} sx={{ height: "100%" }}>
           <Paper
-            sx={{ p: 2, height: "100%", overflowY: "auto", bgcolor: "#f8f9fa" }}
+            variant="outlined"
+            sx={{ p: 3, height: "100%", overflowY: "auto", borderRadius: 3, borderColor: "divider", bgcolor: alpha("#000", 0.01) }}
           >
-            <Typography variant="subtitle2" gutterBottom color="textSecondary">
+            <Typography sx={{ fontSize: 14, fontWeight: 600, color: "text.secondary", mb: 2 }}>
               {t("pv.original_transcript")}
             </Typography>
             <Typography
               variant="body2"
-              sx={{ whiteSpace: "pre-wrap", fontFamily: "monospace" }}
+              sx={{ whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: 13, lineHeight: 1.6 }}
             >
               {originalTranscript || "No transcription available yet."}
             </Typography>
@@ -208,22 +195,25 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
         {/* Right: AI Generated PV (Editable) */}
         <Grid item xs={12} md={7} sx={{ height: "100%" }}>
           <Paper
+            variant="outlined"
             sx={{
-              p: 2,
+              p: 3,
               height: "100%",
               display: "flex",
               flexDirection: "column",
+              borderRadius: 3,
+              borderColor: "divider"
             }}
           >
             <Box
-              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
+              sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
             >
-              <Typography variant="subtitle2" color="primary">
+              <Typography sx={{ fontSize: 14, fontWeight: 600, color: "primary.main" }}>
                 {t("pv.ai_draft")}
               </Typography>
               <Tooltip title="Save Draft">
-                <IconButton size="small">
-                  <SaveIcon fontSize="small" />
+                <IconButton size="small" sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
+                  <SaveIcon sx={{ fontSize: 18, color: "text.secondary" }} />
                 </IconButton>
               </Tooltip>
             </Box>
@@ -238,36 +228,71 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
                 "& .MuiInputBase-root": {
                   height: "100%",
                   alignItems: "flex-start",
+                  borderRadius: 2,
+                  bgcolor: "transparent"
                 },
                 "& textarea": {
                   height: "100% !important",
                   fontFamily: "serif",
                   fontSize: "1.1rem",
+                  lineHeight: 1.6
                 },
               }}
-              placeholder="Waiting for Mistral to generate the draft..."
+              placeholder="Waiting for AI to generate the draft..."
             />
             <Box
               sx={{
                 mt: 2,
                 p: 2,
-                border: "1px dashed #ccc",
-                borderRadius: 1,
+                border: "1px dashed",
+                borderColor: "divider",
+                borderRadius: 2,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                bgcolor: alpha("#000", 0.01)
               }}
             >
               <Typography
-                variant="caption"
-                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                sx={{ display: "flex", alignItems: "center", gap: 1, fontSize: 12, color: "text.secondary" }}
               >
-                <EditIcon fontSize="small" /> {t("pv.signature_placeholder")}
+                <EditIcon sx={{ fontSize: 16 }} /> {t("pv.signature_placeholder")}
               </Typography>
             </Box>
           </Paper>
         </Grid>
       </Grid>
+
+      {/* BOTTOM ACTION BAR */}
+      <Box 
+        sx={{ 
+          pt: 3, 
+          borderTop: "1px solid", 
+          borderColor: "divider",
+          display: "flex",
+          justifyContent: "flex-end"
+        }}
+      >
+        <Button
+          variant="contained"
+          disableElevation
+          startIcon={<ApproveIcon />}
+          onClick={handleApprove}
+          disabled={!pvId || !originalTranscript}
+          sx={{ 
+            bgcolor: "#3B82F6", 
+            color: "#FFF", 
+            borderRadius: 2, 
+            textTransform: "none", 
+            fontWeight: 600, 
+            fontSize: 14, 
+            px: 4,
+            "&:hover": { bgcolor: "#2563EB" }
+          }}
+        >
+          {t("pv.approve") || "Approve & Sign"}
+        </Button>
+      </Box>
     </Box>
   );
 };

@@ -21,7 +21,9 @@ import {
   FormControl,
   Divider,
   Autocomplete,
-  SelectChangeEvent
+  SelectChangeEvent,
+  IconButton,
+  alpha
 } from "@mui/material";
 import {
   CalendarMonth as CalendarIcon,
@@ -178,196 +180,278 @@ const MeetingPlanner: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Typography variant="h4" sx={{ mb: 3 }}>
+    <Box sx={{ p: { xs: 2, md: 6 }, maxWidth: 1400, mx: "auto" }}>
+      
+      {/* HEADER */}
+      <Typography sx={{ fontSize: 18, fontWeight: 600, color: "text.primary", mb: 4 }}>
         {t("meetings.planner_title")}
       </Typography>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={4}>
+        
+        {/* LEFT: SCHEDULE FORM */}
         <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              {t("meetings.new_meeting")}
-            </Typography>
-            <Stack spacing={3} sx={{ mt: 2 }}>
-              <TextField fullWidth label={t("meetings.title")} value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, borderColor: "divider" }}>
+            <Stack spacing={4}>
+              <Typography sx={{ fontSize: 16, fontWeight: 600, color: "text.primary" }}>
+                {t("meetings.new_meeting")}
+              </Typography>
 
-              <Box>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
-                    <TextField fullWidth type="date" label={t("meetings.date")} value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} InputLabelProps={{ shrink: true }} />
+              <Stack spacing={3}>
+                <TextField 
+                  fullWidth 
+                  label={t("meetings.title")} 
+                  variant="outlined"
+                  value={title} 
+                  onChange={(e) => setTitle(e.target.value)}
+                  InputProps={{ sx: { borderRadius: 2 } }}
+                  InputLabelProps={{ sx: { fontSize: 14 } }}
+                />
+
+                <Box>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={4}>
+                      <TextField 
+                        fullWidth 
+                        type="date" 
+                        label={t("meetings.date")} 
+                        value={meetingDate} 
+                        onChange={(e) => setMeetingDate(e.target.value)} 
+                        InputLabelProps={{ shrink: true, sx: { fontSize: 14 } }}
+                        InputProps={{ sx: { borderRadius: 2 } }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <TextField 
+                        fullWidth 
+                        type="time" 
+                        label={t("meetings.time")} 
+                        value={meetingTime} 
+                        onChange={(e) => setMeetingTime(e.target.value)} 
+                        InputLabelProps={{ shrink: true, sx: { fontSize: 14 } }}
+                        InputProps={{ sx: { borderRadius: 2 } }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <FormControl fullWidth>
+                        <InputLabel id="duration-label" sx={{ fontSize: 14 }}>{t("meetings.duration")}</InputLabel>
+                        <Select
+                          labelId="duration-label"
+                          value={plannedDuration}
+                          label={t("meetings.duration")}
+                          onChange={(e: SelectChangeEvent<number>) => setPlannedDuration(e.target.value as number)}
+                          sx={{ borderRadius: 2 }}
+                        >
+                          <MenuItem value={30}>30 min</MenuItem>
+                          <MenuItem value={60}>60 min</MenuItem>
+                          <MenuItem value={90}>90 min</MenuItem>
+                          <MenuItem value={120}>120 min</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField fullWidth type="time" label={t("meetings.time")} value={meetingTime} onChange={(e) => setMeetingTime(e.target.value)} InputLabelProps={{ shrink: true }} />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <FormControl fullWidth>
-                      <InputLabel id="duration-label">{t("meetings.duration")}</InputLabel>
-                      <Select
-                        labelId="duration-label"
-                        value={plannedDuration}
-                        label={t("meetings.duration")}
-                        onChange={(e: SelectChangeEvent<number>) => setPlannedDuration(e.target.value as number)}
-                      >
-                        <MenuItem value={30}>30 min</MenuItem>
-                        <MenuItem value={60}>60 min</MenuItem>
-                        <MenuItem value={90}>90 min</MenuItem>
-                        <MenuItem value={120}>120 min</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                </Grid>
-                {holidayWarning && (
-                  <Alert severity="warning" icon={<WarningIcon />} sx={{ mt: 1 }}>{t("meetings.holiday_warning")} {holidayWarning}</Alert>
-                )}
-              </Box>
+                  {holidayWarning && (
+                    <Alert severity="warning" icon={<WarningIcon />} sx={{ mt: 2, borderRadius: 2, fontSize: 13 }}>
+                      {t("meetings.holiday_warning")} {holidayWarning}
+                    </Alert>
+                  )}
+                </Box>
 
-              <Autocomplete
-                freeSolo
-                options={availableRooms}
-                getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
-                value={location}
-                onChange={(event, newValue) => setLocation(newValue)}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label={t("meetings.location")}
-                    placeholder={t("meetings.location_placeholder")}
-                  />
-                )}
-              />
+                <Autocomplete
+                  freeSolo
+                  options={availableRooms}
+                  getOptionLabel={(option) => (typeof option === 'string' ? option : option.name)}
+                  value={location}
+                  onChange={(event, newValue) => setLocation(newValue)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label={t("meetings.location")}
+                      placeholder={t("meetings.location_placeholder")}
+                      InputLabelProps={{ sx: { fontSize: 14 } }}
+                      InputProps={{ ...params.InputProps, sx: { borderRadius: 2 } }}
+                    />
+                  )}
+                />
 
-              <Autocomplete
-                multiple
-                freeSolo
-                options={participantResults}
-                getOptionLabel={(option) => (typeof option === 'string' ? option : `${option.full_name} (${option.email})`)}
-                value={selectedParticipants}
-                onInputChange={(event, newInputValue) => setParticipantSearch(newInputValue)}
-                onChange={(event, newValue) => setSelectedParticipants(newValue)}
-                renderTags={(value, getTagProps) =>
-                  value.map((option, index) => (
-                    <Chip variant="outlined" color="primary" label={typeof option === 'string' ? option : option.full_name} {...getTagProps({ index })} />
-                  ))
-                }
-                renderInput={(params) => (
-                  <TextField {...params} label={t("meetings.participants")} placeholder={t("common.search")} />
-                )}
-              />
+                <Autocomplete
+                  multiple
+                  freeSolo
+                  options={participantResults}
+                  getOptionLabel={(option) => (typeof option === 'string' ? option : `${option.full_name} (${option.email})`)}
+                  value={selectedParticipants}
+                  onInputChange={(event, newInputValue) => setParticipantSearch(newInputValue)}
+                  onChange={(event, newValue) => setSelectedParticipants(newValue)}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip 
+                        variant="outlined" 
+                        label={typeof option === 'string' ? option : option.full_name} 
+                        {...getTagProps({ index })} 
+                        sx={{ borderRadius: 1, fontSize: 12, fontWeight: 500 }}
+                      />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField 
+                      {...params} 
+                      label={t("meetings.participants")} 
+                      placeholder={t("common.search")} 
+                      InputLabelProps={{ sx: { fontSize: 14 } }}
+                      InputProps={{ ...params.InputProps, sx: { borderRadius: 2 } }}
+                    />
+                  )}
+                />
 
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<AddIcon />}
-                disabled={!!holidayWarning || !title || isSubmitting}
-                onClick={handleCreate}
-              >
-                {t("meetings.create")}
-              </Button>
+                <Button
+                  variant="contained"
+                  disableElevation
+                  fullWidth
+                  disabled={!!holidayWarning || !title || isSubmitting}
+                  onClick={handleCreate}
+                  sx={{ 
+                    bgcolor: "#000", 
+                    color: "#FFF", 
+                    py: 1.5, 
+                    borderRadius: 2, 
+                    textTransform: "none",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    "&:hover": { bgcolor: "#27272A" }
+                  }}
+                >
+                  {t("meetings.create")}
+                </Button>
+              </Stack>
             </Stack>
           </Paper>
         </Grid>
         
+        {/* RIGHT: SIDEBAR */}
         <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center' }}>
-                <MeetingRoomIcon sx={{ mr: 1, color: 'primary.main' }} />
-                {t("meetings.recent_meetings")}
-              </Typography>
-              
-              <FormControl size="small" sx={{ minWidth: 100 }}>
-                <Select
-                  value={exportLanguage}
-                  onChange={(e) => setExportLanguage(e.target.value)}
-                  variant="standard"
-                  sx={{ fontSize: '0.8rem' }}
-                >
-                  <MenuItem value="ar">العربية</MenuItem>
-                  <MenuItem value="fr">Français</MenuItem>
-                  <MenuItem value="en">English</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+          <Stack spacing={4}>
             
-            <Divider sx={{ mb: 1 }} />
-            {recentMeetings.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
-                {t("meetings.no_recent_meetings")}
-              </Typography>
-            ) : (
-              <List dense>
-                {recentMeetings.map((meeting) => (
-                  <ListItem 
-                    disablePadding 
-                    key={meeting.id}
-                    secondaryAction={
-                      pvMap[meeting.id] && (
-                        <Stack direction="row" spacing={1}>
-                          <IconButton 
-                            size="small" 
-                            color="primary" 
-                            href={`/editor/${pvMap[meeting.id]}?lang=${exportLanguage}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              window.open(`/editor/${pvMap[meeting.id]}?lang=${exportLanguage}`, '_blank');
-                            }}
-                            title={t("pv.edit_online")}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                          <DocumentExportMenu 
-                            pvId={pvMap[meeting.id]} 
-                            language={exportLanguage} 
-                            variant="text" 
-                            showDocx={false}
-                          />
-                        </Stack>
-                      )
-                    }
+            {/* Recent Meetings */}
+            <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden", borderColor: "divider" }}>
+              <Box sx={{ px: 3, py: 2, borderBottom: "1px solid", borderColor: "divider", display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography sx={{ fontSize: 15, fontWeight: 600 }}>
+                  {t("meetings.recent_meetings")}
+                </Typography>
+                
+                <FormControl size="small" variant="standard">
+                  <Select
+                    value={exportLanguage}
+                    onChange={(e) => setExportLanguage(e.target.value)}
+                    sx={{ fontSize: '12px', fontWeight: 600 }}
                   >
-                    <ListItemButton onClick={() => navigate(`/meetings/live/${meeting.id}`)} sx={{ borderRadius: 1 }}>
-                      <ListItemIcon>
-                        <EventIcon color="primary" />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={meeting.title} 
-                        secondary={new Date(meeting.start_time).toLocaleString()} 
-                        primaryTypographyProps={{ fontWeight: '500' }}
-                      />
-                      <Chip label={meeting.status} size="small" variant="outlined" color={meeting.status === 'completed' ? 'success' : 'default'} />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </Paper>
+                    <MenuItem value="ar">AR</MenuItem>
+                    <MenuItem value="fr">FR</MenuItem>
+                    <MenuItem value="en">EN</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              
+              <Box>
+                {recentMeetings.length === 0 ? (
+                  <Box sx={{ p: 4, textAlign: 'center' }}>
+                    <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+                      {t("meetings.no_recent_meetings")}
+                    </Typography>
+                  </Box>
+                ) : (
+                  <List disablePadding>
+                    {recentMeetings.map((meeting) => (
+                      <ListItem 
+                        key={meeting.id}
+                        disablePadding 
+                        divider
+                        sx={{ "&:last-child": { borderBottom: 0 } }}
+                        secondaryAction={
+                          pvMap[meeting.id] && (
+                            <Stack direction="row" spacing={1}>
+                              <IconButton 
+                                size="small" 
+                                sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  window.open(`/editor/${pvMap[meeting.id]}?lang=${exportLanguage}`, '_blank');
+                                }}
+                              >
+                                <EditIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+                              </IconButton>
+                              <DocumentExportMenu 
+                                pvId={pvMap[meeting.id]} 
+                                language={exportLanguage} 
+                                variant="text" 
+                                showDocx={false}
+                              />
+                            </Stack>
+                          )
+                        }
+                      >
+                        <ListItemButton 
+                          onClick={() => navigate(`/meetings/live/${meeting.id}`)}
+                          sx={{ py: 2, px: 3, "&:hover": { bgcolor: alpha("#000", 0.02) } }}
+                        >
+                          <ListItemText 
+                            primary={meeting.title} 
+                            secondary={new Date(meeting.start_time).toLocaleString()} 
+                            primaryTypographyProps={{ fontSize: 14, fontWeight: 500, color: "text.primary" }}
+                            secondaryTypographyProps={{ fontSize: 12 }}
+                          />
+                          <Chip 
+                            label={meeting.status} 
+                            size="small" 
+                            variant="outlined" 
+                            sx={{ 
+                              height: 20, 
+                              fontSize: 10, 
+                              fontWeight: 700, 
+                              textTransform: "uppercase",
+                              borderColor: meeting.status === 'completed' ? alpha("#10B981", 0.3) : "divider",
+                              color: meeting.status === 'completed' ? "#10B981" : "text.secondary",
+                              mr: pvMap[meeting.id] ? 10 : 0
+                            }} 
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Box>
+            </Paper>
 
-          <Paper sx={{ p: 2, bgcolor: "action.hover" }}>
-            <Typography variant="subtitle1" gutterBottom>
-              <CalendarIcon sx={{ mr: 1, verticalAlign: "middle" }} />
-              {t("meetings.upcoming_holidays")}
-            </Typography>
-            <List dense>
-              {holidays.map((h, i) => (
-                <ListItem key={i}>
-                  <ListItemIcon>
-                    <EventIcon fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText primary={h.name} secondary={h.date} />
-                  <Chip
-                    label={t("meetings.holiday")}
-                    size="small"
-                    color="error"
-                    variant="outlined"
-                  />
-                </ListItem>
-              ))}
-            </List>
-          </Paper>
+            {/* Cultural Calendar */}
+            <Paper variant="outlined" sx={{ p: 3, borderRadius: 3, borderColor: "divider" }}>
+              <Typography sx={{ fontSize: 15, fontWeight: 600, mb: 2 }}>
+                {t("meetings.upcoming_holidays")}
+              </Typography>
+              <Stack spacing={2}>
+                {holidays.map((h, i) => (
+                  <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <Typography sx={{ fontSize: 14, fontWeight: 500 }}>{h.name}</Typography>
+                      <Typography sx={{ fontSize: 12, color: "text.secondary" }}>{h.date}</Typography>
+                    </Box>
+                    <Chip
+                      label={t("meetings.holiday")}
+                      size="small"
+                      variant="outlined"
+                      sx={{ 
+                        height: 20, 
+                        fontSize: 10, 
+                        fontWeight: 700, 
+                        color: "#EF4444", 
+                        borderColor: alpha("#EF4444", 0.3),
+                        textTransform: "uppercase" 
+                      }}
+                    />
+                  </Box>
+                ))}
+              </Stack>
+            </Paper>
+          </Stack>
         </Grid>
       </Grid>
     </Box>
