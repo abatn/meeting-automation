@@ -149,3 +149,29 @@ async def get_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting
+
+
+@router.patch("/{meeting_id}/cancel", response_model=Meeting)
+async def cancel_meeting(
+    meeting_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+    meeting_service: MeetingService = Depends(deps.get_meeting_service),
+) -> Any:
+    """
+    Cancel a planned meeting (Soft Delete).
+    """
+    from app.schemas.meeting import MeetingUpdate
+    from app.models.meeting import MeetingStatus
+    
+    meeting = await meeting_service.get_meeting(meeting_id, current_user.client_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+        
+    if meeting.status != MeetingStatus.PLANNED:
+        raise HTTPException(status_code=400, detail="Only planned meetings can be cancelled")
+
+    update_data = MeetingUpdate(status=MeetingStatus.CANCELLED)
+    updated_meeting = await meeting_service.update_meeting(meeting_id, current_user.client_id, update_data)
+    
+    return updated_meeting

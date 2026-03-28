@@ -176,7 +176,10 @@
     "download_error": "خطأ في تحميل ملف PDF",
     "edit_online": "تعديل عبر الإنترنت",
     "edit_online_title": "تعديل محضر الاجتماع عبر الإنترنت",
-    "loading_editor": "جاري تحميل محرر المستندات..."
+    "loading_editor": "جاري تحميل محرر المستندات...",
+    "validated": "تمت المصادقة",
+    "approved_success": "تمت المصادقة على المحضر بنجاح! تم تعيين المهام.",
+    "approved_error": "خطأ في المصادقة على المحضر."
   },
   "admin": {
     "clientManagement": "إدارة العملاء (مسؤول)",

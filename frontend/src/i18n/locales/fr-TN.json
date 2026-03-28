@@ -172,7 +172,10 @@
     "download_error": "Erreur lors du téléchargement du PDF",
     "edit_online": "Modifier en ligne",
     "edit_online_title": "Modifier le PV en ligne",
-    "loading_editor": "Chargement de l'éditeur de documents..."
+    "loading_editor": "Chargement de l'éditeur de documents...",
+    "validated": "Validé",
+    "approved_success": "Protocole validé avec succès ! Les tâches ont été assignées.",
+    "approved_error": "Erreur lors de la validation du protocole."
   },
   "admin": {
     "clientManagement": "Gestion des Clients (Admin)",

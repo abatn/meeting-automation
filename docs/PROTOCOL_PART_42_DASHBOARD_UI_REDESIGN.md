@@ -36,5 +36,24 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
 - **Eliminierung von "Müll":** Entfernung aller hartgecodeten englischen Strings und Fallbacks aus dem JSX-Code. Korrektur von Tippfehlern in der arabischen Übersetzung.
 - **RTL-Support:** Validierung der Layout-Spiegelung für das gesamte Dashboard.
 
+
+### 4. Redesign & Logik-Fix: MeetingRoom.tsx (Live Assistant)
+- **2-Spalten-Architektur:** Kompaktes Control Center links (Timer, AI Recommendations) und PV Validation Workflow rechts (Transcription vs. Draft).
+- **i18n Striktheit:** Entfernung aller hartgecodeten englischen Texte. Neue Sektion `meeting_assistant` in allen JSON-Dateien eingeführt.
+- **Workflow-Optimierung:** 
+  - Integration von OnlyOffice (`pv.edit_online`) und PDF-Export in eine saubere Toolbar neben der Sprachauswahl.
+  - Der "Approve & Sign" Button sendet nun den korrekten `POST /api/v1/pv/{pvId}/validate` Request an das Backend, um den **n8n Webhook** auszulösen.
+  - Doppel-Klick-Schutz und visuelles Feedback (Ladekringel, grünes "Validated" Häkchen) für den Approve-Button implementiert.
+
+### 5. Logik-Fix: MeetingPlanner.tsx (Smart Navigation & Soft Cancel)
+- **Smart Navigation:** Bei der Meeting-Erstellung prüft das System nun, ob das Meeting in <= 15 Minuten startet. Zukunfts-Meetings navigieren nicht mehr fälschlicherweise in den Live-Raum, sondern zeigen eine Erfolgsmeldung und leeren das Formular.
+- **Interaktive Meeting-Liste:**
+  - Jedes Meeting in der Liste hat nun kontext-sensitive Buttons.
+  - Zukunfts-Meetings zeigen einen grauen "Scheduled" Button. Startet das Meeting in <= 15 Minuten, wird der Button zu einem grünen "Join Room" CTA.
+  - "Start Now" erlaubt Managern jederzeit den erzwungenen Start.
+- **Soft Cancel (Backend & Frontend):** 
+  - Implementierung des neuen Endpunkts `PATCH /api/v1/meetings/{id}/cancel` im Backend.
+  - Das Frontend ermöglicht nun das sichere Absagen (Cancel) von Meetings. Abgesagte oder abgelaufene ("Expired") Meetings werden in der Liste ausgegraut und durchgestrichen dargestellt. Die Datenbank-Integrität (ISO 27001 Audit-Trail) bleibt erhalten (kein Hard-Delete).
+
 ## 📊 ERGEBNIS
 Die Applikation wirkt nun wie aus einem Guss. Vom ersten Besuch der Landing Page bis zur Bearbeitung eines Protokolls im Meeting Room herrscht eine konsistente, hochprofessionelle Design-Sprache. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.

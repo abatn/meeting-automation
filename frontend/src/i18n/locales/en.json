@@ -176,7 +176,10 @@
     "download_error": "Error downloading PDF",
     "edit_online": "Edit Online",
     "edit_online_title": "Edit Minutes Online",
-    "loading_editor": "Loading Document Editor..."
+    "loading_editor": "Loading Document Editor...",
+    "validated": "Validated",
+    "approved_success": "Protocol successfully validated! Action items have been assigned.",
+    "approved_error": "Error validating the protocol."
   },
   "admin": {
     "clientManagement": "Client Management (Admin)",

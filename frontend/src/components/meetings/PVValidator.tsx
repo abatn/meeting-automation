@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import {
   CheckCircle as ApproveIcon,
+  Check as CheckIcon,
   Edit as EditIcon,
   History as HistoryIcon,
   Save as SaveIcon,
@@ -44,6 +45,8 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pvId, setPvId] = useState<string | null>(null);
+  const [isValidated, setIsValidated] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
 
   useEffect(() => {
@@ -70,6 +73,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
         if (pvRes.data) {
           setPvContent(pvRes.data.content_html || pvRes.data.content || "");
           setPvId(pvRes.data.id);
+          setIsValidated(pvRes.data.status === 'published' || pvRes.data.is_validated === true);
           setError(null);
         }
       } catch (err: any) {
@@ -93,12 +97,17 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
   }, [meetingId]);
 
   const handleApprove = async () => {
-    if (!pvId) return;
+    if (!pvId || isValidated || isApproving) return;
+    setIsApproving(true);
     try {
-      await api.post(`/pv/${pvId}/approve`);
-      // You can add a success notification here
+      await api.post(`/pv/${pvId}/validate`);
+      setIsValidated(true);
+      alert(t("pv.approved_success") || "Protocol successfully validated! Action items have been assigned.");
     } catch (err) {
       console.error("Failed to approve PV", err);
+      alert(t("pv.approved_error") || "Error validating the protocol.");
+    } finally {
+      setIsApproving(false);
     }
   };
 
@@ -276,21 +285,22 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
         <Button
           variant="contained"
           disableElevation
-          startIcon={<ApproveIcon />}
+          startIcon={isApproving ? <CircularProgress size={16} color="inherit" /> : isValidated ? <CheckIcon /> : <ApproveIcon />}
           onClick={handleApprove}
-          disabled={!pvId || !originalTranscript}
+          disabled={!pvId || !originalTranscript || isValidated || isApproving}
           sx={{ 
-            bgcolor: "#3B82F6", 
+            bgcolor: isValidated ? "#10B981" : "#3B82F6", 
             color: "#FFF", 
             borderRadius: 2, 
             textTransform: "none", 
             fontWeight: 600, 
             fontSize: 14, 
             px: 4,
-            "&:hover": { bgcolor: "#2563EB" }
+            "&:hover": { bgcolor: isValidated ? "#059669" : "#2563EB" },
+            "&.Mui-disabled": { bgcolor: isValidated ? alpha("#10B981", 0.6) : undefined, color: isValidated ? "#FFF" : undefined }
           }}
         >
-          {t("pv.approve") || "Approve & Sign"}
+          {isValidated ? (t("pv.validated") || "Validated") : (t("pv.approve") || "Approve & Sign")}
         </Button>
       </Box>
     </Box>

@@ -139,13 +139,11 @@ const MeetingPlanner: React.FC = () => {
     if (!title || !!holidayWarning) return;
     setIsSubmitting(true);
     try {
-      // Prepare participants payload
       const participants = selectedParticipants.map((p) => {
         if (typeof p === 'string') return { email: p, name: p, role: "Guest" };
         return { email: p.email, name: p.full_name || p.email, role: p.position || "Participant", user_id: p.source === "user" ? p.id : null };
       });
 
-      // Prepare location payload
       const meetingLocation: { location?: string; room_id?: string } = {};
       if (typeof location === 'string') {
         meetingLocation.location = location;
@@ -153,7 +151,6 @@ const MeetingPlanner: React.FC = () => {
         meetingLocation.room_id = location.id;
       }
 
-      // Format start and end times
       const startTime = new Date(`${meetingDate}T${meetingTime}:00`);
       const endTime = new Date(startTime.getTime() + plannedDuration * 60 * 1000);
 
@@ -169,13 +166,45 @@ const MeetingPlanner: React.FC = () => {
       };
 
       const newMeeting = await meetingsApi.createMeeting(meetingData);
-      navigate(`/meetings/live/${newMeeting.id}`);
+      
+      // Smart Navigation Logic
+      const now = new Date();
+      const timeDiffMinutes = (startTime.getTime() - now.getTime()) / (1000 * 60);
+      
+      if (timeDiffMinutes <= 15) {
+        // Meeting is happening now or very soon -> jump to live room
+        navigate(`/meetings/live/${newMeeting.id}`);
+      } else {
+        // Meeting is in the future -> stay on page, reset form, show success
+        alert(t("meetings.created_success") || "Meeting successfully scheduled for the future.");
+        setTitle("");
+        setSelectedParticipants([]);
+        setLocation(null);
+        // Refresh the list
+        const meetingsData = await meetingsApi.getMeetings();
+        setRecentMeetings(meetingsData.sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()).slice(0, 10));
+      }
     } catch (error: any) {
       console.error("Failed to create meeting", error);
-      const errorMsg = error.response?.data?.detail || error.message || "Unknown error";
-      alert(`Error creating meeting: ${errorMsg}`);
+      alert(`Error creating meeting: ${error.response?.data?.detail || error.message || "Unknown error"}`);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelMeeting = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to cancel this meeting?")) {
+      try {
+        await api.patch(`/meetings/${id}/cancel`);
+        alert("Meeting successfully cancelled.");
+        const meetingsData = await meetingsApi.getMeetings();
+        setRecentMeetings(meetingsData.sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()).slice(0, 10));
+      } catch (err: any) {
+        console.error("Failed to cancel", err);
+        alert(err.response?.data?.detail || "Failed to cancel meeting.");
+      }
     }
   };
 
@@ -360,63 +389,139 @@ const MeetingPlanner: React.FC = () => {
                   </Box>
                 ) : (
                   <List disablePadding>
-                    {recentMeetings.map((meeting) => (
-                      <ListItem 
-                        key={meeting.id}
-                        disablePadding 
-                        divider
-                        sx={{ "&:last-child": { borderBottom: 0 } }}
-                        secondaryAction={
-                          pvMap[meeting.id] && (
-                            <Stack direction="row" spacing={1}>
-                              <IconButton 
-                                size="small" 
-                                sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  window.open(`/editor/${pvMap[meeting.id]}?lang=${exportLanguage}`, '_blank');
-                                }}
-                              >
-                                <EditIcon sx={{ fontSize: 16, color: "text.secondary" }} />
-                              </IconButton>
-                              <DocumentExportMenu 
-                                pvId={pvMap[meeting.id]} 
-                                language={exportLanguage} 
-                                variant="text" 
-                                showDocx={false}
-                              />
-                            </Stack>
-                          )
-                        }
-                      >
-                        <ListItemButton 
-                          onClick={() => navigate(`/meetings/live/${meeting.id}`)}
-                          sx={{ py: 2, px: 3, "&:hover": { bgcolor: alpha("#000", 0.02) } }}
+                    {recentMeetings.map((meeting) => {
+                      const now = new Date();
+                      const mStartTime = new Date(meeting.start_time);
+                      const mEndTime = meeting.end_time ? new Date(meeting.end_time) : new Date(mStartTime.getTime() + 60 * 60 * 1000); // Default 1h if no end_time
+                      
+                      const timeDiffMins = (mStartTime.getTime() - now.getTime()) / (1000 * 60);
+                      const isJoinable = meeting.status === 'planned' && timeDiffMins <= 15 && now < mEndTime;
+                      const isExpired = meeting.status === 'planned' && now > mEndTime;
+                      
+                      // Derive display status
+                      let displayStatus = meeting.status;
+                      if (isExpired) displayStatus = 'expired';
+
+                      return (
+                        <ListItem 
+                          key={meeting.id}
+                          divider
+                          sx={{ 
+                            px: 3, py: 2.5, 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            alignItems: 'stretch',
+                            "&:hover": { bgcolor: alpha("#000", 0.01) } 
+                          }}
                         >
-                          <ListItemText 
-                            primary={meeting.title} 
-                            secondary={new Date(meeting.start_time).toLocaleString()} 
-                            primaryTypographyProps={{ fontSize: 14, fontWeight: 500, color: "text.primary" }}
-                            secondaryTypographyProps={{ fontSize: 12 }}
-                          />
-                          <Chip 
-                            label={meeting.status} 
-                            size="small" 
-                            variant="outlined" 
-                            sx={{ 
-                              height: 20, 
-                              fontSize: 10, 
-                              fontWeight: 700, 
-                              textTransform: "uppercase",
-                              borderColor: meeting.status === 'completed' ? alpha("#10B981", 0.3) : "divider",
-                              color: meeting.status === 'completed' ? "#10B981" : "text.secondary",
-                              mr: pvMap[meeting.id] ? 10 : 0
-                            }} 
-                          />
-                        </ListItemButton>
-                      </ListItem>
-                    ))}
+                          {/* Top Row: Title & Status */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+                            <Typography sx={{ fontSize: 14, fontWeight: 600, color: isExpired ? "text.secondary" : "#000", textDecoration: isExpired ? "line-through" : "none" }}>
+                              {meeting.title}
+                            </Typography>
+                            <Chip 
+                              label={displayStatus} 
+                              size="small" 
+                              variant="outlined" 
+                              sx={{ 
+                                height: 20, 
+                                fontSize: 10, 
+                                fontWeight: 700, 
+                                textTransform: "uppercase",
+                                borderColor: displayStatus === 'completed' ? alpha("#10B981", 0.3) : displayStatus === 'planned' ? alpha("#F59E0B", 0.3) : displayStatus === 'expired' ? alpha("#EF4444", 0.3) : "divider",
+                                color: displayStatus === 'completed' ? "#10B981" : displayStatus === 'planned' ? "#F59E0B" : displayStatus === 'expired' ? "#EF4444" : "text.secondary"
+                              }} 
+                            />
+                          </Box>
+
+                          {/* Sub Row: Date */}
+                          <Typography sx={{ fontSize: 12, color: "#71717A", mb: 2 }}>
+                            {mStartTime.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                          </Typography>
+
+                          {/* Bottom Row: Actions */}
+                          <Stack direction="row" spacing={1} justifyContent="flex-end">
+                            {meeting.status === 'planned' && (
+                              <>
+                                <Button 
+                                  size="small" 
+                                  variant="text" 
+                                  color="error"
+                                  onClick={(e) => handleCancelMeeting(e, meeting.id)}
+                                  sx={{ textTransform: 'none', fontSize: 12, fontWeight: 500, minWidth: 0, px: 1 }}
+                                >
+                                  {isExpired ? t('common.delete', 'Delete') : t('common.cancel', 'Cancel')}
+                                </Button>
+                                
+                                {!isExpired && (
+                                  <>
+                                    {/* Force Start Button (Always available for planned meetings) */}
+                                    <Button 
+                                      size="small" 
+                                      variant="outlined"
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/meetings/live/${meeting.id}`); }}
+                                      sx={{ 
+                                        textTransform: 'none', borderRadius: 1.5, fontSize: 12, fontWeight: 600, px: 2,
+                                        borderColor: "divider", color: "text.primary",
+                                        "&:hover": { bgcolor: alpha("#000", 0.05) }
+                                      }}
+                                    >
+                                      {t('meetings.start_now', 'Start Now')}
+                                    </Button>
+
+                                    {/* Conditional Join Button (Green when time is close) */}
+                                    <Button 
+                                      size="small" 
+                                      variant={isJoinable ? "contained" : "outlined"}
+                                      disabled={!isJoinable}
+                                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/meetings/live/${meeting.id}`); }}
+                                      sx={{ 
+                                        textTransform: 'none', borderRadius: 1.5, fontSize: 12, fontWeight: 600, px: 2,
+                                        ...(isJoinable ? { bgcolor: "#10B981", color: "#FFF", "&:hover": { bgcolor: "#059669" }, boxShadow: "none" } : { borderColor: "divider", color: "#A1A1AA" })
+                                      }}
+                                    >
+                                      {isJoinable ? t('meetings.join_room', 'Join Room') : t('meetings.scheduled', 'Scheduled')}
+                                    </Button>
+                                  </>
+                                )}
+                              </>
+                            )}
+
+                            {pvMap[meeting.id] && (
+                              <>
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  startIcon={<EditIcon sx={{ fontSize: 14 }} />}
+                                  onClick={() => window.open(`/editor/${pvMap[meeting.id]}?lang=${exportLanguage}`, '_blank')}
+                                  sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: 12, fontWeight: 500, borderColor: 'divider', color: '#000' }}
+                                >
+                                  {t("pv.edit_online")}
+                                </Button>
+                                <DocumentExportMenu 
+                                  pvId={pvMap[meeting.id]} 
+                                  language={exportLanguage} 
+                                  variant="text" 
+                                  showDocx={false}
+                                />
+                              </>
+                            )}
+
+                            {meeting.status === 'in_progress' && (
+                              <Button 
+                                size="small" 
+                                variant="contained" 
+                                color="primary"
+                                onClick={() => navigate(`/meetings/live/${meeting.id}`)}
+                                sx={{ textTransform: 'none', borderRadius: 1.5, fontSize: 12, fontWeight: 600, bgcolor: "#3B82F6" }}
+                              >
+                                {t('meetings.join_room', 'Join Live')}
+                              </Button>
+                            )}
+                          </Stack>
+                        </ListItem>
+                      );
+                    })}
                   </List>
                 )}
               </Box>
