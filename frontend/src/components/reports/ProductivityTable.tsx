@@ -6,8 +6,9 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   TableSortLabel,
+  Box,
+  alpha
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 
@@ -45,12 +46,23 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
     return 0;
   });
 
+  const headerCellStyle = {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "text.secondary",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    py: 1.5,
+    borderBottom: "1px solid",
+    borderColor: "divider"
+  };
+
   return (
-    <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+    <TableContainer sx={{ maxHeight: 600 }}>
       <Table stickyHeader size="small">
         <TableHead>
           <TableRow>
-            <TableCell>
+            <TableCell sx={headerCellStyle}>
               <TableSortLabel
                 active={orderBy === "name"}
                 direction={orderBy === "name" ? order : "asc"}
@@ -59,7 +71,7 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
                 {t("common.name")}
               </TableSortLabel>
             </TableCell>
-            <TableCell align="center">
+            <TableCell align="center" sx={headerCellStyle}>
               <TableSortLabel
                 active={orderBy === "completed"}
                 direction={orderBy === "completed" ? order : "asc"}
@@ -68,7 +80,7 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
                 {t("common.completed")}
               </TableSortLabel>
             </TableCell>
-            <TableCell align="center">
+            <TableCell align="center" sx={headerCellStyle}>
               <TableSortLabel
                 active={orderBy === "pending"}
                 direction={orderBy === "pending" ? order : "asc"}
@@ -77,7 +89,7 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
                 {t("common.pending")}
               </TableSortLabel>
             </TableCell>
-            <TableCell align="center">
+            <TableCell align="center" sx={headerCellStyle}>
               <TableSortLabel
                 active={orderBy === "overdue"}
                 direction={orderBy === "overdue" ? order : "asc"}
@@ -90,13 +102,17 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
         </TableHead>
         <TableBody>
           {sortedData.map((row) => (
-            <TableRow key={row.user_id}>
-              <TableCell component="th" scope="row">
+            <TableRow 
+              key={row.user_id}
+              hover
+              sx={{ "&:hover": { bgcolor: alpha("#000", 0.01) }, "&:last-child td": { borderBottom: 0 } }}
+            >
+              <TableCell component="th" scope="row" sx={{ py: 2, fontSize: 14, fontWeight: 500 }}>
                 {row.name}
               </TableCell>
-              <TableCell align="center">{row.completed}</TableCell>
-              <TableCell align="center">{row.pending}</TableCell>
-              <TableCell align="center">{row.overdue}</TableCell>
+              <TableCell align="center" sx={{ py: 2, fontSize: 14 }}>{row.completed}</TableCell>
+              <TableCell align="center" sx={{ py: 2, fontSize: 14 }}>{row.pending}</TableCell>
+              <TableCell align="center" sx={{ py: 2, fontSize: 14 }}>{row.overdue}</TableCell>
             </TableRow>
           ))}
         </TableBody>
