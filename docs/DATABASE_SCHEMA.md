@@ -25,6 +25,7 @@ erDiagram
     USERS {
         UUID id PK
         UUID client_id FK
+        UUID manager_id FK "Verknüpfung für RBAC-Teamhierarchie"
         VARCHAR email UNIQUE
         VARCHAR hashed_password
         VARCHAR full_name
@@ -94,8 +95,18 @@ erDiagram
         UUID meeting_id FK
         VARCHAR title
         TEXT description
-        VARCHAR status
+        VARCHAR status "ENUM: PENDING, IN_PROGRESS, COMPLETED, CANCELLED, OVERDUE"
+        TIMESTAMP due_date
         TIMESTAMP created_at
+    }
+
+    ACTION_ASSIGNMENTS {
+        UUID id PK
+        UUID action_id FK
+        UUID user_id FK
+        VARCHAR external_email "Für Gastnutzer / KI Zuweisung"
+        VARCHAR external_name "Für Gastnutzer / KI Zuweisung (Fuzzy Matching)"
+        TIMESTAMP assigned_at
     }
 
     AUDIT_LOGS {
@@ -129,10 +140,14 @@ erDiagram
     CLIENTS ||--o{ TEAM_MEMBERS : "has"
 
     USERS ||--o{ MEETINGS : "creates"
+    USERS ||--o{ USERS : "managed by (manager_id)"
     MEETINGS ||--o{ RECORDINGS : "has"
     MEETINGS ||--o{ PVS : "has"
     MEETINGS ||--o{ ACTIONS : "has"
     RECORDINGS ||--o{ TRANSCRIPTIONS : "has"
+    PVS ||--o{ ACTIONS : "generates"
+    ACTIONS ||--o{ ACTION_ASSIGNMENTS : "has"
+    USERS ||--o{ ACTION_ASSIGNMENTS : "assigned to"
 ```
 
 ## 2. Table Descriptions
@@ -216,9 +231,20 @@ erDiagram
     - `client_id` (UUID, FK).
     - `meeting_id` (UUID, FK).
     - `title` (VARCHAR).
-    - `status` (VARCHAR): Enum (PENDING, COMPLETED, CANCELLED).
+    - `status` (VARCHAR): Enum (PENDING, IN_PROGRESS, COMPLETED, CANCELLED, OVERDUE).
 
-### 2.8. `audit_logs` Table
+### 2.8. `action_assignments` Table
+
+- **Description**: Connects actions to users or external guests. Critical for the RBAC Task Circle logic.
+- **Fields**:
+    - `id` (UUID, Primary Key).
+    - `action_id` (UUID, FK to `actions.id`).
+    - `user_id` (UUID, Optional FK to `users.id`): If the assignee is a registered user.
+    - `external_email` (VARCHAR, Optional): For guests or AI-extracted emails.
+    - `external_name` (VARCHAR, Optional): Used by the AI for fuzzy matching if no ID or Email is known.
+    - `assigned_at` (TIMESTAMP).
+
+### 2.9. `audit_logs` Table
 
 - **Description**: ISO 27001 compliant activity logs. Isolated by `client_id`.
 - **Fields**:
@@ -229,7 +255,7 @@ erDiagram
     - `table_name` (VARCHAR).
     - `timestamp` (TIMESTAMP).
 
-### 2.9. `team_members` Table
+### 2.10. `team_members` Table
 
 - **Description**: Centralized company directory for managing employees and frequent meeting participants. Isolated by `client_id`.
 - **Fields**:
