@@ -122,13 +122,13 @@ class ReportService:
             query = (
                 select(
                     func.coalesce(UserModel.full_name, Assignment.external_name).label("name"),
-                    func.sum(case((Action.status == "completed", 1), else_=0)).label(
+                    func.sum(case((Action.status == "COMPLETED", 1), else_=0)).label(
                         "completed"
                     ),
                     func.sum(
                         case(
                             (
-                                Action.status == "pending",
+                                Action.status == "PENDING",
                                 case((Action.due_date < now, 1), else_=0),
                             ),
                             else_=0,
@@ -137,7 +137,7 @@ class ReportService:
                     func.sum(
                         case(
                             (
-                                Action.status == "pending",
+                                Action.status == "PENDING",
                                 case((Action.due_date >= now, 1), (Action.due_date.is_(None), 1), else_=0),
                             ),
                             else_=0,
@@ -265,12 +265,14 @@ class ReportService:
         team_ids = [row[0] for row in team_res.all()]
         team_ids.append(manager_id)
 
+        from sqlalchemy.orm import selectinload
         query = (
             select(Action)
             .join(Assignment)
+            .options(selectinload(Action.assignments).selectinload(Assignment.user))
             .where(
                 Action.client_id == client_id,
-                Action.status == "pending",
+                Action.status == "PENDING",
                 Assignment.user_id.in_(team_ids)
             )
             .order_by(Action.priority.desc(), Action.due_date.asc().nulls_last())
@@ -283,7 +285,8 @@ class ReportService:
                 "id": a.id,
                 "title": a.title,
                 "due_date": a.due_date.isoformat() if a.due_date else None,
-                "priority": a.priority
+                "priority": a.priority,
+                "assigned_to": a.assigned_to
             } for a in actions
         ]
 
@@ -327,7 +330,7 @@ class ReportService:
             .join(Assignment)
             .where(
                 Action.client_id == client_id,
-                Action.status == "pending",
+                Action.status == "PENDING",
                 Assignment.user_id == user_id
             )
             .order_by(Action.due_date.asc().nulls_last())
