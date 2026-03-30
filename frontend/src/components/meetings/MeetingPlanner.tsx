@@ -70,6 +70,29 @@ const MeetingPlanner: React.FC = () => {
   const [pvMap, setPvMap] = useState<{ [key: string]: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // --- VALIDATION LOGIC ---
+  const getCombinedStart = () => {
+    if (!meetingDate || !meetingTime) return null;
+    return meetingDate.hour(meetingTime.hour()).minute(meetingTime.minute()).second(0).millisecond(0);
+  };
+
+  const isPastTime = () => {
+    const combined = getCombinedStart();
+    if (!combined) return false;
+    return combined.isBefore(dayjs().add(1, 'minute')); // 1 min buffer
+  };
+
+  const isFormInvalid = () => {
+    return (
+      !title.trim() || 
+      !meetingDate || 
+      !meetingTime || 
+      !location || 
+      selectedParticipants.length === 0 ||
+      isPastTime()
+    );
+  };
+
   const fetchMeetings = async () => {
     try {
       const meetings = await meetingsApi.getMeetings();
@@ -127,10 +150,23 @@ const MeetingPlanner: React.FC = () => {
   }, [participantSearch]);
 
   const handleCreate = async () => {
-    if (!title || !meetingDate || !meetingTime) return;
+    // 1. Mandatory Fields Validation
+    if (!title || !meetingDate || !meetingTime || !location || selectedParticipants.length === 0) {
+      alert(t("meetings.error_missing_fields", "Please fill all mandatory fields: Title, Date, Time, Location, and Participants."));
+      return;
+    }
+
+    const start = meetingDate.hour(meetingTime.hour()).minute(meetingTime.minute()).second(0);
+    const now = dayjs();
+
+    // 2. Past Date Validation
+    if (start.isBefore(now.subtract(1, 'minute'))) { // Small buffer for network latency
+      alert(t("meetings.error_past_date", "Cannot schedule a meeting in the past."));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const start = meetingDate.hour(meetingTime.hour()).minute(meetingTime.minute()).second(0);
       const data = {
         title,
         status: "planned",
@@ -144,7 +180,10 @@ const MeetingPlanner: React.FC = () => {
       setTitle(""); setSelectedParticipants([]); setLocation(null);
       await fetchMeetings();
       alert(t("meetings.created_success"));
-    } catch (e) { console.error(e); } finally { setIsSubmitting(false); }
+    } catch (e) { 
+      console.error(e); 
+      alert(t("meetings.error_create_failed", "Failed to create meeting."));
+    } finally { setIsSubmitting(false); }
   };
 
   const handleAction = async (id: string, action: 'cancel' | 'delete') => {
@@ -182,8 +221,20 @@ const MeetingPlanner: React.FC = () => {
                 <TextField fullWidth label={t("meetings.title")} value={title} onChange={(e) => setTitle(e.target.value)} />
                 {holidayWarning && <Alert severity="warning">{t("meetings.holiday_warning")} {holidayWarning}</Alert>}
                 <Stack direction="row" spacing={2}>
-                  <DatePicker label={t("meetings.date")} value={meetingDate} onChange={setMeetingDate} sx={{ flex: 1 }} />
-                  <TimePicker label={t("meetings.time")} value={meetingTime} onChange={setMeetingTime} ampm={false} sx={{ flex: 1 }} />
+                  <DatePicker 
+                    label={t("meetings.date")} 
+                    value={meetingDate} 
+                    onChange={setMeetingDate} 
+                    minDate={dayjs()}
+                    sx={{ flex: 1 }} 
+                  />
+                  <TimePicker 
+                    label={t("meetings.time")} 
+                    value={meetingTime} 
+                    onChange={setMeetingTime} 
+                    ampm={false} 
+                    sx={{ flex: 1 }} 
+                  />
                 </Stack>
                 <FormControl fullWidth>
                   <InputLabel id="dur-lbl">{t("meetings.duration")}</InputLabel>
@@ -196,7 +247,15 @@ const MeetingPlanner: React.FC = () => {
                 </FormControl>
                 <Autocomplete freeSolo options={availableRooms} getOptionLabel={(o) => typeof o === 'string' ? o : o.name} value={location} onChange={(_, v) => setLocation(v)} renderInput={(p) => <TextField {...p} label={t("meetings.location")} />} />
                 <Autocomplete multiple freeSolo options={participantResults} getOptionLabel={(o) => typeof o === 'string' ? o : o.full_name} value={selectedParticipants} onInputChange={(_, v) => setParticipantSearch(v)} onChange={(_, v) => setSelectedParticipants(v)} renderInput={(p) => <TextField {...p} label={t("meetings.participants")} />} />
-                <Button fullWidth variant="contained" disabled={isSubmitting || !title} onClick={handleCreate} sx={{ py: 1.5, borderRadius: '12px', fontWeight: 800, bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#333' } }}>{t("meetings.create")}</Button>
+                <Button 
+                  fullWidth 
+                  variant="contained" 
+                  disabled={isSubmitting || isFormInvalid()} 
+                  onClick={handleCreate} 
+                  sx={{ py: 1.5, borderRadius: '12px', fontWeight: 800, bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#333' }, "&.Mui-disabled": { bgcolor: alpha('#000', 0.1), color: alpha('#000', 0.3) } }}
+                >
+                  {isPastTime() && !isSubmitting ? t("meetings.error_past_date", "Invalid Time") : t("meetings.create")}
+                </Button>
               </Stack>
             </Paper>
           </Grid>

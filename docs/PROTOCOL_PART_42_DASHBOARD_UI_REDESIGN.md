@@ -71,6 +71,9 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
 ### 8. Finale Meeting-Logik & Button-Garantie
 - **Zwei-Button-Prinzip:** Geplante Meetings zeigen nun **immer** parallel den `Cancel` (Rot/Outline) und den `Start/Join` Button an. Kein Button verdrängt mehr den anderen.
 - **Lokale Zeit-Synchronisation:** Integration der `dayjs` Plugins `utc` und `timezone`. Vergleiche erfolgen nun gegen die lokale Browserzeit, was fälschliche "Late"-Statusmeldungen bei Zeitverschiebungen eliminiert.
+- **Echtzeit-Validierung (Scheduling):**
+  - **Pflichtfelder-Sperre:** Der "Create"-Button ist erst aktiv, wenn alle Pflichtfelder (Titel, Datum, Uhrzeit, Ort, Teilnehmer) ausgefüllt sind.
+  - **Past-Date-Prevention:** Meetings in der Vergangenheit können nicht mehr erstellt werden. Der `DatePicker` blockiert vergangene Tage (`minDate`), und der Button deaktiviert sich dynamisch bei ungültigen Uhrzeiten für den aktuellen Tag.
 - **Dynamische Button-Zustände:**
   - **Blau ("Start Now"):** Für Meetings in ferner Zukunft.
   - **Grün pulsierend ("Join"):** Automatisches Signal 15 Minuten vor Startzeit.
