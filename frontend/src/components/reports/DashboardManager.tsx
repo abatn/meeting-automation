@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
@@ -18,6 +18,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { RootState, AppDispatch } from "../../store";
 import { fetchManagerDashboardData } from "../../store/dashboardSlice";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
 
 // Material UI Icons
 import EventIcon from "@mui/icons-material/Event";
@@ -27,6 +30,13 @@ import PeopleIcon from "@mui/icons-material/People";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import AddIcon from "@mui/icons-material/Add";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import DeleteIcon from "@mui/icons-material/Delete";
+import CancelIcon from "@mui/icons-material/Cancel";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import api from "../../services/api";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const DashboardManager: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -39,11 +49,15 @@ const DashboardManager: React.FC = () => {
     (state: RootState) => state.dashboard.managerDashboard,
   );
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   useEffect(() => {
     dispatch(fetchManagerDashboardData());
-  }, [dispatch]);
+    const interval = setInterval(() => setRefreshTrigger(prev => prev + 1), 30000);
+    return () => clearInterval(interval);
+  }, [dispatch, refreshTrigger]);
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "60vh" }}>
         <CircularProgress size={30} sx={{ color: "#000" }} />
@@ -58,6 +72,14 @@ const DashboardManager: React.FC = () => {
       </Box>
     );
   }
+
+  const handleCancelMeeting = async (id: string) => {
+    if (!window.confirm(t("common.confirm_cancel") || "Cancel this meeting?")) return;
+    try {
+      await api.patch(`/meetings/${id}/cancel`);
+      dispatch(fetchManagerDashboardData());
+    } catch (e) { console.error(e); }
+  };
 
   const glassStyle = {
     borderRadius: "16px",
@@ -78,93 +100,6 @@ const DashboardManager: React.FC = () => {
     { title: t("dashboard.pending_team_actions"), value: data.action_stats.pending, icon: <AssignmentIcon fontSize="small" />, color: "#F59E0B", route: "/actions" },
     { title: t("dashboard.team_members"), value: data.team_members_count, icon: <PeopleIcon fontSize="small" />, color: "#8B5CF6", route: "/team" },
   ];
-
-  // Logic for phased buttons (Part 42)
-  const getMeetingButton = (meeting: any) => {
-    const startTime = new Date(meeting.start_time);
-    const now = new Date();
-    const diffMs = startTime.getTime() - now.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-
-    if (meeting.status === "in_progress") {
-      return (
-        <Button 
-          size="small" 
-          variant="contained" 
-          onClick={() => navigate(`/meetings/live/${meeting.id}`)}
-          sx={{ 
-            borderRadius: 2, 
-            textTransform: "none", 
-            fontSize: 13, 
-            bgcolor: "#10B981",
-            color: "#FFF",
-            "&:hover": { bgcolor: "#059669" }
-          }}
-        >
-          {t("meetings.join_room", "Join Room")}
-        </Button>
-      );
-    }
-
-    if (diffMins <= 15 && diffMins >= -60) {
-      return (
-        <Button 
-          size="small" 
-          variant="contained" 
-          onClick={() => navigate(`/meetings/live/${meeting.id}`)}
-          sx={{ 
-            borderRadius: 2, 
-            textTransform: "none", 
-            fontSize: 13, 
-            bgcolor: "#10B981",
-            color: "#FFF",
-            "&:hover": { bgcolor: "#059669" },
-            animation: 'pulse 2s infinite',
-            '@keyframes pulse': {
-              '0%': { boxShadow: '0 0 0 0 rgba(16, 185, 129, 0.4)' },
-              '70%': { boxShadow: '0 0 0 10px rgba(16, 185, 129, 0)' },
-              '100%': { boxShadow: '0 0 0 0 rgba(16, 185, 129, 0)' }
-            }
-          }}
-        >
-          {t("meetings.join_room", "Join Room")}
-        </Button>
-      );
-    }
-
-    return (
-      <Stack direction="row" spacing={1}>
-        <Button 
-          size="small" 
-          variant="outlined" 
-          onClick={() => navigate(`/meetings`)}
-          sx={{ 
-            borderRadius: 2, 
-            textTransform: "none", 
-            fontSize: 12, 
-            borderColor: "divider", 
-            color: "text.primary"
-          }}
-        >
-          {t("meetings.start_now", "Start Now")}
-        </Button>
-        <Button 
-          size="small" 
-          variant="text" 
-          color="error"
-          sx={{ borderRadius: 2, textTransform: "none", fontSize: 12 }}
-        >
-          {t("common.cancel")}
-        </Button>
-      </Stack>
-    );
-  };
-
-  const isLate = (startTimeStr: string) => {
-    const startTime = new Date(startTimeStr);
-    const now = new Date();
-    return now > startTime;
-  };
 
   return (
     <Box sx={{ p: { xs: 2, md: 6 }, maxWidth: 1400, mx: "auto", animation: 'fadeIn 0.5s ease-in-out', '@keyframes fadeIn': { from: { opacity: 0 }, to: { opacity: 1 } } }}>
@@ -200,14 +135,7 @@ const DashboardManager: React.FC = () => {
         {kpis.map((kpi, idx) => (
           <Grid item xs={12} sm={6} md={3} key={idx}>
             <Paper 
-              onClick={() => {
-                // Logic for AI tagging navigation (Part 42)
-                if (kpi.route === "/reports") {
-                  navigate("/archive"); // Direct to archive for AI Topics
-                } else {
-                  navigate(kpi.route);
-                }
-              }}
+              onClick={() => navigate(kpi.route === "/reports" ? "/archive" : kpi.route)}
               sx={{ 
                 ...glassStyle,
                 p: 3, 
@@ -251,26 +179,86 @@ const DashboardManager: React.FC = () => {
                 </Box>
               ) : (
                 <Stack divider={<Divider />}>
-                  {data.upcoming_meetings_list.map((mtg: any) => (
-                    <Box key={mtg.id} sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", transition: 'all 0.2s', "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.02), transform: isRtl ? 'translateX(-4px)' : 'translateX(4px)' } }}>
-                      <Stack direction="row" spacing={3} alignItems="center">
-                        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: mtg.status === "in_progress" ? "#10B981" : "#3B82F6" }} />
-                        <Box>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography sx={{ fontSize: 14, fontWeight: 600, color: "text.primary" }}>{mtg.title}</Typography>
-                            {isLate(mtg.start_time) && mtg.status === "scheduled" && (
-                              <Chip label={t("meetings.late", "late")} size="small" color="error" variant="outlined" sx={{ height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }} />
-                            )}
-                          </Stack>
-                          <Typography sx={{ fontSize: 13, color: "text.secondary", display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                            <AccessTimeIcon sx={{ fontSize: 14, mr: 0.5 }} />
-                            {new Date(mtg.start_time).toLocaleString(i18n.language, { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                      {getMeetingButton(mtg)}
-                    </Box>
-                  ))}
+                  {data.upcoming_meetings_list
+                    .filter((m: any) => {
+                      if (m.status === 'cancelled') return false;
+                      if (m.status === 'in_progress') return true;
+                      
+                      const now = dayjs().utc();
+                      const mStart = dayjs(m.start_time).utc();
+                      const mEnd = m.end_time ? dayjs(m.end_time).utc() : mStart.add(1, 'hour');
+                      const isExpired = now.isAfter(mEnd);
+                      
+                      return !isExpired;
+                    })
+                    .map((mtg: any) => {
+                    const now = dayjs().utc();
+                    const mStart = dayjs(mtg.start_time).utc();
+                    const mEnd = mtg.end_time ? dayjs(mtg.end_time).utc() : mStart.add(1, 'hour');
+                    
+                    const isLate = now.isAfter(mStart) && now.isBefore(mEnd);
+                    const diffMins = mStart.diff(now, 'minute');
+                    const isSoon = diffMins <= 15 && diffMins >= 0;
+
+                    return (
+                      <Box key={mtg.id} sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", transition: 'all 0.2s', "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.02), transform: isRtl ? 'translateX(-4px)' : 'translateX(4px)' } }}>
+                        <Stack direction="row" spacing={3} alignItems="center">
+                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: mtg.status === "in_progress" ? "#10B981" : "#3B82F6" }} />
+                          <Box>
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Typography sx={{ fontSize: 14, fontWeight: 600, color: "text.primary" }}>
+                                {mtg.title}
+                              </Typography>
+                              {isLate && mtg.status === "planned" && (
+                                <Chip label={t("meetings.late")} size="small" color="error" variant="outlined" sx={{ height: 18, fontSize: 10, fontWeight: 700 }} />
+                              )}
+                            </Stack>
+                            <Typography sx={{ fontSize: 13, color: "text.secondary", display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                              <AccessTimeIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                              {dayjs(mtg.start_time).format('HH:mm')}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                        
+                        <Stack direction="row" spacing={1}>
+                          {/* PLANNED STATUS */}
+                          {mtg.status === 'planned' && (
+                            <>
+                              <Button 
+                                size="small" variant="outlined" color="error" startIcon={<CancelIcon sx={{ fontSize: 14 }} />} 
+                                onClick={() => handleCancelMeeting(mtg.id)}
+                                sx={{ borderRadius: 1.5, textTransform: "none", fontSize: 12 }}
+                              >
+                                {t("common.cancel")}
+                              </Button>
+                              <Button 
+                                size="small" variant="contained" onClick={() => navigate(`/meetings/live/${mtg.id}`)}
+                                startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
+                                sx={{ 
+                                  borderRadius: 1.5, textTransform: "none", fontSize: 12, fontWeight: 600,
+                                  bgcolor: (isSoon || isLate) ? "success.main" : "primary.main",
+                                  animation: isSoon ? 'pulse 2s infinite' : 'none',
+                                  "&:hover": { bgcolor: (isSoon || isLate) ? "success.dark" : "primary.dark" }
+                                }}
+                              >
+                                {isSoon || isLate ? t("meetings.join_room") : t("meetings.start_now")}
+                              </Button>
+                            </>
+                          )}
+
+                          {/* IN PROGRESS */}
+                          {mtg.status === 'in_progress' && (
+                            <Button 
+                              size="small" variant="contained" onClick={() => navigate(`/meetings/live/${mtg.id}`)}
+                              sx={{ borderRadius: 1.5, textTransform: "none", fontSize: 12, bgcolor: "primary.main" }}
+                            >
+                              {t("meetings.join_room")}
+                            </Button>
+                          )}
+                        </Stack>
+                      </Box>
+                    );
+                  })}
                 </Stack>
               )}
             </Box>
@@ -279,7 +267,7 @@ const DashboardManager: React.FC = () => {
 
         {/* Right: Open Actions */}
         <Grid item xs={12} md={5}>
-          <Paper sx={glassStyle}>
+          <Paper glassStyle sx={glassStyle}>
             <Box sx={{ px: 3, py: 2, borderBottom: "1px solid", borderColor: "divider", bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
               <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
                 {t("dashboard.my_open_actions")}
@@ -318,6 +306,7 @@ const DashboardManager: React.FC = () => {
         </Grid>
 
       </Grid>
+      <style>{`@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }`}</style>
     </Box>
   );
 };

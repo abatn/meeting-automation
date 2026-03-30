@@ -75,8 +75,8 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
   - **Pflichtfelder-Sperre:** Der "Create"-Button ist erst aktiv, wenn alle Pflichtfelder (Titel, Datum, Uhrzeit, Ort, Teilnehmer) ausgefüllt sind.
   - **Past-Date-Prevention:** Meetings in der Vergangenheit können nicht mehr erstellt werden. Der `DatePicker` blockiert vergangene Tage (`minDate`).
 - **Intelligente Listen-Filterung:** 
-  - Die Liste "Recent Meetings" zeigt alle **laufenden** (`in_progress`) und **geplante** (`planned`) Meetings an, die noch nicht abgelaufen sind.
-  - Zur Information wird zusätzlich nur das **einzelne, absolut letzte Meeting** aus der Historie (entweder `cancelled` oder `expired`) eingeblendet, um die Liste übersichtlich zu halten.
+  - Die Liste "Recent Meetings" im Meeting Planner zeigt alle laufenden und geplanten Meetings an, plus das letzte historische Event (cancelled/expired).
+  - Im **Department Manager Dashboard** wurde die Liste "My Upcoming Meetings" gestrafft: Sie zeigt **ausschließlich** aktive (`in_progress`) und bevorstehende (`planned`) Meetings an. Abgelaufene oder abgesagte Termine werden hier vollständig ausgeblendet, um die operative Übersicht zu maximieren.
 - **Optimierte Button-UX:**
   - **Blau ("Start Now"):** Für Meetings in ferner Zukunft.
   - **Grün pulsierend ("Join"):** Automatisches Signal 15 Minuten vor Startzeit.
