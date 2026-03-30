@@ -85,5 +85,16 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
 - **Strikte Ablauf-Regel:** Ein Meeting wird exakt nach Ablauf der geplanten Dauer (Start + Duration) als `expired` markiert. In diesem Zustand wird der Text durchgestrichen und es erscheint ausschließlich der funktionale `Delete`-Button zum Aufräumen.
 - **API-Vollendung:** Implementierung des fehlenden `DELETE /api/v1/meetings/{id}` Endpunkts im Backend zur physischen Bereinigung von Meeting-Leichen (inkl. kaskadierender Löschung von Teilnehmern und Agenden).
 
+### 9. Action Items Tracker & Rollenbasierte Sichtbarkeit (RBAC)
+- **Professioneller Aufgaben-Kreislauf (RBAC):**
+  - Implementierung einer strikten rollenbasierten Sichtbarkeit für den Endpunkt `/api/v1/actions/my-actions`.
+  - **Participant:** Sieht ausschließlich Aufgaben, die ihm explizit per ID, E-Mail oder durch "Fuzzy Matching" seines Namens (für AI-Zuweisungen) zugeordnet wurden.
+  - **Manager:** Sieht die eigenen Aufgaben sowie alle Aufgaben seiner direkten Team-Mitglieder (ausgewertet über die `manager_id` der Untergebenen).
+  - **Director General (DG):** Vollständiger Überblick über alle Aufgaben des Mandanten (Tenant).
+- **Intelligentes AI-Namens-Matching:** Das System spaltet nun Vor- und Nachnamen auf und führt eine tolerante Suche (`ILIKE`) in den `external_name` Feldern durch, um Zuweisungsfehler der KI (z.B. "Herr Batnini" vs. "Abdelkader Batnini") auszugleichen.
+- **UI-Stabilität (Error Boundary Fix):**
+  - Die `StatusBadge.tsx` Komponente wurde robuster programmiert. Unbekannte oder fehlerhaft formatierte Status-Strings aus der Datenbank führen nicht mehr zum Absturz der React-Tabelle (`TypeError: can't access property "label"`). Es greifen nun saubere neutrale Fallbacks (z.B. "Unknown").
+  - Alle Datenbank-Enums (`ActionStatus`) wurden auf konsistente Großschreibung (`PENDING`, `COMPLETED`) normiert.
+
 ## 📊 ERGEBNIS
-Die Applikation wirkt nun wie aus einem Guss. Durch die Beseitigung der funktionalen Defizite ("Müll-Arbeit") in den Manager-Dashboards und die Stabilisierung der Zeit-Logik im Meeting Planner ist das System nun bereit für den produktiven Einsatz in verschiedenen Zeitzonen. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.
+Die Applikation wirkt nun wie aus einem Guss. Durch die Beseitigung der funktionalen Defizite ("Müll-Arbeit") in den Dashboards, die strikte RBAC-Filterung im Action Tracker und die Stabilisierung der Zeit-Logik im Meeting Planner ist das System nun bereit für den produktiven Einsatz in verschiedenen Hierarchieebenen. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.
