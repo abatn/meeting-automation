@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.api import deps
 from app.schemas.action import Action, ActionCreate, ActionSuggestion, ActionPattern, ActionStatistics, ActionAutomation
@@ -154,7 +155,11 @@ async def list_actions(
     """
     Retrieve a list of action items, with optional filters.
     """
-    stmt = select(ActionModel).where(ActionModel.client_id == current_user.client_id)
+    stmt = (
+        select(ActionModel)
+        .options(selectinload(ActionModel.assignments).selectinload(AssignmentModel.user))
+        .where(ActionModel.client_id == current_user.client_id)
+    )
 
     # Optional filters
     if status:
@@ -188,6 +193,7 @@ async def list_my_actions(
     """
     stmt = (
         select(ActionModel)
+        .options(selectinload(ActionModel.assignments).selectinload(AssignmentModel.user))
         .where(ActionModel.client_id == current_user.client_id)
     )
 
@@ -224,6 +230,7 @@ async def list_team_actions(
 
     stmt = (
         select(ActionModel)
+        .options(selectinload(ActionModel.assignments).selectinload(AssignmentModel.user))
         .where(ActionModel.client_id == current_user.client_id)
         .join(AssignmentModel)
         .where(AssignmentModel.user_id.in_(managed_user_ids))
@@ -252,10 +259,10 @@ async def get_pending_actions_for_automation(
     # We join Action -> Assignment -> User (Assignee) and then find the Manager of that user
     stmt = (
         select(ActionModel)
-        .where(ActionModel.status == "pending")
         .options(
             joinedload(ActionModel.assignments).joinedload(AssignmentModel.user)
         )
+        .where(ActionModel.status == ActionStatus.PENDING)
     )
     result = await db.execute(stmt)
     actions = result.scalars().unique().all()
