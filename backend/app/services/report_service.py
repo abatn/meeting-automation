@@ -56,10 +56,18 @@ class ReportService:
             )
 
             result = await self.db.execute(query)
-            counts = {row[0]: row[1] for row in result.all()}
+            counts = {}
+            for row in result.all():
+                status_key = row[0].value if hasattr(row[0], 'value') else str(row[0]).lower()
+                # If enum is returned as string "MeetingStatus.PLANNED", extract the part after dot, or if it's already "planned"
+                if "." in status_key:
+                    status_key = status_key.split(".")[-1].lower()
+                counts[status_key] = row[1]
+                
             return {
+                "total": sum(counts.values()),
                 "completed": counts.get("completed", 0),
-                "scheduled": counts.get("scheduled", 0),
+                "scheduled": counts.get("planned", 0) + counts.get("in_progress", 0),
                 "cancelled": counts.get("cancelled", 0),
             }
 
