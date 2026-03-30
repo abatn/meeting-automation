@@ -11,12 +11,14 @@ export const createAppTheme = (direction: Direction) => {
         main: "#475569", // Professional slate grey instead of aggressive red
       },
       background: {
-        default: "#f8fafc", // Slightly lighter professional background
+        default: "#FAFAFA", // Noble, clean background for Glassmorphism
       },
     },
     typography: {
       fontFamily:
-        direction === "rtl" ? "Roboto, Cairo, Arial" : "Roboto, Arial",
+        direction === "rtl" 
+          ? "'Noto Sans Arabic', sans-serif" 
+          : "'Inter', sans-serif",
     },
     components: {
       MuiButton: {

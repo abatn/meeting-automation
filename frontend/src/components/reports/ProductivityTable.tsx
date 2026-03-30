@@ -58,7 +58,7 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
   };
 
   return (
-    <TableContainer sx={{ maxHeight: 600 }}>
+    <TableContainer sx={{ maxHeight: 600, overflowX: "auto", width: "100%" }}>
       <Table stickyHeader size="small">
         <TableHead>
           <TableRow>

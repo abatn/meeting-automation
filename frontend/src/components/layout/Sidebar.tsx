@@ -23,7 +23,12 @@ import PaymentIcon from "@mui/icons-material/Payment";
 
 const drawerWidth = 240;
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  mobileOpen: boolean;
+  onDrawerToggle: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -46,64 +51,94 @@ const Sidebar: React.FC = () => {
   ];
 
   const currentItems = isBusinessAdmin ? adminItems : coreItems;
-  const isRtl = i18n.dir() === "rtl";
+
+  const drawer = (
+    <Box sx={{ overflow: "auto", px: 2, pt: 3 }}>
+      <List>
+        {currentItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
+              <ListItemButton
+                onClick={() => {
+                  navigate(item.path);
+                  if (mobileOpen) onDrawerToggle();
+                }}
+                sx={{
+                  borderRadius: "8px",
+                  py: 1,
+                  px: 1.5,
+                  bgcolor: isActive ? "rgba(0, 0, 0, 0.04)" : "transparent",
+                  color: isActive ? "#000" : "#52525B",
+                  "&:hover": {
+                    bgcolor: isActive ? "rgba(0, 0, 0, 0.04)" : "rgba(0, 0, 0, 0.02)",
+                    color: "#000",
+                  },
+                  "& .MuiListItemIcon-root": {
+                    color: isActive ? "#000" : "#71717A",
+                    minWidth: "40px",
+                  },
+                }}
+              >
+                <ListItemIcon>{item.icon}</ListItemIcon>
+                <ListItemText
+                  primary={item.text}
+                  primaryTypographyProps={{
+                    fontWeight: isActive ? 700 : 600,
+                    fontSize: "14px",
+                    letterSpacing: "-0.01em",
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          );
+        })}
+      </List>
+    </Box>
+  );
 
   return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: drawerWidth,
-        flexShrink: 0,
-        [`& .MuiDrawer-paper`]: {
-          width: drawerWidth,
-          boxSizing: "border-box",
-          bgcolor: "#F9FAFB",
-          borderRight: isRtl ? "none" : "1px solid rgba(0, 0, 0, 0.05)",
-          borderLeft: isRtl ? "1px solid rgba(0, 0, 0, 0.05)" : "none",
-        },
-      }}
+    <Box
+      component="nav"
+      sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
     >
-      <Toolbar />
-      <Box sx={{ overflow: "auto", px: 2, pt: 3 }}>
-        <List>
-          {currentItems.map((item) => {
-            const isActive = location.pathname === item.path;
-            return (
-              <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
-                <ListItemButton
-                  onClick={() => navigate(item.path)}
-                  sx={{
-                    borderRadius: "8px",
-                    py: 1,
-                    px: 1.5,
-                    bgcolor: isActive ? "rgba(0, 0, 0, 0.04)" : "transparent",
-                    color: isActive ? "#000" : "#52525B",
-                    "&:hover": {
-                      bgcolor: isActive ? "rgba(0, 0, 0, 0.04)" : "rgba(0, 0, 0, 0.02)",
-                      color: "#000",
-                    },
-                    "& .MuiListItemIcon-root": {
-                      color: isActive ? "#000" : "#71717A",
-                      minWidth: "32px",
-                    },
-                  }}
-                >
-                  <ListItemIcon>{item.icon}</ListItemIcon>
-                  <ListItemText
-                    primary={item.text}
-                    primaryTypographyProps={{
-                      fontWeight: isActive ? 600 : 500,
-                      fontSize: "14px",
-                      letterSpacing: "-0.01em",
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            );
-          })}
-        </List>
-      </Box>
-    </Drawer>
+      <Drawer
+        variant="temporary"
+        anchor="left"
+        open={mobileOpen}
+        onClose={onDrawerToggle}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: "block", sm: "none" },
+          "& .MuiDrawer-paper": {
+            boxSizing: "border-box",
+            width: drawerWidth,
+            bgcolor: "#FAFAFA",
+            borderRight: "1px solid rgba(0, 0, 0, 0.05)",
+          },
+        }}
+      >
+        <Toolbar />
+        {drawer}
+      </Drawer>
+      <Drawer
+        variant="permanent"
+        anchor="left"
+        sx={{
+          display: { xs: "none", sm: "block" },
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            bgcolor: "#FAFAFA",
+            borderRight: "1px solid rgba(0, 0, 0, 0.05)",
+          },
+        }}
+        open
+      >
+        <Toolbar />
+        {drawer}
+      </Drawer>
+    </Box>
   );
 };
 

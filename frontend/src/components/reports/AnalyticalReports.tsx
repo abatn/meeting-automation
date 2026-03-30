@@ -44,7 +44,7 @@ const AnalyticalReports: React.FC = () => {
       <Grid container spacing={4}>
         {/* Productivity Table */}
         <Grid item xs={12} md={8}>
-          <Box sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
+          <Box sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
             <Box sx={{ px: 3, py: 2, borderBottom: "1px solid", borderColor: "divider", bgcolor: alpha("#000", 0.02) }}>
               <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
                 {t("dashboard.dept_performance")}

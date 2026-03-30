@@ -160,7 +160,7 @@ const MeetingArchive: React.FC = () => {
                     <SearchIcon fontSize="small" sx={{ color: "text.secondary" }} />
                   </InputAdornment>
                 ),
-                sx: { borderRadius: 2, bgcolor: "#FFF" },
+                sx: { borderRadius: 2, bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : '#FFF' },
               }}
             />
           </Grid>
@@ -179,19 +179,19 @@ const MeetingArchive: React.FC = () => {
                     <FilterIcon fontSize="small" sx={{ color: "text.secondary" }} />
                   </InputAdornment>
                 ),
-                sx: { borderRadius: 2, bgcolor: "#FFF" },
+                sx: { borderRadius: 2, bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : '#FFF' },
               }}
             />
           </Grid>
 
-          <Grid item xs={6} md={2.3}>
+          <Grid item xs={12} md={2.3}>
             <FormControl fullWidth size="small">
               <InputLabel sx={{ fontSize: 14 }}>{t("meetings.location")}</InputLabel>
               <Select
                 value={selectedRoom}
                 label={t("meetings.location")}
                 onChange={(e) => setSelectedRoom(e.target.value)}
-                sx={{ borderRadius: 2, bgcolor: "#FFF", fontSize: 14 }}
+                sx={{ borderRadius: 2, bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : '#FFF', fontSize: 14 }}
               >
                 <MenuItem value="all">{t("common.all")}</MenuItem>
                 {rooms.map((r) => (
@@ -203,7 +203,7 @@ const MeetingArchive: React.FC = () => {
             </FormControl>
           </Grid>
 
-          <Grid item xs={6} md={2.3}>
+          <Grid item xs={12} sm={6} md={2.3}>
             <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={dayjsLocale}>
               <DatePicker
                 label={t("archive.date_from")}
@@ -215,14 +215,14 @@ const MeetingArchive: React.FC = () => {
                     size: "small",
                     fullWidth: true,
                     InputLabelProps: { shrink: true, sx: { fontSize: 14 } },
-                    InputProps: { sx: { borderRadius: 2, bgcolor: "#FFF", fontSize: 14 } },
+                    InputProps: { sx: { borderRadius: 2, bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : '#FFF', fontSize: 14 } },
                   },
                 }}
               />
             </LocalizationProvider>
           </Grid>
 
-          <Grid item xs={6} md={2.3}>
+          <Grid item xs={12} sm={6} md={2.3}>
             <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale={dayjsLocale}>
               <DatePicker
                 label={t("archive.date_to")}
@@ -234,7 +234,7 @@ const MeetingArchive: React.FC = () => {
                     size: "small",
                     fullWidth: true,
                     InputLabelProps: { shrink: true, sx: { fontSize: 14 } },
-                    InputProps: { sx: { borderRadius: 2, bgcolor: "#FFF", fontSize: 14 } },
+                    InputProps: { sx: { borderRadius: 2, bgcolor: theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.2)' : '#FFF', fontSize: 14 } },
                   },
                 }}
               />
@@ -249,12 +249,20 @@ const MeetingArchive: React.FC = () => {
         variant="outlined"
         sx={{
           borderRadius: 3,
-          overflow: "hidden",
+          overflowX: "auto",
+          width: "100%",
           borderColor: "divider",
           boxShadow: "none",
+          "&::-webkit-scrollbar": {
+            height: "6px",
+          },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: "rgba(0,0,0,0.1)",
+            borderRadius: "3px",
+          },
         }}
       >
-        <Table stickyHeader>
+        <Table stickyHeader sx={{ minWidth: 800 }}>
           <TableHead>
             <TableRow sx={{ bgcolor: alpha("#000", 0.02) }}>
               <TableCell
@@ -264,6 +272,7 @@ const MeetingArchive: React.FC = () => {
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
                   color: "#71717A",
+                  minWidth: 100
                 }}
               >
                 {t("meetings.date")}
@@ -275,6 +284,7 @@ const MeetingArchive: React.FC = () => {
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
                   color: "#71717A",
+                  minWidth: 150
                 }}
               >
                 {t("meetings.title")}
@@ -286,6 +296,7 @@ const MeetingArchive: React.FC = () => {
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
                   color: "#71717A",
+                  minWidth: 150
                 }}
               >
                 {t("archive.topics")}
@@ -297,6 +308,7 @@ const MeetingArchive: React.FC = () => {
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
                   color: "#71717A",
+                  minWidth: 120
                 }}
               >
                 {t("meetings.location")}
@@ -321,7 +333,7 @@ const MeetingArchive: React.FC = () => {
                   letterSpacing: "0.05em",
                   color: "#71717A",
                 }}
-                align="right"
+                align={i18n.dir() === 'rtl' ? 'left' : 'right'}
               >
                 {t("common.actions")}
               </TableCell>
@@ -405,8 +417,8 @@ const MeetingArchive: React.FC = () => {
                       />
                     </Tooltip>
                   </TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                  <TableCell align={i18n.dir() === 'rtl' ? 'left' : 'right'}>
+                    <Stack direction="row" spacing={1} justifyContent={i18n.dir() === 'rtl' ? 'flex-start' : 'flex-end'}>
                       <Button
                         size="small"
                         variant="outlined"

@@ -16,6 +16,7 @@ import {
   IconButton,
   CircularProgress,
   alpha,
+  Stack,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -31,7 +32,7 @@ import api from "../../services/api";
 import StatusBadge from "./StatusBadge";
 
 const ActionTracker: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [actions, setActions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,7 +81,7 @@ const ActionTracker: React.FC = () => {
       {/* TOOLBAR */}
       <Paper
         variant="outlined"
-        sx={{ mb: 4, p: 2, display: "flex", gap: 2, alignItems: "center", borderRadius: 3, borderColor: "divider" }}
+        sx={{ mb: 4, p: 2, display: "flex", flexDirection: { xs: 'column', sm: 'row' }, gap: 2, alignItems: { xs: 'stretch', sm: 'center' }, borderRadius: 3, borderColor: "divider" }}
       >
         <TextField
           size="small"
@@ -97,38 +98,40 @@ const ActionTracker: React.FC = () => {
           }}
           sx={{ flexGrow: 1 }}
         />
-        <Button 
-          startIcon={<FilterIcon sx={{ fontSize: 18 }} />} 
-          variant="outlined"
-          sx={{ 
-            borderRadius: 2, 
-            borderColor: "divider", 
-            color: "text.primary", 
-            textTransform: "none",
-            fontSize: 14,
-            fontWeight: 500,
-            px: 3,
-            "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
-          }}
-        >
-          {t("common.filter")}
-        </Button>
-        <Button 
-          variant="contained" 
-          disableElevation
-          sx={{ 
-            bgcolor: "#000", 
-            color: "#FFF", 
-            borderRadius: 2, 
-            textTransform: "none",
-            fontSize: 14,
-            fontWeight: 600,
-            px: 3,
-            "&:hover": { bgcolor: "#27272A" }
-          }}
-        >
-          {t("actions.export")}
-        </Button>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <Button 
+            startIcon={<FilterIcon sx={{ fontSize: 18 }} />} 
+            variant="outlined"
+            sx={{ 
+              borderRadius: 2, 
+              borderColor: "divider", 
+              color: "text.primary", 
+              textTransform: "none",
+              fontSize: 14,
+              fontWeight: 500,
+              px: 3,
+              "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
+            }}
+          >
+            {t("common.filter")}
+          </Button>
+          <Button 
+            variant="contained" 
+            disableElevation
+            sx={{ 
+              bgcolor: "#000", 
+              color: "#FFF", 
+              borderRadius: 2, 
+              textTransform: "none",
+              fontSize: 14,
+              fontWeight: 600,
+              px: 3,
+              "&:hover": { bgcolor: "#27272A" }
+            }}
+          >
+            {t("actions.export")}
+          </Button>
+        </Stack>
       </Paper>
 
       {/* TABLE */}
@@ -137,16 +140,32 @@ const ActionTracker: React.FC = () => {
           <CircularProgress size={30} sx={{ color: "#000" }} />
         </Box>
       ) : (
-        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, borderColor: "divider", overflow: "hidden" }}>
-          <Table>
+        <TableContainer 
+          component={Paper} 
+          variant="outlined" 
+          sx={{ 
+            borderRadius: 3, 
+            borderColor: "divider", 
+            overflowX: "auto", 
+            width: "100%",
+            "&::-webkit-scrollbar": {
+              height: "6px",
+            },
+            "&::-webkit-scrollbar-thumb": {
+              backgroundColor: "rgba(0,0,0,0.1)",
+              borderRadius: "3px",
+            },
+          }}
+        >
+          <Table sx={{ minWidth: 800 }}>
             <TableHead sx={{ bgcolor: alpha("#000", 0.02) }}>
               <TableRow>
-                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2 }}>{t("actions.title")}</TableCell>
-                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2 }}>{t("actions.owner")}</TableCell>
-                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2 }}>{t("actions.priority")}</TableCell>
-                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2 }}>{t("actions.status")}</TableCell>
-                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2 }}>{t("actions.due_date")}</TableCell>
-                <TableCell align="right" sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2 }}>{t("common.actions")}</TableCell>
+                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 150 }}>{t("actions.title")}</TableCell>
+                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 120 }}>{t("actions.owner")}</TableCell>
+                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 100 }}>{t("actions.priority")}</TableCell>
+                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 100 }}>{t("actions.status")}</TableCell>
+                <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 120 }}>{t("actions.due_date")}</TableCell>
+                <TableCell align={i18n.dir() === 'rtl' ? 'left' : 'right'} sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 120 }}>{t("common.actions")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -188,8 +207,8 @@ const ActionTracker: React.FC = () => {
                       <StatusBadge status={action.status || 'pending'} />
                     </TableCell>
                     <TableCell sx={{ fontSize: 14, color: "text.secondary", py: 2 }}>{action.due_date ? new Date(action.due_date).toLocaleDateString() : 'N/A'}</TableCell>
-                    <TableCell align="right" sx={{ py: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                    <TableCell align={i18n.dir() === 'rtl' ? 'left' : 'right'} sx={{ py: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: i18n.dir() === 'rtl' ? 'flex-start' : 'flex-end', gap: 1 }}>
                         <IconButton
                           size="small"
                           onClick={() => handleWhatsAppReminder(user?.full_name || 'Me')}

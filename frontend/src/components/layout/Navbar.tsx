@@ -23,9 +23,14 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import PeopleIcon from "@mui/icons-material/People";
 import PaymentIcon from "@mui/icons-material/Payment";
 import SecurityIcon from "@mui/icons-material/Security";
+import MenuIcon from "@mui/icons-material/Menu";
 import { AutoFixHigh as IAIcon } from "@mui/icons-material";
 
-const Navbar: React.FC = () => {
+interface NavbarProps {
+  onMenuClick: () => void;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const { t, i18n } = useTranslation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -60,14 +65,27 @@ const Navbar: React.FC = () => {
     >
       <Toolbar sx={{ justifyContent: "space-between", minHeight: "64px !important" }}>
         
-        {/* BRANDING */}
-        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
-          <Box sx={{ width: 28, height: 28, bgcolor: '#000', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IAIcon sx={{ color: '#FFF', fontSize: 16 }} />
-          </Box>
-          <Typography variant="h6" fontWeight="700" sx={{ letterSpacing: '-0.5px', fontSize: '16px' }}>
-            {t('common.appNamePart1')}<Box component="span" sx={{ color: '#71717A' }}>{t('common.appNamePart2')}</Box>
-          </Typography>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          {/* HAMBURGER FOR MOBILE */}
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={onMenuClick}
+            sx={{ display: { sm: "none" } }}
+          >
+            <MenuIcon fontSize="small" />
+          </IconButton>
+
+          {/* BRANDING */}
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
+            <Box sx={{ width: 28, height: 28, bgcolor: '#000', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IAIcon sx={{ color: '#FFF', fontSize: 16 }} />
+            </Box>
+            <Typography variant="h6" fontWeight="700" sx={{ letterSpacing: '-0.5px', fontSize: '16px' }}>
+              {t('common.appNamePart1')}<Box component="span" sx={{ color: '#71717A' }}>{t('common.appNamePart2')}</Box>
+            </Typography>
+          </Stack>
         </Stack>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
