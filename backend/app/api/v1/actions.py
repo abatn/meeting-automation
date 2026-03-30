@@ -204,25 +204,46 @@ async def list_my_actions(
 
     if current_user.role == UserRole.PARTICIPANT:
         # Participants strictly see only their own tasks (including AI assignments by name/email)
-        stmt = stmt.join(ActionModel.assignments).where(
+        name_parts = current_user.full_name.split() if current_user.full_name else []
+        name_conditions = [AssignmentModel.external_name.ilike(f"%{part}%") for part in name_parts if len(part) > 3]
+
+        stmt = stmt.outerjoin(ActionModel.assignments).where(
             or_(
                 AssignmentModel.user_id == current_user.id,
                 AssignmentModel.external_email == current_user.email,
-                AssignmentModel.external_name == current_user.full_name
+                AssignmentModel.external_name.ilike(f"%{current_user.full_name}%"),
+                AssignmentModel.external_name.ilike(f"%{current_user.email.split('@')[0]}%"),
+                *name_conditions
             )
         )
     elif current_user.role == UserRole.MANAGER:
         # Managers see their own tasks AND tasks of their direct reports
-        managed_query = select(UserModel.id).where(UserModel.manager_id == current_user.id)
+        managed_query = select(UserModel.id, UserModel.email, UserModel.full_name).where(UserModel.manager_id == current_user.id)
         managed_res = await db.execute(managed_query)
-        managed_ids = [row[0] for row in managed_res.all()]
-        managed_ids.append(current_user.id) # Add self
+        reports = managed_res.all()
+        
+        managed_ids = [current_user.id]
+        managed_emails = [current_user.email]
+        name_conditions = []
+        
+        if current_user.full_name:
+            for part in current_user.full_name.split():
+                if len(part) > 3:
+                    name_conditions.append(AssignmentModel.external_name.ilike(f"%{part}%"))
 
-        stmt = stmt.join(ActionModel.assignments).where(
+        for r in reports:
+            managed_ids.append(r[0])
+            managed_emails.append(r[1])
+            if r[2]: # full_name
+                for part in r[2].split():
+                    if len(part) > 3:
+                        name_conditions.append(AssignmentModel.external_name.ilike(f"%{part}%"))
+
+        stmt = stmt.outerjoin(ActionModel.assignments).where(
             or_(
                 AssignmentModel.user_id.in_(managed_ids),
-                AssignmentModel.external_email == current_user.email,
-                AssignmentModel.external_name == current_user.full_name
+                AssignmentModel.external_email.in_(managed_emails),
+                *name_conditions
             )
         )
     # DG, ADMIN, and SYSTEM_ADMIN fall through and see ALL actions for the client.
