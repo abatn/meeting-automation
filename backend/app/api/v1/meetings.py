@@ -181,3 +181,19 @@ async def cancel_meeting(
     updated_meeting = await meeting_service.update_meeting(meeting_id, current_user.client_id, update_data)
     
     return updated_meeting
+
+
+@router.delete("/{meeting_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_meeting(
+    meeting_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+    meeting_service: MeetingService = Depends(deps.get_meeting_service),
+) -> Any:
+    """
+    Delete a meeting.
+    """
+    success = await meeting_service.delete_meeting(meeting_id, current_user.client_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    return None

@@ -188,13 +188,96 @@ class ReportService:
         action_stats = await self.get_action_completion_rate(client_id)
         team_prod = await self.get_team_productivity(client_id)
         trend = await self.get_efficiency_trend(client_id)
+        
+        # NEU: Team-Listen für Meetings und Actions (Part 42 Logik)
+        upcoming_meetings = await self.get_team_upcoming_meetings(manager_id, client_id)
+        open_actions = await self.get_team_open_actions(manager_id, client_id)
 
         return {
             "meeting_stats": meeting_stats,
             "action_stats": action_stats,
             "team_productivity": team_prod,
             "efficiency_trend": trend,
+            "upcoming_meetings_list": upcoming_meetings,
+            "open_actions_list": open_actions,
+            "team_members_count": len(team_prod)
         }
+
+    async def get_team_upcoming_meetings(self, manager_id: str, client_id: str, limit: int = 10) -> List[dict]:
+        """Holt Meetings des Managers und seines Teams (Part 42)"""
+        from app.models.meeting import Participant
+        from sqlalchemy import or_
+        
+        # 1. Teammitglieder finden (direkte Reports)
+        team_query = select(UserModel.id).where(UserModel.manager_id == manager_id)
+        team_res = await self.db.execute(team_query)
+        team_ids = [row[0] for row in team_res.all()]
+        team_ids.append(manager_id) # Manager selbst einbeziehen
+
+        now = datetime.utcnow()
+        # Meetings where any team member is participant OR creator
+        query = (
+            select(Meeting)
+            .outerjoin(Participant)
+            .where(
+                Meeting.client_id == client_id,
+                Meeting.status != "cancelled", # Filter cancelled as per protocol
+                Meeting.start_time >= (now - timedelta(hours=2)), # Show in-progress too
+                or_(Participant.user_id.in_(team_ids), Meeting.creator_id.in_(team_ids))
+            )
+            .order_by(
+                case(
+                    (Meeting.status == "in_progress", 0),
+                    (Meeting.status == "planned", 1),
+                    else_=2
+                ),
+                Meeting.start_time.asc()
+            )
+            .group_by(Meeting.id)
+            .limit(limit)
+        )
+        result = await self.db.execute(query)
+        meetings = result.scalars().all()
+        return [
+            {
+                "id": m.id,
+                "title": m.title,
+                "start_time": m.start_time.isoformat(),
+                "status": m.status
+            } for m in meetings
+        ]
+
+    async def get_team_open_actions(self, manager_id: str, client_id: str, limit: int = 10) -> List[dict]:
+        """Holt offene Aufgaben des gesamten Teams (Part 42)"""
+        from app.models.action import Assignment
+        
+        # 1. Teammitglieder finden
+        team_query = select(UserModel.id).where(UserModel.manager_id == manager_id)
+        team_res = await self.db.execute(team_query)
+        team_ids = [row[0] for row in team_res.all()]
+        team_ids.append(manager_id)
+
+        query = (
+            select(Action)
+            .join(Assignment)
+            .where(
+                Action.client_id == client_id,
+                Action.status == "pending",
+                Assignment.user_id.in_(team_ids)
+            )
+            .order_by(Action.priority.desc(), Action.due_date.asc().nulls_last())
+            .limit(limit)
+        )
+        result = await self.db.execute(query)
+        actions = result.scalars().all()
+        return [
+            {
+                "id": a.id,
+                "title": a.title,
+                "due_date": a.due_date.isoformat() if a.due_date else None,
+                "priority": a.priority
+            } for a in actions
+        ]
 
     async def get_upcoming_meetings(self, user_id: str, client_id: str, limit: int = 5) -> List[dict]:
         from app.models.meeting import Participant

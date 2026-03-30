@@ -25,6 +25,8 @@ interface ManagerDashboardData {
   action_stats: ActionStats;
   team_members_count: number;
   client_usage: UsageInfo;
+  upcoming_meetings_list: any[];
+  open_actions_list: any[];
 }
 
 interface ParticipantDashboardData {

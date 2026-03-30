@@ -10,7 +10,8 @@ import {
   useTheme,
   IconButton,
   Divider,
-  Paper
+  Paper,
+  Chip
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
@@ -25,6 +26,7 @@ import AssignmentIcon from "@mui/icons-material/Assignment";
 import PeopleIcon from "@mui/icons-material/People";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import AddIcon from "@mui/icons-material/Add";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 const DashboardManager: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -77,16 +79,92 @@ const DashboardManager: React.FC = () => {
     { title: t("dashboard.team_members"), value: data.team_members_count, icon: <PeopleIcon fontSize="small" />, color: "#8B5CF6", route: "/team" },
   ];
 
-  const upcomingMeetings = [
-    { id: "1", title: "Q3 Strategy Sync", time: "10:00 AM", status: "scheduled" },
-    { id: "2", title: "Product Roadmap", time: "1:30 PM", status: "scheduled" },
-  ];
+  // Logic for phased buttons (Part 42)
+  const getMeetingButton = (meeting: any) => {
+    const startTime = new Date(meeting.start_time);
+    const now = new Date();
+    const diffMs = startTime.getTime() - now.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
 
-  const openActions = [
-    { id: "1", title: "Review Q3 Budget", priority: "high" },
-    { id: "2", title: "Send ISO Compliance Report", priority: "medium" },
-    { id: "3", title: "Update Marketing Assets", priority: "low" },
-  ];
+    if (meeting.status === "in_progress") {
+      return (
+        <Button 
+          size="small" 
+          variant="contained" 
+          onClick={() => navigate(`/meetings/live/${meeting.id}`)}
+          sx={{ 
+            borderRadius: 2, 
+            textTransform: "none", 
+            fontSize: 13, 
+            bgcolor: "#10B981",
+            color: "#FFF",
+            "&:hover": { bgcolor: "#059669" }
+          }}
+        >
+          {t("meetings.join_room", "Join Room")}
+        </Button>
+      );
+    }
+
+    if (diffMins <= 15 && diffMins >= -60) {
+      return (
+        <Button 
+          size="small" 
+          variant="contained" 
+          onClick={() => navigate(`/meetings/live/${meeting.id}`)}
+          sx={{ 
+            borderRadius: 2, 
+            textTransform: "none", 
+            fontSize: 13, 
+            bgcolor: "#10B981",
+            color: "#FFF",
+            "&:hover": { bgcolor: "#059669" },
+            animation: 'pulse 2s infinite',
+            '@keyframes pulse': {
+              '0%': { boxShadow: '0 0 0 0 rgba(16, 185, 129, 0.4)' },
+              '70%': { boxShadow: '0 0 0 10px rgba(16, 185, 129, 0)' },
+              '100%': { boxShadow: '0 0 0 0 rgba(16, 185, 129, 0)' }
+            }
+          }}
+        >
+          {t("meetings.join_room", "Join Room")}
+        </Button>
+      );
+    }
+
+    return (
+      <Stack direction="row" spacing={1}>
+        <Button 
+          size="small" 
+          variant="outlined" 
+          onClick={() => navigate(`/meetings`)}
+          sx={{ 
+            borderRadius: 2, 
+            textTransform: "none", 
+            fontSize: 12, 
+            borderColor: "divider", 
+            color: "text.primary"
+          }}
+        >
+          {t("meetings.start_now", "Start Now")}
+        </Button>
+        <Button 
+          size="small" 
+          variant="text" 
+          color="error"
+          sx={{ borderRadius: 2, textTransform: "none", fontSize: 12 }}
+        >
+          {t("common.cancel")}
+        </Button>
+      </Stack>
+    );
+  };
+
+  const isLate = (startTimeStr: string) => {
+    const startTime = new Date(startTimeStr);
+    const now = new Date();
+    return now > startTime;
+  };
 
   return (
     <Box sx={{ p: { xs: 2, md: 6 }, maxWidth: 1400, mx: "auto", animation: 'fadeIn 0.5s ease-in-out', '@keyframes fadeIn': { from: { opacity: 0 }, to: { opacity: 1 } } }}>
@@ -122,7 +200,14 @@ const DashboardManager: React.FC = () => {
         {kpis.map((kpi, idx) => (
           <Grid item xs={12} sm={6} md={3} key={idx}>
             <Paper 
-              onClick={() => navigate(kpi.route)}
+              onClick={() => {
+                // Logic for AI tagging navigation (Part 42)
+                if (kpi.route === "/reports") {
+                  navigate("/archive"); // Direct to archive for AI Topics
+                } else {
+                  navigate(kpi.route);
+                }
+              }}
               sx={{ 
                 ...glassStyle,
                 p: 3, 
@@ -160,35 +245,30 @@ const DashboardManager: React.FC = () => {
             </Box>
             
             <Box>
-              {data.meeting_stats.total === 0 ? (
+              {!data.upcoming_meetings_list || data.upcoming_meetings_list.length === 0 ? (
                 <Box sx={{ p: 8, textAlign: "center" }}>
                   <Typography sx={{ fontSize: 14, color: "text.secondary" }}>{t("dashboard.no_meetings_found")}</Typography>
                 </Box>
               ) : (
                 <Stack divider={<Divider />}>
-                  {upcomingMeetings.map((mtg) => (
+                  {data.upcoming_meetings_list.map((mtg: any) => (
                     <Box key={mtg.id} sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", transition: 'all 0.2s', "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.02), transform: isRtl ? 'translateX(-4px)' : 'translateX(4px)' } }}>
                       <Stack direction="row" spacing={3} alignItems="center">
-                        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#3B82F6" }} />
+                        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: mtg.status === "in_progress" ? "#10B981" : "#3B82F6" }} />
                         <Box>
-                          <Typography sx={{ fontSize: 14, fontWeight: 600, color: "text.primary" }}>{mtg.title}</Typography>
-                          <Typography sx={{ fontSize: 13, color: "text.secondary" }}>{mtg.time}</Typography>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography sx={{ fontSize: 14, fontWeight: 600, color: "text.primary" }}>{mtg.title}</Typography>
+                            {isLate(mtg.start_time) && mtg.status === "scheduled" && (
+                              <Chip label={t("meetings.late", "late")} size="small" color="error" variant="outlined" sx={{ height: 18, fontSize: 10, fontWeight: 700, textTransform: "uppercase" }} />
+                            )}
+                          </Stack>
+                          <Typography sx={{ fontSize: 13, color: "text.secondary", display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                            <AccessTimeIcon sx={{ fontSize: 14, mr: 0.5 }} />
+                            {new Date(mtg.start_time).toLocaleString(i18n.language, { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
+                          </Typography>
                         </Box>
                       </Stack>
-                      <Button 
-                        size="small" 
-                        variant="outlined" 
-                        sx={{ 
-                          borderRadius: 2, 
-                          textTransform: "none", 
-                          fontSize: 13, 
-                          borderColor: "divider", 
-                          color: "text.primary",
-                          "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
-                        }}
-                      >
-                        {t("common.join")}
-                      </Button>
+                      {getMeetingButton(mtg)}
                     </Box>
                   ))}
                 </Stack>
@@ -207,19 +287,24 @@ const DashboardManager: React.FC = () => {
             </Box>
             
             <Box>
-              {data.action_stats.pending === 0 ? (
+              {!data.open_actions_list || data.open_actions_list.length === 0 ? (
                 <Box sx={{ p: 8, textAlign: "center" }}>
                   <Typography sx={{ fontSize: 14, color: "text.secondary" }}>{t("dashboard.no_actions_found")}</Typography>
                 </Box>
               ) : (
                 <Stack divider={<Divider />}>
-                  {openActions.map((act) => (
+                  {data.open_actions_list.map((act: any) => (
                     <Box key={act.id} sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", transition: 'all 0.2s', "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.02), transform: isRtl ? 'translateX(-4px)' : 'translateX(4px)' } }}>
                       <Box>
                         <Typography sx={{ fontSize: 14, fontWeight: 600, color: "text.primary", mb: 0.5 }}>{act.title}</Typography>
-                        <Typography sx={{ fontSize: 12, fontWeight: 600, color: act.priority === 'high' ? "#EF4444" : "#F59E0B", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                          {act.priority}
-                        </Typography>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography sx={{ fontSize: 12, fontWeight: 700, color: act.priority === 'high' ? "#EF4444" : act.priority === 'medium' ? "#F59E0B" : "#3B82F6", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            {t(`common.priority_${act.priority}`, act.priority) as string}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
+                            • {act.due_date ? new Date(act.due_date).toLocaleDateString(i18n.language) : "No date"}
+                          </Typography>
+                        </Stack>
                       </Box>
                       <IconButton size="small" sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
                         <CheckCircleIcon sx={{ fontSize: 18, color: "#D4D4D8" }} />

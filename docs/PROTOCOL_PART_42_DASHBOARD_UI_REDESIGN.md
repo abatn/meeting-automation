@@ -61,17 +61,22 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
   - Ersatz von nativen HTML-Datumsfeldern durch den **MUI DatePicker** (`@mui/x-date-pickers`).
   - Strikte Koppelung des `AdapterDayjs` an die aktive Sprache (`i18n.language`), sodass Kalender-Popups, Wochentage und Platzhalter (z.B. `JJ/MM/AAAA` für FR, arabische Formate für AR) vollautomatisch und nativ gerendert werden.
 
-### 7. Personal & Department Manager Dashboards (Mobile & RTL Optimierung)
-- **Modern Enterprise Transformation:**
-  - Komplette Überarbeitung von `DashboardParticipant` und den Manager-Ansichten auf den "Glassmorphism"-Standard (transparente Hintergründe, Blur-Effekte, 16px Border-Radius).
-  - Ersetzung klobiger Standard-MUI-Schatten durch flache, subtile Rahmen (`border: 1px solid rgba(0,0,0,0.05)`).
-- **RTL (Arabisch) & Mobile-First Fixes:**
-  - **Sidebar "Double-Flip" Fix (Korrektur):** Beibehaltung des MUI-Drawer Anchors auf `left` und der physischen Eigenschaft `borderRight`. Das global geladene `stylis-plugin-rtl` (in `RTLLayout.tsx`) übernimmt vollautomatisch die Spiegelung auf `right` und `borderLeft` im arabischen Modus. Die manuelle Umschaltung (`anchor={isRtl ? 'right' : 'left'}`) war fehlerhaft und führte zu einem "Double-Flip", da das Plugin das `right` wieder auf `left` gespiegelt hat.
-  - **Logische CSS-Properties:** Ersatz von harten physischen Werten durch logische Eigenschaften (z.B. `marginInlineEnd`) in den Dashboard-Komponenten, während tiefgreifende MUI-Strukturkomponenten (wie der Drawer) der globalen RTL-Engine vertrauen.
-  - **Mobile Table Rescue:** Entfernung von `overflow: "hidden"` auf Wrapper-Elementen und Einführung von zwingendem `overflowX: "auto"` für `TableContainer` in *Action Tracker*, *Meeting Archive* und *Analytical Reports*. Dies verhindert das Abschneiden von Tabellen auf Smartphones und ermöglicht sauberes horizontales Scrollen im RTL-Modus, ohne die Tabelle zu stauchen.
-  - **Smart Hover & Touch UX:** Die Hover-Animationen in den Dashboards (`translateX`) respektieren nun die Leserichtung (`isRtl ? '-4px' : '4px'`). Die Touch-Targets (Padding `py: 1.5 - 2`) wurden für Smartphones vergrößert.
-- **Typografie-Upgrade:**
-  - Harmonisierung der Typografie: Sicherstellung, dass arabischer Text nicht gequetscht wird (angepasste `lineHeight` und `minWidth` für Icons).
+### 7. Dashboard-Audit & Beseitigung von "Müll-Arbeit" (Refactoring)
+- **Sanierung der Manager-Ansichten:**
+  - `DashboardManager.tsx` & `DashboardDG.tsx` wurden grundlegend refactored, da sie zuvor nur oberflächliche Mock-Designs ohne funktionale Logik enthielten.
+  - **Glassmorphism-Standard:** Einführung von echtem `backdropFilter: "blur(12px)"` und 16px Radien für alle KPI-Karten, identisch zum `DashboardParticipant`.
+  - **i18n-Vollendung:** Restlose Entfernung aller hartcodierten englischen Strings (z.B. "Frequently Delayed Tasks", "AI Suggestion Analytics"). Alle Texte werden nun über den `t()`-Hook bezogen.
+  - **Backend-Logik Integration:** Ersetzung der Mock-Listen durch echte Daten aus dem `ReportService`. Manager sehen nun verifiziert die Meetings ihres gesamten Teams (basierend auf der `manager_id` Verknüpfung).
+
+### 8. Finale Meeting-Logik & Button-Garantie
+- **Zwei-Button-Prinzip:** Geplante Meetings zeigen nun **immer** parallel den `Cancel` (Rot/Outline) und den `Start/Join` Button an. Kein Button verdrängt mehr den anderen.
+- **Lokale Zeit-Synchronisation:** Integration der `dayjs` Plugins `utc` und `timezone`. Vergleiche erfolgen nun gegen die lokale Browserzeit, was fälschliche "Late"-Statusmeldungen bei Zeitverschiebungen eliminiert.
+- **Dynamische Button-Zustände:**
+  - **Blau ("Start Now"):** Für Meetings in ferner Zukunft.
+  - **Grün pulsierend ("Join"):** Automatisches Signal 15 Minuten vor Startzeit.
+  - **Rot ("Join"):** Visueller Alarm für verspätete Meetings ("Late"), solange die Endzeit nicht überschritten ist.
+- **Strikte Ablauf-Regel:** Ein Meeting wird exakt nach Ablauf der geplanten Dauer (Start + Duration) als `expired` markiert. In diesem Zustand wird der Text durchgestrichen und es erscheint ausschließlich der funktionale `Delete`-Button zum Aufräumen.
+- **API-Vollendung:** Implementierung des fehlenden `DELETE /api/v1/meetings/{id}` Endpunkts im Backend zur physischen Bereinigung von Meeting-Leichen (inkl. kaskadierender Löschung von Teilnehmern und Agenden).
 
 ## 📊 ERGEBNIS
-Die Applikation wirkt nun wie aus einem Guss. Vom ersten Besuch der Landing Page bis zur Bearbeitung eines Protokolls im Meeting Room herrscht eine konsistente, hochprofessionelle Design-Sprache. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.
+Die Applikation wirkt nun wie aus einem Guss. Durch die Beseitigung der funktionalen Defizite ("Müll-Arbeit") in den Manager-Dashboards und die Stabilisierung der Zeit-Logik im Meeting Planner ist das System nun bereit für den produktiven Einsatz in verschiedenen Zeitzonen. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.
