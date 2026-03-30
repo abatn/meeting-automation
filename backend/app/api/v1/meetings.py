@@ -189,11 +189,10 @@ async def delete_meeting(
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
     meeting_service: MeetingService = Depends(deps.get_meeting_service),
-) -> Any:
+):
     """
     Delete a meeting.
     """
     success = await meeting_service.delete_meeting(meeting_id, current_user.client_id)
     if not success:
         raise HTTPException(status_code=404, detail="Meeting not found")
-    return None

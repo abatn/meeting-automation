@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.api import deps
-from app.schemas.action import Action, ActionCreate, ActionSuggestion, ActionPattern, ActionStatistics
+from app.schemas.action import Action, ActionCreate, ActionSuggestion, ActionPattern, ActionStatistics, ActionAutomation
 from app.models.action import Action as ActionModel, Assignment as AssignmentModel, ActionSuggestion as ActionSuggestionModel
 from app.models.user import User as UserModel, UserRole
 from app.services.action_service import ActionService
