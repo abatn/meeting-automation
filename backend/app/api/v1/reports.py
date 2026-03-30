@@ -95,3 +95,55 @@ async def get_audit_logs(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+# --- AUTOMATION ENDPOINTS (Internal Use for n8n) ---
+
+@router.get("/automation/meeting/{meeting_id}")
+async def get_meeting_details_for_automation(
+    meeting_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    api_key_valid: bool = Depends(deps.verify_internal_api_key),
+) -> Any:
+    """
+    Returns meeting details for n8n.
+    """
+    stmt = select(MeetingModel).options(selectinload(MeetingModel.participants)).where(MeetingModel.id == meeting_id)
+    result = await db.execute(stmt)
+    m = result.scalars().first()
+    if not m:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    return {
+        "id": m.id,
+        "title": m.title,
+        "start_time": m.start_time.isoformat(),
+        "attendees": [p.email for p in m.participants]
+    }
+
+
+@router.get("/automation/pdf/{meeting_id}")
+async def get_meeting_pdf_for_automation(
+    meeting_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    api_key_valid: bool = Depends(deps.verify_internal_api_key),
+) -> Any:
+    """
+    Returns the PV PDF for n8n attachment.
+    """
+    from app.models.pv import PV as PVModel
+    from fastapi.responses import FileResponse
+    from app.services.pdf_service import PDFService
+
+    pv_stmt = select(PVModel).where(PVModel.meeting_id == meeting_id)
+    pv_res = await db.execute(pv_stmt)
+    pv = pv_res.scalars().first()
+    if not pv:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="PV not found for this meeting")
+
+    pdf_service = PDFService(db)
+    pdf_path = await pdf_service.generate_pv_pdf(pv_id=pv.id, client_id=pv.client_id)
+    
+    return FileResponse(path=pdf_path, filename=f"Protocol_{meeting_id}.pdf")

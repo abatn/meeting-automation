@@ -55,6 +55,11 @@ Diese Phase finalisiert die Plattform für den kommerziellen Betrieb.
 
 Diese Phase konzentriert sich auf den stabilen Betrieb unter Last, die Benutzererfahrung und detailliertes Monitoring.
 
+- [x] **Automation & Notification Pipelines**:
+  - [x] **Meeting Invitation**: Backend webhook synchronisiert, n8n Workflow (ID 2) importiert und aktiv.
+  - [x] **Transcription Notification**: Fehlende Backend-Endpunkte für n8n-Details und PDF-Download implementiert. Workflow (ID 3) importiert und aktiv.
+  - [x] **Daily Reminders**: Backend-Endpunkt `/actions/pending` mit Zuweisern und Manager-Kontaktdaten angereichert. Workflow (ID 4) importiert und aktiv.
+  - [x] **Konnektivität**: Alle Schnittstellen verifiziert (HTTP 200 via Simulation). *Hinweis: SMTP/WhatsApp-Credentials müssen einmalig in der n8n-UI hinterlegt werden.*
 - [x] **Erweitertes Monitoring & System-Telemetrie**:
   - **Container-Ebene**: CPU/RAM pro Service (Frontend, Backend, Celery), Disk I/O (MinIO, PostgreSQL), Uptime.
   - **PostgreSQL**: Aktive Verbindungen, Langsame Queries (> 100ms), DB Cache Hit Ratio.

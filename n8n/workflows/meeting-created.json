@@ -30,15 +30,15 @@
       ],
       "credentials": {
         "postgres": {
-          "id": "1",
-          "name": "Postgres"
+          "id": "9BA7sMxhBRRNcWob",
+          "name": "Postgres account"
         }
       }
     },
     {
       "parameters": {
         "fromEmail": "noreply@meeting-automation.tn",
-        "toEmail": "={{$node[\"Webhook\"].json[\"body\"][\"attendees\"]}}",
+        "toEmail": "={{$node[\"Webhook\"].json[\"body\"][\"attendees\"].join(',')}}",
         "subject": "=Invitation: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}}",
         "text": "=You are invited to a new meeting: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}} at {{$node[\"Webhook\"].json[\"body\"][\"start_time\"]}}.",
         "options": {}
@@ -52,8 +52,8 @@
       ],
       "credentials": {
         "smtp": {
-          "id": "2",
-          "name": "SMTP Account"
+          "id": "eHaPFftWKgcTTXQc",
+          "name": "SMTP account"
         }
       }
     }

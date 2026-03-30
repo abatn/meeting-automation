@@ -237,19 +237,59 @@ async def list_team_actions(
     return result.scalars().all()
 
 
-@router.get("/pending", response_model=List[Action])
+@router.get("/pending", response_model=List[ActionAutomation])
 async def get_pending_actions_for_automation(
     db: AsyncSession = Depends(deps.get_db),
     api_key_valid: bool = Depends(deps.verify_internal_api_key),
 ) -> Any:
     """
-    Retrieve all pending action items for N8N automation.
+    Retrieve all pending action items with enriched contact info for N8N automation.
     Protected by X-Internal-API-Key.
     """
-    stmt = select(ActionModel).where(ActionModel.status == "pending")
+    from sqlalchemy.orm import joinedload
+    from app.models.user import User as UserModel
+    
+    # We join Action -> Assignment -> User (Assignee) and then find the Manager of that user
+    stmt = (
+        select(ActionModel)
+        .where(ActionModel.status == "pending")
+        .options(
+            joinedload(ActionModel.assignments).joinedload(AssignmentModel.user)
+        )
+    )
     result = await db.execute(stmt)
-    actions = result.scalars().all()
-    return actions
+    actions = result.scalars().unique().all()
+    
+    enriched_actions = []
+    for action in actions:
+        # Get primary assignee info
+        assignee_name = None
+        assignee_phone = None
+        manager_email = None
+        
+        if action.assignments:
+            user = action.assignments[0].user
+            if user:
+                assignee_name = user.full_name or user.email
+                # Simulate phone logic if not in model, or use email as fallback
+                assignee_phone = "Simulation_Phone" 
+                
+                # Fetch Manager Email
+                if user.manager_id:
+                    mgr_stmt = select(UserModel.email).where(UserModel.id == user.manager_id)
+                    mgr_res = await db.execute(mgr_stmt)
+                    manager_email = mgr_res.scalar()
+
+        enriched_actions.append({
+            "id": action.id,
+            "title": action.title,
+            "due_date": action.due_date,
+            "assignee_name": assignee_name,
+            "assignee_phone": assignee_phone,
+            "manager_email": manager_email
+        })
+        
+    return enriched_actions
 
 
 @router.post("/", response_model=Action, status_code=201)

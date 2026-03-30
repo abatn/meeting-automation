@@ -125,29 +125,22 @@ class MeetingService:
 
     async def _trigger_n8n_meeting_created(self, meeting: Meeting):
         """Triggert n8n Webhook: meeting-created"""
-        participants_payload = [
-            {"id": p.id, "user_id": p.user_id, "email": p.email, "name": p.name}
-            for p in meeting.participants
-        ]
+        # Create a simple list of attendee emails for the n8n node
+        attendees = [p.email for p in meeting.participants]
 
         payload = {
-            "event": "meeting.created",
-            "meeting": {
-                "id": meeting.id,
-                "title": meeting.title,
-                "description": meeting.description,
-                "location": meeting.location,
-                "start_time": (
-                    meeting.start_time.isoformat() if meeting.start_time else None
-                ),
-                "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
-                "status": meeting.status,
-                "creator_id": meeting.creator_id,
-                "created_at": (
-                    meeting.created_at.isoformat() if meeting.created_at else None
-                ),
-                "participants": participants_payload,
-            },
+            "id": meeting.id,
+            "title": meeting.title,
+            "description": meeting.description,
+            "location": meeting.location,
+            "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
+            "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
+            "status": meeting.status,
+            "attendees": attendees, # Fixed field for n8n email node
+            "participants": [
+                {"id": p.id, "email": p.email, "name": p.name}
+                for p in meeting.participants
+            ]
         }
         try:
             async with httpx.AsyncClient() as client:

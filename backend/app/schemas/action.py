@@ -43,6 +43,17 @@ class Action(ActionBase):
     class Config:
         from_attributes = True
 
+class ActionAutomation(BaseModel):
+    id: str
+    title: str
+    due_date: Optional[datetime]
+    assignee_name: Optional[str]
+    assignee_phone: Optional[str]
+    manager_email: Optional[str]
+
+    class Config:
+        from_attributes = True
+
 class SuggestionStatus(str, Enum):
     SUGGESTED = "suggested"
     ACCEPTED = "accepted"
