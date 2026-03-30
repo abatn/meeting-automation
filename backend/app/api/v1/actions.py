@@ -197,12 +197,43 @@ async def list_my_actions(
         .where(ActionModel.client_id == current_user.client_id)
     )
 
+    # ---------------------------------------------------------
+    # PROFESSIONAL TASK CIRCLE LOGIC (RBAC)
+    # ---------------------------------------------------------
+    from sqlalchemy import or_
+
+    if current_user.role == UserRole.PARTICIPANT:
+        # Participants strictly see only their own tasks (including AI assignments by name/email)
+        stmt = stmt.join(ActionModel.assignments).where(
+            or_(
+                AssignmentModel.user_id == current_user.id,
+                AssignmentModel.external_email == current_user.email,
+                AssignmentModel.external_name == current_user.full_name
+            )
+        )
+    elif current_user.role == UserRole.MANAGER:
+        # Managers see their own tasks AND tasks of their direct reports
+        managed_query = select(UserModel.id).where(UserModel.manager_id == current_user.id)
+        managed_res = await db.execute(managed_query)
+        managed_ids = [row[0] for row in managed_res.all()]
+        managed_ids.append(current_user.id) # Add self
+
+        stmt = stmt.join(ActionModel.assignments).where(
+            or_(
+                AssignmentModel.user_id.in_(managed_ids),
+                AssignmentModel.external_email == current_user.email,
+                AssignmentModel.external_name == current_user.full_name
+            )
+        )
+    # DG, ADMIN, and SYSTEM_ADMIN fall through and see ALL actions for the client.
+
     if status:
-        stmt = stmt.where(ActionModel.status == status)
+        # allow case-insensitive filtering for status
+        stmt = stmt.where(ActionModel.status == status.upper())
 
     stmt = stmt.order_by(ActionModel.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
-    actions = result.scalars().all()
+    actions = result.scalars().unique().all()
     return actions
 
 
