@@ -79,43 +79,54 @@ const MeetingPlanner: React.FC = () => {
   const isPastTime = () => {
     const combined = getCombinedStart();
     if (!combined) return false;
-    return combined.isBefore(dayjs().add(1, 'minute')); // 1 min buffer
+    return combined.isBefore(dayjs().add(1, 'minute'));
   };
 
   const isFormInvalid = () => {
-    return (
-      !title.trim() || 
-      !meetingDate || 
-      !meetingTime || 
-      !location || 
-      selectedParticipants.length === 0 ||
-      isPastTime()
-    );
+    return (!title.trim() || !meetingDate || !meetingTime || !location || selectedParticipants.length === 0 || isPastTime());
   };
 
   const fetchMeetings = async () => {
     try {
       const meetings = await meetingsApi.getMeetings();
-      const now = dayjs();
+      const nowTs = dayjs().valueOf();
       
-      const sorted = meetings
-        .filter((m: any) => m.status !== 'cancelled')
-        .sort((a: any, b: any) => {
-          const mStartA = dayjs(a.start_time);
-          const mEndA = a.end_time ? dayjs(a.end_time) : mStartA.add(1, 'hour');
-          const mStartB = dayjs(b.start_time);
-          const mEndB = b.end_time ? dayjs(b.end_time) : mStartB.add(1, 'hour');
+      // 1. Define what is "Active" vs "History/Past"
+      const processed = meetings.map((m: any) => {
+        const mStart = dayjs(m.start_time).valueOf();
+        const mEnd = m.end_time ? dayjs(m.end_time).valueOf() : mStart + (3600 * 1000);
+        return { ...m, isExpired: nowTs > mEnd && m.status === 'planned' };
+      });
 
-          const getStatusScore = (m: any, end: dayjs.Dayjs) => {
+      const activeMeetings = processed.filter((m: any) => 
+        m.status === 'in_progress' || (m.status === 'planned' && !m.isExpired)
+      );
+
+      const historyMeetings = processed
+        .filter((m: any) => m.status === 'cancelled' || m.isExpired)
+        .sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+      
+      // 2. Combine all active + the single latest from history (cancelled or expired)
+      const filtered = [...activeMeetings];
+      if (historyMeetings.length > 0) {
+        filtered.push(historyMeetings[0]);
+      }
+
+      const sorted = filtered
+        .sort((a: any, b: any) => {
+          const startA = dayjs(a.start_time).valueOf();
+          const startB = dayjs(b.start_time).valueOf();
+
+          const getStatusScore = (m: any) => {
             if (m.status === 'in_progress') return 0;
-            if (m.status === 'planned') return now.isAfter(end) ? 3 : 1;
-            return 2;
+            if (m.status === 'planned' && !m.isExpired) return 1;
+            return 2; // Cancelled or Expired
           };
 
-          const scoreA = getStatusScore(a, mEndA);
-          const scoreB = getStatusScore(b, mEndB);
+          const scoreA = getStatusScore(a);
+          const scoreB = getStatusScore(b);
           if (scoreA !== scoreB) return scoreA - scoreB;
-          return mStartA.valueOf() - mStartB.valueOf();
+          return startA - startB;
         })
         .slice(0, 10);
       setRecentMeetings(sorted);
@@ -136,6 +147,8 @@ const MeetingPlanner: React.FC = () => {
   useEffect(() => {
     roomsApi.getRooms().then(setAvailableRooms);
     fetchMeetings();
+    const interval = setInterval(fetchMeetings, 30000); // Auto-refresh every 30s
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -150,23 +163,10 @@ const MeetingPlanner: React.FC = () => {
   }, [participantSearch]);
 
   const handleCreate = async () => {
-    // 1. Mandatory Fields Validation
-    if (!title || !meetingDate || !meetingTime || !location || selectedParticipants.length === 0) {
-      alert(t("meetings.error_missing_fields", "Please fill all mandatory fields: Title, Date, Time, Location, and Participants."));
-      return;
-    }
-
-    const start = meetingDate.hour(meetingTime.hour()).minute(meetingTime.minute()).second(0);
-    const now = dayjs();
-
-    // 2. Past Date Validation
-    if (start.isBefore(now.subtract(1, 'minute'))) { // Small buffer for network latency
-      alert(t("meetings.error_past_date", "Cannot schedule a meeting in the past."));
-      return;
-    }
-
+    if (isFormInvalid()) return;
     setIsSubmitting(true);
     try {
+      const start = meetingDate!.hour(meetingTime!.hour()).minute(meetingTime!.minute()).second(0);
       const data = {
         title,
         status: "planned",
@@ -180,17 +180,12 @@ const MeetingPlanner: React.FC = () => {
       setTitle(""); setSelectedParticipants([]); setLocation(null);
       await fetchMeetings();
       alert(t("meetings.created_success"));
-    } catch (e) { 
-      console.error(e); 
-      alert(t("meetings.error_create_failed", "Failed to create meeting."));
-    } finally { setIsSubmitting(false); }
+    } catch (e) { console.error(e); } finally { setIsSubmitting(false); }
   };
 
   const handleAction = async (id: string, action: 'cancel' | 'delete') => {
-    const confirmMsg = action === 'cancel' 
-      ? (t("common.confirm_cancel") || "Are you sure you want to cancel?") 
-      : (t("common.confirm_delete") || "Are you sure you want to delete?");
-    if (!window.confirm(confirmMsg)) return;
+    const msg = action === 'cancel' ? t("common.confirm_cancel") : t("common.confirm_delete");
+    if (!window.confirm(msg || "Confirm?")) return;
     try {
       if (action === 'cancel') await api.patch(`/meetings/${id}/cancel`);
       else await api.delete(`/meetings/${id}`);
@@ -213,7 +208,6 @@ const MeetingPlanner: React.FC = () => {
       <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1200, mx: "auto" }}>
         <Typography variant="h4" sx={{ fontWeight: 800, mb: 4, letterSpacing: '-0.02em' }}>{t("meetings.planner_title")}</Typography>
         <Grid container spacing={4}>
-          {/* FORM SECTION */}
           <Grid item xs={12} md={7}>
             <Paper sx={glassStyle}>
               <Stack spacing={3}>
@@ -221,20 +215,8 @@ const MeetingPlanner: React.FC = () => {
                 <TextField fullWidth label={t("meetings.title")} value={title} onChange={(e) => setTitle(e.target.value)} />
                 {holidayWarning && <Alert severity="warning">{t("meetings.holiday_warning")} {holidayWarning}</Alert>}
                 <Stack direction="row" spacing={2}>
-                  <DatePicker 
-                    label={t("meetings.date")} 
-                    value={meetingDate} 
-                    onChange={setMeetingDate} 
-                    minDate={dayjs()}
-                    sx={{ flex: 1 }} 
-                  />
-                  <TimePicker 
-                    label={t("meetings.time")} 
-                    value={meetingTime} 
-                    onChange={setMeetingTime} 
-                    ampm={false} 
-                    sx={{ flex: 1 }} 
-                  />
+                  <DatePicker label={t("meetings.date")} value={meetingDate} onChange={setMeetingDate} minDate={dayjs()} sx={{ flex: 1 }} />
+                  <TimePicker label={t("meetings.time")} value={meetingTime} onChange={setMeetingTime} ampm={false} sx={{ flex: 1 }} />
                 </Stack>
                 <FormControl fullWidth>
                   <InputLabel id="dur-lbl">{t("meetings.duration")}</InputLabel>
@@ -248,11 +230,8 @@ const MeetingPlanner: React.FC = () => {
                 <Autocomplete freeSolo options={availableRooms} getOptionLabel={(o) => typeof o === 'string' ? o : o.name} value={location} onChange={(_, v) => setLocation(v)} renderInput={(p) => <TextField {...p} label={t("meetings.location")} />} />
                 <Autocomplete multiple freeSolo options={participantResults} getOptionLabel={(o) => typeof o === 'string' ? o : o.full_name} value={selectedParticipants} onInputChange={(_, v) => setParticipantSearch(v)} onChange={(_, v) => setSelectedParticipants(v)} renderInput={(p) => <TextField {...p} label={t("meetings.participants")} />} />
                 <Button 
-                  fullWidth 
-                  variant="contained" 
-                  disabled={isSubmitting || isFormInvalid()} 
-                  onClick={handleCreate} 
-                  sx={{ py: 1.5, borderRadius: '12px', fontWeight: 800, bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#333' }, "&.Mui-disabled": { bgcolor: alpha('#000', 0.1), color: alpha('#000', 0.3) } }}
+                  fullWidth variant="contained" disabled={isSubmitting || isFormInvalid()} onClick={handleCreate} 
+                  sx={{ py: 1.5, borderRadius: '12px', fontWeight: 800, bgcolor: '#000', color: '#fff', '&:hover': { bgcolor: '#333' }, "&.Mui-disabled": { bgcolor: alpha('#000', 0.1) } }}
                 >
                   {isPastTime() && !isSubmitting ? t("meetings.error_past_date", "Invalid Time") : t("meetings.create")}
                 </Button>
@@ -267,9 +246,9 @@ const MeetingPlanner: React.FC = () => {
               </Box>
               <List disablePadding>
                 {recentMeetings.map((m) => {
+                  const now = dayjs();
                   const mStart = dayjs(m.start_time);
                   const mEnd = m.end_time ? dayjs(m.end_time) : mStart.add(1, 'hour');
-                  const now = dayjs();
                   
                   const isLate = now.isAfter(mStart) && now.isBefore(mEnd);
                   const isExpired = now.isAfter(mEnd) && m.status === 'planned';
@@ -285,58 +264,27 @@ const MeetingPlanner: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><ScheduleIcon sx={{ fontSize: 14 }} /><Typography variant="caption">{mStart.format('HH:mm')}</Typography></Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><RoomIcon sx={{ fontSize: 14 }} /><Typography variant="caption">{m.location || "Office"}</Typography></Box>
                       </Stack>
-                      
                       <Stack direction="row" spacing={1} justifyContent="flex-end">
-                        {/* PLANNED LOGIC - START BUTTON ALWAYS SAYS "START" TO AVOID CONFUSION */}
                         {m.status === 'planned' && !isExpired && (
                           <>
+                            <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'cancel')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t('common.cancel', 'Cancel')}</Button>
                             <Button 
-                              size="small" 
-                              variant="outlined" 
-                              color="error" 
-                              startIcon={<CancelIcon sx={{ fontSize: 14 }} />} 
-                              onClick={() => handleAction(m.id, 'cancel')} 
-                              sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}
-                            >
-                              {t('common.cancel', 'Cancel')}
-                            </Button>
-                            <Button 
-                              size="small" 
-                              variant="contained"
-                              onClick={() => navigate(`/meetings/live/${m.id}`)}
+                              size="small" variant="contained" onClick={() => navigate(`/meetings/live/${m.id}`)}
                               startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
                               sx={{ 
                                 borderRadius: '8px', fontWeight: 800, textTransform: 'none',
-                                bgcolor: isSoon ? 'success.main' : isLate ? 'error.main' : 'primary.main',
-                                color: '#fff',
-                                animation: isSoon ? 'pulse 2s infinite' : 'none',
-                                '&:hover': {
-                                  bgcolor: isSoon ? 'success.dark' : isLate ? 'error.dark' : 'primary.dark',
-                                }
+                                bgcolor: (isSoon || isLate) ? 'success.main' : 'primary.main',
+                                color: '#fff', animation: isSoon ? 'pulse 2s infinite' : 'none',
+                                '&:hover': { bgcolor: (isSoon || isLate) ? 'success.dark' : 'primary.dark' }
                               }}
                             >
-                              {t('meetings.start_now', 'Start Now')}
+                              {isSoon || isLate ? t('meetings.join_room', 'Join') : t('meetings.start_now', 'Start Now')}
                             </Button>
                           </>
                         )}
-
-                        {isExpired && (
-                          <Button size="small" color="error" startIcon={<DeleteIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'delete')} sx={{ textTransform: 'none', fontWeight: 700 }}>
-                            {t('common.delete', 'Delete')}
-                          </Button>
-                        )}
-
-                        {m.status === 'in_progress' && (
-                          <Button size="small" variant="contained" color="primary" onClick={() => navigate(`/meetings/live/${m.id}`)} sx={{ borderRadius: '8px', fontWeight: 800, textTransform: 'none' }}>
-                            {t('meetings.join_room', 'Join Room')}
-                          </Button>
-                        )}
-
-                        {m.status === 'completed' && pvMap[m.id] && (
-                          <Button size="small" variant="outlined" startIcon={<EditIcon sx={{ fontSize: 14 }} />} onClick={() => window.open(`/editor/${pvMap[m.id]}`, '_blank')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>
-                            {t("pv.edit_online", "Edit PV")}
-                          </Button>
-                        )}
+                        {isExpired && <Button size="small" color="error" startIcon={<DeleteIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'delete')} sx={{ textTransform: 'none', fontWeight: 700 }}>{t('common.delete', 'Delete')}</Button>}
+                        {m.status === 'in_progress' && <Button size="small" variant="contained" color="primary" onClick={() => navigate(`/meetings/live/${m.id}`)} sx={{ borderRadius: '8px', fontWeight: 800, textTransform: 'none' }}>{t('meetings.join_room', 'Join Room')}</Button>}
+                        {m.status === 'completed' && pvMap[m.id] && <Button size="small" variant="outlined" startIcon={<EditIcon sx={{ fontSize: 14 }} />} onClick={() => window.open(`/editor/${pvMap[m.id]}`, '_blank')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t("pv.edit_online", "Edit PV")}</Button>}
                       </Stack>
                     </ListItem>
                   );
@@ -344,22 +292,12 @@ const MeetingPlanner: React.FC = () => {
               </List>
             </Paper>
 
-            {/* TUNISIAN CULTURAL CALENDAR */}
             <Paper sx={{ ...glassStyle, p: 3, mt: 4 }}>
-              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
-                <EventIcon color="primary" />
-                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{t("meetings.upcoming_holidays")}</Typography>
-              </Stack>
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}><EventIcon color="primary" /><Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{t("meetings.upcoming_holidays")}</Typography></Stack>
               <Stack spacing={2}>
-                {[
-                  { date: "2026-03-20", name: t("meetings.holiday_independence") },
-                  { date: "2026-04-09", name: t("meetings.holiday_martyrs") },
-                ].map((h, i) => (
+                {[ { date: "2026-03-20", name: t("meetings.holiday_independence") }, { date: "2026-04-09", name: t("meetings.holiday_martyrs") } ].map((h, i) => (
                   <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderRadius: '12px', bgcolor: alpha(theme.palette.error.main, 0.03), border: `1px solid ${alpha(theme.palette.error.main, 0.1)}` }}>
-                    <Box>
-                      <Typography sx={{ fontSize: '0.9rem', fontWeight: 700 }}>{h.name}</Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>{dayjs(h.date).locale(dayjsLocale).format('LL')}</Typography>
-                    </Box>
+                    <Box><Typography sx={{ fontSize: '0.9rem', fontWeight: 700 }}>{h.name}</Typography><Typography variant="caption" sx={{ color: "text.secondary" }}>{dayjs(h.date).locale(dayjsLocale).format('LL')}</Typography></Box>
                     <Chip label={t("meetings.holiday")} size="small" color="error" variant="filled" sx={{ fontWeight: 800, fontSize: '0.65rem' }} />
                   </Box>
                 ))}

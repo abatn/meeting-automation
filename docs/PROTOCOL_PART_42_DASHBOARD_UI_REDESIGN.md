@@ -70,14 +70,18 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
 
 ### 8. Finale Meeting-Logik & Button-Garantie
 - **Zwei-Button-Prinzip:** Geplante Meetings zeigen nun **immer** parallel den `Cancel` (Rot/Outline) und den `Start/Join` Button an. Kein Button verdrängt mehr den anderen.
-- **Lokale Zeit-Synchronisation:** Integration der `dayjs` Plugins `utc` und `timezone`. Vergleiche erfolgen nun gegen die lokale Browserzeit, was fälschliche "Late"-Statusmeldungen bei Zeitverschiebungen eliminiert.
+- **Lokale Zeit-Synchronisation:** Integration der `dayjs` Plugins `utc` und `timezone`. Vergleiche erfolgen nun gegen die lokale Browserzeit via Unix-Timestamps, was Fehlberechnungen bei Zeitverschiebungen vollständig eliminiert.
 - **Echtzeit-Validierung (Scheduling):**
   - **Pflichtfelder-Sperre:** Der "Create"-Button ist erst aktiv, wenn alle Pflichtfelder (Titel, Datum, Uhrzeit, Ort, Teilnehmer) ausgefüllt sind.
-  - **Past-Date-Prevention:** Meetings in der Vergangenheit können nicht mehr erstellt werden. Der `DatePicker` blockiert vergangene Tage (`minDate`), und der Button deaktiviert sich dynamisch bei ungültigen Uhrzeiten für den aktuellen Tag.
-- **Dynamische Button-Zustände:**
+  - **Past-Date-Prevention:** Meetings in der Vergangenheit können nicht mehr erstellt werden. Der `DatePicker` blockiert vergangene Tage (`minDate`).
+- **Intelligente Listen-Filterung:** 
+  - Die Liste "Recent Meetings" zeigt alle **laufenden** (`in_progress`) und **geplante** (`planned`) Meetings an, die noch nicht abgelaufen sind.
+  - Zur Information wird zusätzlich nur das **einzelne, absolut letzte Meeting** aus der Historie (entweder `cancelled` oder `expired`) eingeblendet, um die Liste übersichtlich zu halten.
+- **Optimierte Button-UX:**
   - **Blau ("Start Now"):** Für Meetings in ferner Zukunft.
   - **Grün pulsierend ("Join"):** Automatisches Signal 15 Minuten vor Startzeit.
-  - **Rot ("Join"):** Visueller Alarm für verspätete Meetings ("Late"), solange die Endzeit nicht überschritten ist.
+  - **Grün ("Join"):** Für verspätete Meetings ("Late"), um eine positive Handlungsaufforderung zu geben (ersetzt die warnende rote Farbe).
+  - **Auto-Refresh:** Die Liste aktualisiert sich alle 30 Sekunden automatisch, um den Status-Übergang (z.B. von Start Now zu Join) ohne Page-Reload anzuzeigen.
 - **Strikte Ablauf-Regel:** Ein Meeting wird exakt nach Ablauf der geplanten Dauer (Start + Duration) als `expired` markiert. In diesem Zustand wird der Text durchgestrichen und es erscheint ausschließlich der funktionale `Delete`-Button zum Aufräumen.
 - **API-Vollendung:** Implementierung des fehlenden `DELETE /api/v1/meetings/{id}` Endpunkts im Backend zur physischen Bereinigung von Meeting-Leichen (inkl. kaskadierender Löschung von Teilnehmern und Agenden).
 
