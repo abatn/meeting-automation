@@ -58,8 +58,8 @@ const ActionTracker: React.FC = () => {
 
   const handleComplete = async (id: string) => {
     try {
-      await api.patch(`/actions/${id}/status`, { status: "completed" });
-      setActions(actions.map(a => a.id === id ? { ...a, status: "completed" } : a));
+      await api.patch(`/actions/${id}/status`, { status: "COMPLETED" });
+      setActions(actions.map(a => a.id === id ? { ...a, status: "COMPLETED" } : a));
     } catch (error) {
       console.error('Failed to complete action:', error);
     }
@@ -67,7 +67,7 @@ const ActionTracker: React.FC = () => {
 
   const filteredActions = actions.filter((action) =>
     action.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
-    action.status?.toLowerCase() !== "completed"
+    action.status?.toUpperCase() !== "COMPLETED"
   );
 
   return (
@@ -185,7 +185,7 @@ const ActionTracker: React.FC = () => {
                     <TableCell sx={{ fontWeight: 600, fontSize: 14, color: "text.primary", py: 2 }}>
                       {action.title}
                     </TableCell>
-                    <TableCell sx={{ fontSize: 14, color: "text.secondary", py: 2 }}>{user?.full_name || t('common.me')}</TableCell>
+                    <TableCell sx={{ fontSize: 14, color: "text.secondary", py: 2 }}>{action.assigned_to || t('common.unassigned', 'Unassigned')}</TableCell>
                     <TableCell sx={{ py: 2 }}>
                       <Chip
                         label={action.priority || 'Medium'}
@@ -211,7 +211,7 @@ const ActionTracker: React.FC = () => {
                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                         <IconButton
                           size="small"
-                          onClick={() => handleWhatsAppReminder(user?.full_name || 'Me')}
+                          onClick={() => handleWhatsAppReminder(action.assigned_to || t('common.unassigned', 'Unassigned'))}
                           title={t("common.actions")}
                           sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, color: "#10B981", "&:hover": { bgcolor: alpha("#10B981", 0.05), borderColor: "#10B981" } }}
                         >
@@ -220,7 +220,7 @@ const ActionTracker: React.FC = () => {
                         <IconButton 
                           size="small"
                           onClick={() => handleComplete(action.id)}
-                          disabled={action.status === 'completed'}
+                          disabled={action.status === 'COMPLETED'}
                           sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, color: "#3B82F6", "&:hover": { bgcolor: alpha("#3B82F6", 0.05), borderColor: "#3B82F6" } }}
                         >
                           <CompleteIcon sx={{ fontSize: 16 }} />
