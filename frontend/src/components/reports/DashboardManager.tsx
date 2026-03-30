@@ -6,11 +6,11 @@ import {
   CircularProgress,
   Button,
   Stack,
-  CardActionArea,
   alpha,
-  Chip,
+  useTheme,
   IconButton,
-  Divider
+  Divider,
+  Paper
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
@@ -23,39 +23,16 @@ import EventIcon from "@mui/icons-material/Event";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import PeopleIcon from "@mui/icons-material/People";
-import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import AddIcon from "@mui/icons-material/Add";
-import TimelineIcon from "@mui/icons-material/Timeline";
-
-const GlassCard = ({ children, sx = {}, onClick = undefined }: any) => {
-  const content = (
-    <Box sx={{
-      bgcolor: "#FFF",
-      borderRadius: "16px",
-      border: "1px solid rgba(0,0,0,0.05)",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
-      overflow: "hidden",
-      height: "100%",
-      transition: "all 0.2s ease",
-      "&:hover": onClick ? {
-        boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-        borderColor: "rgba(0,0,0,0.1)",
-        transform: "translateY(-2px)"
-      } : {},
-      ...sx
-    }}>
-      {children}
-    </Box>
-  );
-
-  return onClick ? <CardActionArea onClick={onClick} sx={{ height: '100%', borderRadius: "16px" }}>{content}</CardActionArea> : content;
-};
 
 const DashboardManager: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const theme = useTheme();
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
+  const isRtl = i18n.dir() === 'rtl';
+  
   const { data, loading, error } = useSelector(
     (state: RootState) => state.dashboard.managerDashboard,
   );
@@ -80,6 +57,19 @@ const DashboardManager: React.FC = () => {
     );
   }
 
+  const glassStyle = {
+    borderRadius: "16px",
+    background: theme.palette.mode === 'dark' 
+      ? alpha(theme.palette.background.paper, 0.05) 
+      : alpha(theme.palette.background.paper, 0.8),
+    backdropFilter: "blur(12px)",
+    border: `1px solid ${theme.palette.mode === 'dark' 
+      ? 'rgba(255, 255, 255, 0.08)' 
+      : 'rgba(0, 0, 0, 0.05)'}`,
+    boxShadow: "none",
+    overflow: "hidden"
+  };
+
   const kpis = [
     { title: t("dashboard.total_team_meetings"), value: data.meeting_stats.total, icon: <EventIcon fontSize="small" />, color: "#3B82F6", route: "/meetings" },
     { title: t("dashboard.completed_team_meetings"), value: data.meeting_stats.completed, icon: <EventAvailableIcon fontSize="small" />, color: "#10B981", route: "/reports" },
@@ -99,7 +89,7 @@ const DashboardManager: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ p: { xs: 2, md: 6 }, maxWidth: 1400, mx: "auto" }}>
+    <Box sx={{ p: { xs: 2, md: 6 }, maxWidth: 1400, mx: "auto", animation: 'fadeIn 0.5s ease-in-out', '@keyframes fadeIn': { from: { opacity: 0 }, to: { opacity: 1 } } }}>
       
       {/* HEADER */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 6 }}>
@@ -123,7 +113,7 @@ const DashboardManager: React.FC = () => {
             "&:hover": { bgcolor: "#27272A" } 
           }}
         >
-          {t("meetings.new_meeting", "New Meeting")}
+          {t("meetings.new_meeting")}
         </Button>
       </Stack>
 
@@ -131,16 +121,14 @@ const DashboardManager: React.FC = () => {
       <Grid container spacing={3} sx={{ mb: 6 }}>
         {kpis.map((kpi, idx) => (
           <Grid item xs={12} sm={6} md={3} key={idx}>
-            <Box 
+            <Paper 
               onClick={() => navigate(kpi.route)}
               sx={{ 
+                ...glassStyle,
                 p: 3, 
-                borderRadius: 3, 
-                border: "1px solid",
-                borderColor: "divider",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
-                "&:hover": { borderColor: "text.primary", bgcolor: alpha("#000", 0.01) }
+                "&:hover": { borderColor: "text.primary", bgcolor: alpha(theme.palette.primary.main, 0.02), transform: "translateY(-2px)" }
               }}
             >
               <Stack spacing={1}>
@@ -154,7 +142,7 @@ const DashboardManager: React.FC = () => {
                   {kpi.title}
                 </Typography>
               </Stack>
-            </Box>
+            </Paper>
           </Grid>
         ))}
       </Grid>
@@ -164,22 +152,22 @@ const DashboardManager: React.FC = () => {
         
         {/* Left: Upcoming Meetings */}
         <Grid item xs={12} md={7}>
-          <Box sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
-            <Box sx={{ px: 3, py: 2, borderBottom: "1px solid", borderColor: "divider", bgcolor: alpha("#000", 0.02) }}>
+          <Paper sx={glassStyle}>
+            <Box sx={{ px: 3, py: 2, borderBottom: "1px solid", borderColor: "divider", bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
               <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
-                {t("dashboard.my_upcoming_meetings", "Upcoming Meetings")}
+                {t("dashboard.my_upcoming_meetings")}
               </Typography>
             </Box>
             
             <Box>
               {data.meeting_stats.total === 0 ? (
                 <Box sx={{ p: 8, textAlign: "center" }}>
-                  <Typography sx={{ fontSize: 14, color: "text.secondary" }}>No meetings scheduled</Typography>
+                  <Typography sx={{ fontSize: 14, color: "text.secondary" }}>{t("dashboard.no_meetings_found")}</Typography>
                 </Box>
               ) : (
                 <Stack divider={<Divider />}>
                   {upcomingMeetings.map((mtg) => (
-                    <Box key={mtg.id} sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", "&:hover": { bgcolor: alpha("#000", 0.02) } }}>
+                    <Box key={mtg.id} sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", transition: 'all 0.2s', "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.02), transform: isRtl ? 'translateX(-4px)' : 'translateX(4px)' } }}>
                       <Stack direction="row" spacing={3} alignItems="center">
                         <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#3B82F6" }} />
                         <Box>
@@ -199,34 +187,34 @@ const DashboardManager: React.FC = () => {
                           "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
                         }}
                       >
-                        Join
+                        {t("common.join")}
                       </Button>
                     </Box>
                   ))}
                 </Stack>
               )}
             </Box>
-          </Box>
+          </Paper>
         </Grid>
 
         {/* Right: Open Actions */}
         <Grid item xs={12} md={5}>
-          <Box sx={{ borderRadius: 3, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
-            <Box sx={{ px: 3, py: 2, borderBottom: "1px solid", borderColor: "divider", bgcolor: alpha("#000", 0.02) }}>
+          <Paper sx={glassStyle}>
+            <Box sx={{ px: 3, py: 2, borderBottom: "1px solid", borderColor: "divider", bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
               <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
-                {t("dashboard.my_open_actions", "My Priorities")}
+                {t("dashboard.my_open_actions")}
               </Typography>
             </Box>
             
             <Box>
               {data.action_stats.pending === 0 ? (
                 <Box sx={{ p: 8, textAlign: "center" }}>
-                  <Typography sx={{ fontSize: 14, color: "text.secondary" }}>All caught up!</Typography>
+                  <Typography sx={{ fontSize: 14, color: "text.secondary" }}>{t("dashboard.no_actions_found")}</Typography>
                 </Box>
               ) : (
                 <Stack divider={<Divider />}>
                   {openActions.map((act) => (
-                    <Box key={act.id} sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", "&:hover": { bgcolor: alpha("#000", 0.02) } }}>
+                    <Box key={act.id} sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", transition: 'all 0.2s', "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.02), transform: isRtl ? 'translateX(-4px)' : 'translateX(4px)' } }}>
                       <Box>
                         <Typography sx={{ fontSize: 14, fontWeight: 600, color: "text.primary", mb: 0.5 }}>{act.title}</Typography>
                         <Typography sx={{ fontSize: 12, fontWeight: 600, color: act.priority === 'high' ? "#EF4444" : "#F59E0B", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -241,7 +229,7 @@ const DashboardManager: React.FC = () => {
                 </Stack>
               )}
             </Box>
-          </Box>
+          </Paper>
         </Grid>
 
       </Grid>

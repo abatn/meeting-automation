@@ -12,6 +12,8 @@ import {
   ListItemSecondaryAction,
   Chip,
   CircularProgress,
+  useTheme,
+  alpha
 } from "@mui/material";
 import {
   Download as DownloadIcon,
@@ -44,7 +46,9 @@ interface ActionStatistics {
 
 const DashboardDG: React.FC = () => {
   const { t, i18n } = useTranslation();
+  const theme = useTheme();
   const dispatch = useDispatch<AppDispatch>();
+  const isRtl = i18n.dir() === 'rtl';
   const { dashboardData, loading } = useSelector(
     (state: RootState) => state.reports,
   );
@@ -77,6 +81,20 @@ const DashboardDG: React.FC = () => {
       </Box>
     );
   }
+
+  const glassStyle = {
+    p: 3,
+    height: '100%',
+    borderRadius: "16px",
+    background: theme.palette.mode === 'dark' 
+      ? alpha(theme.palette.background.paper, 0.05) 
+      : alpha(theme.palette.background.paper, 0.8),
+    backdropFilter: "blur(12px)",
+    border: `1px solid ${theme.palette.mode === 'dark' 
+      ? 'rgba(255, 255, 255, 0.08)' 
+      : 'rgba(0, 0, 0, 0.05)'}`,
+    boxShadow: "none",
+  };
 
   // Data for Charts
   const meetingData = {
@@ -137,7 +155,7 @@ const DashboardDG: React.FC = () => {
   ];
 
   return (
-    <Box sx={{ flexGrow: 1, p: { xs: 2, md: 3 } }}>
+    <Box sx={{ flexGrow: 1, p: { xs: 2, md: 3 }, animation: 'fadeIn 0.5s ease-in-out', '@keyframes fadeIn': { from: { opacity: 0 }, to: { opacity: 1 } } }}>
       {/* Header */}
       <Box
         sx={{
@@ -159,7 +177,7 @@ const DashboardDG: React.FC = () => {
           variant="contained"
           startIcon={<DownloadIcon />}
           color="primary"
-          sx={{ borderRadius: 2, px: 3 }}
+          sx={{ borderRadius: 2, px: 3, textTransform: "none" }}
         >
           {t("common.export")}
         </Button>
@@ -171,22 +189,19 @@ const DashboardDG: React.FC = () => {
           <Grid item xs={12} sm={6} md={4} key={idx}>
             <Paper
               sx={{
-                p: 3,
+                ...glassStyle,
                 display: "flex",
                 alignItems: "center",
-                borderRadius: 4,
-                boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-                border: "1px solid rgba(0,0,0,0.05)",
                 minHeight: 120,
               }}
             >
               <Box
                 sx={{
-                  bgcolor: "action.hover",
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
                   p: 2,
                   borderRadius: 3,
                   display: "flex",
-                  mr: 3,
+                  marginInlineEnd: 3,
                 }}
               >
                 {kpi.icon}
@@ -225,14 +240,7 @@ const DashboardDG: React.FC = () => {
       {/* Analytical Charts Section */}
       <Grid container spacing={4} sx={{ mb: 4 }}>
         <Grid item xs={12} lg={6}>
-          <Paper
-            sx={{
-              p: 3,
-              borderRadius: 4,
-              height: "100%",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            }}
-          >
+          <Paper sx={glassStyle}>
             <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
               {t("dashboard.meeting_distribution")}
             </Typography>
@@ -243,14 +251,7 @@ const DashboardDG: React.FC = () => {
           </Paper>
         </Grid>
         <Grid item xs={12} lg={6}>
-          <Paper
-            sx={{
-              p: 3,
-              borderRadius: 4,
-              height: "100%",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
-            }}
-          >
+          <Paper sx={glassStyle}>
             <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold" }}>
               {t("dashboard.action_summary")}
             </Typography>
@@ -265,9 +266,9 @@ const DashboardDG: React.FC = () => {
       {/* AI & ML Analytics Section */}
       <Grid container spacing={4} sx={{ mb: 4 }}>
         <Grid item xs={12} lg={6}>
-          <Paper sx={{ p: 3, borderRadius: 4, height: "100%", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+          <Paper sx={glassStyle}>
             <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", display: 'flex', alignItems: 'center' }}>
-              <Warning sx={{ mr: 1, color: 'warning.main' }} /> {t("dashboard.recurring_patterns") || "Frequently Delayed Tasks"}
+              <Warning sx={{ marginInlineEnd: 1, color: 'warning.main' }} /> {t("dashboard.recurring_patterns")}
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <List>
@@ -282,14 +283,14 @@ const DashboardDG: React.FC = () => {
                   {idx < patterns.length - 1 && <Divider component="li" />}
                 </React.Fragment>
               ))}
-              {patterns.length === 0 && <Typography variant="body2" color="textSecondary">No patterns found.</Typography>}
+              {patterns.length === 0 && <Typography variant="body2" color="textSecondary">{t("dashboard.no_patterns_found")}</Typography>}
             </List>
           </Paper>
         </Grid>
         <Grid item xs={12} lg={6}>
-          <Paper sx={{ p: 3, borderRadius: 4, height: "100%", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
+          <Paper sx={glassStyle}>
             <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", display: 'flex', alignItems: 'center' }}>
-              <Assignment sx={{ mr: 1, color: 'secondary.main' }} /> {t("dashboard.ai_suggestion_stats") || "AI Suggestion Analytics"}
+              <Assignment sx={{ marginInlineEnd: 1, color: 'secondary.main' }} /> {t("dashboard.ai_suggestion_stats")}
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <List>
@@ -297,7 +298,7 @@ const DashboardDG: React.FC = () => {
                 <React.Fragment key={idx}>
                   <ListItem disableGutters>
                     <ListItemText 
-                      primary={stat.suggested_assignee || "Unassigned"} 
+                      primary={stat.suggested_assignee || t("dashboard.unassigned")} 
                       secondary={`${t("dashboard.stat_total")}: ${stat.total_suggestions} | ${t("dashboard.stat_accepted")}: ${stat.accepted_count} | ${t("dashboard.stat_rejected")}: ${stat.rejected_count}`}
                     />
                     <ListItemSecondaryAction>
@@ -312,7 +313,7 @@ const DashboardDG: React.FC = () => {
                   {idx < stats.length - 1 && <Divider component="li" />}
                 </React.Fragment>
               ))}
-              {stats.length === 0 && <Typography variant="body2" color="textSecondary">No statistics found.</Typography>}
+              {stats.length === 0 && <Typography variant="body2" color="textSecondary">{t("dashboard.no_statistics_found")}</Typography>}
             </List>
           </Paper>
         </Grid>
@@ -321,14 +322,14 @@ const DashboardDG: React.FC = () => {
       <Grid container spacing={3}>
         {/* Recent Activity */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, borderRadius: 3, height: "100%" }}>
+          <Paper sx={glassStyle}>
             <Typography
               variant="h6"
               gutterBottom
               display="flex"
               alignItems="center"
             >
-              <NotificationsActive sx={{ mr: 1 }} />{" "}
+              <NotificationsActive sx={{ marginInlineEnd: 1 }} />{" "}
               {t("dashboard.recent_activity")}
             </Typography>
             <Divider sx={{ mb: 2 }} />
@@ -364,7 +365,7 @@ const DashboardDG: React.FC = () => {
 
         {/* System Health Summary */}
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 3, borderRadius: 3, bgcolor: "#f5f7fa" }}>
+          <Paper sx={{ ...glassStyle, bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
             <Typography variant="h6" gutterBottom>
               {t("dashboard.system_health")}
             </Typography>
