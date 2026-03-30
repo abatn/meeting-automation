@@ -332,8 +332,9 @@ const MeetingArchive: React.FC = () => {
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
                   color: "#71717A",
+                  minWidth: 120
                 }}
-                align={i18n.dir() === 'rtl' ? 'left' : 'right'}
+                align="right"
               >
                 {t("common.actions")}
               </TableCell>
@@ -417,8 +418,8 @@ const MeetingArchive: React.FC = () => {
                       />
                     </Tooltip>
                   </TableCell>
-                  <TableCell align={i18n.dir() === 'rtl' ? 'left' : 'right'}>
-                    <Stack direction="row" spacing={1} justifyContent={i18n.dir() === 'rtl' ? 'flex-start' : 'flex-end'}>
+                  <TableCell align="right">
+                    <Stack direction="row" spacing={1} justifyContent="flex-end">
                       <Button
                         size="small"
                         variant="outlined"

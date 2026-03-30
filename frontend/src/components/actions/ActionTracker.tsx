@@ -165,7 +165,7 @@ const ActionTracker: React.FC = () => {
                 <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 100 }}>{t("actions.priority")}</TableCell>
                 <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 100 }}>{t("actions.status")}</TableCell>
                 <TableCell sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 120 }}>{t("actions.due_date")}</TableCell>
-                <TableCell align={i18n.dir() === 'rtl' ? 'left' : 'right'} sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 120 }}>{t("common.actions")}</TableCell>
+                <TableCell align="right" sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.05em", py: 2, minWidth: 120 }}>{t("common.actions")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -207,8 +207,8 @@ const ActionTracker: React.FC = () => {
                       <StatusBadge status={action.status || 'pending'} />
                     </TableCell>
                     <TableCell sx={{ fontSize: 14, color: "text.secondary", py: 2 }}>{action.due_date ? new Date(action.due_date).toLocaleDateString() : 'N/A'}</TableCell>
-                    <TableCell align={i18n.dir() === 'rtl' ? 'left' : 'right'} sx={{ py: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: i18n.dir() === 'rtl' ? 'flex-start' : 'flex-end', gap: 1 }}>
+                    <TableCell align="right" sx={{ py: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                         <IconButton
                           size="small"
                           onClick={() => handleWhatsAppReminder(user?.full_name || 'Me')}

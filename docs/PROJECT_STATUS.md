@@ -95,3 +95,4 @@ Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilenste
 17. **[Meeting Planner Extension](PROTOCOL_PART_40_MEETING_PLANNER_EXTENSION.md)**: Intelligentes Location-Mapping (Rooms) und automatische Meeting-Endzeit beim Stoppen der Aufnahme.
 18. **[OnlyOffice Integration](PROTOCOL_PART_41_ONLYOFFICE_INTEGRATION.md)**: Einführung eines selbst gehosteten OnlyOffice Document Servers für die Online-Bearbeitung von KI-Protokollen im Browser (ISO 27001).
 19. **[ISS Map-Reduce Pipeline Final Validation](PROTOCOL_ISS_FINAL_VALIDATION.md)**: Live-Test und Validierung der asynchronen Audio-Synthese-Pipeline (S3 -> Gladia -> Qwen-1.5B -> Mistral).
+20. **[Mobile-First Redesign & RTL Stabilization](PROTOCOL_PART_43_MOBILE_RTL_STABILIZATION.md)**: Smartphone-Optimierung der gesamten Applikation, Behebung von RTL-Scrollfehlern und Einführung des Modern Enterprise Stripe-Designs.

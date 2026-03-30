@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { Box, createTheme, ThemeProvider } from "@mui/material";
+import React, { useMemo, useEffect } from "react";
+import { Box, ThemeProvider } from "@mui/material";
 import rtlPlugin from "stylis-plugin-rtl";
 import { CacheProvider } from "@emotion/react";
 import createCache from "@emotion/cache";
@@ -20,6 +20,11 @@ const cacheRtl = createCache({
 const RTLLayout: React.FC<RTLLayoutProps> = ({ children }) => {
   const { i18n } = useTranslation();
   const direction = i18n.dir();
+
+  useEffect(() => {
+    document.body.dir = direction;
+    document.documentElement.lang = i18n.language;
+  }, [direction, i18n.language]);
 
   const theme = useMemo(() => createAppTheme(direction), [direction]);
 

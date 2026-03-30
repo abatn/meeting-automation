@@ -8,7 +8,8 @@ import {
   TableRow,
   TableSortLabel,
   Box,
-  alpha
+  alpha,
+  Paper
 } from "@mui/material";
 import { useTranslation } from "react-i18next";
 
@@ -58,8 +59,26 @@ const ProductivityTable: React.FC<Props> = ({ data }) => {
   };
 
   return (
-    <TableContainer sx={{ maxHeight: 600, overflowX: "auto", width: "100%" }}>
-      <Table stickyHeader size="small">
+    <TableContainer 
+      component={Paper} 
+      elevation={0}
+      sx={{ 
+        maxHeight: 600, 
+        overflowX: "auto", 
+        width: "100%",
+        borderRadius: "12px",
+        border: "1px solid",
+        borderColor: "divider",
+        "&::-webkit-scrollbar": {
+          height: "6px",
+        },
+        "&::-webkit-scrollbar-thumb": {
+          backgroundColor: "rgba(0,0,0,0.1)",
+          borderRadius: "3px",
+        },
+      }}
+    >
+      <Table stickyHeader size="small" sx={{ minWidth: 800 }}>
         <TableHead>
           <TableRow>
             <TableCell sx={headerCellStyle}>

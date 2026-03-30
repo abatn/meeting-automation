@@ -28,6 +28,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             flexGrow: 1,
             p: { xs: 2, md: 4 },
             width: { sm: `calc(100% - ${drawerWidth}px)` },
+            minWidth: 0, // CRITICAL: Fixes RTL flexbox overflow and enables horizontal scrolling
             minHeight: "100vh",
             bgcolor: "background.default",
           }}
