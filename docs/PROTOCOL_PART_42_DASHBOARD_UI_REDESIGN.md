@@ -61,5 +61,17 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
   - Ersatz von nativen HTML-Datumsfeldern durch den **MUI DatePicker** (`@mui/x-date-pickers`).
   - Strikte Koppelung des `AdapterDayjs` an die aktive Sprache (`i18n.language`), sodass Kalender-Popups, Wochentage und Platzhalter (z.B. `JJ/MM/AAAA` für FR, arabische Formate für AR) vollautomatisch und nativ gerendert werden.
 
+### 7. Personal & Department Manager Dashboards (Mobile & RTL Optimierung)
+- **Modern Enterprise Transformation:**
+  - Komplette Überarbeitung von `DashboardParticipant` und den Manager-Ansichten auf den "Glassmorphism"-Standard (transparente Hintergründe, Blur-Effekte, 16px Border-Radius).
+  - Ersetzung klobiger Standard-MUI-Schatten durch flache, subtile Rahmen (`border: 1px solid rgba(0,0,0,0.05)`).
+- **RTL (Arabisch) & Mobile-First Fixes:**
+  - **Sidebar "Double-Flip" Fix:** Korrektur des MUI-Drawer Anchors auf `anchor={i18n.dir() === 'rtl' ? 'right' : 'left'}`. Entfernung von manuellen `isRtl`-Hacks, um Konflikte mit dem `stylis-plugin-rtl` zu vermeiden. Die mobile Sidebar fährt nun im arabischen Modus sauber von rechts ein.
+  - **Logische CSS-Properties:** Ersatz von harten physischen Werten (`borderRight`, `paddingRight`, `marginLeft`) durch logische Eigenschaften (`borderInlineEnd`, `paddingInlineEnd`), um ein perfektes Spiegeln in RTL-Sprachen zu garantieren.
+  - **Mobile Table Rescue:** Entfernung von `overflow: "hidden"` auf Wrapper-Elementen und Einführung von zwingendem `overflowX: "auto"` für `TableContainer` in *Action Tracker*, *Meeting Archive* und *Analytical Reports*. Dies verhindert das Abschneiden von Tabellen auf Smartphones und ermöglicht sauberes horizontales Scrollen im RTL-Modus, ohne die Tabelle zu stauchen.
+  - **Smart Hover & Touch UX:** Die Hover-Animationen in den Dashboards (`translateX`) respektieren nun die Leserichtung (`isRtl ? '-4px' : '4px'`). Die Touch-Targets (Padding `py: 1.5 - 2`) wurden für Smartphones vergrößert.
+- **Typografie-Upgrade:**
+  - Harmonisierung der Typografie: Sicherstellung, dass arabischer Text nicht gequetscht wird (angepasste `lineHeight` und `minWidth` für Icons).
+
 ## 📊 ERGEBNIS
 Die Applikation wirkt nun wie aus einem Guss. Vom ersten Besuch der Landing Page bis zur Bearbeitung eines Protokolls im Meeting Room herrscht eine konsistente, hochprofessionelle Design-Sprache. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.
