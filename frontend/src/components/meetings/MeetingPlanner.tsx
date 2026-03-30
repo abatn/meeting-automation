@@ -137,11 +137,15 @@ const MeetingPlanner: React.FC = () => {
           try {
             const pvRes = await api.get(`/pv/meeting/${m.id}`);
             if (pvRes.data) pvs[m.id] = pvRes.data.id;
-          } catch (e) {}
+          } catch (e) {
+            // Ignore error if PV not found
+          }
         }
       }
       setPvMap(pvs);
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e); 
+    }
   };
 
   useEffect(() => {
@@ -180,7 +184,9 @@ const MeetingPlanner: React.FC = () => {
       setTitle(""); setSelectedParticipants([]); setLocation(null);
       await fetchMeetings();
       alert(t("meetings.created_success"));
-    } catch (e) { console.error(e); } finally { setIsSubmitting(false); }
+    } catch (e) { 
+      console.error(e); 
+    } finally { setIsSubmitting(false); }
   };
 
   const handleAction = async (id: string, action: 'cancel' | 'delete') => {
@@ -190,7 +196,9 @@ const MeetingPlanner: React.FC = () => {
       if (action === 'cancel') await api.patch(`/meetings/${id}/cancel`);
       else await api.delete(`/meetings/${id}`);
       await fetchMeetings();
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e); 
+    }
   };
 
   const glassStyle = {
