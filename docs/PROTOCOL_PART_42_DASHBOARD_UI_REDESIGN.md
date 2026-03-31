@@ -108,5 +108,10 @@ Um die Benutzererfahrung zu optimieren und die Datensicherheit (ISO 27001) zu er
 - **Department Manager:** Fokus auf operative Steuerung und Team-Produktivität. Sichtbare Menüpunkte: Dashboard, Meetings, Archive, Actions, Reports und Team.
 - **Participant:** Maximaler Fokus auf die eigene Arbeit. Sichtbare Menüpunkte: Dashboard, Meetings, Archive und Actions (Eingeschränkte Sicht). Reports, Team und Billing sind für diese Rolle ausgeblendet.
 
+### 12. Konsolidierung der Management-Metriken
+- **Datenschutz-Härtung:** Die Anzeige "Minutes Usage" (Unternehmensweiter KI-Minutenverbrauch) wurde aus dem **Participant Dashboard** entfernt, da diese Information für normale Mitarbeiter irrelevant und aus Sicht der Data Governance sensibel ist.
+- **Zentralisierung im DG-Dashboard:** Der Minuten-Fortschrittsbalken (`UsageProgressBar`) wurde exklusiv in das **Director General Dashboard** integriert, um der Geschäftsführung die Budget-Kontrolle zu ermöglichen.
+- **Bugfix (UI):** Behebung eines `ReferenceError: Stack is not defined` im DG-Dashboard durch Ergänzung der fehlenden Material-UI Importe.
+
 ## 📊 ERGEBNIS
 Die Applikation wirkt nun wie aus einem Guss. Durch die Beseitigung der funktionalen Defizite ("Müll-Arbeit") in den Dashboards, die strikte RBAC-Filterung im Action Tracker und die Stabilisierung der Zeit-Logik im Meeting Planner ist das System nun bereit für den produktiven Einsatz in verschiedenen Hierarchieebenen. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.

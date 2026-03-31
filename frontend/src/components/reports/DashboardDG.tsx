@@ -12,6 +12,7 @@ import {
   ListItemSecondaryAction,
   Chip,
   CircularProgress,
+  Stack,
   useTheme,
   alpha
 } from "@mui/material";
@@ -31,6 +32,7 @@ import api from "../../services/api";
 
 import MeetingsPieChart from "./MeetingsPieChart";
 import ActionsBarChart from "./ActionsBarChart";
+import UsageProgressBar from "../common/UsageProgressBar";
 
 interface ActionPattern {
   title: string;
@@ -167,20 +169,36 @@ const DashboardDG: React.FC = () => {
           gap: 2,
         }}
       >
-        <Typography
-          variant="h4"
-          sx={{ fontWeight: "bold", color: "text.primary" }}
-        >
-          {t("dashboard.dg_title")}
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<DownloadIcon />}
-          color="primary"
-          sx={{ borderRadius: 2, px: 3, textTransform: "none" }}
-        >
-          {t("common.export")}
-        </Button>
+        <Box>
+          <Typography
+            variant="h4"
+            sx={{ fontWeight: "bold", color: "text.primary", mb: 0.5 }}
+          >
+            {t("dashboard.dg_title")}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {new Date().toLocaleDateString(i18n.language, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </Typography>
+        </Box>
+
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ width: { xs: '100%', sm: 'auto' } }}>
+          {dashboardData?.client_usage && (
+            <Box sx={{ width: 250, p: 1.5, borderRadius: '12px', bgcolor: alpha(theme.palette.primary.main, 0.03), border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
+              <UsageProgressBar 
+                used={dashboardData.client_usage.minutes_used} 
+                total={dashboardData.client_usage.minutes_included} 
+              />
+            </Box>
+          )}
+          <Button
+            variant="contained"
+            startIcon={<DownloadIcon />}
+            color="primary"
+            sx={{ borderRadius: 2, px: 3, textTransform: "none", height: 48 }}
+          >
+            {t("common.export")}
+          </Button>
+        </Stack>
       </Box>
 
       {/* KPI Section */}

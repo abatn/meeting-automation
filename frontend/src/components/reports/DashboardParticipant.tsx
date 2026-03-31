@@ -24,7 +24,6 @@ import { fetchParticipantDashboardData } from "../../store/dashboardSlice";
 import KPICard from "../common/KPICard";
 import EventIcon from "@mui/icons-material/Event";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
-import UsageProgressBar from "../common/UsageProgressBar";
 
 const DashboardParticipant: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -116,15 +115,6 @@ const DashboardParticipant: React.FC = () => {
             {new Date().toLocaleDateString(i18n.language, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </Typography>
         </Box>
-
-        {data.client_usage && (
-          <Box sx={{ width: { xs: '100%', sm: 300 }, p: 2, borderRadius: '12px', bgcolor: alpha(theme.palette.primary.main, 0.03), border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
-            <UsageProgressBar 
-              used={data.client_usage.minutes_used} 
-              total={data.client_usage.minutes_included} 
-            />
-          </Box>
-        )}
       </Stack>
 
       <Grid container spacing={{ xs: 2, md: 3 }}>
