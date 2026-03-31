@@ -34,23 +34,39 @@ const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, onDrawerToggle }) => {
   const location = useLocation();
   const { user } = useSelector((state: RootState) => state.auth);
 
-  const isBusinessAdmin = user?.role === "system_admin";
+  // Define all available sidebar items for regular users
+  const dashboardItem = { text: t("sidebar.dashboard"), icon: <DashboardIcon fontSize="small" />, path: "/" };
+  const meetingsItem = { text: t("sidebar.meetings"), icon: <EventIcon fontSize="small" />, path: "/meetings" };
+  const archiveItem = { text: t("sidebar.archive"), icon: <CollectionsBookmarkIcon fontSize="small" />, path: "/archive" };
+  const actionsItem = { text: t("sidebar.actions"), icon: <AssignmentIcon fontSize="small" />, path: "/actions" };
+  const reportsItem = { text: t("sidebar.reports"), icon: <AssessmentIcon fontSize="small" />, path: "/reports" };
+  const teamItem = { text: t("sidebar.team", "Team"), icon: <PeopleIcon fontSize="small" />, path: "/team" };
+  const billingItem = { text: t("sidebar.billing", "Billing"), icon: <PaymentIcon fontSize="small" />, path: "/billing" };
 
-  const coreItems = [
-    { text: t("sidebar.dashboard"), icon: <DashboardIcon fontSize="small" />, path: "/" },
-    { text: t("sidebar.meetings"), icon: <EventIcon fontSize="small" />, path: "/meetings" },
-    { text: t("sidebar.archive"), icon: <CollectionsBookmarkIcon fontSize="small" />, path: "/archive" },
-    { text: t("sidebar.actions"), icon: <AssignmentIcon fontSize="small" />, path: "/actions" },
-    { text: t("sidebar.reports"), icon: <AssessmentIcon fontSize="small" />, path: "/reports" },
-  ];
-
+  // Logic for System Admin (God Mode)
   const adminItems = [
     { text: t("admin.businessOverview"), icon: <DashboardIcon fontSize="small" />, path: "/" },
     { text: t("admin.manageClients"), icon: <PeopleIcon fontSize="small" />, path: "/admin/clients" },
     { text: t("admin.revenueBilling"), icon: <PaymentIcon fontSize="small" />, path: "/billing" },
   ];
 
-  const currentItems = isBusinessAdmin ? adminItems : coreItems;
+  // RBAC Sidebar Item Selection
+  const getSidebarItems = () => {
+    switch (user?.role) {
+      case "system_admin":
+        return adminItems;
+      case "dg":
+        return [dashboardItem, meetingsItem, archiveItem, actionsItem, reportsItem, teamItem, billingItem];
+      case "manager":
+        return [dashboardItem, meetingsItem, archiveItem, actionsItem, reportsItem, teamItem];
+      case "participant":
+        return [dashboardItem, meetingsItem, archiveItem, actionsItem];
+      default:
+        return [dashboardItem, meetingsItem, archiveItem, actionsItem];
+    }
+  };
+
+  const currentItems = getSidebarItems();
 
   const drawer = (
     <Box sx={{ overflow: "auto", px: 2, pt: 3 }}>

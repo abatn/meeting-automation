@@ -96,5 +96,17 @@ Beseitigung klobiger Schatten und überdimensionierter Schriften zugunsten eines
   - Die `StatusBadge.tsx` Komponente wurde robuster programmiert. Unbekannte oder fehlerhaft formatierte Status-Strings aus der Datenbank führen nicht mehr zum Absturz der React-Tabelle (`TypeError: can't access property "label"`). Es greifen nun saubere neutrale Fallbacks (z.B. "Unknown").
   - Alle Datenbank-Enums (`ActionStatus`) wurden auf konsistente Großschreibung (`PENDING`, `COMPLETED`) normiert.
 
+### 10. Datenbank-Sanierung & Hierarchie-Tests
+- **Korrektur der Testdaten (Users/Roles):** 
+  - Die Benutzer `batniniabdelkader@yahoo.com` und `mohamedlarbi.nakti@gmail.com` wurden in der Tabelle `user_roles` manuell von der Rolle "Manager" auf "Participant" zurückgestuft, um den strikten RBAC-Filter realitätsnah zu testen.
+  - Dem Account `manager@meeting.tn` wurde in der `users`-Tabelle die Führung über diese Participants (via `manager_id`) zugewiesen. Dies stellte sicher, dass die "Team-Sichtbarkeit" im Department Manager Dashboard korrekt greift.
+- **Enum-Harmonisierung:** Manuelle SQL-Updates zur Konvertierung aller Kleinschrift-Status (z.B. 'pending') in der `actions`-Tabelle in den neuen Großschrift-Standard ('PENDING'), um `InvalidTextRepresentationError` Abstürze im Dashboard zu vermeiden.
+
+### 11. Rollenbasierte Navigations-Differenzierung (RBAC Sidebar)
+Um die Benutzererfahrung zu optimieren und die Datensicherheit (ISO 27001) zu erhöhen, wird die Sidebar-Navigation nun feingranular an die Benutzerrolle innerhalb des Kunden-Tenants angepasst:
+- **Director General (DG):** Vollständiger Zugriff auf alle operativen und administrativen Unternehmensebenen. Sichtbare Menüpunkte: Dashboard, Meetings, Archive, Actions, Reports, Team und Billing.
+- **Department Manager:** Fokus auf operative Steuerung und Team-Produktivität. Sichtbare Menüpunkte: Dashboard, Meetings, Archive, Actions, Reports und Team.
+- **Participant:** Maximaler Fokus auf die eigene Arbeit. Sichtbare Menüpunkte: Dashboard, Meetings, Archive und Actions (Eingeschränkte Sicht). Reports, Team und Billing sind für diese Rolle ausgeblendet.
+
 ## 📊 ERGEBNIS
 Die Applikation wirkt nun wie aus einem Guss. Durch die Beseitigung der funktionalen Defizite ("Müll-Arbeit") in den Dashboards, die strikte RBAC-Filterung im Action Tracker und die Stabilisierung der Zeit-Logik im Meeting Planner ist das System nun bereit für den produktiven Einsatz in verschiedenen Hierarchieebenen. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.

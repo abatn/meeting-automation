@@ -49,6 +49,7 @@ Diese Phase finalisiert die Plattform für den kommerziellen Betrieb.
 - [x] **Billing & Payment**: Integration von Rechnungen, Minutenverbrauch-Tracking und Stripe-Logik.
 - [x] **Public Landing Page**: Modernisierung im "Modern Enterprise"-Stil (Linear/Stripe) mit voller Trilingualität (AR, FR, EN), RTL-Support und Noto Sans Arabic.
 - [x] **Dashboard & Meeting Room Redesign**: Vollständige visuelle Überarbeitung der internen App (Cockpit, Planner, Assistant) für ein konsistentes Enterprise-Gefühl. 100% i18n Striktheit ohne Fallbacks.
+  - *RBAC Task Circle:* Strikte Implementierung der Aufgabensichtbarkeit (Participant sieht eigene, Manager sieht Team, DG sieht alle) inkl. intelligentem KI-Fuzzy-Matching für Namen und manueller Datenbank-Korrektur der Testhierarchie.
 - [x] **Technik-Dashboard**: System-Monitoring für den Betreiber.
 
 ## Phase 5: Production Operations & Global Optimization (Next)

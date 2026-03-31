@@ -5,10 +5,11 @@ from enum import Enum
 
 
 class ActionStatus(str, Enum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    OVERDUE = "OVERDUE"
 
 
 class ActionBase(BaseModel):

@@ -15,11 +15,11 @@ if TYPE_CHECKING:
 
 
 class ActionStatus(str, enum.Enum):
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-    OVERDUE = "overdue"
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    OVERDUE = "OVERDUE"
 
 class SuggestionStatus(str, enum.Enum):
     SUGGESTED = "suggested"
@@ -94,6 +94,15 @@ class Action(Base):
     def assignee_id(self) -> Optional[str]:
         if self.assignments:
             return self.assignments[0].user_id
+        return None
+
+    @property
+    def assigned_to(self) -> Optional[str]:
+        if self.assignments:
+            assign = self.assignments[0]
+            if assign.user:
+                return assign.user.full_name or assign.user.email
+            return assign.external_name or assign.external_email
         return None
 
 

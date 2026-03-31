@@ -290,6 +290,9 @@ const DashboardManager: React.FC = () => {
                             {t(`common.priority_${act.priority}`, act.priority) as string}
                           </Typography>
                           <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
+                            • {act.assigned_to || t('common.unassigned')}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
                             • {act.due_date ? new Date(act.due_date).toLocaleDateString(i18n.language) : "No date"}
                           </Typography>
                         </Stack>
