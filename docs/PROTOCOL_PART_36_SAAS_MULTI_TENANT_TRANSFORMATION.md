@@ -31,6 +31,8 @@
 - Alle Backend-Router und Services (`meetings.py`, `actions.py`, `pv.py`, etc.) umgebaut.
 - Jede Datenbankabfrage filtert nun zwingend mit `.where(Model.client_id == current_user.client_id)`.
 - Audit-Logging Middleware aktualisiert, um jede Aktion untrennbar mit einer `client_id` zu verknüpfen.
+- **RBAC Hierarchie-Isolation:** Behebung eines architektonischen Datenlecks im `ReportService` bei dem die Rolle `manager` und `dg` gleich behandelt wurden. Der Director General (`dg`) sieht nun verifiziert den *gesamten* Mandanten (`client_id`), während der Department-Manager (`manager`) innerhalb des Mandanten nochmals streng durch seine Untergebenen-Hierarchie (`manager_id`) isoliert wird.
+- **Defense in Depth:** Alle internen Sub-Queries zur Identifizierung von Teammitgliedern wurden zusätzlich mit einem `client_id` Filter gehärtet, um selbst bei Fehlern in der Hierarchie-Zuordnung ein Cross-Tenant Leakage physikalisch unmöglich zu machen.
 
 ### 4. System-Admin Funktionalität
 - Neue Rolle `system_admin` eingeführt.

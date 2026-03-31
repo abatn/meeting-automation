@@ -380,16 +380,60 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
 ### 7.1. Generate Dashboard Data
 - **Endpoint**: `/api/v1/reports/dashboard/{role}`
 - **Method**: `GET`
-- **Description**: Generates data for role-specific dashboards (DG, Manager, Participant).
+- **Description**: Generates data for role-specific dashboards (DG, Manager, Participant). Includes strict RBAC filtering (DG sees tenant-wide data, Manager sees only team data).
 - **Path Parameter**: `role` (str: "dg", "manager", "participant")
-- **Response (200 OK)**: Returns a JSON object containing relevant metrics and data for the specified role's dashboard.
+- **Response (200 OK)**: Returns a JSON object containing relevant metrics, dynamic trends, and audit logs.
     ```json
     {
+        "meeting_stats": {
+            "total": 150,
+            "completed": 120,
+            "scheduled": 20,
+            "cancelled": 10
+        },
+        "action_stats": {
+            "completed": 70,
+            "overdue": 5,
+            "pending": 25
+        },
+        "team_productivity": [
+            {
+                "user_id": "uuid",
+                "name": "Sami Ben Ali",
+                "completed": 10,
+                "overdue": 0,
+                "pending": 2
+            }
+        ],
+        "kpi_trends": {
+            "meetings": { "percent": 15.5, "direction": "up" },
+            "completion_rate": { "percent": 2.0, "direction": "down" }
+        },
+        "recent_audit_logs": [
+            {
+                "id": "uuid",
+                "action": "POST",
+                "table_name": "meetings",
+                "timestamp": "2026-03-31T14:00:22Z",
+                "user_id": "uuid"
+            }
+        ],
+        "system_health": {
+            "api": "healthy",
+            "ai": "healthy",
+            "storage": "healthy"
+        },
+        "upcoming_meetings_list": [],
+        "open_actions_list": [],
+        "team_members_count": 5,
         "total_meetings": 150,
-        "completed_meetings": 120,
-        "pending_actions": 30,
-        "meetings_by_month": {"Jan": 10, "Feb": 15},
-        "action_status_distribution": {"open": 20, "in_progress": 10, "completed": 70}
+        "client_usage": {
+            "period": "2026-03",
+            "minutes_used": 120,
+            "minutes_included": 1000,
+            "remaining": 880,
+            "next_billing_date": "April 26, 2026"
+        }
     }
     ```
 

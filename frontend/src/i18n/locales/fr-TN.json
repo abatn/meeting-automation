@@ -88,8 +88,14 @@
     "health_ai": "Charge de Transcription IA",
     "health_ai_status": "Normale",
     "health_storage": "Capacité de Stockage",
-    "health_storage_status": "85% Plein",
-    "activity_pv_generated": "PV généré pour la réunion Stratégie 2026",
+    "health_storage_status": "Opérationnel",
+    "vs_last_month": "vs mois dernier",
+    "trend_overdue": "en retard",
+    "no_activity": "Aucune activité récente trouvée.",
+    "no_patterns_found": "Aucun modèle récurrent identifié pour le moment.",
+    "no_statistics_found": "Aucune statistique de suggestion disponible.",
+    "unassigned": "Non assigné",
+    "activity_pv_generated": "PV généré",
     "time_2h_ago": "Il y a 2h",
     "activity_action_assigned": "Tâche de révision du budget assignée à Sami",
     "time_5h_ago": "Il y a 5h",
@@ -346,5 +352,24 @@
     "filter_topic": "Filtrer par sujet...",
     "topics": "Sujets IA",
     "search_placeholder": "ex. Planification du Budget"
+  },
+  "audit": {
+    "action": {
+      "create": "Créé",
+      "update": "Mis à jour",
+      "delete": "Supprimé",
+      "unknown": "Action Système"
+    },
+    "table": {
+      "meetings": "Réunion",
+      "actions": "Tâche",
+      "pvs": "Procès-Verbal (PV)",
+      "users": "Utilisateur",
+      "recordings": "Enregistrement",
+      "transcriptions": "Transcription",
+      "logout": "Déconnexion (Session)",
+      "cancel": "Annulation de Réunion",
+      "unknown": "Enregistrement Système"
+    }
   }
 }

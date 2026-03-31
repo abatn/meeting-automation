@@ -100,61 +100,78 @@ const DashboardDG: React.FC = () => {
 
   // Data for Charts
   const meetingData = {
-    completed: dashboardData?.completed_meetings || 0,
-    scheduled:
-      (dashboardData?.total_meetings || 0) -
-      (dashboardData?.completed_meetings || 0),
-    cancelled: 0, // Default for now
+    completed: dashboardData?.meeting_stats?.completed || 0,
+    scheduled: dashboardData?.meeting_stats?.scheduled || 0,
+    cancelled: dashboardData?.meeting_stats?.cancelled || 0,
   };
 
   const actionData = {
-    completed: dashboardData?.action_status_distribution?.completed || 0,
-    pending: dashboardData?.action_status_distribution?.in_progress || 0,
-    overdue: dashboardData?.action_status_distribution?.open || 0,
+    completed: dashboardData?.action_stats?.completed || 0,
+    pending: dashboardData?.action_stats?.pending || 0,
+    overdue: dashboardData?.action_stats?.overdue || 0,
   };
 
   // Map API data to KPI objects
   const kpis = [
     {
       title: t("dashboard.meetings_month"),
-      value: dashboardData?.total_meetings || "0",
+      value: dashboardData?.meeting_stats?.total || "0",
       icon: <TrendingUp color="primary" />,
-      trend: t("dashboard.trend_15"),
+      trend: dashboardData?.kpi_trends?.meetings 
+        ? `${dashboardData.kpi_trends.meetings.direction === 'up' ? '+' : '-'}${dashboardData.kpi_trends.meetings.percent}% ${t("dashboard.vs_last_month")}`
+        : t("dashboard.trend_stable"),
+      trendColor: dashboardData?.kpi_trends?.meetings?.direction === 'up' ? 'success.main' : (dashboardData?.kpi_trends?.meetings?.direction === 'down' ? 'error.main' : 'text.secondary'),
     },
     {
       title: t("dashboard.completion_rate"),
-      value: dashboardData?.completed_meetings || "0",
+      value: dashboardData?.action_stats?.completed || "0",
       icon: <CheckCircle color="success" />,
-      trend: t("dashboard.trend_stable"),
+      trend: dashboardData?.kpi_trends?.completion_rate 
+        ? `${dashboardData.kpi_trends.completion_rate.direction === 'up' ? '+' : '-'}${dashboardData.kpi_trends.completion_rate.percent}% ${t("dashboard.vs_last_month")}`
+        : t("dashboard.trend_stable"),
+      trendColor: dashboardData?.kpi_trends?.completion_rate?.direction === 'up' ? 'success.main' : (dashboardData?.kpi_trends?.completion_rate?.direction === 'down' ? 'error.main' : 'text.secondary'),
     },
     {
       title: t("dashboard.pending_pvs"),
-      value: dashboardData?.pending_actions || "0",
+      value: dashboardData?.action_stats?.pending || "0",
       icon: <Assignment color="warning" />,
-      trend: t("dashboard.trend_actionrequired"),
+      trend: (dashboardData?.action_stats?.overdue || 0) > 0 
+        ? `${dashboardData.action_stats.overdue} ${t("dashboard.trend_overdue")}`
+        : t("dashboard.trend_actionrequired"),
+      trendColor: (dashboardData?.action_stats?.overdue || 0) > 0 ? 'error.main' : 'warning.main',
     },
   ];
 
-  const recentActivities = [
-    {
-      id: 1,
-      text: t("dashboard.activity_pv_generated"),
-      time: t("dashboard.time_2h_ago"),
+  const recentActivities = dashboardData?.recent_audit_logs?.map((log: any) => {
+    // 1. Sichere Klein-Schreibung für die Keys
+    const rawAction = (log.action || 'unknown').toLowerCase();
+    const rawTable = (log.table_name || 'unknown').toLowerCase();
+    
+    // 2. Übersetze die Aktion (POST -> create, DELETE -> delete)
+    const actionKey = rawAction === 'post' ? 'audit.action.create' : 
+                      rawAction === 'put' || rawAction === 'patch' ? 'audit.action.update' :
+                      rawAction === 'delete' ? 'audit.action.delete' : `audit.action.${rawAction}`;
+    
+    // 3. Übersetze die Tabelle (meetings -> audit.table.meetings)
+    const tableKey = `audit.table.${rawTable}`;
+
+    // 4. Fallback-Logik, falls eine Tabelle/Aktion nicht im i18n steht
+    const actionText = t(actionKey, rawAction.toUpperCase());
+    const tableText = t(tableKey, rawTable);
+
+    return {
+      id: log.id,
+      text: `${actionText} - ${tableText}`,
+      time: new Date(log.timestamp).toLocaleString(i18n.language, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
       status: t("common.success"),
-    },
-    {
-      id: 2,
-      text: t("dashboard.activity_action_assigned"),
-      time: t("dashboard.time_5h_ago"),
-      status: t("common.pending"),
-    },
-    {
-      id: 3,
-      text: t("dashboard.activity_meeting_completed"),
-      time: t("dashboard.time_1d_ago"),
-      status: t("common.success"),
-    },
-  ];
+    };
+  }) || [];
+
+  const systemHealth = dashboardData?.system_health || {
+    api: "healthy",
+    ai: "healthy",
+    storage: "healthy"
+  };
 
   return (
     <Box sx={{ flexGrow: 1, p: { xs: 2, md: 3 }, animation: 'fadeIn 0.5s ease-in-out', '@keyframes fadeIn': { from: { opacity: 0 }, to: { opacity: 1 } } }}>
@@ -244,7 +261,7 @@ const DashboardDG: React.FC = () => {
                 </Typography>
                 <Typography
                   variant="caption"
-                  color="success.main"
+                  color={kpi.trendColor || "success.main"}
                   sx={{ fontWeight: "bold" }}
                 >
                   {kpi.trend}
@@ -352,7 +369,7 @@ const DashboardDG: React.FC = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <List>
-              {recentActivities.map((activity, idx) => (
+              {recentActivities.length > 0 ? recentActivities.map((activity, idx) => (
                 <React.Fragment key={activity.id}>
                   <ListItem disableGutters>
                     <ListItemText
@@ -376,7 +393,9 @@ const DashboardDG: React.FC = () => {
                     <Divider component="li" />
                   )}
                 </React.Fragment>
-              ))}
+              )) : (
+                <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>{t("dashboard.no_activity")}</Typography>
+              )}
             </List>
           </Paper>
         </Grid>
@@ -394,10 +413,10 @@ const DashboardDG: React.FC = () => {
               </Typography>
               <Typography
                 variant="subtitle1"
-                color="success.main"
+                color={systemHealth.api === "healthy" ? "success.main" : "error.main"}
                 sx={{ fontWeight: "bold" }}
               >
-                {t("dashboard.health_api_status")}
+                {systemHealth.api === "healthy" ? t("dashboard.health_api_status") : systemHealth.api}
               </Typography>
             </Box>
             <Box sx={{ mb: 2 }}>
@@ -406,10 +425,10 @@ const DashboardDG: React.FC = () => {
               </Typography>
               <Typography
                 variant="subtitle1"
-                color="primary"
+                color={systemHealth.ai === "healthy" ? "primary.main" : "error.main"}
                 sx={{ fontWeight: "bold" }}
               >
-                {t("dashboard.health_ai_status")}
+                {systemHealth.ai === "healthy" ? t("dashboard.health_ai_status") : systemHealth.ai}
               </Typography>
             </Box>
             <Box>
@@ -418,10 +437,10 @@ const DashboardDG: React.FC = () => {
               </Typography>
               <Typography
                 variant="subtitle1"
-                color="warning.main"
+                color={systemHealth.storage === "healthy" ? "success.main" : "warning.main"}
                 sx={{ fontWeight: "bold" }}
               >
-                {t("dashboard.health_storage_status")}
+                {systemHealth.storage === "healthy" ? t("dashboard.health_storage_status") : systemHealth.storage}
               </Typography>
             </Box>
           </Paper>

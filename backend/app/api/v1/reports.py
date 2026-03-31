@@ -38,8 +38,20 @@ async def get_dashboard_data(
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
-    Get dashboard data based on user role.
+    Get dashboard data based on user role. Includes strict RBAC validation.
     """
+    # --- SECURITY CHECK (Authorization Bypass Fix) ---
+    actual_role = current_user.role
+    is_privileged = current_user.is_superuser or actual_role in ["dg", "admin", "system_admin"]
+    
+    if role == "dg" and not is_privileged:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Not authorized to access DG dashboard")
+        
+    if role == "manager" and not (is_privileged or actual_role == "manager"):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Not authorized to access Manager dashboard")
+
     usage_info = await get_client_usage_info(db, current_user.client_id)
     report_service = ReportService(db)
     
@@ -47,7 +59,7 @@ async def get_dashboard_data(
         # --- ECHTE DATENBANKLOGIK FÜR DG / MANAGER DASHBOARD ---
         
         # 1. Base Stats via Service
-        stats = await report_service.get_manager_dashboard(current_user.id, current_user.client_id)
+        stats = await report_service.get_manager_dashboard(current_user.id, current_user.client_id, role)
         
         # 2. Total and Completed Meetings (Additional legacy stats if needed)
         total_meetings_query = select(func.count(MeetingModel.id)).where(MeetingModel.client_id == current_user.client_id)

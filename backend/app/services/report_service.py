@@ -112,8 +112,8 @@ class ReportService:
 
         return await self._get_cached_or_compute(f"reports_actions_{client_id}_{days}", compute)
 
-    async def get_team_productivity(self, client_id: str) -> List[dict]:
-        """Leistung pro Mitarbeiter (cached)"""
+    async def get_team_productivity(self, client_id: str, manager_id: str = None, role: str = "dg") -> List[dict]:
+        """Leistung pro Mitarbeiter (cached). Manager sieht nur sein Team, DG sieht alle."""
 
         async def compute():
             now = datetime.utcnow()
@@ -148,8 +148,20 @@ class ReportService:
                 .join(Action, Action.id == Assignment.action_id)
                 .outerjoin(UserModel, UserModel.id == Assignment.user_id)
                 .where(Action.client_id == client_id)
-                .group_by(func.coalesce(UserModel.full_name, Assignment.external_name))
             )
+
+            if role == "manager" and manager_id:
+                # Manager darf nur die Aufgaben seines Teams (inkl. sich selbst) sehen
+                team_query = select(UserModel.id).where(
+                    UserModel.manager_id == manager_id,
+                    UserModel.client_id == client_id # Defense in depth
+                )
+                team_res = await self.db.execute(team_query)
+                team_ids = [row[0] for row in team_res.all()]
+                team_ids.append(manager_id)
+                query = query.where(Assignment.user_id.in_(team_ids))
+
+            query = query.group_by(func.coalesce(UserModel.full_name, Assignment.external_name))
 
             result = await self.db.execute(query)
             data = []
@@ -166,11 +178,12 @@ class ReportService:
                 )
             return data
 
-        return await self._get_cached_or_compute(f"reports_team_prod_{client_id}", compute, ttl=3600)
+        # Der Cache-Key muss nun den Manager und die Rolle beinhalten, um Datenlecks zwischen Abteilungen zu verhindern!
+        cache_key = f"reports_team_prod_{client_id}_{role}_{manager_id}" if role == "manager" else f"reports_team_prod_{client_id}_dg"
+        return await self._get_cached_or_compute(cache_key, compute, ttl=3600)
 
     async def get_efficiency_trend(self, client_id: str, months: int = 6) -> List[dict]:
         """Trend der Effizienz (cached)"""
-
         async def compute():
             # Vereinfachte Mock-Implementierung für den Graphen
             trend = []
@@ -190,16 +203,114 @@ class ReportService:
             f"reports_efficiency_{client_id}_{months}", compute, ttl=86400
         )
 
-    async def get_manager_dashboard(self, manager_id: str, client_id: str) -> dict:
-        """Haupt-Dashboard zusammenstellen"""
+    async def get_kpi_trends(self, client_id: str) -> dict:
+        """Calculates trends (current vs. previous month) for Meetings and Actions."""
+        async def compute():
+            now = datetime.utcnow()
+            first_day_current = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            first_day_prev = (first_day_current - timedelta(days=1)).replace(day=1)
+            last_day_prev = first_day_current - timedelta(seconds=1)
+
+            # 1. Meetings Current vs Previous
+            query_curr_meetings = select(func.count(Meeting.id)).where(
+                Meeting.client_id == client_id,
+                Meeting.start_time >= first_day_current
+            )
+            query_prev_meetings = select(func.count(Meeting.id)).where(
+                Meeting.client_id == client_id,
+                Meeting.start_time >= first_day_prev,
+                Meeting.start_time <= last_day_prev
+            )
+            
+            res_curr = await self.db.execute(query_curr_meetings)
+            res_prev = await self.db.execute(query_prev_meetings)
+            curr_meetings = res_curr.scalar() or 0
+            prev_meetings = res_prev.scalar() or 0
+
+            # 2. Completed Actions Current vs Previous
+            query_curr_actions = select(func.count(Action.id)).where(
+                Action.client_id == client_id,
+                Action.status == "COMPLETED",
+                Action.updated_at >= first_day_current
+            )
+            query_prev_actions = select(func.count(Action.id)).where(
+                Action.client_id == client_id,
+                Action.status == "COMPLETED",
+                Action.updated_at >= first_day_prev,
+                Action.updated_at <= last_day_prev
+            )
+
+            res_curr_a = await self.db.execute(query_curr_actions)
+            res_prev_a = await self.db.execute(query_prev_actions)
+            curr_actions = res_curr_a.scalar() or 0
+            prev_actions = res_prev_a.scalar() or 0
+
+            def calc_trend(curr, prev):
+                if prev == 0:
+                    return {"percent": 100 if curr > 0 else 0, "direction": "up" if curr > 0 else "neutral"}
+                diff = ((curr - prev) / prev) * 100
+                return {
+                    "percent": round(abs(diff), 1),
+                    "direction": "up" if diff > 0 else ("down" if diff < 0 else "neutral")
+                }
+
+            return {
+                "meetings": calc_trend(curr_meetings, prev_meetings),
+                "completion_rate": calc_trend(curr_actions, prev_actions)
+            }
+
+        return await self._get_cached_or_compute(f"reports_trends_{client_id}", compute, ttl=3600)
+
+    async def get_manager_dashboard(self, manager_id: str, client_id: str, role: str = "manager") -> dict:
+        """Haupt-Dashboard zusammenstellen. Trennt zwischen 'dg' (ganze Firma) und 'manager' (nur Team)."""
         meeting_stats = await self.get_meeting_stats(client_id)
         action_stats = await self.get_action_completion_rate(client_id)
-        team_prod = await self.get_team_productivity(client_id)
+        
+        # Gebe die Rolle an get_team_productivity weiter!
+        team_prod = await self.get_team_productivity(client_id, manager_id, role)
+        
         trend = await self.get_efficiency_trend(client_id)
         
-        # NEU: Team-Listen für Meetings und Actions (Part 42 Logik)
-        upcoming_meetings = await self.get_team_upcoming_meetings(manager_id, client_id)
-        open_actions = await self.get_team_open_actions(manager_id, client_id)
+        # NEU: KPI Trends
+        kpi_trends = await self.get_kpi_trends(client_id)
+        
+        # NEU: Team-Listen für Meetings und Actions (Rollenbasiert gefiltert!)
+        upcoming_meetings = await self.get_team_upcoming_meetings(manager_id, client_id, role=role)
+        open_actions = await self.get_team_open_actions(manager_id, client_id, role=role)
+
+        # NEU: Audit Logs (letzte 5)
+        from app.models.audit_log import AuditLog
+        audit_query = select(AuditLog).where(AuditLog.client_id == client_id).order_by(AuditLog.timestamp.desc()).limit(5)
+        audit_res = await self.db.execute(audit_query)
+        recent_audit_logs = [
+            {
+                "id": str(log.id),
+                "action": log.action,
+                "table_name": log.table_name,
+                "timestamp": log.timestamp.isoformat(),
+                "user_id": log.user_id
+            } for log in audit_res.scalars().all()
+        ]
+
+        # NEU: System Health
+        from app.services.monitoring_service import MonitoringService
+        health_summary = {
+            "api": "healthy",
+            "ai": "healthy",
+            "storage": "healthy"
+        }
+        try:
+            db_metrics = await MonitoringService.get_database_metrics(self.db)
+            ai_metrics = await MonitoringService.get_ai_metrics()
+            minio_metrics = await MonitoringService.get_minio_metrics()
+            
+            health_summary = {
+                "api": db_metrics.get("status", "healthy"),
+                "ai": ai_metrics.get("mistral", {}).get("status", "healthy"),
+                "storage": minio_metrics.get("status", "healthy")
+            }
+        except Exception as e:
+            logger.error(f"Failed to fetch health for dashboard: {e}")
 
         return {
             "meeting_stats": meeting_stats,
@@ -208,31 +319,46 @@ class ReportService:
             "efficiency_trend": trend,
             "upcoming_meetings_list": upcoming_meetings,
             "open_actions_list": open_actions,
-            "team_members_count": len(team_prod)
+            "team_members_count": len(team_prod),
+            "kpi_trends": kpi_trends,
+            "recent_audit_logs": recent_audit_logs,
+            "system_health": health_summary
         }
 
-    async def get_team_upcoming_meetings(self, manager_id: str, client_id: str, limit: int = 10) -> List[dict]:
-        """Holt Meetings des Managers und seines Teams (Part 42)"""
+    async def get_team_upcoming_meetings(self, manager_id: str, client_id: str, limit: int = 10, role: str = "manager") -> List[dict]:
+        """Holt Meetings der Firma (DG) oder des eigenen Teams (Manager)."""
         from app.models.meeting import Participant
         from sqlalchemy import or_
         
-        # 1. Teammitglieder finden (direkte Reports)
-        team_query = select(UserModel.id).where(UserModel.manager_id == manager_id)
-        team_res = await self.db.execute(team_query)
-        team_ids = [row[0] for row in team_res.all()]
-        team_ids.append(manager_id) # Manager selbst einbeziehen
-
         now = datetime.utcnow()
-        # Meetings where any team member is participant OR creator
+        
         query = (
             select(Meeting)
             .outerjoin(Participant)
             .where(
                 Meeting.client_id == client_id,
                 Meeting.status != "cancelled", # Filter cancelled as per protocol
-                Meeting.start_time >= (now - timedelta(hours=2)), # Show in-progress too
+                Meeting.start_time >= (now - timedelta(hours=2)) # Show in-progress too
+            )
+        )
+
+        if role == "manager":
+            # 1. Teammitglieder finden (direkte Reports)
+            team_query = select(UserModel.id).where(
+                UserModel.manager_id == manager_id,
+                UserModel.client_id == client_id # Defense in depth
+            )
+            team_res = await self.db.execute(team_query)
+            team_ids = [row[0] for row in team_res.all()]
+            team_ids.append(manager_id) # Manager selbst einbeziehen
+            
+            # Meetings where any team member is participant OR creator
+            query = query.where(
                 or_(Participant.user_id.in_(team_ids), Meeting.creator_id.in_(team_ids))
             )
+
+        query = (
+            query
             .order_by(
                 case(
                     (Meeting.status == "in_progress", 0),
@@ -244,6 +370,7 @@ class ReportService:
             .group_by(Meeting.id)
             .limit(limit)
         )
+        
         result = await self.db.execute(query)
         meetings = result.scalars().all()
         return [
@@ -255,29 +382,38 @@ class ReportService:
             } for m in meetings
         ]
 
-    async def get_team_open_actions(self, manager_id: str, client_id: str, limit: int = 10) -> List[dict]:
-        """Holt offene Aufgaben des gesamten Teams (Part 42)"""
+    async def get_team_open_actions(self, manager_id: str, client_id: str, limit: int = 10, role: str = "manager") -> List[dict]:
+        """Holt offene Aufgaben der ganzen Firma (DG) oder des Teams (Manager)."""
         from app.models.action import Assignment
-        
-        # 1. Teammitglieder finden
-        team_query = select(UserModel.id).where(UserModel.manager_id == manager_id)
-        team_res = await self.db.execute(team_query)
-        team_ids = [row[0] for row in team_res.all()]
-        team_ids.append(manager_id)
-
         from sqlalchemy.orm import selectinload
+        
         query = (
             select(Action)
             .join(Assignment)
             .options(selectinload(Action.assignments).selectinload(Assignment.user))
             .where(
                 Action.client_id == client_id,
-                Action.status == "PENDING",
-                Assignment.user_id.in_(team_ids)
+                Action.status == "PENDING"
             )
+        )
+
+        if role == "manager":
+            # 1. Teammitglieder finden
+            team_query = select(UserModel.id).where(
+                UserModel.manager_id == manager_id,
+                UserModel.client_id == client_id # Defense in depth
+            )
+            team_res = await self.db.execute(team_query)
+            team_ids = [row[0] for row in team_res.all()]
+            team_ids.append(manager_id)
+            query = query.where(Assignment.user_id.in_(team_ids))
+
+        query = (
+            query
             .order_by(Action.priority.desc(), Action.due_date.asc().nulls_last())
             .limit(limit)
         )
+        
         result = await self.db.execute(query)
         actions = result.scalars().all()
         return [

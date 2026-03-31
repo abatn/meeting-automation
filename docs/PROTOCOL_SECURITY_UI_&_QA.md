@@ -19,10 +19,13 @@ Gewährleistung der ISO 27001 Compliance durch Härtung der Authentifizierung, A
 - **Sicherer Logout:** Implementierung einer Redis-basierten Blacklist zur sofortigen Invalidierung von JWT-Tokens nach der Abmeldung.
 - **JWT-Stabilisierung:** Umstellung auf statische `SECRET_KEY` Zuweisung und explizite UTC-Zeitstempel zur Vermeidung von "ExpiredSignatureErrors".
 - **ISO 27001 Audit-Logs:** Korrektur der `AuditMiddleware` zur fehlerfreien Erfassung modifizierender Aktionen, inklusive Benutzer-Validierung gegen die Datenbank.
+- **Audit-Log Visualisierung:** Die Audit-Logs (`action`, `table_name`) wurden im Dashboard des Director General (DG) angebunden. Rohdaten der Datenbank werden nun über ein i18n-Mapping (z.B. "POST" auf "meetings" -> "Created Meeting") sicher und verständlich in der UI visualisiert (Recent System Activity).
+- **Authorization Bypass Fix:** Behebung einer kritischen Sicherheitslücke im Dashboard-Endpunkt. Das Backend validiert nun die angeforderte Dashboard-Rolle (`role` Path-Parameter) gegen die tatsächliche Rolle im JWT-Token. Ein unbefugter Zugriff (z.B. Participant greift auf DG-Dashboard zu) wird nun mit `403 Forbidden` blockiert.
 
 ### 2. Frontend & UX Optimierung
-- **Rollenbasierte Dashboards:** Implementierung spezialisierter Ansichten für den General Manager (DG), Abteilungsleiter (Manager) und Teilnehmer.
-- **Sprachanpassung:** Vollständige Ausrichtung der UI auf **Arabisch, Französisch und Englisch**. Entfernung des Browser-Language-Detectors zur Vermeidung ungewollter Umschaltung auf Deutsch.
+- **Strikte Rollen-Isolation (RBAC Fix):** Das Backend trennt die Daten-Bereitstellung nun sauber nach Rolle (`get_manager_dashboard` in `ReportService`). Der Director General (DG) sieht mandantenweit *alle* KPIs, Meetings und Team-Aufgaben, während der Department Manager (`manager`) durch die `manager_id` auf direkte Untergebene isoliert wird. Data-Leakage im Redis-Cache wurde durch Aufnahme der `role` in den Cache-Key abgeriegelt.
+- **Rollenbasierte Dashboards:** Implementierung spezialisierter Ansichten für den General Manager (DG), Abteilungsleiter (Manager) und Teilnehmer. Ergänzt um dynamische KPI-Trends (Vergleich zum Vormonat) und Live System Health im DG-Dashboard.
+- **Sprachanpassung:** Vollständige Ausrichtung der UI auf **Arabisch, Französisch und Englisch**. Entfernung des Browser-Language-Detectors zur Vermeidung ungewollter Umschaltung auf Deutsch. Die Systemaktivitäten (Audit-Logs) besitzen nun eine eigene lokalisierte `audit`-Map in den `i18n` Dateien.
 - **Stabilität:** Einführung einer globalen `ErrorBoundary` und Korrektur von Datenformaten für KPI-Diagramme (Recharts).
 
 ### 3. QA & Test-Strategie

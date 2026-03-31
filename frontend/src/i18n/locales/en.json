@@ -88,8 +88,14 @@
     "health_ai": "AI Transcription Load",
     "health_ai_status": "Normal",
     "health_storage": "Storage Capacity",
-    "health_storage_status": "85% Full",
-    "activity_pv_generated": "PV for Strategy 2026 generated",
+    "health_storage_status": "Operational",
+    "vs_last_month": "vs last month",
+    "trend_overdue": "overdue",
+    "no_activity": "No recent activity found.",
+    "no_patterns_found": "No recurring patterns identified yet.",
+    "no_statistics_found": "No suggestion statistics available.",
+    "unassigned": "Unassigned",
+    "activity_pv_generated": "PV generated",
     "time_2h_ago": "2h ago",
     "activity_action_assigned": "Budget Review Action assigned to Sami",
     "time_5h_ago": "5h ago",
@@ -349,5 +355,24 @@
     "filter_topic": "Filter by Topic...",
     "topics": "AI Topics",
     "search_placeholder": "e.g. Budget Planning"
+  },
+  "audit": {
+    "action": {
+      "create": "Created",
+      "update": "Updated",
+      "delete": "Deleted",
+      "unknown": "System Action"
+    },
+    "table": {
+      "meetings": "Meeting",
+      "actions": "Action Item",
+      "pvs": "Protocol (PV)",
+      "users": "User",
+      "recordings": "Recording",
+      "transcriptions": "Transcription",
+      "logout": "Session Logout",
+      "cancel": "Meeting Cancellation",
+      "unknown": "System Record"
+    }
   }
 }
