@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from app.core.database import AsyncSessionLocal
 from app.models.client import Client, SubscriptionPlan, SubscriptionStatus
-from app.models.user import User, Role
+from app.models.user import User, Role, UserStatus
 from app.core.security import get_password_hash
 from sqlalchemy import select
 
@@ -45,7 +45,7 @@ async def seed_plans():
                 email=p["email"],
                 full_name=f"{p['plan'].capitalize()} Admin",
                 hashed_password=hashed_pw,
-                is_active=True
+                status=UserStatus.ACTIVE.value
             )
             user.roles.append(role)
             db.add(user)

@@ -5,17 +5,74 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 
 from app.core import security
 from app.core.config import settings
 from app.api import deps
-from app.models.user import User as UserModel, Role as RoleModel
-from app.schemas.user import User, UserCreate, Token
+from app.models.user import User as UserModel, Role as RoleModel, UserStatus, ActivationToken
+from app.schemas.user import User, UserCreate, Token, ActivationConfirm
 from app.services.auth_service import AuthService
+from datetime import timezone
 
 router = APIRouter()
+
+@router.get("/activate/verify")
+async def verify_activation_token(
+    token: str,
+    db: AsyncSession = Depends(deps.get_db)
+) -> Any:
+    """Verifies an activation token."""
+    stmt = select(ActivationToken).where(ActivationToken.token == token).options(selectinload(ActivationToken.user))
+    res = await db.execute(stmt)
+    token_obj = res.scalar_one_or_none()
+    
+    if not token_obj:
+        raise HTTPException(status_code=400, detail="Invalid activation token")
+    
+    # Python 3.11 datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    # Ensure timezone awareness comparison
+    expires_at = token_obj.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+        
+    if expires_at < now:
+        raise HTTPException(status_code=400, detail="Activation token expired")
+        
+    return {"email": token_obj.user.email}
+
+@router.post("/activate/confirm")
+async def confirm_activation(
+    body: ActivationConfirm,
+    db: AsyncSession = Depends(deps.get_db)
+) -> Any:
+    """Confirms user activation by setting a password and changing status to ACTIVE."""
+    stmt = select(ActivationToken).where(ActivationToken.token == body.token).options(selectinload(ActivationToken.user))
+    res = await db.execute(stmt)
+    token_obj = res.scalar_one_or_none()
+    
+    if not token_obj:
+        raise HTTPException(status_code=400, detail="Invalid activation token")
+        
+    now = datetime.now(timezone.utc)
+    expires_at = token_obj.expires_at
+    if expires_at.tzinfo is None:
+         expires_at = expires_at.replace(tzinfo=timezone.utc)
+         
+    if expires_at < now:
+        raise HTTPException(status_code=400, detail="Activation token expired")
+
+    user = token_obj.user
+    user.hashed_password = security.get_password_hash(body.new_password)
+    user.status = UserStatus.ACTIVE.value
+    
+    # Delete token
+    await db.delete(token_obj)
+    await db.commit()
+    
+    return {"message": "User activated successfully"}
 
 
 import logging
@@ -34,7 +91,7 @@ async def login(
     )
     user = user_result.scalar_one_or_none()
 
-    is_valid = security.verify_password(form_data.password, user.hashed_password)
+    is_valid = security.verify_password(form_data.password, user.hashed_password) if user else False
     logger.error(f"DIAGNOSE LOGIN: verify_password result: {is_valid}")
 
     if not user or not is_valid:
@@ -43,7 +100,7 @@ async def login(
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    elif not user.is_active:
+    elif user.status != UserStatus.ACTIVE.value:
         raise HTTPException(status_code=400, detail="Inactive user")
 
     # Generate token
@@ -111,7 +168,7 @@ async def register(
         email=user_in.email,
         hashed_password=security.get_password_hash(user_in.password),
         full_name=user_in.full_name,
-        is_active=True,
+        status=UserStatus.ACTIVE.value,
         is_superuser=False,
         is_mfa_enabled=False,
         created_at=datetime.now(datetime.timezone.utc) if hasattr(datetime, "UTC") else datetime.utcnow(),
@@ -136,7 +193,7 @@ async def register(
         id=db_obj.id,
         email=db_obj.email,
         full_name=db_obj.full_name,
-        is_active=db_obj.is_active,
+        status=db_obj.status,
         is_superuser=db_obj.is_superuser,
         is_mfa_enabled=db_obj.is_mfa_enabled,
         created_at=db_obj.created_at,

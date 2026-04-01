@@ -30,6 +30,12 @@ n8n dient nun ausschließlich als **orchestrator für externe Kommunikation** (E
     - Sendet automatisierte WhatsApp-Erinnerungen via WhatsApp Business API.
     - Eskaliert überfällige Aufgaben per E-Mail an den Manager.
 
+### 4. User Invited (`user-invited.json`)
+- **Trigger**: Webhook vom Backend (`/webhook/user-invited`), wenn ein Admin ein neues Teammitglied einlädt.
+- **Aktionen**:
+    - Empfängt flachen JSON-Payload (`email`, `full_name`, `company_name`, `activation_link`).
+    - Sendet eine professionelle HTML-Willkommens-E-Mail inkl. Aktivierungslink via SMTP.
+
 ## Setup & Aktivierung
 
 1. **Umgebungsvariablen**:

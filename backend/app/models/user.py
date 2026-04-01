@@ -24,6 +24,12 @@ class UserRole(str, enum.Enum):
     DG = "dg"
 
 
+class UserStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    PENDING = "PENDING"
+    DISABLED = "DISABLED"
+
+
 # Association table for User-Role (Many-to-Many)
 user_roles = Table(
     "user_roles",
@@ -60,7 +66,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     full_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String, default=UserStatus.ACTIVE.value, nullable=False)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # MFA
@@ -90,6 +96,9 @@ class User(Base):
     audit_logs: Mapped[List["AuditLog"]] = relationship(
         "AuditLog", back_populates="user"
     )
+    activation_token: Mapped[Optional["ActivationToken"]] = relationship(
+        "ActivationToken", back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
 
     @property
     def role(self) -> str:
@@ -99,16 +108,21 @@ class User(Base):
     )
 
     @property
-    def role(self) -> str:
-        """Compatibility property for legacy code expecting a single role string"""
-        if self.roles:
-            return self.roles[0].name
-        return "participant"
-
-    @property
     def department(self) -> Optional[str]:
         """Placeholder for department logic"""
         return None
+
+
+class ActivationToken(Base):
+    __tablename__ = "activation_tokens"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    token: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped["User"] = relationship("User", back_populates="activation_token")
 
 
 class Role(Base):

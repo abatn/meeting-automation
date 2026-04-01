@@ -13,6 +13,7 @@ The backend uses `HTTP POST` webhooks to trigger n8n workflows. n8n processes th
 | **Meeting Created** | `meeting.created` | `MeetingService.create_meeting` | `N8N_WEBHOOK_MEETING_CREATED` |
 | **Transcription Completed**| `transcription.completed`| `transcription_tasks._notify_n8n_completion` | `N8N_WEBHOOK_TRANSCRIPTION_COMPLETED` |
 | **Daily Reminders**| `daily_reminders` | `daily_reminder_task` (Celery) | `N8N_WEBHOOK_DAILY_REMINDER`|
+| **User Invited**| `user.invited` | `TeamService.create_team_member` | `N8N_WEBHOOK_URL + /user-invited`|
 
 ## 3. Callback Endpoints
 

@@ -29,11 +29,19 @@ erDiagram
         VARCHAR email UNIQUE
         VARCHAR hashed_password
         VARCHAR full_name
-        BOOLEAN is_active
+        VARCHAR status "ACTIVE, PENDING, DISABLED"
         BOOLEAN is_mfa_enabled
         VARCHAR mfa_secret OPTIONAL
         TIMESTAMP created_at
         TIMESTAMP updated_at
+    }
+
+    ACTIVATION_TOKENS {
+        UUID id PK
+        UUID user_id FK UNIQUE
+        VARCHAR token UNIQUE
+        TIMESTAMP expires_at
+        TIMESTAMP created_at
     }
 
     MEETINGS {
@@ -139,6 +147,7 @@ erDiagram
     CLIENTS ||--o{ AUDIT_LOGS : "has"
     CLIENTS ||--o{ TEAM_MEMBERS : "has"
 
+    USERS ||--o| ACTIVATION_TOKENS : "has"
     USERS ||--o{ MEETINGS : "creates"
     USERS ||--o{ USERS : "managed by (manager_id)"
     MEETINGS ||--o{ RECORDINGS : "has"
@@ -172,7 +181,18 @@ erDiagram
     - `client_id` (UUID, Foreign Key to `clients.id`): Tenant ID.
     - `email` (VARCHAR, Unique): Login email.
     - `hashed_password` (VARCHAR): Security credential.
+    - `status` (VARCHAR): Current user state (`ACTIVE`, `PENDING`, `DISABLED`).
     - `is_superuser` (BOOLEAN): Flag for System-Admins.
+
+### 2.1.b. `activation_tokens` Table
+
+- **Description**: Temporary tokens for the Enterprise Onboarding workflow (Way B).
+- **Fields**:
+    - `id` (UUID, Primary Key).
+    - `user_id` (UUID, Foreign Key to `users.id`, Unique): The pending user.
+    - `token` (VARCHAR, Unique): Secure URL safe token.
+    - `expires_at` (TIMESTAMP): Token expiration date.
+
 
 ### 2.2. `meetings` Table
 

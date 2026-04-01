@@ -27,7 +27,10 @@ async def create_team_member(
     # We remove the strict DG/MANAGER check here to allow the initial client user 
     # (who might be a 'participant' by default) to manage their team.
     service = TeamService(db)
-    return await service.create_team_member(current_user.client_id, member_in, current_user.id)
+    try:
+        return await service.create_team_member(current_user.client_id, member_in, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 @router.patch("/{member_id}", response_model=TeamMember)
 async def update_team_member(

@@ -32,7 +32,7 @@ async def db_session() -> Generator:
         await conn.run_sync(Base.metadata.drop_all)
 
 from app.api import deps
-from app.models.user import User as UserModel
+from app.models.user import User as UserModel, UserStatus
 from unittest.mock import patch, MagicMock
 
 @pytest_asyncio.fixture(scope="function")
@@ -46,7 +46,7 @@ async def client(db_session: AsyncSession) -> Generator:
             client_id="test-client-id",
             email="dg@example.com",
             full_name="Test DG",
-            is_active=True,
+            status=UserStatus.ACTIVE.value,
             is_superuser=True
         )
     

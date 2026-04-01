@@ -1,13 +1,14 @@
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
+from app.models.user import UserStatus
 
 
 class UserBase(BaseModel):
     client_id: Optional[str] = None
     email: EmailStr
     full_name: Optional[str] = None
-    is_active: Optional[bool] = True
+    status: Optional[UserStatus] = UserStatus.ACTIVE
     role: Optional[str] = "user"
     department: Optional[str] = None
 
@@ -22,7 +23,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     password: Optional[str] = None
-    is_active: Optional[bool] = None
+    status: Optional[UserStatus] = None
     role: Optional[str] = None
     department: Optional[str] = None
 
@@ -54,3 +55,7 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     user_id: Optional[str] = None
+
+class ActivationConfirm(BaseModel):
+    token: str
+    new_password: str

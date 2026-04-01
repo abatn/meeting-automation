@@ -7,7 +7,7 @@ import os
 sys.path.append(os.getcwd())
 
 from app.core.database import AsyncSessionLocal
-from app.models.user import User, Role
+from app.models.user import User, Role, UserStatus
 from app.models.client import Client, SubscriptionPlan, SubscriptionStatus
 from app.core.security import get_password_hash
 from sqlalchemy import select
@@ -110,7 +110,7 @@ async def seed_data():
                     email=u_data["email"],
                     full_name=u_data["name"],
                     hashed_password=hashed_pw,
-                    is_active=True,
+                    status=UserStatus.ACTIVE.value,
                     is_superuser=u_data["superuser"]
                 )
                 user.roles.append(role_objs[u_data["role"]])

@@ -83,6 +83,7 @@ class Settings(BaseSettings):
     ONLYOFFICE_URL: str = "http://localhost:8080"
     # Internal URL for Docker-to-Docker communication
     ONLYOFFICE_BACKEND_URL: str = "http://backend:8000"
+    FRONTEND_URL: str = "http://localhost:3000"
 
     class Config:
         env_file = ".env"

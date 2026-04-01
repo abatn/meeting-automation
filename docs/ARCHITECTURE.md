@@ -97,6 +97,7 @@ graph TD
 ### 3.2. Backend (FastAPI/Python)
 
 - **Technology**: FastAPI, Python 3.11, PostgreSQL, SQLAlchemy, Alembic, Redis, Celery, RabbitMQ.
+- **User Management**: Advanced onboarding via token-based invitations and state-based user lifecycles (`ACTIVE`, `PENDING`, `DISABLED`).
 - **Purpose**: Core business logic, API endpoints, data persistence, and integration with AI and external services.
 - **Key Modules**:
     - `app.api.v1.admin`: Platform-wide management for system administrators (Tenant control, MRR tracking, System health).
@@ -129,11 +130,12 @@ graph TD
 - **Technology**: n8n (Node.js based workflow automation tool).
 - **Purpose**: Automates complex business workflows and integrates with various external services.
 - **Key Workflows**:
-    - `meeting-created.json`: Triggered when a new meeting is created (e.g., sends confirmation emails).
-    - `audio-uploaded.json`: Triggered after a recording is uploaded (e.g., initiates transcription, notifies users).
-    - `pv-validated.json`: Triggered when a PV is validated (e.g., distributes the PV, updates action items).
-    - `daily-reminders.json`: Sends daily reminders for upcoming meetings or pending action items via WhatsApp/Email.
-- **Integration**: Connects to the Backend API via webhooks and external APIs like WhatsApp Business API and Email (SendGrid).
+    - `meeting-created.json`: Triggered when a new meeting is created.
+    - `audio-uploaded.json`: Triggered after a recording is uploaded.
+    - `pv-validated.json`: Triggered when a PV is validated.
+    - `daily-reminders.json`: Sends daily reminders via WhatsApp/Email.
+    - `user-invited.json`: Enterprise Onboarding workflow (Way B). Sends tokenized activation links to new employees.
+- **Integration**: Connects to the Backend API via webhooks and external APIs.
 
 ### 3.5. Infrastructure
 

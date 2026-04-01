@@ -75,3 +75,4 @@ graph TD
 4. **KI**: **Gladia V2** (Transkription & Sprechererkennung) & **Mistral** (Zusammenfassung & intelligente Aufgabenvorschläge).
 5. **Feedback Loop**: Die Interaktion der Nutzer mit den KI-Vorschlägen wird in der DB gespeichert, um einen Datensatz für zukünftiges Fine-Tuning zu erstellen (ML Feedback Loop).
 6. **n8n**: Zentraler Hub für den Versand von E-Mails und Benachrichtigungen.
+7. **Enterprise Onboarding**: API-gesteuerter Einladungsprozess mit n8n-Email-Versand und Token-Aktivierung im Frontend.

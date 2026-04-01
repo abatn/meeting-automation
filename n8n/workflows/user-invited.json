@@ -1,0 +1,61 @@
+{
+  "name": "User Invited Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "user-invited",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "webhookId": "user-invited-webhook-id"
+    },
+    {
+      "parameters": {
+        "fromEmail": "no-reply@meeting.tn",
+        "toEmail": "={{$json.body.email}}",
+        "subject": "You have been invited to Meeting Automation",
+        "text": "",
+        "html": "=<html><body><h2>Welcome {{$json.body.full_name}}!</h2><p>You have been invited to join <b>{{$json.body.company_name}}</b> on Meeting Automation.</p><p>Please click the link below to set your password and activate your account:</p><a href=\"{{$json.body.activation_link}}\" style=\"display: inline-block; padding: 10px 20px; color: white; background-color: #007bff; text-decoration: none; border-radius: 5px;\">Activate Account</a></body></html>",
+        "options": {}
+      },
+      "id": "send-email-node",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [
+        450,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "eHaPFftWKgcTTXQc",
+          "name": "SMTP Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {}
+}

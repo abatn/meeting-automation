@@ -22,6 +22,8 @@ class TeamMemberUpdate(BaseModel):
 class TeamMember(TeamMemberBase):
     id: str
     client_id: str
+    status: Optional[str] = None
+    source: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

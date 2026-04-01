@@ -10,7 +10,7 @@ import redis.asyncio as redis
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.redis_client import get_redis_client
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, UserStatus
 from app.services.meeting_service import MeetingService
 from app.services.auth_service import AuthService
 from sqlalchemy import select
@@ -83,7 +83,7 @@ async def get_current_user(
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    if not user.is_active:
+    if user.status != UserStatus.ACTIVE.value:
         raise HTTPException(status_code=400, detail="Inactive user")
     return user
 

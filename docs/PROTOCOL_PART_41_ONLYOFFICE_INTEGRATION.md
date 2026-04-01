@@ -38,6 +38,13 @@ Einführung eines selbst gehosteten "OnlyOffice Document Servers" (v8.3.3) zur n
   2. **Erzwungene Cache-Invalidierung**: Bei jedem Speichervorgang wird das alte PDF in S3 sofort gelöscht und der Redis-Status `pdf_converting_{id}` gesetzt.
   3. **Robustes Polling**: Der Download-Endpunkt prüft nun sowohl den Redis-Key als auch die S3-Metadaten (LastModified) und wartet bis zu 50 Sekunden auf die neue Version.
 - **Ergebnis**: Der "First-Click-Success" beim PDF-Download nach einer Bearbeitung ist nun garantiert.
-
+- **Wichtig bei für die setup-system.sh um das system wieder zu bauen**: # Im ONLYOFFICE Container Schriftarten installieren
+	# Schriftarten installieren
+	docker exec -u root meeting-automation-onlyoffice-1 apt-get update
+	docker exec -u root meeting-automation-onlyoffice-1 apt-get install -y fonts-noto fonts-arabic
+	# Font-Cache neu generieren
+	docker exec -u root meeting-automation-onlyoffice-1 /usr/bin/documentserver-generate-allfonts.sh
+	# Container neu starten
+	docker restart meeting-automation-onlyoffice-1***
 📊 ERGEBNIS
 Der Online-Editor ist für Arabisch, Französisch und Englisch voll einsatzfähig. Das Layout ist stabil. Die PDF-Konvertierung nach manueller Änderung ist nun wasserdicht synchronisiert.

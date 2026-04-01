@@ -18,7 +18,8 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
-  Paper
+  Paper,
+  Chip
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -155,10 +156,16 @@ const TeamMembers: React.FC = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <PersonIcon color="action" />
                       <Typography>{member.full_name}</Typography>
+                      {member.status === "PENDING" && (
+                        <Chip label="Invitation Sent" size="small" color="warning" variant="outlined" />
+                      )}
+                      {member.status === "ACTIVE" && (
+                        <Chip label="User" size="small" color="success" variant="outlined" />
+                      )}
                     </Box>
                   </TableCell>
                   <TableCell>{member.email}</TableCell>
-                  <TableCell>{member.position || "-"}</TableCell>
+                  <TableCell>{member.source === "user" ? "Registered User" : (member.position || "-")}</TableCell>
                   <TableCell>{member.department || "-"}</TableCell>
                   <TableCell align="right">
                     <IconButton onClick={() => handleOpenDialog(member)} color="primary" size="small">

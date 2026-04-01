@@ -70,6 +70,7 @@ Diese Phase konzentriert sich auf den stabilen Betrieb unter Last, die Benutzere
   - **MinIO/S3**: Korrekte Speicherplatzberechnung, Anzahl Objekte, Upload/Download Rate.
   - **n8n**: Workflow-Fehler der letzten 24h, Durchschnittliche Ausführungszeit.
 - [x] **Online Document Editing (OnlyOffice)**: Integration für ISO-27001-konforme Online-Bearbeitung von KI-Protokollen. (Optimiert: PDF-Sync-Staleness behoben via Forcesave-Callback & Redis-Sync).
+- [x] **Enterprise Onboarding (Way B)**: Implementierung eines sicheren, token-basierten Einladungssystems mit `PENDING` User-Status, n8n-Integration und automatisierter Passwort-Setzung.
 - [ ] **Auto-Scaling**: Konfiguration von Horizontal Pod Autoscaler (HPA) in Kubernetes für die AI-Worker (Gladia/Mistral Proxy).
 - [ ] **Mobile App Applikation**: Entwicklung einer progressiven Web App (PWA) oder nativen App für Meeting-Aufnahmen via Smartphone.
 - [ ] **Finetuning AI**: Optimierung der Mistral-Prompts für noch präzisere tunesische Dialekt-Zusammenfassungen.
@@ -102,3 +103,4 @@ Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilenste
 18. **[OnlyOffice Integration](PROTOCOL_PART_41_ONLYOFFICE_INTEGRATION.md)**: Einführung eines selbst gehosteten OnlyOffice Document Servers für die Online-Bearbeitung von KI-Protokollen im Browser (ISO 27001).
 19. **[ISS Map-Reduce Pipeline Final Validation](PROTOCOL_ISS_FINAL_VALIDATION.md)**: Live-Test und Validierung der asynchronen Audio-Synthese-Pipeline (S3 -> Gladia -> Qwen-1.5B -> Mistral).
 20. **[Mobile-First Redesign & RTL Stabilization](PROTOCOL_PART_43_MOBILE_RTL_STABILIZATION.md)**: Smartphone-Optimierung der gesamten Applikation, Behebung von RTL-Scrollfehlern und Einführung des Modern Enterprise Stripe-Designs.
+21. **[Enterprise Onboarding Workflow](PROTOCOL_PART_44_ENTERPRISE_ONBOARDING_WORKFLOW.md)**: Sicheres Einladungssystem mit Token-Aktivierung, n8n-SMTP Integration und Soft-Delete Strategie für ISO 27001 Audit-Logs.

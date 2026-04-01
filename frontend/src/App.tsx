@@ -27,6 +27,7 @@ import ClientDetails from "./pages/admin/ClientDetails";
 import TechnikDashboard from "./pages/admin/TechnikDashboard";
 import BillingPanel from "./pages/billing/BillingPanel";
 import LandingPage from "./pages/LandingPage";
+import ActivationPage from "./pages/ActivationPage";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -132,6 +133,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<LoginForm />} />
           <Route path="/register" element={<RegisterForm />} />
+          <Route path="/activate" element={<ActivationPage />} />
           <Route path="/" element={<LandingPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

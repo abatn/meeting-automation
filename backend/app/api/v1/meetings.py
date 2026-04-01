@@ -9,7 +9,7 @@ from app.api import deps
 from app.models.meeting import Meeting as MeetingModel
 from app.models.meeting import Participant as ParticipantModel
 from app.models.user import User as UserModel
-from app.models.user import UserRole
+from app.models.user import UserRole, UserStatus
 from app.schemas.meeting import Meeting, MeetingCreate, MeetingWithPV
 from app.schemas.user import User
 from app.services.meeting_service import MeetingService
@@ -28,7 +28,7 @@ async def list_client_users(
     result = await db.execute(
         select(UserModel)
         .where(UserModel.client_id == current_user.client_id)
-        .where(UserModel.is_active == True)
+        .where(UserModel.status == UserStatus.ACTIVE.value)
     )
     return result.scalars().all()
 
