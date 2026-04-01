@@ -173,18 +173,25 @@ async def register(
         is_mfa_enabled=False,
         created_at=datetime.now(datetime.timezone.utc) if hasattr(datetime, "UTC") else datetime.utcnow(),
     )
-    db.add(db_obj)
-    await db.flush()
 
-    # Assign role
+    # Assign role - Auto-assign 'dg' if it's a new tenant (client_id is None)
+    target_role = user_in.role
+    if not user_in.client_id:
+        target_role = "dg"
+
     role_result = await db.execute(
-        select(RoleModel).where(RoleModel.name == user_in.role)
+        select(RoleModel).where(RoleModel.name == target_role)
     )
     role = role_result.scalar_one_or_none()
     if not role:
-        role = RoleModel(id=str(uuid.uuid4()), name=user_in.role)
+        role = RoleModel(id=str(uuid.uuid4()), name=target_role)
         db.add(role)
         await db.flush()
+    
+    # Assign role BEFORE adding to session to avoid lazy loading issues
+    db_obj.roles = [role]
+    db.add(db_obj)
+    await db.flush()
 
     await db.commit()
     await db.refresh(db_obj)
@@ -197,7 +204,7 @@ async def register(
         is_superuser=db_obj.is_superuser,
         is_mfa_enabled=db_obj.is_mfa_enabled,
         created_at=db_obj.created_at,
-        role=user_in.role,
+        role=target_role,
     )
 
 

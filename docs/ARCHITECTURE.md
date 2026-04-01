@@ -8,6 +8,12 @@ The Meeting Automation System is a microservices-based, **multi-tenant SaaS plat
 The system is built to scale across multiple organizations (tenants):
 - **Data Isolation**: A dedicated `clients` table manages organizational units. All core records are linked via `client_id`.
 - **Backend Filtering**: Every API request is strictly filtered by the `client_id` extracted from the cryptographically signed JWT.
+- **Role-Based Access Control (RBAC)**:
+    - **DG (Director General)**: The primary admin for a tenant. Automatically assigned to the *first* user who registers a new company. Has full visibility over all tenant data.
+    - **Manager**: Department lead. Manages a specific subset of users (reports).
+    - **Participant**: Regular user with access to their own meetings and assigned actions.
+    - **System Admin**: Global platform manager (across all tenants). Manages billing and tenant status.
+    - **Tech Admin**: Infrastructure monitor ("Mission Control"). No access to business data.
 - **System Administration**: A "God-Mode" dashboard provides global visibility into tenant health, subscriptions, and MRR.
 
 ## 2. High-Level Architecture

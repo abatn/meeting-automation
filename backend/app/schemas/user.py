@@ -9,7 +9,7 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
     status: Optional[UserStatus] = UserStatus.ACTIVE
-    role: Optional[str] = "user"
+    role: Optional[str] = "participant"
     department: Optional[str] = None
 
 
