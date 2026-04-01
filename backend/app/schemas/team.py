@@ -8,6 +8,7 @@ class TeamMemberBase(BaseModel):
     phone_number: Optional[str] = None
     position: Optional[str] = None
     department: Optional[str] = None
+    role: Optional[str] = "participant"
 
 class TeamMemberCreate(TeamMemberBase):
     pass

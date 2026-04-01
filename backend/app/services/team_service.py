@@ -47,6 +47,7 @@ class TeamService:
                 "full_name": u.full_name or u.email,
                 "email": u.email,
                 "status": u.status, # ACTIVE, PENDING
+                "role": u.role,
                 "position": "User",
                 "department": None,
                 "created_at": u.created_at,
@@ -62,6 +63,7 @@ class TeamService:
                     "full_name": t.full_name,
                     "email": t.email,
                     "status": "TEAM_MEMBER",
+                    "role": "participant",
                     "position": t.position,
                     "department": t.department,
                     "created_at": t.created_at,
@@ -71,6 +73,10 @@ class TeamService:
 
     async def create_team_member(self, client_id: str, obj_in: TeamMemberCreate, creator_id: str) -> User:
         """Invite a new team member. Re-activates if user was previously DISABLED."""
+        # Security: Prevent assigning global admin roles via team management
+        if obj_in.role in ["system_admin", "tech_admin"]:
+            raise ValueError("Unauthorized role assignment.")
+
         # Check if email exists in Users
         stmt = select(User).where(User.email == obj_in.email)
         res = await self.db.execute(stmt)
@@ -109,16 +115,26 @@ class TeamService:
                 is_superuser=False,
                 is_mfa_enabled=False
             )
-            self.db.add(new_user)
-            
-            # Assign participant role
+            # We don't add to DB yet, we assign roles first
+
+        # Update / Assign role
+        role_stmt = select(Role).where(Role.name == obj_in.role)
+        role_res = await self.db.execute(role_stmt)
+        role_obj = role_res.scalar_one_or_none()
+        
+        if not role_obj:
+            # Fallback to participant if role doesn't exist
             role_stmt = select(Role).where(Role.name == "participant")
             role_res = await self.db.execute(role_stmt)
-            role = role_res.scalar_one_or_none()
-            if role:
-                new_user.roles.append(role)
+            role_obj = role_res.scalar_one()
+
+        # Explicitly set the roles list to avoid lazy loading issues
+        new_user.roles = [role_obj]
+        
+        if not existing_user:
+            self.db.add(new_user)
             
-            await self.db.flush()
+        await self.db.flush()
 
         # Create New Activation Token
         token = secrets.token_urlsafe(32)

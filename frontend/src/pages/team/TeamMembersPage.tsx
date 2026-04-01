@@ -19,7 +19,8 @@ import {
   Alert,
   CircularProgress,
   Paper,
-  Chip
+  Chip,
+  MenuItem
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -42,6 +43,7 @@ const TeamMembers: React.FC = () => {
     phone_number: "",
     position: "",
     department: "",
+    role: "participant",
   });
   const [submitting, setSubmitting] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" });
@@ -71,6 +73,7 @@ const TeamMembers: React.FC = () => {
         phone_number: member.phone_number || "",
         position: member.position || "",
         department: member.department || "",
+        role: member.role || "participant",
       });
     } else {
       setEditingMember(null);
@@ -80,6 +83,7 @@ const TeamMembers: React.FC = () => {
         phone_number: "",
         position: "",
         department: "",
+        role: "participant",
       });
     }
     setOpenDialog(true);
@@ -144,6 +148,7 @@ const TeamMembers: React.FC = () => {
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>{t("team.full_name")}</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>{t("team.email")}</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>{t("team.role")}</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>{t("team.position")}</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>{t("team.department")}</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 'bold' }}>{t("team.actions")}</TableCell>
@@ -165,6 +170,11 @@ const TeamMembers: React.FC = () => {
                     </Box>
                   </TableCell>
                   <TableCell>{member.email}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ textTransform: 'capitalize' }}>
+                      {t(`team.role_${member.role}`) || member.role}
+                    </Typography>
+                  </TableCell>
                   <TableCell>{member.source === "user" ? "Registered User" : (member.position || "-")}</TableCell>
                   <TableCell>{member.department || "-"}</TableCell>
                   <TableCell align="right">
@@ -187,8 +197,21 @@ const TeamMembers: React.FC = () => {
         <DialogTitle>{editingMember ? t("team.edit_member") : t("team.add_member")}</DialogTitle>
         <DialogContent dividers>
           <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-            <TextField label={t("team.full_name")} fullWidth value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} />
+            <TextField label={t("team.full_name")} border="none" fullWidth value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} />
             <TextField label={t("team.email")} fullWidth type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+            
+            <TextField
+              select
+              label={t("team.role")}
+              fullWidth
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+            >
+              <MenuItem value="participant">{t("team.role_participant")}</MenuItem>
+              <MenuItem value="manager">{t("team.role_manager")}</MenuItem>
+              <MenuItem value="admin">{t("team.role_admin")}</MenuItem>
+            </TextField>
+
             <TextField label={t("team.phone")} fullWidth value={formData.phone_number} onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })} />
             <TextField label={t("team.position")} fullWidth value={formData.position} onChange={(e) => setFormData({ ...formData, position: e.target.value })} />
             <TextField label={t("team.department")} fullWidth value={formData.department} onChange={(e) => setFormData({ ...formData, department: e.target.value })} />
