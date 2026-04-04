@@ -39,6 +39,66 @@ def publish_status(recording_id: str, status: str, progress: int, message: str =
     except Exception as e:
         logger.error(f"Redis publish failed: {e}")
 
+
+def match_timestamps(words: List[Dict], segments: List[Dict]) -> List[Dict]:
+    """
+    Assign word-level timestamps to speaker segments.
+
+    For each word, find the segment with the closest boundary (start or end).
+    Uses point-to-interval distance: if word_mid is within segment, distance=0;
+    if left of segment, distance = segment.start - word_mid; if right, distance = word_mid - segment.end.
+
+    Args:
+        words: List of word dicts with 'word', 'start', 'end'
+        segments: List of segment dicts with 'speaker', 'start', 'end'
+
+    Returns:
+        List of dicts with 'speaker', 'text' (concatenated words for each segment).
+        Only returns segments that have at least one word assigned.
+    """
+    if not words or not segments:
+        return []
+
+    # Group words by closest segment
+    segmented_words = {seg["speaker"]: [] for seg in segments}
+
+    for word in words:
+        word_mid = (word["start"] + word["end"]) / 2
+        closest_seg = None
+        min_dist = float('inf')
+
+        for seg in segments:
+            seg_start = seg["start"]
+            seg_end = seg["end"]
+            # Distance from point to interval
+            if word_mid < seg_start:
+                dist = seg_start - word_mid
+            elif word_mid > seg_end:
+                dist = word_mid - seg_end
+            else:
+                dist = 0.0
+            if dist < min_dist:
+                min_dist = dist
+                closest_seg = seg["speaker"]
+
+        if closest_seg:
+            segmented_words[closest_seg].append(word["word"])
+
+    # Build result: only include segments that have words
+    result = []
+    for seg in segments:
+        speaker = seg["speaker"]
+        words_list = segmented_words.get(speaker, [])
+        if words_list:  # Only add if there are words
+            result.append({
+                "speaker": speaker,
+                "text": " ".join(words_list),
+                "start": seg["start"],
+                "end": seg["end"]
+            })
+
+    return result
+
 async def _process_recording_pipeline(recording_id: str) -> None:
     publish_status(recording_id, "uploaded", 5, "Initializing Map-Reduce Pipeline...")
 
@@ -116,20 +176,38 @@ async def _download_audio(file_key: str) -> Optional[str]:
     except: return None
 
 async def _save_pv_and_actions(db, recording, pv_data, language="fr"):
-    # Re-using the logic from previous version for consistency
     summary = pv_data.get("summary", "")
     decisions_list = pv_data.get("decisions", [])
     html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><ul>" + "".join([f"<li>{d}</li>" for d in decisions_list]) + "</ul>"
 
     pv_id = str(uuid.uuid4())
-    # Ensure is_validated is False by default for ISO integrity
     await db.execute(insert(PV).values(
         id=pv_id, client_id=str(recording.client_id), meeting_id=str(recording.meeting_id),
-        title=pv_data.get("title", "Meeting PV"), 
+        title=pv_data.get("title", "Meeting PV"),
         tags=pv_data.get("tags"),
         content_html=html, language=language, status="draft", is_validated=False
     ))
-    # ... (rest of action mapping logic remains as in stable version)
+
+    for act in pv_data.get("actions", []):
+        due_date = None
+        if act.get("deadline"):
+            try:
+                due_date = datetime.fromisoformat(act["deadline"])
+            except (ValueError, TypeError):
+                pass
+        description = act.get("description", "")
+        action = Action(
+            id=str(uuid.uuid4()),
+            client_id=str(recording.client_id),
+            meeting_id=str(recording.meeting_id),
+            title=description[:200] if description else "Action",
+            description=description,
+            due_date=due_date,
+            status="PENDING",
+            priority=act.get("priority", "medium"),
+        )
+        db.add(action)
+
     await db.flush()
 
 async def _notify_n8n_completion(recording_id, meeting_id):
@@ -145,3 +223,7 @@ def process_recording(recording_id: str) -> None:
         loop.run_until_complete(_process_recording_pipeline(recording_id))
     else:
         asyncio.ensure_future(_process_recording_pipeline(recording_id), loop=loop)
+
+
+# Expose DiarizationService for backward compatibility with tests
+from app.services.diarization_service import DiarizationService  # noqa

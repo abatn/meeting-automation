@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import httpx
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -20,6 +21,9 @@ class MeetingService:
 
     async def create_meeting(self, meeting_in: MeetingCreate, owner_id: str, client_id: str) -> Meeting:
         """Meeting anlegen + n8n-Webhook triggern"""
+        if meeting_in.end_time and meeting_in.start_time and meeting_in.end_time <= meeting_in.start_time:
+            raise HTTPException(status_code=400, detail="Meeting end time must be after start time")
+
         db_meeting = Meeting(
             id=str(uuid.uuid4()),
             client_id=client_id,
