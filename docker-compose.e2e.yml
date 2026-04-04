@@ -1,0 +1,192 @@
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: meeting_db_test
+      POSTGRES_USER: meeting_user
+      POSTGRES_PASSWORD: meeting_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meeting_user -d meeting_db_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - e2e-network
+
+  redis-test:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass redis_password
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_test_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis_password", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - e2e-network
+
+  rabbitmq-test:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    hostname: rabbitmq-test
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbit_user
+      RABBITMQ_DEFAULT_PASS: rabbit_password
+      RABBITMQ_ERLANG_COOKIE: "fixed_wsl2_cookie_123"
+      RABBITMQ_NODENAME: rabbit@localhost
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+    volumes:
+      - rabbitmq_test_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 60s
+    networks:
+      - e2e-network
+
+  # celery-worker service removed for E2E tests - using eager mode instead
+  # celery-beat service also not needed in E2E (periodic tasks disabled)
+
+  minio-test:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_user
+      MINIO_ROOT_PASSWORD: minio_password
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - minio_test_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - e2e-network
+
+  n8n-test:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      - N8N_SECURE_COOKIE=false
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - WEBHOOK_URL=http://localhost:5678
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres-test
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=meeting_db_test
+      - DB_POSTGRESDB_USER=meeting_user
+      - DB_POSTGRESDB_PASSWORD=meeting_password
+    ports:
+      - "5679:5678"
+    volumes:
+      - n8n_test_data:/home/node/.n8n
+   # healthcheck:
+   #   test:  ["CMD", "n8n", "health-check"]
+   #   interval: 30s
+   #   timeout: 10s
+   #   retries: 10
+   #   start_period: 90s
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    networks:
+      - e2e-network
+
+  onlyoffice-test:
+    image: onlyoffice/documentserver:latest
+    restart: unless-stopped
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=test_secret_onlyoffice_2026
+      - JWT_HEADER=Authorization
+      - ALLOW_PRIVATE_IP_ADDRESS=true
+    ports:
+      - "8081:80"
+    volumes:
+      - onlyoffice_test_data:/var/www/onlyoffice/Data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    networks:
+      - e2e-network
+
+  backend:
+    build: ./backend
+    container_name: meeting-automation-backend-e2e
+    command: >
+      bash -c "
+        echo '=== Waiting for all services to be ready ===' &&
+        sleep 15 &&
+        cd /app &&
+        echo '=== Starting Backend Server ===' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+    environment:
+      - PYTHONPATH=/app
+      - E2E_TEST=true
+      - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres-test:5432/meeting_db_test
+      - REDIS_URL=redis://:redis_password@redis-test:6379/0
+      - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq-test:5672/
+      - CELERY_RESULT_BACKEND=redis://:redis_password@redis-test:6379/2
+      - S3_ENDPOINT=http://minio-test:9000
+      - S3_ACCESS_KEY=minio_user
+      - S3_SECRET_KEY=minio_password
+      - ONLYOFFICE_SECRET=test_secret_onlyoffice_2026
+      - ONLYOFFICE_URL=http://onlyoffice-test:80
+      - N8N_WEBHOOK_URL=http://n8n-test:5678/webhook
+      - SECRET_KEY=test-secret-key-for-e2e-only
+      - MISTRAL_API_KEY=test-key
+      - GLADIA_API_KEY=test-key
+      - DEBUG=true
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./backend:/app
+      - ./:/workspace
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+      rabbitmq-test:
+        condition: service_healthy
+      minio-test:
+        condition: service_healthy
+      onlyoffice-test:
+        condition: service_healthy
+    networks:
+      - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge
+
+volumes:
+  postgres_test_data:
+  redis_test_data:
+  rabbitmq_test_data:
+  minio_test_data:
+  n8n_test_data:
+  onlyoffice_test_data:
