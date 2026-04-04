@@ -32,7 +32,7 @@ async def test_health_check(e2e_client_no_auth: AsyncClient, environment_config:
 async def test_admin_login(e2e_client: AsyncClient, environment_config: EnvironmentConfig):
     """Smoke: Admin can log in and receives access token."""
     # The e2e_client fixture already authenticated, we verify it works
-    resp = await e2e_client.get("/api/v1/users/me")
+    resp = await e2e_client.get("/api/v1/auth/me")
     assert resp.status_code == 200, f"Failed to get current user: {resp.text}"
     user = resp.json()
     assert "email" in user, "User email missing"
@@ -107,7 +107,7 @@ async def test_api_endpoints_responsive(e2e_client: AsyncClient):
     """Smoke: All critical API endpoints are responsive."""
     endpoints_to_check = [
         "/health",
-        "/api/v1/users/me",
+        "/api/v1/auth/me",
     ]
 
     for endpoint in endpoints_to_check:
