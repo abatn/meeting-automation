@@ -104,6 +104,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
+      - N8N_SECURE_COOKIE=false #TOBEDEAKTIVATED
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432

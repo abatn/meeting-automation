@@ -1,7 +1,7 @@
 import pytest
 import uuid
 from unittest.mock import MagicMock, AsyncMock, patch
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.meeting import Meeting, MeetingStatus
 from app.models.meeting_room import MeetingRoom
@@ -65,7 +65,10 @@ async def test_stop_stream_updates_meeting_end_time(db_session: AsyncSession):
     # Verification
     await db_session.refresh(meeting)
     assert meeting.end_time is not None
-    assert (datetime.utcnow() - meeting.end_time).total_seconds() < 10
+    # Use timezone-aware comparison for PostgreSQL compatibility
+    now = datetime.now(timezone.utc)
+    delta = now - meeting.end_time.replace(tzinfo=timezone.utc) if meeting.end_time.tzinfo is None else now - meeting.end_time
+    assert delta.total_seconds() < 10
 
 @pytest.mark.asyncio
 async def test_pdf_export_uses_room_name(db_session: AsyncSession):

@@ -2,7 +2,7 @@ import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from app.api import deps
 from app.services.action_service import ActionService
@@ -26,12 +26,41 @@ async def transcription_complete(
     content = data.get("transcription") or data.get("transcription_text")
     meeting_id = data.get("meeting_id")
 
-    if not meeting_id or not content:
-        raise HTTPException(status_code=400, detail="Missing data")
+    if not meeting_id or not content or not recording_id:
+        raise HTTPException(status_code=400, detail="Missing data (recording_id, meeting_id, transcription)")
 
-    # Save transcription
+    # Look up recording to get client_id and verify existence
+    result = await db.execute(
+        select(Recording).where(Recording.id == recording_id)
+    )
+    recording = result.scalar_one_or_none()
+    if not recording:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    client_id = recording.client_id
+
+    # Verify meeting_id matches if provided (optional consistency check)
+    if recording.meeting_id != meeting_id:
+        logger.warning(f"Meeting ID mismatch: payload meeting_id={meeting_id}, recording meeting_id={recording.meeting_id}")
+
+    # Idempotency: Check if a transcription already exists for this recording
+    existing = await db.execute(
+        select(Transcription).where(Transcription.recording_id == recording_id).where(Transcription.client_id == client_id)
+    )
+    if existing.scalar_one_or_none():
+        # Still update recording status to ensure it's marked as transcribed
+        await db.execute(
+            update(Recording)
+            .where(Recording.id == recording_id)
+            .values(status="transcribed")
+        )
+        await db.commit()
+        logger.info(f"Transcription already exists for recording {recording_id}; idempotent skip.")
+        return {"status": "success", "message": "transcription already processed"}
+
+    # Save transcription with derived client_id
     transcription = Transcription(
         id=str(uuid.uuid4()),
+        client_id=client_id,
         meeting_id=meeting_id,
         recording_id=recording_id,
         full_text=content,
@@ -52,7 +81,7 @@ async def transcription_complete(
     # Optional: Automatically trigger PV generation
     # await PVService.generate_pv(content)
 
-    return {"status": "success"}
+    return {"status": "success", "message": "transcription saved"}
 
 
 @router.post("/pv-generated")

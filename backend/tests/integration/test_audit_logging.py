@@ -15,8 +15,7 @@ async def test_audit_log_creation(client: AsyncClient, db_session: AsyncSession,
     
     await client.post(
         "/api/v1/meetings/",
-        json=meeting_data,
-        headers=normal_user_token_headers
+        json=meeting_data
     )
     
     # Prüfen, ob ein Audit-Log Eintrag erstellt wurde

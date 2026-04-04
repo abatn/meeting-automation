@@ -1,3 +1,4 @@
+import os
 from celery import Celery
 from celery.schedules import crontab
 from app.core.config import settings
@@ -16,6 +17,11 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
 )
+
+# Enable eager mode for E2E tests to run tasks synchronously in the same process
+if os.getenv("E2E_TEST", "").lower() == "true":
+    celery_app.conf.task_always_eager = True
+    celery_app.conf.task_eager_propagates = True
 
 # Auto-discover tasks in the 'app.tasks' package
 celery_app.autodiscover_tasks(

@@ -15,6 +15,7 @@ async def test_pv_versioning_lifecycle(client: AsyncClient, db_session: AsyncSes
     
     mock_meeting = Meeting(
         id=meeting_id,
+        client_id="test-client-id",
         title="Test Meeting for PV",
         start_time=datetime(2026, 3, 1, 10, 0, 0),
         end_time=datetime(2026, 3, 1, 11, 0, 0),
@@ -26,6 +27,7 @@ async def test_pv_versioning_lifecycle(client: AsyncClient, db_session: AsyncSes
     mock_pv = PV(
         id=pv_id,
         meeting_id=meeting_id,
+        client_id="test-client-id",
         title="Original PV Title",
         content_html="<p>Initial content</p>",
         status="draft"

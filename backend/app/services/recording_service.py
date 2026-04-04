@@ -167,9 +167,9 @@ class RecordingService:
 
         db_recording.status = "uploaded"
 
-        # Update Meeting end_time
+        # Update Meeting end_time (with client_id check for multi-tenant isolation)
         meeting_result = await self.db.execute(
-            select(Meeting).where(Meeting.id == db_recording.meeting_id)
+            select(Meeting).where(Meeting.id == db_recording.meeting_id).where(Meeting.client_id == client_id)
         )
         meeting = meeting_result.scalar_one_or_none()
         if meeting:

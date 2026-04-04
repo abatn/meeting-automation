@@ -344,20 +344,32 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
 ### 6.3. Update Action Status
 - **Endpoint**: `/api/v1/actions/{action_id}/status`
 - **Method**: `PATCH`
-- **Description**: Updates the status of an action item.
+- **Description**: Updates the status of an action item. The status must be one of the allowed `ActionStatus` enum values.
 - **Request Body**:
     ```json
     {
         "status": "completed"
     }
     ```
+- **Allowed status values** (case-sensitive):
+    - `PENDING`
+    - `IN_PROGRESS`
+    - `COMPLETED`
+    - `CANCELLED`
+    - `OVERDUE`
 - **Response (200 OK)**:
     ```json
     {
         "id": "uuid",
-        "status": "completed"
+        "title": "Action title",
+        "status": "COMPLETED",
+        ...
     }
     ```
+- **Error Responses**:
+    - `400 Bad Request`: If the provided status is not one of the allowed enum values.
+    - `404 Not Found`: If the action does not exist or does not belong to the user's client.
+- **Side Effects**: On successful update, a notification webhook is sent to `N8N_WEBHOOK_URL` with the event `action.status_updated`, enabling downstream automation (e.g., manager alerts, WhatsApp reminders).
 
 ### 6.4. List Actions
 - **Endpoint**: `/api/v1/actions/`

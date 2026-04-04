@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload, joinedload
 
 from app.api import deps
 from app.schemas.action import Action, ActionCreate, ActionSuggestion, ActionPattern, ActionStatistics, ActionAutomation
-from app.models.action import Action as ActionModel, Assignment as AssignmentModel, ActionSuggestion as ActionSuggestionModel
+from app.models.action import Action as ActionModel, Assignment as AssignmentModel, ActionSuggestion as ActionSuggestionModel, ActionStatus as DB_ActionStatus
 from app.models.user import User as UserModel, UserRole
 from app.services.action_service import ActionService
 from pydantic import BaseModel
@@ -381,7 +381,16 @@ async def create_action(
         db.add(assignment)
 
     await db.commit()
-    await db.refresh(action)
+
+    # Eager load relationships to avoid MissingGreenlet during Pydantic serialization
+    result = await db.execute(
+        select(ActionModel)
+        .options(
+            selectinload(ActionModel.assignments).selectinload(AssignmentModel.user)
+        )
+        .where(ActionModel.id == action.id)
+    )
+    action = result.scalar_one()
 
     return action
 
@@ -400,10 +409,14 @@ async def get_action(
         select(ActionModel)
         .where(ActionModel.id == action_id)
         .where(ActionModel.client_id == current_user.client_id)
+        .options(
+            selectinload(ActionModel.assignments).selectinload(AssignmentModel.user)
+        )
     )
-    action = result.scalars().first()
+    action = result.scalar_one_or_none()
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
+
     return action
 
 
@@ -412,26 +425,24 @@ async def update_action_status(
     *,
     db: AsyncSession = Depends(deps.get_db),
     action_id: str,
-    status_update: dict,  # Simplified for PATCH {"status": "completed"}
+    status_update: dict,
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
     Updates the status of an action item.
     """
-    result = await db.execute(
-        select(ActionModel)
-        .where(ActionModel.id == action_id)
-        .where(ActionModel.client_id == current_user.client_id)
-    )
-    action = result.scalars().first()
+    if "status" not in status_update:
+        raise HTTPException(status_code=400, detail="Status field is required")
 
-    if not action:
+    action_service = ActionService(db)
+    try:
+        updated_action = await action_service.update_action_status(
+            action_id, current_user.client_id, status_update["status"]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not updated_action:
         raise HTTPException(status_code=404, detail="Action not found")
 
-    if "status" in status_update:
-        action.status = status_update["status"]
-
-    db.add(action)
-    await db.commit()
-    await db.refresh(action)
-    return action
+    return updated_action

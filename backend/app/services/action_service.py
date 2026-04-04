@@ -288,15 +288,44 @@ Return ONLY a JSON array of objects with the following structure:
         self, action_id: str, client_id: str, status: str
     ) -> Optional[Action]:
         """Status-Änderung -> n8n Notification"""
-        result = await self.db.execute(select(Action).where(Action.id == action_id).where(Action.client_id == client_id))
+        from sqlalchemy.orm import selectinload
+        result = await self.db.execute(
+            select(Action)
+            .where(Action.id == action_id)
+            .where(Action.client_id == client_id)
+            .options(selectinload(Action.assignments).selectinload(Assignment.user))
+        )
         action = result.scalar_one_or_none()
 
         if not action:
             return None
 
-        # Hack for enum
-        action.status = status  # type: ignore
+        # Validate status against ActionStatus enum
+        try:
+            validated_status = ActionStatus(status)  # raises ValueError if not a member
+        except ValueError:
+            allowed = ", ".join(symbol for symbol in ActionStatus.__members__.values())
+            logger.error(
+                f"Invalid status value received: {status!r}. "
+                f"Allowed values are: {allowed}"
+            )
+            raise ValueError(
+                f"Invalid status value: {status!r}. "
+                f"Must be one of: {allowed}"
+            )
+
+        # Assign the enum member (SQLAlchemy will store the canonical name)
+        action.status = validated_status  # type: ignore
         await self.db.commit()
+
+        # Reload action with fresh DB state and eager-loaded relationships
+        from sqlalchemy.orm import selectinload
+        result = await self.db.execute(
+            select(Action)
+            .options(selectinload(Action.assignments).selectinload(Assignment.user))
+            .where(Action.id == action.id)
+        )
+        action = result.scalar_one()
 
         # n8n Notification (e.g., to Manager)
         payload = {

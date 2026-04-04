@@ -84,15 +84,16 @@ async def login(
     db: AsyncSession = Depends(deps.get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Any:
-    logger.error(f"DIAGNOSE LOGIN: Received Username='{form_data.username}' | Password Length={len(form_data.password)} | Password='{form_data.password}'")
-    
+    # Debug logging without sensitive data
+    logger.debug(f"Login attempt for user: {form_data.username}")
+
     user_result = await db.execute(
         select(UserModel).where(UserModel.email == form_data.username)
     )
     user = user_result.scalar_one_or_none()
 
     is_valid = security.verify_password(form_data.password, user.hashed_password) if user else False
-    logger.error(f"DIAGNOSE LOGIN: verify_password result: {is_valid}")
+    logger.debug(f"Password verification result: {is_valid}")
 
     if not user or not is_valid:
         raise HTTPException(
@@ -174,19 +175,23 @@ async def register(
         created_at=datetime.now(datetime.timezone.utc) if hasattr(datetime, "UTC") else datetime.utcnow(),
     )
 
-    # Assign role - Auto-assign 'dg' if it's a new tenant (client_id is None)
-    target_role = user_in.role
+    # Determine role: For new tenant (no client_id), first user gets 'dg'
+    # For existing client (client_id provided), use provided role or default 'participant'
     if not user_in.client_id:
         target_role = "dg"
+    else:
+        target_role = user_in.role or "participant"
 
+    # Retrieve existing role from DB (do not create arbitrary roles)
     role_result = await db.execute(
         select(RoleModel).where(RoleModel.name == target_role)
     )
     role = role_result.scalar_one_or_none()
     if not role:
-        role = RoleModel(id=str(uuid.uuid4()), name=target_role)
-        db.add(role)
-        await db.flush()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid role: {target_role}. Please contact administrator."
+        )
     
     # Assign role BEFORE adding to session to avoid lazy loading issues
     db_obj.roles = [role]
