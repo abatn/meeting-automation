@@ -72,6 +72,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Check Staging Secrets
+      run: |
+        # Skip staging deployment if KUBE_CONFIG_STAGING secret is not configured
+        if [ -z "${{ secrets.KUBE_CONFIG_STAGING }}" ]; then
+          echo "⚠️ KUBE_CONFIG_STAGING secret not set. Skipping Cloud Staging deployment."
+          echo "To enable: Set up Cloud Staging cluster and add KUBE_CONFIG_STAGING secret in GitHub repo settings."
+          exit 0
+        fi
+
     - name: Configure K8s context for staging
       run: |
         # KUBE_CONFIG_STAGING secret contains kubeconfig for staging cluster
