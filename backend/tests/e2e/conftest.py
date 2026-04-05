@@ -60,6 +60,11 @@ class EnvironmentConfig:
 
     def _get_base_url(self) -> str:
         """Get the base URL for the API depending on environment."""
+        # Allow override via E2E_BASE_URL env var (for STAGING internal access)
+        override_url = os.getenv("E2E_BASE_URL")
+        if override_url:
+            return override_url
+
         if self.env == TestEnvironment.STAGING:
             return "https://staging.meeting-automate.tn"
         elif self.env == TestEnvironment.PRODUCTION:
