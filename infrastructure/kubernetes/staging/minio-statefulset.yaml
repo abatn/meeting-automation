@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio-staging
+  namespace: meeting-automation-staging
+spec:
+  serviceName: "minio-staging"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio-staging
+  template:
+    metadata:
+      labels:
+        app: minio-staging
+    spec:
+      containers:
+      - name: minio
+        image: minio/minio:latest
+        command: ["minio", "server", "/data", "--console-address", ":9001"]
+        ports:
+        - containerPort: 9000
+          name: api
+        - containerPort: 9001
+          name: console
+        envFrom:
+        - secretRef:
+            name: minio-secrets
+        volumeMounts:
+        - name: minio-staging-storage
+          mountPath: /data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: minio-staging-storage
+        hostPath:
+          path: /data/minio
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-staging
+  namespace: meeting-automation-staging
+  labels:
+    app: minio-staging
+spec:
+  selector:
+    app: minio-staging
+  ports:
+  - port: 9000
+    targetPort: 9000
+    name: api
+  - port: 9001
+    targetPort: 9001
+    name: console
+  type: ClusterIP
