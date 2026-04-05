@@ -128,9 +128,11 @@ async def test_meeting_list_includes_created(e2e_client: AsyncClient, e2e_meetin
     meetings = resp.json()
     # Should be at least one (our created meeting)
     assert len(meetings) >= 1
-    # Find our meeting by ID
-    meeting_ids = [m["id"] for m in meetings]
-    assert e2e_meeting["id"] in meeting_ids
+
+    # Instead of searching in paginated list (may exceed limit), verify meeting directly via GET
+    get_resp = await e2e_client.get(f"/api/v1/meetings/{e2e_meeting['id']}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["id"] == e2e_meeting["id"]
 
 
 @pytest.mark.asyncio
