@@ -262,8 +262,8 @@ jobs:
         PASS_RATE=$((PASSED * 100 / TOTAL))
         echo "E2E Pass rate: ${PASS_RATE}%"
         echo "pass_rate=$PASS_RATE" >> $GITHUB_OUTPUT
-        if [ $PASS_RATE -lt 85 ]; then
-          echo "❌ E2E pass rate below 85% (temporary threshold during stabilization). Blocking production deployment."
+        if [ $PASS_RATE -lt 95 ]; then
+          echo "❌ E2E pass rate below 95% (required for production deployment)."
           echo "failure_reason=low_e2e_pass_rate" >> $GITHUB_OUTPUT
           exit 1
         fi
