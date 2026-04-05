@@ -314,7 +314,7 @@ async def get_pending_actions_for_automation(
         .options(
             joinedload(ActionModel.assignments).joinedload(AssignmentModel.user)
         )
-        .where(ActionModel.status == ActionStatus.PENDING)
+        .where(ActionModel.status == DB_ActionStatus.PENDING)
     )
     result = await db.execute(stmt)
     actions = result.scalars().unique().all()
