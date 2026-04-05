@@ -11,15 +11,16 @@ import boto3
 import httpx
 import redis
 from botocore.exceptions import ClientError
-from sqlalchemy import select, insert, update, delete
+from sqlalchemy import select, insert, update, delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
-from app.models.action import Action
+from app.models.action import Action, Assignment
 from app.models.pv import PV, Section
 from app.models.recording import Recording
 from app.models.transcription import Transcription
+from app.models.user import User
 from app.services.gladia_service import gladia_service
 from app.services.pv_service import PVService
 from app.services.sentinel_service import sentinel
@@ -100,59 +101,83 @@ def match_timestamps(words: List[Dict], segments: List[Dict]) -> List[Dict]:
     return result
 
 async def _process_recording_pipeline(recording_id: str) -> None:
-    publish_status(recording_id, "uploaded", 5, "Initializing Map-Reduce Pipeline...")
+    temp_path = None
+    try:
+        publish_status(recording_id, "uploaded", 5, "Initializing Map-Reduce Pipeline...")
 
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Recording).where(Recording.id == recording_id))
-        recording = result.scalar_one_or_none()
-        if not recording: return
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Recording).where(Recording.id == recording_id))
+            recording = result.scalar_one_or_none()
+            if not recording:
+                logger.warning(f"Recording {recording_id} not found, aborting.")
+                return
 
-        recording.status = "transcribing"
-        await db.commit()
+            recording.status = "transcribing"
+            await db.commit()
 
-        temp_path = await _download_audio(str(recording.file_path))
-        if not temp_path: raise Exception("S3 Error")
+            # Download audio from S3
+            temp_path = await _download_audio(str(recording.file_path))
+            if not temp_path:
+                raise Exception("S3 Error: Failed to download audio from MinIO")
 
-        # 1. GLADIA PHASE (Diarization)
-        publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
-        gladia_result = await gladia_service.transcribe_and_diarize(temp_path)
-        
-        # 2. MAP PHASE (Local SLM Sentinel)
-        publish_status(recording_id, "analyzing", 45, "Local Semantic Synthesis (Qwen-1.5B)...")
-        transcript_text = gladia_result.get("full_text", "")
-        
-        # Chunking: split by time or length
-        chunks = [transcript_text[i:i+3000] for i in range(0, len(transcript_text), 3000)]
-        
-        # Parallel Map execution
-        map_tasks = [sentinel.summarize_chunk(chunk) for chunk in chunks]
-        partial_summaries = await asyncio.gather(*map_tasks)
-        
-        enriched_context = "\n---\n".join(partial_summaries)
-        
-        # 3. REDUCE PHASE (Mistral Small)
-        publish_status(recording_id, "analyzing", 75, "Final Protocol Refinement (Mistral)...")
-        
-        from app.models.meeting import Meeting
-        from sqlalchemy.orm import selectinload
-        stmt = select(Meeting).options(selectinload(Meeting.participants)).where(Meeting.id == recording.meeting_id)
-        meeting_res = await db.execute(stmt)
-        meeting = meeting_res.scalar_one_or_none()
-        participant_names = [p.name for p in meeting.participants if p.name] if meeting else []
+            # 1. GLADIA PHASE (Diarization)
+            publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
+            gladia_result = await gladia_service.transcribe_and_diarize(temp_path)
 
-        pv_data = await PVService.generate_pv(enriched_context, target_language="fr", participant_names=participant_names)
-        
-        # 4. Persistence
-        await _save_transcription(db, recording, gladia_result)
-        await _save_pv_and_actions(db, recording, pv_data, language="fr")
-        
-        recording.status = "completed"
-        await db.commit()
-        
-        publish_status(recording_id, "completed", 100, "ISS Synthesis Successful (33.3s target).")
-        await _notify_n8n_completion(str(recording.id), str(recording.meeting_id))
-        
-        if os.path.exists(temp_path): os.remove(temp_path)
+            # 2. MAP PHASE (Local SLM Sentinel)
+            publish_status(recording_id, "analyzing", 45, "Local Semantic Synthesis (Qwen-1.5B)...")
+            transcript_text = gladia_result.get("full_text", "")
+
+            # Chunking: split by time or length
+            chunks = [transcript_text[i:i+3000] for i in range(0, len(transcript_text), 3000)]
+
+            # Parallel Map execution
+            map_tasks = [sentinel.summarize_chunk(chunk) for chunk in chunks]
+            partial_summaries = await asyncio.gather(*map_tasks)
+
+            enriched_context = "\n---\n".join(partial_summaries)
+
+            # 3. REDUCE PHASE (Mistral Small)
+            publish_status(recording_id, "analyzing", 75, "Final Protocol Refinement (Mistral)...")
+
+            from app.models.meeting import Meeting
+            from sqlalchemy.orm import selectinload
+            stmt = select(Meeting).options(selectinload(Meeting.participants)).where(Meeting.id == recording.meeting_id)
+            meeting_res = await db.execute(stmt)
+            meeting = meeting_res.scalar_one_or_none()
+            participant_names = [p.name for p in meeting.participants if p.name] if meeting else []
+
+            pv_data = await PVService.generate_pv(enriched_context, target_language="fr", participant_names=participant_names)
+
+            # 4. Persistence
+            await _save_transcription(db, recording, gladia_result)
+            await _save_pv_and_actions(db, recording, pv_data, language="fr")
+
+            recording.status = "completed"
+            await db.commit()
+
+            publish_status(recording_id, "completed", 100, "ISS Synthesis Successful (33.3s target).")
+            await _notify_n8n_completion(str(recording.id), str(recording.meeting_id))
+
+    except Exception as e:
+        logger.error(f"Pipeline failed for recording {recording_id}: {str(e)}", exc_info=True)
+        # Rollback: Set recording.status to "failed"
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Recording).where(Recording.id == recording_id))
+            recording = result.scalar_one_or_none()
+            if recording:
+                recording.status = "failed"
+                await db.commit()
+                publish_status(recording_id, "failed", 0, f"Processing failed: {str(e)}")
+        # Re-raise untuk Celery retry
+        raise
+    finally:
+        # Cleanup temp file
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete temp file {temp_path}: {e}")
 
 async def _save_transcription(db, recording, gladia_result):
     db_trans = Transcription(
@@ -176,6 +201,12 @@ async def _download_audio(file_key: str) -> Optional[str]:
     except: return None
 
 async def _save_pv_and_actions(db, recording, pv_data, language="fr"):
+    """Save PV and Actions with fuzzy-matching assignments.
+
+    Creates Assignment records by matching assignee names (from Mistral) to Users in the same client.
+    Uses ilike substring matching for simplicity and consistency with team_service.search_members.
+    If no User found, creates external assignment (external_name or external_email).
+    """
     summary = pv_data.get("summary", "")
     decisions_list = pv_data.get("decisions", [])
     html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><ul>" + "".join([f"<li>{d}</li>" for d in decisions_list]) + "</ul>"
@@ -188,6 +219,7 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr"):
         content_html=html, language=language, status="draft", is_validated=False
     ))
 
+    created_actions = []  # List of (action, assignee_name) tuples
     for act in pv_data.get("actions", []):
         due_date = None
         if act.get("deadline"):
@@ -207,6 +239,50 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr"):
             priority=act.get("priority", "medium"),
         )
         db.add(action)
+        created_actions.append((action, act.get("assignee")))
+
+    await db.flush()
+
+    # Create assignments with fuzzy matching (Option A: ilike substring)
+    for action, assignee_name in created_actions:
+        if not assignee_name:
+            continue
+
+        # Search for user in the same client where full_name or email contains assignee_name (case-insensitive)
+        stmt = select(User).where(
+            User.client_id == recording.client_id
+        ).where(
+            or_(
+                User.full_name.ilike(f"%{assignee_name}%"),
+                User.email.ilike(f"%{assignee_name}%")
+            )
+        ).limit(1)
+
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if user:
+            # Internal user found
+            assignment = Assignment(
+                id=str(uuid.uuid4()),
+                action_id=action.id,
+                user_id=user.id
+            )
+        else:
+            # No user found, treat as external contact
+            if '@' in assignee_name:
+                assignment = Assignment(
+                    id=str(uuid.uuid4()),
+                    action_id=action.id,
+                    external_email=assignee_name
+                )
+            else:
+                assignment = Assignment(
+                    id=str(uuid.uuid4()),
+                    action_id=action.id,
+                    external_name=assignee_name
+                )
+        db.add(assignment)
 
     await db.flush()
 

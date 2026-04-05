@@ -29,8 +29,13 @@ class RecordingService:
     async def upload_recording(
         self, meeting_id: str, client_id: str, file: UploadFile, recording_id: Optional[str] = None
     ) -> Recording:
-        """Audio zu Minio/S3 hochladen und DB aktualisieren/erstellen"""
-        file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_{file.filename}"
+        """Audio zu Minio/S3 hochladen und DB aktualisieren/erstellen
+
+        Multi-Tenant Isolation: file_key = "{client_id}/recordings/{meeting_id}/{uuid}_{filename}"
+        Backward-Compatible: Alte recordings/{meeting_id}/... keys bleiben lesbar, aber Uploads
+        verwenden neuen Prefix.
+        """
+        file_key = f"{client_id}/recordings/{meeting_id}/{uuid.uuid4()}_{file.filename}"
 
         # S3 Upload
         try:
@@ -69,6 +74,9 @@ class RecordingService:
         await self.db.commit()
         await self.db.refresh(db_recording)
 
+        # Trigger n8n audio-uploaded webhook (P1-11: after_upload hook aufrufen)
+        await self.after_upload(db_recording)
+
         # Trigger Celery Pipeline
         from app.tasks.transcription_tasks import process_recording
 
@@ -82,8 +90,10 @@ class RecordingService:
         """
         Start a recording session by using a local temporary file to
         bypass S3 5MB limits.
+
+        Multi-Tenant Isolation: file_key = "{client_id}/recordings/{meeting_id}/..."
         """
-        file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_stream.webm"
+        file_key = f"{client_id}/recordings/{meeting_id}/{uuid.uuid4()}_stream.webm"
         upload_id = str(uuid.uuid4())  # Use UUID as local temp file identifier
         try:
             # Update Meeting start_time to the exact moment recording starts

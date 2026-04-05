@@ -95,6 +95,10 @@ class MeetingService:
             return None
 
         update_data = meeting_in.model_dump(exclude_unset=True)
+
+        # Store previous status for webhook
+        previous_status = db_meeting.status
+
         for key, value in update_data.items():
             setattr(db_meeting, key, value)
 
@@ -103,7 +107,7 @@ class MeetingService:
 
         # Notify n8n about status change if relevant
         if "status" in update_data:
-            await self._trigger_n8n_meeting_status_change(db_meeting)
+            await self._trigger_n8n_meeting_status_change(db_meeting, previous_status)
 
         return db_meeting
 
@@ -156,7 +160,24 @@ class MeetingService:
         except Exception as e:
             logger.error(f"Failed to trigger n8n meeting-created: {e}")
 
-    async def _trigger_n8n_meeting_status_change(self, meeting: Meeting):
+    async def _trigger_n8n_meeting_status_change(self, meeting: Meeting, previous_status: str):
         """Triggert n8n Webhook für Statusänderungen"""
-        # Common webhook or specific one
-        pass
+        payload = {
+            "meeting_id": meeting.id,
+            "status": meeting.status,
+            "previous_status": previous_status,
+            "attendees": [p.email for p in meeting.participants],
+            "title": meeting.title,
+            "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
+        }
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    settings.N8N_WEBHOOK_MEETING_STATUS_CHANGED,
+                    json=payload,
+                    timeout=5.0
+                )
+                response.raise_for_status()
+                logger.info(f"n8n meeting-status-changed triggered for meeting {meeting.id}: {previous_status} -> {meeting.status}")
+        except Exception as e:
+            logger.error(f"Failed to trigger n8n meeting-status-changed: {e}")

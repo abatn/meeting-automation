@@ -1,6 +1,8 @@
 from datetime import timedelta, datetime
 from typing import Any
 import uuid
+import secrets
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -12,9 +14,15 @@ from app.core import security
 from app.core.config import settings
 from app.api import deps
 from app.models.user import User as UserModel, Role as RoleModel, UserStatus, ActivationToken
+from app.models.client import Client, SubscriptionStatus, SubscriptionPlan
+from app.models.team import TeamMember
 from app.schemas.user import User, UserCreate, Token, ActivationConfirm
 from app.services.auth_service import AuthService
+from app.services.audit_service import AuditService
+from app.utils.webhook_utils import trigger_user_invited_webhook
 from datetime import timezone
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -126,32 +134,53 @@ async def login(
 async def register(
     *, db: AsyncSession = Depends(deps.get_db), user_in: UserCreate
 ) -> Any:
-    user_result = await db.execute(
-        select(UserModel).where(UserModel.email == user_in.email)
-    )
-    user = user_result.scalar_one_or_none()
-    if user:
+    """
+    Self-Service Registration.
+
+    Flow:
+    1. Check if email already exists in users (ACTIVE or PENDING) → Error
+    2. Check if email exists in team_members → delete (upgrade to registered user)
+    3. Create Client if not provided
+    4. Create User with status=PENDING (not ACTIVE!)
+    5. Create ActivationToken (expires in 7 days)
+    6. Trigger user-invited webhook (sends email with activation link)
+    7. AuditLog for Client creation and User creation
+    8. Single transaction (commit at end)
+    """
+    # 1. Prüfe Duplicate in users (ACTIVE oder PENDING)
+    stmt = select(UserModel).where(UserModel.email == user_in.email)
+    res = await db.execute(stmt)
+    existing_user = res.scalar_one_or_none()
+    if existing_user:
         raise HTTPException(
             status_code=400,
-            detail="The user with this username already exists in the system.",
+            detail="A user with this email already exists.",
         )
 
-    from app.models.client import Client, SubscriptionStatus, SubscriptionPlan
-    
+    # 2. Prüfe team_members und lösche falls vorhanden (upgrade)
+    stmt_tm = select(TeamMember).where(TeamMember.email == user_in.email)
+    res_tm = await db.execute(stmt_tm)
+    existing_tm = res_tm.scalar_one_or_none()
+    if existing_tm:
+        await db.delete(existing_tm)
+        await db.flush()
+
+    # 3. Client Handling
     client_id = user_in.client_id
     if not client_id:
         client_id = str(uuid.uuid4())
-        # Determine plan from schema
+
+        # Determine plan
         plan_enum = SubscriptionPlan.GRATUIT
         minutes = 600
-        
+
         if user_in.plan == "PRO":
             plan_enum = SubscriptionPlan.PRO
             minutes = 3000
         elif user_in.plan == "ENTREPRISE":
             plan_enum = SubscriptionPlan.ENTREPRISE
             minutes = 12000
-            
+
         new_client = Client(
             id=client_id,
             company_name=user_in.company_name or f"{user_in.full_name or user_in.email}'s Company",
@@ -160,29 +189,29 @@ async def register(
             minutes_included=minutes
         )
         db.add(new_client)
-        await db.flush()
+        await db.flush()  # Get client_id for user FK
 
-    # Create user with string ID (UUID)
-    db_obj = UserModel(
-        id=str(uuid.uuid4()),
-        client_id=client_id,
-        email=user_in.email,
-        hashed_password=security.get_password_hash(user_in.password),
-        full_name=user_in.full_name,
-        status=UserStatus.ACTIVE.value,
-        is_superuser=False,
-        is_mfa_enabled=False,
-        created_at=datetime.now(datetime.timezone.utc) if hasattr(datetime, "UTC") else datetime.utcnow(),
-    )
+        # AuditLog für Client-Erstellung
+        await AuditService.log_action(
+            db,
+            client_id=client_id,
+            action="CREATE_CLIENT",
+            user_id=None,  # Self-Service, kein User-ID verfügbar
+            table_name="clients",
+            record_id=new_client.id,
+            new_values={
+                "company_name": new_client.company_name,
+                "subscription_plan": new_client.subscription_plan.value,
+                "minutes_included": new_client.minutes_included
+            }
+        )
 
-    # Determine role: For new tenant (no client_id), first user gets 'dg'
-    # For existing client (client_id provided), use provided role or default 'participant'
+    # 4. Determine Role
     if not user_in.client_id:
-        target_role = "dg"
+        target_role = "dg"  # First user of tenant becomes 'dg'
     else:
         target_role = user_in.role or "participant"
 
-    # Retrieve existing role from DB (do not create arbitrary roles)
     role_result = await db.execute(
         select(RoleModel).where(RoleModel.name == target_role)
     )
@@ -192,14 +221,72 @@ async def register(
             status_code=400,
             detail=f"Invalid role: {target_role}. Please contact administrator."
         )
-    
-    # Assign role BEFORE adding to session to avoid lazy loading issues
+
+    # 5. Create User mit status=PENDING (nicht ACTIVE!)
+    db_obj = UserModel(
+        id=str(uuid.uuid4()),
+        client_id=client_id,
+        email=user_in.email,
+        hashed_password=security.get_password_hash(user_in.password),
+        full_name=user_in.full_name,
+        status=UserStatus.PENDING.value,  # ✅ PENDING för E-Mail-Verifikation
+        is_superuser=False,
+        is_mfa_enabled=False,
+        created_at=datetime.now(timezone.utc) if hasattr(datetime, "UTC") else datetime.utcnow(),
+    )
+
     db_obj.roles = [role]
     db.add(db_obj)
     await db.flush()
 
+    # 6. ActivationToken erstellen
+    token = secrets.token_urlsafe(32)
+    expiration = datetime.now(timezone.utc) + timedelta(days=7)
+    activation_entry = ActivationToken(
+        id=str(uuid.uuid4()),
+        user_id=db_obj.id,
+        token=token,
+        expires_at=expiration
+    )
+    db.add(activation_entry)
+    await db.flush()
+
+    # 7. Client laden für Company Name im Webhook
+    client_stmt = select(Client).where(Client.id == client_id)
+    client_res = await db.execute(client_stmt)
+    client_obj = client_res.scalar_one()
+
+    # 8. AuditLog für User-Erstellung
+    await AuditService.log_action(
+        db,
+        client_id=client_id,
+        action="CREATE_USER",
+        user_id=db_obj.id,  # Self-Service: User erstellt sich selbst
+        table_name="users",
+        record_id=db_obj.id,
+        new_values={
+            "email": db_obj.email,
+            "status": db_obj.status,
+            "role": target_role
+        }
+    )
+
+    # 9. Commit ALLES atomar (Client + User + Token + AuditLogs)
     await db.commit()
     await db.refresh(db_obj)
+
+    # 10. Webhook AUSSERHALB Transaction (nach Commit) – Background Task wäre besser
+    activation_link = f"{settings.FRONTEND_URL}/activate?token={token}"
+    try:
+        await trigger_user_invited_webhook(
+            email=db_obj.email,
+            full_name=db_obj.full_name or "Valued Customer",
+            company_name=client_obj.company_name,
+            activation_link=activation_link
+        )
+    except Exception as e:
+        logger.error(f"Failed to send activation webhook: {e}")
+        # Optional: Celery Task für Retry Queueen
 
     return User(
         id=db_obj.id,

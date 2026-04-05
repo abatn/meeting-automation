@@ -316,6 +316,11 @@ Return ONLY a JSON array of objects with the following structure:
 
         # Assign the enum member (SQLAlchemy will store the canonical name)
         action.status = validated_status  # type: ignore
+
+        # Set completed_at when status changes to COMPLETED (P1-9)
+        if validated_status == ActionStatus.COMPLETED:
+            action.completed_at = datetime.utcnow()
+
         await self.db.commit()
 
         # Reload action with fresh DB state and eager-loaded relationships
