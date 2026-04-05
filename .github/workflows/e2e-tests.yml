@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: batnini/meeting-automation-backend
+  IMAGE_NAME: docker.io/batnini/meeting-automation-backend
 
 jobs:
   # Job 1: Build backend Docker image and run E2E tests in DEV (docker-compose.e2e.yml)
@@ -351,7 +351,7 @@ jobs:
             ${{ secrets.SLACK_WEBHOOK_URL }}
         fi
 
-    - name: Notify Success
+    -name: Notify Success
       if: success()
       run: |
         if [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ]; then
