@@ -12,6 +12,7 @@ from app.schemas.team import TeamMemberCreate, TeamMemberUpdate, TeamSearchResul
 from app.services.audit_service import AuditService
 from app.utils.webhook_utils import trigger_user_invited_webhook
 from app.core.config import settings
+from app.core import security
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,8 @@ class TeamService:
             # Re-activate the DISABLED user
             existing_user.status = UserStatus.PENDING.value
             existing_user.full_name = obj_in.full_name
-            existing_user.hashed_password = "PENDING_USER_NO_PASSWORD"
+            # Secure random placeholder password (user will set via activation)
+            existing_user.hashed_password = security.get_password_hash(secrets.token_urlsafe(32))
             new_user = existing_user
             
             # Delete old tokens if any exist
@@ -110,7 +112,8 @@ class TeamService:
                 client_id=client_id,
                 email=obj_in.email,
                 full_name=obj_in.full_name,
-                hashed_password="PENDING_USER_NO_PASSWORD",
+                # Secure random placeholder password (user will set via activation)
+                hashed_password=security.get_password_hash(secrets.token_urlsafe(32)),
                 status=UserStatus.PENDING.value,
                 is_superuser=False,
                 is_mfa_enabled=False
