@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: meeting-automation-staging
+  labels:
+    app: backend
+    environment: staging
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+      environment: staging
+  template:
+    metadata:
+      labels:
+        app: backend
+        environment: staging
+    spec:
+      containers:
+      - name: backend
+        image: meeting-automation-backend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        envFrom:
+        - secretRef:
+            name: backend-secrets-staging
+        - configMapRef:
+            name: backend-config
+        # Enable debug logging in staging for troubleshooting
+        env:
+        - name: DEBUG
+          value: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: meeting-automation-staging
+  labels:
+    app: backend
+    environment: staging
+spec:
+  selector:
+    app: backend
+    environment: staging
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  type: ClusterIP

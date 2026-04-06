@@ -133,7 +133,7 @@ services:
       - JWT_HEADER=Authorization
       - ALLOW_PRIVATE_IP_ADDRESS=true
     ports:
-      - "8080:80"
+      - "8081:80"
     volumes:
       - onlyoffice_data:/var/www/onlyoffice/Data
     deploy:

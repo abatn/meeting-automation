@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker-staging
+  namespace: meeting-automation-staging
+  labels:
+    app: celery-worker-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: celery-worker-staging
+  template:
+    metadata:
+      labels:
+        app: celery-worker-staging
+    spec:
+      containers:
+      - name: celery-worker
+        image: meeting-automation-backend:latest
+        imagePullPolicy: IfNotPresent
+        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info"]
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        env:
+        - name: PYTHONPATH
+          value: "/app"
+        envFrom:
+        - secretRef:
+            name: backend-secrets-staging
+        - configMapRef:
+            name: backend-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: celery-worker-staging
+  namespace: meeting-automation-staging
+  labels:
+    app: celery-worker-staging
+spec:
+  selector:
+    app: celery-worker-staging
+  ports:
+  - port: 5555
+    name: stats
+  type: ClusterIP

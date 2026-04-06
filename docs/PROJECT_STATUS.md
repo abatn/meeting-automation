@@ -70,6 +70,7 @@ Diese Phase konzentriert sich auf den stabilen Betrieb unter Last, die Benutzere
   - **MinIO/S3**: Korrekte Speicherplatzberechnung, Anzahl Objekte, Upload/Download Rate.
   - **n8n**: Workflow-Fehler der letzten 24h, Durchschnittliche Ausführungszeit.
 - [x] **Online Document Editing (OnlyOffice)**: Integration für ISO-27001-konforme Online-Bearbeitung von KI-Protokollen. (Optimiert: PDF-Sync-Staleness behoben via Forcesave-Callback & Redis-Sync).
+  > ⚠️ **TODO Produktion**: `ONLYOFFICE_URL` in `.env` ist aktuell auf VM-Test-IP gesetzt. Vor Produktion durch echte Domain ersetzen oder dynamische Host-Ableitung implementieren. Siehe `PROTOCOL_PART_41_ONLYOFFICE_INTEGRATION.md`.
 - [x] **Enterprise Onboarding (Way B)**: Implementierung eines sicheren, token-basierten Einladungssystems mit `PENDING` User-Status, n8n-Integration und automatisierter Passwort-Setzung.
 - [ ] **Auto-Scaling**: Konfiguration von Horizontal Pod Autoscaler (HPA) in Kubernetes für die AI-Worker (Gladia/Mistral Proxy).
 - [ ] **Mobile App Applikation**: Entwicklung einer progressiven Web App (PWA) oder nativen App für Meeting-Aufnahmen via Smartphone.

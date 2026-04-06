@@ -18,7 +18,7 @@
     },
     {
       "parameters": {
-        "url": "=http://backend:8000/api/v1/reports/automation/meeting/{{$node[\"Webhook\"].json[\"body\"][\"meeting_id\"]}}",
+        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/meeting/{{$node[\"Webhook\"].json[\"body\"][\"meeting_id\"]}}",
         "method": "GET",
         "queryParameters": {
           "parameters": [
@@ -40,7 +40,7 @@
     },
     {
       "parameters": {
-        "url": "=http://backend:8000/api/v1/reports/automation/pdf/{{$node[\"Webhook\"].json[\"body\"][\"meeting_id\"]}}",
+        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/pdf/{{$node[\"Webhook\"].json[\"body\"][\"meeting_id\"]}}",
         "method": "GET",
         "queryParameters": {
           "parameters": [

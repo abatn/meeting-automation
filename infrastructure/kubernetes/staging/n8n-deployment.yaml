@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n-staging
+  namespace: meeting-automation-staging
+  labels:
+    app: n8n-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: n8n-staging
+  template:
+    metadata:
+      labels:
+        app: n8n-staging
+    spec:
+      containers:
+      - name: n8n
+        image: n8nio/n8n:latest
+        ports:
+        - containerPort: 5678
+          name: http
+        env:
+        - name: DB_TYPE
+          value: "postgresdb"
+        - name: DB_POSTGRESDB_HOST
+          value: "postgres-staging"
+        - name: DB_POSTGRESDB_PORT
+          value: "5432"
+        - name: DB_POSTGRESDB_DATABASE
+          value: "meeting_db_staging"
+        - name: DB_POSTGRESDB_USER
+          value: "meeting_user"
+        - name: DB_POSTGRESDB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: n8n-secrets
+              key: DB_POSTGRESDB_PASSWORD
+        - name: N8N_HOST
+          value: "n8n-staging.meeting-automation-staging.svc.cluster.local"
+        - name: N8N_PORT
+          value: "5678"
+        - name: WEBHOOK_URL
+          value: "http://n8n-staging:5678"
+        envFrom:
+        - secretRef:
+            name: n8n-secrets
+        volumeMounts:
+        - name: n8n-staging-storage
+          mountPath: /home/node/.n8n
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: n8n-staging-storage
+        persistentVolumeClaim:
+          claimName: n8n-staging-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: n8n-staging-pvc
+  namespace: meeting-automation-staging
+  labels:
+    app: n8n-staging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: n8n-staging
+  namespace: meeting-automation-staging
+  labels:
+    app: n8n-staging
+spec:
+  selector:
+    app: n8n-staging
+  ports:
+  - port: 5678
+    targetPort: 5678
+    name: http
+  type: ClusterIP

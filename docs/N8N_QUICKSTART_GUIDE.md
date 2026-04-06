@@ -26,9 +26,15 @@ Wenn du den Webhook-Node öffnest, siehst du oben zwei Tabs:
 
 Im Meeting Automation System sind folgende Pfade registriert:
 
--   **Meeting Created**: `meeting-created`
+-   **Meeting Created**: `meeting-created` (Workflow ID: 2)
 -   **Audio Uploaded**: `audio-uploaded`
+-   **Meeting Status Changed**: `meeting-status-changed`
+-   **Transcription Completed**: `transcription-completed` (Workflow ID: 3)
 -   **PV Validated**: `pv-validated`
+-   **Daily Reminders**: `daily-reminders` (Workflow ID: 4)
+-   **User Invited**: `user-invited`
+
+**Wichtig**: Die Workflows mit IDs (2, 3, 4) verwenden den Pfad `/webhook/{ID}/webhook/{path}`. Die anderen verwenden direkt `/webhook/{path}`.
 
 Du findest alle aktiven Webhooks in n8n in der Seitenleiste unter **"Settings" -> "Webhooks"**.
 

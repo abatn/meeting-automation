@@ -1,0 +1,427 @@
+#!/usr/bin/env bash
+
+################################################################################
+# Staging Cluster Setup Script
+#
+# Dieses Script automatisiert die Einrichtung eines Kubernetes Staging-Clusters
+# für die Meeting Automation App. Es unterstützt:
+#   - Lokale Cluster (Docker Desktop, Kind)
+#   - Externe/Cloud Cluster (AWS EKS, GKE, Azure AKS, DigitalOcean)
+#
+# Usage:
+#   ./scripts/setup-staging-cluster.sh [OPTIONS]
+#
+# Options:
+#   --env, -e ENV          Environment: local, aws, gcp, azure, do (default: local)
+#   --kubeconfig, -k PATH  Pfad zur kubeconfig (default: ~/.kube/config)
+#   --context, -c NAME     Kubernetes context name (default: staging-cluster)
+#   --export-kubeconfig    Kubeconfig für GitHub Secrets exportieren (kubeconfig-staging.txt)
+#   --skip-infra           Infrastructure Deployment überspringen (nur Namespace/Secrets)
+#   --skip-seeds           User Seeding überspringen
+#   --help, -h             Diese Hilfe anzeigen
+#
+# Beispiele:
+#   # Lokales Staging mit Kind:
+#   kind create cluster --name meeting-staging
+#   kubectl config rename-context kind-meeting-staging staging-cluster
+#   ./scripts/setup-staging-cluster.sh --env local
+#
+#   # AWS EKS:
+#   aws eks update-kubeconfig --region eu-west-1 --name meeting-staging
+#   ./scripts/setup-staging-cluster.sh --env aws --context meeting-staging
+#
+#   # Nach Setup: Kubeconfig exportieren für GitHub Secrets:
+#   ./scripts/setup-staging-cluster.sh --export-kubeconfig
+#
+# Voraussetzungen:
+#   - kubectl installiert und in PATH
+#   - Kubernetes Cluster bereits provisioniert (oder Kind/Docker Desktop)
+#   - SOPS & age (falls verschlüsselte Secrets verwendet werden)
+#   - kustomize (optional, für manifest management)
+#
+# Siehe: docs/STAGING_CLUSTER_SETUP_PLAN.md für vollständige Dokumentation.
+################################################################################
+
+set -e  # Exit bei Fehler
+set -u  # Error auf unset Variable
+set -o pipefail
+
+# Farbcodes für Output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Defaults
+ENVIRONMENT="local"
+KUBECONFIG_PATH="${HOME}/.kube/config"
+CONTEXT_NAME="staging-cluster"
+EXPORT_KUBECONFIG=false
+SKIP_INFRASTRUCTURE=false
+SKIP_SEEDS=false
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+INFRA_DIR="${PROJECT_ROOT}/infrastructure/kubernetes/staging"
+
+# Help Funktion
+show_help() {
+    grep '^#' "$0" | cut -c4-
+    exit 0
+}
+
+# Logging Funktionen
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Argumente parsen
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --env|-e)
+            ENVIRONMENT="$2"
+            shift 2
+            ;;
+        --kubeconfig|-k)
+            KUBECONFIG_PATH="$2"
+            shift 2
+            ;;
+        --context|-c)
+            CONTEXT_NAME="$2"
+            shift 2
+            ;;
+        --export-kubeconfig)
+            EXPORT_KUBECONFIG=true
+            shift
+            ;;
+        --skip-infra)
+            SKIP_INFRASTRUCTURE=true
+            shift
+            ;;
+        --skip-seeds)
+            SKIP_SEEDS=true
+            shift
+            ;;
+        --help|-h)
+            show_help
+            ;;
+        *)
+            log_error "Unbekannte Option: $1"
+            show_help
+            ;;
+    esac
+done
+
+# Header
+echo "=================================================="
+echo "   Staging Cluster Setup"
+echo "=================================================="
+echo "Environment: ${ENVIRONMENT}"
+echo "Kubeconfig:  ${KUBECONFIG_PATH}"
+echo "Context:     ${CONTEXT_NAME}"
+echo "Infra:       $([ "$SKIP_INFRASTRUCTURE" = true ] && echo 'SKIP' || echo 'DEPLOY')"
+echo "Seeds:       $([ "$SKIP_SEEDS" = true ] && echo 'SKIP' || echo 'DEPLOY')"
+echo "=================================================="
+echo ""
+
+# 1. Kubectl Context validieren
+log_info "Prüfe kubectl Konfiguration..."
+if ! command -v kubectl &> /dev/null; then
+    log_error "kubectl ist nicht installiert. Bitte installiere kubectl."
+    exit 1
+fi
+
+# Setze KUBECONFIG enviroment variable für diesen Prozess
+export KUBECONFIG="${KUBECONFIG_PATH}"
+
+# Prüfe, ob Context existiert
+if kubectl config get-contexts | grep -qw "${CONTEXT_NAME}"; then
+    log_success "Context '${CONTEXT_NAME}' gefunden."
+    kubectl config use-context "${CONTEXT_NAME}"
+else
+    log_error "Context '${CONTEXT_NAME}' nicht gefunden in ${KUBECONFIG_PATH}."
+    log_info "Verfügbare Contexts:"
+    kubectl config get-contexts || true
+    log_error "Bitte erstelle den Cluster und Context zuerst (z.B. mit Kind oder cloud provider)."
+    exit 1
+fi
+
+# 2. Namespace prüfen/erstellen
+log_info "Prüfe/erstelle Namespace 'meeting-automation-staging'..."
+if kubectl get namespace meeting-automation-staging &> /dev/null; then
+    log_success "Namespace existiert bereits."
+else
+    log_info "Erstelle Namespace..."
+    if [ -f "${INFRA_DIR}/namespace.yaml" ]; then
+        kubectl apply -f "${INFRA_DIR}/namespace.yaml"
+        log_success "Namespace erstellt."
+    else
+        log_error "namespace.yaml nicht gefunden in ${INFRA_DIR}"
+        exit 1
+    fi
+fi
+
+# 3. Infrastructure deployen (wenn nicht übersprungen)
+if [ "${SKIP_INFRASTRUCTURE}" = false ]; then
+    log_info "Deploye Infrastruktur..."
+
+    # Reihenfolge ist wichtig (abhängigkeiten)
+    INFRA_MANIFESTS=(
+        # Database & Cache
+        "postgres-secrets.yaml"
+        "postgres-statefulset.yaml"
+        "redis-secrets.yaml"
+        "redis-deployment.yaml"
+        "rabbitmq-secrets.yaml"
+        "rabbitmq-statefulset.yaml"
+        # Object Storage
+        "minio-secrets.yaml"
+        "minio-statefulset.yaml"
+        # Automation & Office
+        "n8n-secrets.yaml"
+        "n8n-deployment.yaml"
+        "onlyoffice-deployment.yaml"
+        # Backend (benötigt backend-secrets & backend-config)
+        "backend-secrets.yaml"
+        "backend-config.yaml"
+        "backend-deployment.yaml"
+        # Celery (wenn separat)
+        "celery-worker-deployment.yaml"
+        "celery-beat-deployment.yaml"
+        # Ingress
+        "traefik-middlewares.yaml"
+        "traefik-ingressroute.yaml"
+    )
+
+    for manifest in "${INFRA_MANIFESTS[@]}"; do
+        manifest_path="${INFRA_DIR}/${manifest}"
+        if [ ! -f "${manifest_path}" ]; then
+            log_warn "Manifest nicht gefunden, überspringe: ${manifest}"
+            continue
+        fi
+        log_info "Apply: ${manifest}"
+        if kubectl apply -f "${manifest_path}" -n meeting-automation-staging; then
+            log_success "  → applied"
+        else
+            log_error "  → failed to apply"
+            exit 1
+        fi
+    done
+
+    # Warte auf Postgres (kritischste)
+    log_info "Warte auf PostgreSQL readiness (timeout: 180s)..."
+    if kubectl wait --for=condition=ready pod/postgres-staging-0 -n meeting-automation-staging --timeout=180s; then
+        log_success "PostgreSQL ist bereit."
+    else
+        log_warn "PostgreSQL timeout. Prüfe: kubectl get pods -n meeting-automation-staging"
+    fi
+else
+    log_warn "Infrastructure Deployment übersprungen (--skip-infra)."
+fi
+
+# 4. Backend Deployment
+log_info "Deploye Backend (from local Docker image)..."
+# Hier erwarten wir, dass das Image bereits von CI gepusht wurde.
+# In Lokal-Entwicklung: Build lokal, in CI: Image von Docker Hub.
+LOCAL_IMAGE="${ENVIRONMENT}/meeting-automation-backend:latest"
+
+if [ "${ENVIRONMENT}" = "local" ]; then
+    # Für lokales Staging: Baue Image wenn nötig
+    if docker images | grep -q "meeting-automation-backend"; then
+        log_info "Verwende lokales Docker Image."
+    else
+        log_info "Baue Docker Image lokal..."
+        (cd "${PROJECT_ROOT}/backend" && docker build -t meeting-automation-backend:latest .)
+    fi
+    # Für kind/minikube: Image importieren
+    if command -v kind &> /dev/null && [[ "${CONTEXT_NAME}" == kind-* ]]; then
+        log_info "Lade Image in Kind Cluster..."
+        kind load docker-image meeting-automation-backend:latest --name "${CONTEXT_NAME##kind-}"
+    fi
+    # Für Docker Desktop: direkt verwenden (local images verfügbar)
+    IMAGE_TAG="meeting-automation-backend:latest"
+else
+    # Für Cloud: Image kommt von Docker Hub, wird von CI gepusht
+    IMAGE_TAG="docker.io/batnini/meeting-automation-backend:${CI_COMMIT_SHA:-latest}"
+    log_info "Cloud-Modus: verwende Image ${IMAGE_TAG}"
+fi
+
+# Backend Deployment Manifest anpassen
+BACKEND_DEPLOYMENT="${INFRA_DIR}/../backend-deployment.yaml"
+if [ -f "${BACKEND_DEPLOYMENT}" ]; then
+    # Ersetze Image in Deployment
+    log_info "Patching backend deployment with image: ${IMAGE_TAG}"
+    kubectl set image deployment/backend \
+        backend="${IMAGE_TAG}" \
+        -n meeting-automation-staging --record || true
+else
+    log_warn "backend-deployment.yaml nicht gefunden, überspringe."
+fi
+
+# Warte auf Backend rollout
+log_info "Warte auf Backend rollout (timeout: 300s)..."
+if kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=300s; then
+    log_success "Backend部署完成。"
+else
+    log_error "Backend rollout fehlgeschlagen."
+    kubectl logs deployment/backend -n meeting-automation-staging --tail=50 || true
+    exit 1
+fi
+
+# 5. Ingress Routes (Traefik)
+log_info "Deploye Traefik Ingress Routes..."
+if [ -f "${INFRA_DIR}/traefik-middlewares.yaml" ]; then
+    kubectl apply -f "${INFRA_DIR}/traefik-middlewares.yaml" -n meeting-automation-staging
+    log_success "Middlewares applied."
+fi
+if [ -f "${INFRA_DIR}/traefik-ingressroute.yaml" ]; then
+    kubectl apply -f "${INFRA_DIR}/traefik-ingressroute.yaml" -n meeting-automation-staging
+    log_success "IngressRoute applied."
+else
+    log_warn "traefik-ingressroute.yaml nicht gefunden."
+fi
+
+# 6. Health Check
+STAGING_URL="https://staging.meeting-automate.tn"
+log_info "Warte auf Health Check: ${STAGING_URL}/health"
+for i in {1..60}; do
+    STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${STAGING_URL}/health" 2>/dev/null || echo "000")
+    if [ "${STATUS}" = "200" ]; then
+        log_success "Staging Health Check OK (HTTP 200)."
+        break
+    fi
+    log_info "Health Check ${STATUS}, Versuch ${i}/60..."
+    sleep 5
+done
+
+if [ "${i}" -eq 60 ] && [ "${STATUS}" != "200" ]; then
+    log_error "Health Check failed nach 60 Versuchen."
+    log_error "Bitte prüfe: kubectl logs -n meeting-automation-staging deployment/backend"
+    exit 1
+fi
+
+# 7. Secrets für E2E-Test-User (wenn nicht bereits vorhanden)
+log_info "Erstelle/Update E2E-Test-User Secret..."
+# Diese Werte kommen aus GitHub Secrets in CI; für lokales Setup hier hardcoded.
+# In Produktion sollten diese aus einer sicheren Quelle kommen.
+E2E_EMAIL="${STAGING_E2E_USER_EMAIL:-e2e-tester@staging.meeting.tn}"
+E2E_PASSWORD="${STAGING_E2E_USER_PASSWORD:-Password123!}"
+
+kubectl create secret generic e2e-test-user \
+    --namespace meeting-automation-staging \
+    --from-literal=E2E_TEST_USER_EMAIL="${E2E_EMAIL}" \
+    --from-literal=E2E_TEST_USER_PASSWORD="${E2E_PASSWORD}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+log_success "E2E Test-User Secret gesetzt (Email: ${E2E_EMAIL})."
+
+# 8. AI API Keys Secret
+log_info "Erstelle/Update backend-api-keys-staging Secret..."
+# Hier: Werte aus Umgebungsvariablen oder .env lesen
+if [ -f "${PROJECT_ROOT}/.env" ]; then
+    source "${PROJECT_ROOT}/.env" 2>/dev/null || true
+fi
+
+MISTRAL_KEY="${MISTRAL_API_KEY:-}"
+GLADIA_KEY="${GLADIA_API_KEY:-}"
+
+if [ -z "${MISTRAL_KEY}" ] || [ -z "${GLADIA_KEY}" ]; then
+    log_warn "MISTRAL_API_KEY oder GLADIA_API_KEY nicht in .env gefunden."
+    log_warn "Bitte setze Umgebungsvariablen oder erstelle Secret manuell."
+else
+    kubectl create secret generic backend-api-keys-staging \
+        --namespace meeting-automation-staging \
+        --from-literal=MISTRAL_API_KEY="${MISTRAL_KEY}" \
+        --from-literal=GLADIA_API_KEY="${GLADIA_KEY}" \
+        --dry-run=client -o yaml | kubectl apply -f -
+    log_success "AI API Keys Secret gesetzt."
+fi
+
+# 9. E2E-Test-User in Datenbank anlegen (wenn nicht übersprungen)
+if [ "${SKIP_SEEDS}" = false ]; then
+    log_info "Seede Test-User in Staging-DB..."
+
+    # Finde backend Pod
+    BACKEND_POD=$(kubectl get pods -n meeting-automation-staging -l app=backend -o jsonpath="{.items[0].metadata.name}" 2>/dev/null || echo "")
+    if [ -z "${BACKEND_POD}" ]; then
+        log_warn "Backend Pod nicht gefunden. Überspringe Seeding."
+    else
+        # Führe seed_users.py aus (oder direkt über API)
+        log_info "Führe seed_users.py im Pod aus..."
+        if kubectl exec -n meeting-automation-staging "${BACKEND_POD}" -- python backend/scripts/seed_users.py 2>&1; then
+            log_success "Test-User erfolgreich gesetzt (oder bereits vorhanden)."
+        else
+            log_warn "Seeding fehlgeschlagen. Versuche manuelle Registrierung über API..."
+            # Alternative: Registrierung über API
+            REGISTER_PAYLOAD=$(jq -n \
+                --arg email "${E2E_EMAIL}" \
+                --arg password "${E2E_PASSWORD}" \
+                --arg name "E2E Tester" \
+                '{"email": $email, "password": $password, "full_name": $name, "company_name": "E2E Tests"}')
+            curl -s -f -X POST "${STAGING_URL}/api/v1/auth/register" \
+                -H "Content-Type: application/json" \
+                -d "${REGISTER_PAYLOAD}" && log_success "Test-User über API registriert." || log_warn "API-Registrierung fehlgeschlagen (User existiert vielleicht bereits)."
+        fi
+    fi
+else
+    log_warn "Seeding übersprungen (--skip-seeds)."
+fi
+
+# 10. Kubeconfig exportieren (optional)
+if [ "${EXPORT_KUBECONFIG}" = true ]; then
+    log_info "Exportiere Kubeconfig für Context '${CONTEXT_NAME}'..."
+    KUBECONFIG_FILE="${PROJECT_ROOT}/kubeconfig-staging.txt"
+    kubectl config view --context="${CONTEXT_NAME}" --raw > "${KUBECONFIG_FILE}"
+    log_success "Kubeconfig geschrieben nach: ${KUBECONFIG_FILE}"
+    log_info "------------------------------------------------------------------"
+    log_info "Inhalt für GitHub Secret 'KUBE_CONFIG_STAGING':"
+    echo ""
+    cat "${KUBECONFIG_FILE}"
+    echo ""
+    log_info "------------------------------------------------------------------"
+    log_info "Kopiere den obigen Inhalt in GitHub:"
+    log_info "  Settings → Secrets and variables → Actions → New repository secret"
+    log_info "  Name: KUBE_CONFIG_STAGING"
+    log_info ""
+    log_warn "WICHTIG: Stelle sicher, dass die kubeconfig keine privaten Keys enthält, die nicht für CI bestimmt sind."
+    log_warn "         Normalerweise enthält sie nur Cluster-Endpunkte und Zertifikate."
+fi
+
+# Abschluss
+echo ""
+echo "=================================================="
+log_success "Staging Cluster Setup abgeschlossen!"
+echo "=================================================="
+echo ""
+echo "Status Check:"
+echo "  kubectl get pods -n meeting-automation-staging"
+echo "  kubectl get ingressroute -n meeting-automation-staging"
+echo ""
+echo "Health Check:"
+echo "  curl https://staging.meeting-automate.tn/health"
+echo ""
+echo "Logs ansehen:"
+echo "  kubectl logs -f deployment/backend -n meeting-automation-staging"
+echo ""
+echo "Pipeline triggern:"
+echo "  git add . && git commit -m 'ci: trigger staging after setup' && git push origin main"
+echo ""
+echo "Nicht vergessen: GitHub Secrets setzen (falls nicht bereits geschehen):"
+echo "  - KUBE_CONFIG_STAGING (siehe export oben)"
+echo "  - STAGING_E2E_USER_EMAIL=${E2E_EMAIL}"
+echo "  - STAGING_E2E_USER_PASSWORD=${E2E_PASSWORD}"
+echo "  - MISTRAL_API_KEY_STAGING (aus .env)"
+echo "  - GLADIA_API_KEY_STAGING (aus .env)"
+echo "  - DOCKERHUB_TOKEN (Docker Hub Access Token)"
+echo ""

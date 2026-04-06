@@ -23,18 +23,37 @@ n8n dient nun ausschließlich als **orchestrator für externe Kommunikation** (E
     - Lädt das fertig generierte PDF-Protokoll vom Backend herunter.
     - Sendet das PDF-Protokoll als E-Mail-Anhang an alle Teilnehmer via SMTP.
 
-### 3. Daily Reminders (`daily-reminders.json`)
+### 3. Audio Uploaded (`audio-uploaded.json`)
+- **Trigger**: Webhook vom Backend (`/webhook/audio-uploaded`), nachdem eine Meeting-Aufnahme zu MinIO/S3 hochgeladen wurde.
+- **Aktionen**:
+    - Startet die Transkriptions-Pipeline (Whisper/Mistral) mit der Audio-Datei.
+    -送往 Backend-Callback-URL nach Abschluss (`/api/v1/webhooks/transcription-complete`).
+
+### 4. Transcription Completed (`transcription-completed.json`)
+- **Trigger**: Webhook vom Backend (`/webhook/transcription-completed`), sobald die KI (Whisper/Mistral) das Protokoll fertiggestellt hat.
+- **Aktionen**:
+    - Ruft über die interne Backend-API (`/api/v1/reports/automation/...`) die finalen Meeting-Details ab.
+    - Lädt das fertig generierte PDF-Protokoll vom Backend herunter.
+    - Sendet das PDF-Protokoll als E-Mail-Anhang an alle Teilnehmer via SMTP.
+
+### 5. Daily Reminders (`daily-reminders.json`)
 - **Trigger**: Cron Schedule (Jeden Tag um 08:00 Uhr morgens).
 - **Aktionen**:
     - Ruft offene und überfällige Aufgaben (Action Items) vom Backend ab (`/api/v1/actions/pending`).
     - Sendet automatisierte WhatsApp-Erinnerungen via WhatsApp Business API.
     - Eskaliert überfällige Aufgaben per E-Mail an den Manager.
 
-### 4. User Invited (`user-invited.json`)
+### 6. User Invited (`user-invited.json`)
 - **Trigger**: Webhook vom Backend (`/webhook/user-invited`), wenn ein Admin ein neues Teammitglied einlädt.
 - **Aktionen**:
     - Empfängt flachen JSON-Payload (`email`, `full_name`, `company_name`, `activation_link`).
     - Sendet eine professionelle HTML-Willkommens-E-Mail inkl. Aktivierungslink via SMTP.
+
+### 7. Meeting Status Changed (`meeting-status-changed.json`)
+- **Trigger**: Webhook vom Backend (`/webhook/meeting-status-changed`), wenn sich der Meeting-Status ändert (geplant → in_progress → completed).
+- **Aktionen**:
+    - Sendet eine Status-Benachrichtigung an alle Teilnehmer (E-Mail).
+    - Unterschiedliche Templates für: in_progress ("Réunion démarrée"), completed ("Réunion terminée"), cancelled ("Réunion annulée").
 
 ## Setup & Aktivierung
 

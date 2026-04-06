@@ -1,0 +1,29 @@
+{
+  "name": "meeting-automation",
+  "version": "1.0.0",
+  "description": "Automated meeting transcription, PV generation, and action tracking system optimized for Tunisia/Maghreb markets.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://abatn: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@github.com/abatn/meeting-automation.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/abatn/meeting-automation/issues"
+  },
+  "homepage": "https://github.com/abatn/meeting-automation#readme",
+  "dependencies": {
+    "axios": "^1.14.0",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {}
+}

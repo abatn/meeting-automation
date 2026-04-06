@@ -374,7 +374,7 @@ Return ONLY a JSON array of objects with the following structure:
                 meeting_id=suggestion.meeting_id,
                 title=suggestion.title,
                 description=suggestion.description,
-                status="pending",
+                status="PENDING",
                 priority="medium"
             )
             self.db.add(new_action)
