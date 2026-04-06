@@ -1,0 +1,76 @@
+{
+  "name": "Meeting Status Changed Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "meeting-status-changed",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "meeting-status-changed-webhook-id"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nconst status = body.status || '';\nconst previousStatus = body.previous_status || '';\nconst meetingTitle = body.title || 'Meeting';\nconst attendees = body.attendees || [];\nconst startTime = body.start_time ? new Date(body.start_time).toLocaleString('fr-FR', { timeZone: 'Africa/Tunis' }) : 'N/A';\n\nconst statusLabels = {\n  planned: 'Planifié',\n  in_progress: 'En cours',\n  completed: 'Terminé',\n  cancelled: 'Annulé'\n};\n\nconst statusLabel = statusLabels[status] || status;\nconst previousStatusLabel = statusLabels[previousStatus] || previousStatus;\n\nconst subjectMap = {\n  in_progress: `📢 Réunion démarrée : ${meetingTitle}`,\n  completed: `✅ Réunion terminée : ${meetingTitle}`,\n  cancelled: `❌ Réunion annulée : ${meetingTitle}`\n};\n\nconst subject = subjectMap[status] || `Mise à jour de réunion : ${meetingTitle} (${previousStatusLabel} → ${statusLabel})`;\n\nconst htmlBody = `\n<html><body>\n  <h2>${subject}</h2>\n  <p>Le statut de la réunion <b>${meetingTitle}</b> a changé :</p>\n  <table style=\"border-collapse:collapse;\">\n    <tr><td style=\"padding:4px 12px;\"><b>Statut précédent</b></td><td style=\"padding:4px 12px;\">${previousStatusLabel}</td></tr>\n    <tr><td style=\"padding:4px 12px;\"><b>Nouveau statut</b></td><td style=\"padding:4px 12px;\">${statusLabel}</td></tr>\n    <tr><td style=\"padding:4px 12px;\"><b>Heure de début</b></td><td style=\"padding:4px 12px;\">${startTime}</td></tr>\n  </table>\n  <p style=\"margin-top:16px;\">Connectez-vous à la plateforme pour plus de détails.</p>\n</body></html>\n`;\n\nreturn attendees.map(email => ({\n  json: {\n    toEmail: email,\n    subject: subject,\n    html: htmlBody\n  }\n}));"
+      },
+      "id": "prepare-emails-node",
+      "name": "Prepare Emails",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "no-reply@meeting.tn",
+        "toEmail": "={{$json.toEmail}}",
+        "subject": "={{$json.subject}}",
+        "text": "",
+        "html": "={{$json.html}}",
+        "options": {}
+      },
+      "id": "send-email-node",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "credentials": {
+        "smtp": {
+          "id": "eHaPFftWKgcTTXQc",
+          "name": "SMTP Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Emails": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {}
+}
