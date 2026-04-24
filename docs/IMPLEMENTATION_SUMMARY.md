@@ -378,9 +378,10 @@ docker-compose exec postgres psql -U meeting_user -d meeting_db \
 PUBLIC_BACKEND_URL=http://localhost:8000  # neu hinzugefügt
 N8N_WEBHOOK_MEETING_STATUS_CHANGED=http://n8n:5678/webhook/meeting-status-changed  # neu
 N8N_WEBHOOK_URL=http://n8n:5678/webhook
-N8N_WEBHOOK_MEETING_CREATED=http://n8n:5678/webhook/2/webhook/meeting-created
+N8N_WEBHOOK_MEETING_CREATED=http://n8n:5678/webhook/meeting-created
 N8N_WEBHOOK_AUDIO_UPLOADED=http://n8n:5678/webhook/audio-uploaded
-N8N_WEBHOOK_TRANSCRIPTION_COMPLETED=http://n8n:5678/webhook/3/webhook/transcription-completed
+N8N_WEBHOOK_TRANSCRIPTION_COMPLETED=http://n8n:5678/webhook/transcription-completed
+N8N_WEBHOOK_DAILY_REMINDER=http://n8n:5678/webhook/daily-reminders
 # ... andere
 ```
 
@@ -397,32 +398,7 @@ N8N_WEBHOOK_TRANSCRIPTION_COMPLETED=http://n8n:5678/webhook/3/webhook/transcript
 
 ## n8n Workflows anlegen
 
-**Workflow `meeting-status-changed`** fehlt noch! Muss in n8n erstellt werden:
-
-```json
-{
-  "name": "Meeting Status Changed Automation",
-  "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "meeting-status-changed",
-        "options": {}
-      },
-      "id": "webhook",
-      "name": "Webhook",
-      "type": "n8n-nodes-base.webhook"
-    },
-    {
-      "parameters": {
-        "fromEmail": "noreply@meeting-automation.tn",
-        "toEmail": "={{$node[\"Webhook\"].json[\"body\"][\"attendees\"].join(',')}}",
-        "subject": "=Meeting Update: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}}",
-        "text": "=Status changed: {{$node[\"Webhook\"].json[\"body\"][\"previous_status\"]}} -> {{$node[\"Webhook\"].json[\"body\"][\"status\"]}}",
-        "options": {}
-      },
-      "id": "send-email",
-      "name": "Send Status Update",
+**Workflow `meeting-status-changed`** muss in n8n erstellt werden mit dem Pfad `meeting-status-changed`.
       "type": "n8n-nodes-base.emailSend",
       "credentials": { "smtp": { "id": "...", "name": "SMTP account" } }
     }

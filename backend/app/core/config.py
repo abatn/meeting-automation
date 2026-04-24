@@ -53,14 +53,13 @@ class Settings(BaseSettings):
 
     # n8n
     N8N_WEBHOOK_URL: str = "http://n8n:5678/webhook"
-    N8N_WEBHOOK_MEETING_CREATED: str = "http://n8n:5678/webhook/2/webhook/meeting-created"
+    N8N_WEBHOOK_USER_INVITED: str = "http://n8n:5678/webhook/user-invited"
+    N8N_WEBHOOK_MEETING_CREATED: str = "http://n8n:5678/webhook/meeting-created"
     N8N_WEBHOOK_MEETING_STATUS_CHANGED: str = "http://n8n:5678/webhook/meeting-status-changed"
     N8N_WEBHOOK_AUDIO_UPLOADED: str = "http://n8n:5678/webhook/audio-uploaded"
     N8N_WEBHOOK_PV_VALIDATED: str = "http://n8n:5678/webhook/pv-validated"
-    N8N_WEBHOOK_DAILY_REMINDER: str = "http://n8n:5678/webhook/4/webhook/daily-reminders"
-    N8N_WEBHOOK_TRANSCRIPTION_COMPLETED: str = (
-        "http://n8n:5678/webhook/3/webhook/transcription-completed"
-    )
+    N8N_WEBHOOK_DAILY_REMINDER: str = "http://n8n:5678/webhook/daily-reminders"
+    N8N_WEBHOOK_TRANSCRIPTION_COMPLETED: str = "http://n8n:5678/webhook/transcription-completed"
 
     # Security
     INTERNAL_API_SECRET: str = "super-secret-automation-key-2026"

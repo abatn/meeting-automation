@@ -162,6 +162,7 @@ services:
       - S3_SECRET_KEY=minio_password
       - ONLYOFFICE_SECRET=${ONLYOFFICE_SECRET:-super_secret_jwt_key_onlyoffice_2026}
       - ONLYOFFICE_URL=${ONLYOFFICE_URL:-http://localhost:8080}
+      - N8N_WEBHOOK_MEETING_CREATED=http://n8n:5678/webhook/meeting-created
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
       - INTERNAL_API_SECRET=test-internal-api-secret-key-2026

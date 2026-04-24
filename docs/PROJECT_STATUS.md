@@ -132,10 +132,10 @@ Diese Phase finalisiert die Plattform für den kommerziellen Betrieb.
 Diese Phase konzentriert sich auf den stabilen Betrieb unter Last, die Benutzererfahrung und detailliertes Monitoring.
 
 - [x] **Automation & Notification Pipelines**:
-  - [x] **Meeting Invitation**: Backend webhook synchronisiert, n8n Workflow (ID 2) importiert und aktiv.
-  - [x] **Transcription Notification**: Fehlende Backend-Endpunkte für n8n-Details und PDF-Download implementiert. Workflow (ID 3) importiert und aktiv.
-  - [x] **Daily Reminders**: Backend-Endpunkt `/actions/pending` mit Zuweisern und Manager-Kontaktdaten angereichert. Workflow (ID 4) importiert und aktiv.
-  - [x] **Meeting Status Changed**: Webhook `/webhook/meeting-status-changed` sendet Status-Benachrichtigungen an Teilnehmer. Workflow aktiviert.
+   - [x] **Meeting Invitation**: Backend webhook `/webhook/meeting-created` synchronisiert, n8n Workflow aktiv.
+   - [x] **Transcription Notification**: Backend-Endpunkte für n8n-Details und PDF-Download implementiert. Workflow `/webhook/transcription-completed` aktiv.
+   - [x] **Daily Reminders**: Backend-Endpunkt `/actions/pending` mit Zuweisern und Manager-Kontaktdaten angereichert. Workflow `/webhook/daily-reminders` aktiv.
+   - [x] **Meeting Status Changed**: Webhook `/webhook/meeting-status-changed` sendet Status-Benachrichtigungen an Teilnehmer. Workflow aktiviert.
   - [x] **Konnektivität**: Alle 4 Webhooks + 1 Cron getestet (HTTP 200 Response). SMTP/WhatsApp-Credentials in n8n-UI erforderlich.
 - [x] **Erweitertes Monitoring & System-Telemetrie**:
   - **Container-Ebene**: CPU/RAM pro Service (Frontend, Backend, Celery), Disk I/O (MinIO, PostgreSQL), Uptime.

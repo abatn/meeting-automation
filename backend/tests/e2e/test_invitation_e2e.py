@@ -18,7 +18,6 @@ import secrets
 from app.models.user import User, UserStatus, ActivationToken
 from app.models.client import Client, SubscriptionStatus
 from app.core.security import get_password_hash, verify_password
-from app.utils.token_utils import hash_token
 
 
 @pytest.mark.asyncio
@@ -51,13 +50,12 @@ class TestInvitationE2E:
 
         # Create activation token
         plaintext_token = secrets.token_urlsafe(32)
-        token_hash = hash_token(plaintext_token)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
 
         activation_token = ActivationToken(
             id=str(uuid.uuid4()),
             user_id=new_user_id,
-            token_hash=token_hash,
+            token=plaintext_token,
             expires_at=expires_at,
         )
         db_session.add(activation_token)
@@ -138,13 +136,12 @@ class TestInvitationE2E:
 
         # Create EXPIRED token (already past expiry)
         plaintext_token = secrets.token_urlsafe(32)
-        token_hash = hash_token(plaintext_token)
-        expires_at = datetime.now(timezone.utc) - timedelta(hours=1)  # 1 hour ago
+        expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
 
         expired_token = ActivationToken(
             id=str(uuid.uuid4()),
             user_id=expired_user_id,
-            token_hash=token_hash,
+            token=plaintext_token,
             expires_at=expires_at,
         )
         db_session.add(expired_token)
@@ -210,13 +207,12 @@ class TestInvitationE2E:
         await db_session.flush()
 
         plaintext_token = secrets.token_urlsafe(32)
-        token_hash = hash_token(plaintext_token)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
 
         activation_token = ActivationToken(
             id=str(uuid.uuid4()),
             user_id=user_id,
-            token_hash=token_hash,
+            token=plaintext_token,
             expires_at=expires_at,
         )
         db_session.add(activation_token)
