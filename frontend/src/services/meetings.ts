@@ -73,6 +73,11 @@ export const meetingsApi = {
     return response.data;
   },
 
+  getRecordingStatus: async (meetingId: string) => {
+    const response = await api.get(`/meetings/${meetingId}/recording-status`);
+    return response.data;
+  },
+
   getTranscription: async (meetingId: string) => {
     const response = await api.get(`/transcriptions/meeting/${meetingId}`);
     return response.data;

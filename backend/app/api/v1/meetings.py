@@ -1,18 +1,28 @@
 from typing import Any, List
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from pydantic import BaseModel
 
 from app.api import deps
 from app.models.meeting import Meeting as MeetingModel
 from app.models.meeting import Participant as ParticipantModel
+from app.models.recording import Recording as RecordingModel
 from app.models.user import User as UserModel
 from app.models.user import UserRole, UserStatus
 from app.schemas.meeting import Meeting, MeetingCreate, MeetingWithPV
 from app.schemas.user import User
 from app.services.meeting_service import MeetingService
+
+
+class RecordingStatus(BaseModel):
+    """Recording status with real-time duration calculation"""
+    is_recording: bool
+    recording_duration: int  # Duration in seconds
+    recording_id: str | None = None
 
 router = APIRouter()
 
@@ -155,6 +165,57 @@ async def get_meeting(
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
     return meeting
+
+
+@router.get("/{meeting_id}/recording-status", response_model=RecordingStatus)
+async def get_recording_status(
+    meeting_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Get recording status with real-time duration calculation.
+    This endpoint allows all participants to see the same recording duration
+    synchronized from the server.
+    """
+    # Verify meeting belongs to current client
+    result = await db.execute(
+        select(MeetingModel).where(
+            MeetingModel.id == meeting_id,
+            MeetingModel.client_id == current_user.client_id,
+        )
+    )
+    meeting = result.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    # Get the active recording for this meeting
+    recording_result = await db.execute(
+        select(RecordingModel).where(
+            RecordingModel.meeting_id == meeting_id,
+            RecordingModel.client_id == current_user.client_id,
+            RecordingModel.status == "recording",
+        )
+    )
+    recording = recording_result.scalar_one_or_none()
+
+    if not recording:
+        # No active recording
+        return RecordingStatus(
+            is_recording=False,
+            recording_duration=0,
+            recording_id=None,
+        )
+
+    # Calculate duration from creation time
+    now = datetime.now(timezone.utc)
+    duration_seconds = int((now - recording.created_at).total_seconds())
+
+    return RecordingStatus(
+        is_recording=True,
+        recording_duration=duration_seconds,
+        recording_id=recording.id,
+    )
 
 
 @router.patch("/{meeting_id}/cancel", response_model=Meeting)

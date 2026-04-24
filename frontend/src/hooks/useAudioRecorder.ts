@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { meetingsApi } from "../services/meetings";
 
 interface UseAudioRecorderReturn {
@@ -20,6 +20,7 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
 
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const timerInterval = useRef<number | null>(null);
+  const currentMeetingId = useRef<string | null>(null);
 
   // Streaming state
   const uploadIdRef = useRef<string | null>(null);
@@ -72,6 +73,8 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
     async (meetingId: string) => {
       try {
         isStoppingRef.current = false;
+        currentMeetingId.current = meetingId;
+
         // 1. Start capturing audio
         let stream;
         try {
@@ -119,8 +122,14 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
         setDuration(0);
         setError(null);
 
-        timerInterval.current = window.setInterval(() => {
-          setDuration((prev) => prev + 1);
+        // Poll backend for recording duration (synchronized across all participants)
+        timerInterval.current = window.setInterval(async () => {
+          try {
+            const statusResponse = await meetingsApi.getRecordingStatus(meetingId);
+            setDuration(statusResponse.recording_duration);
+          } catch (err) {
+            console.error("Failed to fetch recording status:", err);
+          }
         }, 1000);
       } catch (err) {
         setError("An unexpected error occurred while starting the recording.");
@@ -144,9 +153,18 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
     if (mediaRecorder.current && isRecording && isPaused) {
       mediaRecorder.current.resume();
       setIsPaused(false);
-      timerInterval.current = window.setInterval(() => {
-        setDuration((prev) => prev + 1);
-      }, 1000);
+
+      // Resume backend polling for recording duration
+      if (currentMeetingId.current) {
+        timerInterval.current = window.setInterval(async () => {
+          try {
+            const statusResponse = await meetingsApi.getRecordingStatus(currentMeetingId.current!);
+            setDuration(statusResponse.recording_duration);
+          } catch (err) {
+            console.error("Failed to fetch recording status:", err);
+          }
+        }, 1000);
+      }
     }
   }, [isRecording, isPaused]);
 

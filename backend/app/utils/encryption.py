@@ -6,11 +6,12 @@ from app.core.config import settings
 def get_fernet() -> Fernet:
     """
     Get a Fernet instance using the configured encryption key.
-    The key must be a 32-byte key, which we then base64-encode.
+    Settings.ENCRYPTION_KEY should be a valid base64-encoded Fernet key (44 chars).
     """
-    # Fernet requires a base64 encoded 32-byte key.
-    # We take our 32 bytes from settings and encode them.
-    key = base64.urlsafe_b64encode(settings.ENCRYPTION_KEY)
+    key = settings.ENCRYPTION_KEY
+    # If it's bytes (from Pydantic env variable), convert to string for Fernet
+    if isinstance(key, bytes):
+        key = key.decode('utf-8')
     return Fernet(key)
 
 
