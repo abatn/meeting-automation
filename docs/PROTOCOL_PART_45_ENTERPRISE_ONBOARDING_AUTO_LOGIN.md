@@ -294,10 +294,23 @@ Umgebung: E2E_TEST=true (echte PostgreSQL/Redis)
 ## 📊 ÄNDERUNGEN SUMMARY
 
 ### Backend
-- **1 File:** `backend/app/api/v1/auth.py`
-  - `/activate/confirm` Endpoint: `response_model=Token` 
-  - Gibt JWT + User-Daten zurück (statt nur Nachricht)
-  - Sichert selectinload für User.roles
+- **3 Files:**
+  1. `backend/app/api/v1/auth.py`
+     - `/activate/confirm` Endpoint: `response_model=Token` 
+     - Gibt JWT + User-Daten zurück (statt nur Nachricht)
+     - Sichert selectinload für User.roles
+  
+  2. `backend/app/utils/token_utils.py` ✨ NEW
+     - `hash_token()`: SHA-256 secure token storage
+     - `verify_token()`: Supports hash + legacy plaintext tokens
+     - One-time-use token guarantee
+  
+  3. `backend/app/utils/rate_limit.py` ✨ NEW
+     - Rate limiting decorator für Auth-Endpoints
+     - `/activate/verify`: 5 requests/60s
+     - `/activate/confirm`: 5 requests/60s
+     - `/login`: 10 requests/60s
+     - Brute-force & token enumeration protection
 
 ### Frontend  
 - **2 Files:**
@@ -316,6 +329,7 @@ Umgebung: E2E_TEST=true (echte PostgreSQL/Redis)
   - Alle `client.*` Calls mit `await` versehen (async fix)
   - `test_complete_invitation_flow`: JWT-Response assertions
   - `test_double_activation_prevented`: Rate-limit-safe (429 oder 400)
+  - **All 5 Tests PASSED** ✅ (nach Rate-Limit Reset)
 
 ---
 
