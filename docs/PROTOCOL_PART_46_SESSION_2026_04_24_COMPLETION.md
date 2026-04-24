@@ -297,6 +297,50 @@ Ready for: Staging/Prod Deployment
 
 ---
 
+## 🔧 NEUE ÄNDERUNGEN: N8N WEBHOOK FIX (2026-04-24)
+
+### Problem
+- BackendConfig enthielt falsche Webhook URLs mit Prefix `2`:
+  - `http://n8n:5678/webhook/2/webhook/meeting-created`
+  - statt korrekt: `http://n8n:5678/webhook/meeting-created`
+- n8n WorkflowID "2" aus DB gelöscht → Webhook nicht registriert
+- HTTP 404 Fehler bei Meeting-Erstellung
+
+### Lösung
+1. **config.py aktualisiert** (`backend/app/core/config.py`):
+   - `N8N_WEBHOOK_MEETING_CREATED`: `/webhook/2/...` → `/webhook/meeting-created`
+   - `N8N_WEBHOOK_DAILY_REMINDER`: `/webhook/4/...` → `/webhook/daily-reminders`
+   - `N8N_WEBHOOK_TRANSCRIPTION_COMPLETED`: `/webhook/3/...` → `/webhook/transcription-completed`
+
+2. **docker-compose.yml** (`docker-compose.yml:164`):
+   - Environment Variable hinzugefügt:
+     ```yaml
+     - N8N_WEBHOOK_MEETING_CREATED=http://n8n:5678/webhook/meeting-created
+     ```
+
+### Verifizierung
+```bash
+# Container Neustart
+docker-compose up -d backend
+
+# Config Check
+docker-compose exec backend python -c "from app.core.config import settings; print(settings.N8N_WEBHOOK_MEETING_CREATED)"
+# Output: http://n8n:5678/webhook/meeting-created ✅
+
+# Webhook Test
+curl -X POST http://localhost:5678/webhook/meeting-created \
+  -H "Content-Type: application/json" \
+  -d '{"id":"test-final","title":"Final Test","start_time":"2026-04-24T18:00:00Z","attendees":["final@example.com"]}'
+# Output: {"message":"Workflow was started"} ✅
+```
+
+### Database Status
+- Workflow `cLkxoD9stPULq428` ist aktiv
+- Webhook Pfad `meeting-created` korrekt gemapped
+- Execution: status=success ✅
+
+---
+
 ## ✨ FAZIT
 
 Die **Enterprise Onboarding Workflow** ist jetzt vollständig professionalisiert mit:

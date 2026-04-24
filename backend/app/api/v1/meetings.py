@@ -194,7 +194,7 @@ async def get_recording_status(
         select(RecordingModel).where(
             RecordingModel.meeting_id == meeting_id,
             RecordingModel.client_id == current_user.client_id,
-            RecordingModel.status == "recording",
+            RecordingModel.status.in_(["recording", "streaming"]),
         )
     )
     recording = recording_result.scalar_one_or_none()

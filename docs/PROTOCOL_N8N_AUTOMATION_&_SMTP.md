@@ -89,5 +89,15 @@ N8N_WEBHOOK_TRANSCRIPTION_COMPLETED=http://n8n:5678/webhook/3/webhook/transcript
 - [ ] E2E-Test: Komplette Pipeline von Meeting-Erstellung bis PV-Export validieren.
 - [ ] Staging: `PUBLIC_BACKEND_URL` auf externe URL setzen (nicht `localhost`).
 
+### 10. owner_id → creator_id Bugfix (24.04.2026)
+- **Problem:** n8n `meeting-created` Workflow speicherte keine Daten in `n8n_meetings` Tabelle. Backend-Log zeigte erfolgreichen Webhook-Call, aber kein Eintrag in der DB.
+- **Ursache:** `meeting_service.py` (Zeile 168) referenzierte `meeting.owner_id`, aber das Meeting-Modell hat stattdessen `meeting.creator_id`.
+- **Fix:**
+  - Datei: `backend/app/services/meeting_service.py`
+  - Änderung: `meeting.owner_id` → `meeting.creator_id`
+- **Verifizierung:** Full E2E-Test erfolgreich – Meeting erstellt → Webhook getriggert → n8n speichert in DB → Email versendet.
+- **Workflow ID:** 2 (aktiviert via n8n UI)
+- **Hinweis:** Für Debugging n8n UI nutzen (`http://localhost:5678`), nicht CLI/DB-Queries.
+
 ---
 *Hinweis: Dieses Dokument fasst die Protokolle ehemals PART 11 (Teile), PART 14 und PART 16 zusammen.*

@@ -11,7 +11,7 @@ import {
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "../store";
-import { setCredentials } from "../store/authSlice";
+import { setCredentials, logout } from "../store/authSlice";
 import axios from "axios";
 
 const ActivationPage: React.FC = () => {
@@ -36,6 +36,10 @@ const ActivationPage: React.FC = () => {
         setLoading(false);
         return;
       }
+
+      // Clear any existing session so the invited user can activate their account
+      dispatch(logout());
+      
       try {
         const response = await axios.get(`/api/v1/auth/activate/verify?token=${token}`);
         setEmail(response.data.email);
@@ -47,7 +51,7 @@ const ActivationPage: React.FC = () => {
     };
 
     verifyToken();
-  }, [token]);
+  }, [token, dispatch]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

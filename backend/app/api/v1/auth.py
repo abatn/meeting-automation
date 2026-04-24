@@ -19,7 +19,6 @@ from app.models.team import TeamMember
 from app.schemas.user import User, UserCreate, Token, ActivationConfirm
 from app.services.auth_service import AuthService
 from app.services.audit_service import AuditService
-from app.utils.token_utils import hash_token, verify_token
 from app.utils.rate_limit import create_rate_limiter
 from app.tasks.email_tasks import send_invitation_email
 from datetime import timezone
@@ -40,28 +39,16 @@ async def verify_activation_token(
     _: None = Depends(activate_verify_limiter),
 ) -> Any:
     """Verifies an activation token."""
-    # First try to find by token_hash (new tokens stored as hash)
-    token_hash = hash_token(token)
     stmt = select(ActivationToken).where(
-        ActivationToken.token_hash == token_hash
+        ActivationToken.token == token
     ).options(selectinload(ActivationToken.user))
     res = await db.execute(stmt)
     token_obj = res.scalar_one_or_none()
 
-    # Fallback to plaintext token for backward compatibility with old tokens
-    if not token_obj:
-        stmt = select(ActivationToken).where(
-            ActivationToken.token == token
-        ).options(selectinload(ActivationToken.user))
-        res = await db.execute(stmt)
-        token_obj = res.scalar_one_or_none()
-
     if not token_obj:
         raise HTTPException(status_code=400, detail="Invalid activation token")
 
-    # Python 3.11 datetime.now(timezone.utc)
     now = datetime.now(timezone.utc)
-    # Ensure timezone awareness comparison
     expires_at = token_obj.expires_at
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
@@ -79,21 +66,11 @@ async def confirm_activation(
 ) -> Any:
     """Confirms user activation by setting a password and changing status to ACTIVE.
     Returns JWT token for automatic login after activation."""
-    # First try to find by token_hash (new tokens stored as hash)
-    token_hash = hash_token(body.token)
     stmt = select(ActivationToken).where(
-        ActivationToken.token_hash == token_hash
+        ActivationToken.token == body.token
     ).options(selectinload(ActivationToken.user).selectinload(UserModel.roles))
     res = await db.execute(stmt)
     token_obj = res.scalar_one_or_none()
-
-    # Fallback to plaintext token for backward compatibility with old tokens
-    if not token_obj:
-        stmt = select(ActivationToken).where(
-            ActivationToken.token == body.token
-        ).options(selectinload(ActivationToken.user).selectinload(UserModel.roles))
-        res = await db.execute(stmt)
-        token_obj = res.scalar_one_or_none()
 
     if not token_obj:
         raise HTTPException(status_code=400, detail="Invalid activation token")
@@ -110,11 +87,9 @@ async def confirm_activation(
     user.hashed_password = security.get_password_hash(body.new_password)
     user.status = UserStatus.ACTIVE.value
 
-    # Delete token
     await db.delete(token_obj)
     await db.commit()
 
-    # Generate JWT token for automatic login
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return {
         "access_token": security.create_access_token(
@@ -132,10 +107,6 @@ async def confirm_activation(
         },
     }
 
-
-import logging
-
-logger = logging.getLogger(__name__)
 
 @router.post("/login", response_model=Token)
 async def login(

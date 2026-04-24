@@ -11,6 +11,7 @@ from sqlalchemy.future import select
 from app.core.config import settings
 from app.models.meeting import Agenda, Meeting, Participant
 from app.schemas.meeting import MeetingCreate, MeetingUpdate
+from app.services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
 
@@ -132,8 +133,7 @@ class MeetingService:
         return list(result.scalars().all())
 
     async def _trigger_n8n_meeting_created(self, meeting: Meeting):
-        """Triggert n8n Webhook: meeting-created"""
-        # Create a simple list of attendee emails for the n8n node
+        """Triggert n8n Webhook: meeting-created (ISO 27001 A.12.4.1 Audit-Log)"""
         attendees = [p.email for p in meeting.participants]
 
         payload = {
@@ -144,7 +144,7 @@ class MeetingService:
             "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
             "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
             "status": meeting.status,
-            "attendees": attendees, # Fixed field for n8n email node
+            "attendees": attendees,
             "participants": [
                 {"id": p.id, "email": p.email, "name": p.name}
                 for p in meeting.participants
@@ -153,12 +153,34 @@ class MeetingService:
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    settings.N8N_WEBHOOK_MEETING_CREATED, json=payload, timeout=5.0
+                    settings.N8N_WEBHOOK_MEETING_CREATED, json=payload, timeout=10.0
                 )
                 response.raise_for_status()
-                logger.info(f"n8n meeting-created triggered for meeting {meeting.id}")
-        except Exception as e:
-            logger.error(f"Failed to trigger n8n meeting-created: {e}")
+                logger.info(
+                    f"n8n meeting-created triggered for meeting {meeting.id} "
+                    f"(status={response.status_code}, attendees={len(attendees)})"
+                )
+                # Audit-Log für erfolgreichen n8n-Call (ISO 27001 A.12.4.1)
+                await AuditService.log_action(
+                    self.db,
+                    client_id=meeting.client_id,
+                    action="N8N_MEETING_CREATED_TRIGGERED",
+                    user_id=meeting.creator_id,
+                    table_name="meetings",
+                    record_id=meeting.id,
+                    new_values={
+                        "n8n_webhook_url": settings.N8N_WEBHOOK_MEETING_CREATED,
+                        "attendee_count": len(attendees),
+                        "http_status": response.status_code,
+                    },
+                )
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"n8n meeting-created failed for meeting {meeting.id}: "
+                f"HTTP {e.response.status_code} — {e.response.text[:200]}"
+            )
+        except httpx.RequestError as e:
+            logger.error(f"n8n meeting-created connection error for meeting {meeting.id}: {e}")
 
     async def _trigger_n8n_meeting_status_change(self, meeting: Meeting, previous_status: str):
         """Triggert n8n Webhook für Statusänderungen"""
