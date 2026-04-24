@@ -27,6 +27,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Person as PersonIcon,
+  Refresh as RefreshIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { teamApi } from "../../services/team";
@@ -62,6 +63,14 @@ const TeamMembers: React.FC = () => {
 
   useEffect(() => {
     fetchMembers();
+
+    // Auto-refresh team members every 30 seconds to catch status changes
+    // (e.g., when user activates their account after invitation)
+    const refreshInterval = setInterval(() => {
+      fetchMembers();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(refreshInterval);
   }, []);
 
   const handleOpenDialog = (member?: any) => {
@@ -128,13 +137,24 @@ const TeamMembers: React.FC = () => {
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">{t('team.members_list')}</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          {t("team.add_member")}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={() => fetchMembers()}
+            disabled={loading}
+          >
+            {t("common.refresh") || "Refresh"}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            {t("team.add_member")}
+          </Button>
+        </Box>
       </Box>
 
       {loading ? (

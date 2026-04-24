@@ -9,12 +9,16 @@ import {
   Alert,
 } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "../store";
+import { setCredentials } from "../store/authSlice";
 import axios from "axios";
 
 const ActivationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,14 +64,24 @@ const ActivationPage: React.FC = () => {
     setError(null);
 
     try {
-      await axios.post("/api/v1/auth/activate/confirm", {
+      const response = await axios.post("/api/v1/auth/activate/confirm", {
         token: token,
         new_password: password,
       });
+
+      // Dispatch setCredentials to store JWT and user data (auto-login)
+      dispatch(setCredentials({
+        user: response.data.user,
+        access_token: response.data.access_token,
+        refresh_token: response.data.refresh_token,
+      }));
+
       setSuccess(true);
+
+      // Navigate to home dashboard (App.tsx will route based on role)
       setTimeout(() => {
-        navigate("/login");
-      }, 3000);
+        navigate("/");
+      }, 2000);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to activate account. Please try again.");
     } finally {
@@ -105,7 +119,7 @@ const ActivationPage: React.FC = () => {
           </Alert>
         ) : success ? (
           <Alert severity="success" sx={{ mb: 2 }}>
-            Account activated successfully! Redirecting to login...
+            Account activated successfully! Redirecting to your dashboard...
           </Alert>
         ) : (
           <>

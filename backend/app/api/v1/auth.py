@@ -19,68 +19,118 @@ from app.models.team import TeamMember
 from app.schemas.user import User, UserCreate, Token, ActivationConfirm
 from app.services.auth_service import AuthService
 from app.services.audit_service import AuditService
-from app.utils.webhook_utils import trigger_user_invited_webhook
+from app.utils.token_utils import hash_token, verify_token
+from app.utils.rate_limit import create_rate_limiter
+from app.tasks.email_tasks import send_invitation_email
 from datetime import timezone
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Rate limiters for auth endpoints
+activate_verify_limiter = create_rate_limiter("activate_verify", max_requests=5, time_window_seconds=60)
+activate_confirm_limiter = create_rate_limiter("activate_confirm", max_requests=5, time_window_seconds=60)
+login_limiter = create_rate_limiter("login", max_requests=10, time_window_seconds=60)
+
 @router.get("/activate/verify")
 async def verify_activation_token(
     token: str,
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
+    _: None = Depends(activate_verify_limiter),
 ) -> Any:
     """Verifies an activation token."""
-    stmt = select(ActivationToken).where(ActivationToken.token == token).options(selectinload(ActivationToken.user))
+    # First try to find by token_hash (new tokens stored as hash)
+    token_hash = hash_token(token)
+    stmt = select(ActivationToken).where(
+        ActivationToken.token_hash == token_hash
+    ).options(selectinload(ActivationToken.user))
     res = await db.execute(stmt)
     token_obj = res.scalar_one_or_none()
-    
+
+    # Fallback to plaintext token for backward compatibility with old tokens
+    if not token_obj:
+        stmt = select(ActivationToken).where(
+            ActivationToken.token == token
+        ).options(selectinload(ActivationToken.user))
+        res = await db.execute(stmt)
+        token_obj = res.scalar_one_or_none()
+
     if not token_obj:
         raise HTTPException(status_code=400, detail="Invalid activation token")
-    
+
     # Python 3.11 datetime.now(timezone.utc)
     now = datetime.now(timezone.utc)
     # Ensure timezone awareness comparison
     expires_at = token_obj.expires_at
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
-        
+
     if expires_at < now:
         raise HTTPException(status_code=400, detail="Activation token expired")
-        
+
     return {"email": token_obj.user.email}
 
-@router.post("/activate/confirm")
+@router.post("/activate/confirm", response_model=Token)
 async def confirm_activation(
     body: ActivationConfirm,
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
+    _: None = Depends(activate_confirm_limiter),
 ) -> Any:
-    """Confirms user activation by setting a password and changing status to ACTIVE."""
-    stmt = select(ActivationToken).where(ActivationToken.token == body.token).options(selectinload(ActivationToken.user))
+    """Confirms user activation by setting a password and changing status to ACTIVE.
+    Returns JWT token for automatic login after activation."""
+    # First try to find by token_hash (new tokens stored as hash)
+    token_hash = hash_token(body.token)
+    stmt = select(ActivationToken).where(
+        ActivationToken.token_hash == token_hash
+    ).options(selectinload(ActivationToken.user).selectinload(UserModel.roles))
     res = await db.execute(stmt)
     token_obj = res.scalar_one_or_none()
-    
+
+    # Fallback to plaintext token for backward compatibility with old tokens
+    if not token_obj:
+        stmt = select(ActivationToken).where(
+            ActivationToken.token == body.token
+        ).options(selectinload(ActivationToken.user).selectinload(UserModel.roles))
+        res = await db.execute(stmt)
+        token_obj = res.scalar_one_or_none()
+
     if not token_obj:
         raise HTTPException(status_code=400, detail="Invalid activation token")
-        
+
     now = datetime.now(timezone.utc)
     expires_at = token_obj.expires_at
     if expires_at.tzinfo is None:
          expires_at = expires_at.replace(tzinfo=timezone.utc)
-         
+
     if expires_at < now:
         raise HTTPException(status_code=400, detail="Activation token expired")
 
     user = token_obj.user
     user.hashed_password = security.get_password_hash(body.new_password)
     user.status = UserStatus.ACTIVE.value
-    
+
     # Delete token
     await db.delete(token_obj)
     await db.commit()
-    
-    return {"message": "User activated successfully"}
+
+    # Generate JWT token for automatic login
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    return {
+        "access_token": security.create_access_token(
+            {"sub": str(user.id), "client_id": str(user.client_id), "role": user.role},
+            expires_delta=access_token_expires
+        ),
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "client_id": user.client_id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+            "created_at": user.created_at,
+        },
+    }
 
 
 import logging
@@ -91,6 +141,7 @@ logger = logging.getLogger(__name__)
 async def login(
     db: AsyncSession = Depends(deps.get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
+    _: None = Depends(login_limiter),
 ) -> Any:
     # Debug logging without sensitive data
     logger.debug(f"Login attempt for user: {form_data.username}")
@@ -241,11 +292,14 @@ async def register(
 
     # 6. ActivationToken erstellen
     token = secrets.token_urlsafe(32)
-    expiration = datetime.now(timezone.utc) + timedelta(days=7)
+    # Token expires after 48 hours (Best Practice: 24-72 hours maximum for one-time-use tokens)
+    expiration = datetime.now(timezone.utc) + timedelta(hours=48)
+    # Store token hash instead of plaintext for security
+    token_hash = hash_token(token)
     activation_entry = ActivationToken(
         id=str(uuid.uuid4()),
         user_id=db_obj.id,
-        token=token,
+        token_hash=token_hash,
         expires_at=expiration
     )
     db.add(activation_entry)
@@ -275,18 +329,15 @@ async def register(
     await db.commit()
     await db.refresh(db_obj)
 
-    # 10. Webhook AUSSERHALB Transaction (nach Commit) – Background Task wäre besser
+    # 10. Enqueue invitation email task with automatic retries
     activation_link = f"{settings.FRONTEND_URL}/activate?token={token}"
-    try:
-        await trigger_user_invited_webhook(
-            email=db_obj.email,
-            full_name=db_obj.full_name or "Valued Customer",
-            company_name=client_obj.company_name,
-            activation_link=activation_link
-        )
-    except Exception as e:
-        logger.error(f"Failed to send activation webhook: {e}")
-        # Optional: Celery Task für Retry Queueen
+    send_invitation_email.delay(
+        email=db_obj.email,
+        full_name=db_obj.full_name or "Valued Customer",
+        company_name=client_obj.company_name,
+        activation_link=activation_link
+    )
+    logger.info(f"Enqueued invitation email task for {db_obj.email}")
 
     return User(
         id=db_obj.id,

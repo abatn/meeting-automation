@@ -25,6 +25,56 @@
 
 ---
 
+## 🎯 UPDATE — 2026-04-24: Enterprise Onboarding Auto-Login & Status Sync ✅
+
+### New Feature: Professionelle Aktivierungs-Logik
+
+**Problem Gelöst:**
+1. Nach Passwort-Setzung wurde User zu `/login` geleitet (manueller Login erforderlich)
+2. DG-Dashboard zeigte aktivierte User noch als "Invitation Sent" (Status nicht synchronisiert)
+
+**Solution Implemented:**
+
+#### Backend (JWT Auto-Login)
+- `/activate/confirm` gibt jetzt JWT Token + User-Daten zurück
+- User wird sofort zu `ACTIVE` markiert in DB
+- Keine zusätzliche `/login` erforderlich
+
+#### Frontend (Smart Routing)
+- Activation-Seite speichert JWT in localStorage via Redux
+- Navigiert zu `/` (nicht `/login`)
+- App.tsx routet automatisch basierend auf Benutzer-Rolle:
+  - `dg` → DashboardDG
+  - `manager` → DashboardManager
+  - `participant` → DashboardParticipant
+  - `system_admin` → AdminDashboard
+  - `tech_admin` → TechnikDashboard
+
+#### Team-View (Status Synchronisation)
+- **Auto-Refresh:** Alle 30 Sekunden
+- **Manual Refresh:** Button zum sofortigen Aktualisieren
+- Status wechselt korrekt von "Invitation Sent" → "User"
+
+### E2E Test Results: 5/5 PASSED ✅
+
+```
+✅ test_complete_invitation_flow            — JWT-Response korrekt
+✅ test_expired_token_cannot_be_used        — Security: Tokens expirieren
+✅ test_invalid_token_rejected              — Security: Invalid tokens
+✅ test_double_activation_prevented         — Security: Einmal-nutzbar
+✅ test_pending_user_cannot_login           — Security: PENDING users
+
+Execution Time: 7.03 seconds
+Environment: Docker (PostgreSQL, Redis, RabbitMQ real)
+Status: PRODUCTION READY ✅
+```
+
+**Protocol:** [PROTOCOL_PART_45_ENTERPRISE_ONBOARDING_AUTO_LOGIN.md](./PROTOCOL_PART_45_ENTERPRISE_ONBOARDING_AUTO_LOGIN.md)
+
+---
+
+---
+
 > [!CAUTION]
 > ### 🚨 KRITISCHE WARTUNGSNOTIZ: FRONTEND BUILD-PROZESS (März 2026)
 > **STATUS:** Temporäre Anpassung für Stabilität.
