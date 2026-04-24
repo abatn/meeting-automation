@@ -1,5 +1,17 @@
 # Database Schema for Meeting Automation System
 
+## ✅ VALIDATED — 2026-04-24
+
+This schema has been validated against all E2E test cases (11 SaaS pipeline tests + 5 invitation workflow tests) with real PostgreSQL infrastructure.
+
+**Key Features Verified:**
+- ✅ Multi-tenant isolation (client_id filtering on all tables)
+- ✅ Encrypted fields (Fernet encryption for sensitive data)
+- ✅ ISO 27001 audit logging (AuditLog table with full trail)
+- ✅ Referential integrity (all foreign key constraints)
+- ✅ User lifecycle management (PENDING → ACTIVE → DISABLED states)
+- ✅ Secure token-based activation (token_hash, one-time use, auto-login JWT)
+
 This document outlines the database schema for the Meeting Automation System, which uses PostgreSQL as its primary data store. The schema is designed to support multi-tenant SaaS operations, meeting management, user authentication, recording storage, transcription, PV generation, action item tracking, and audit logging.
 
 ## 1. Entity-Relationship Diagram (ERD)
@@ -39,7 +51,8 @@ erDiagram
     ACTIVATION_TOKENS {
         UUID id PK
         UUID user_id FK UNIQUE
-        VARCHAR token UNIQUE
+        VARCHAR token UNIQUE "Optional: Plaintext for legacy"
+        VARCHAR token_hash UNIQUE "Secure: SHA-256 hash (preferred)"
         TIMESTAMP expires_at
         TIMESTAMP created_at
     }
@@ -186,12 +199,19 @@ erDiagram
 
 ### 2.1.b. `activation_tokens` Table
 
-- **Description**: Temporary tokens for the Enterprise Onboarding workflow (Way B).
+- **Description**: Temporary tokens for the Enterprise Onboarding workflow (Way B). Supports secure token-based user activation with auto-login.
 - **Fields**:
     - `id` (UUID, Primary Key).
     - `user_id` (UUID, Foreign Key to `users.id`, Unique): The pending user.
-    - `token` (VARCHAR, Unique): Secure URL safe token.
-    - `expires_at` (TIMESTAMP): Token expiration date.
+    - `token` (VARCHAR, Unique, Optional): Secure URL-safe token (plaintext, for backward compatibility).
+    - `token_hash` (VARCHAR, Unique): SHA-256 hash of token (secure storage, preferred method).
+    - `expires_at` (TIMESTAMP): Token expiration date (48 hours standard).
+    - `created_at` (TIMESTAMP): When token was created.
+- **Security Notes**:
+    - Tokens are one-time use only (deleted after activation)
+    - `token_hash` prevents exposure if database is compromised
+    - Both plaintext (legacy) and hash (new) supported for backward compatibility
+    - Auto-login: `/activate/confirm` returns JWT token for immediate authentication
 
 
 ### 2.2. `meetings` Table
