@@ -38,7 +38,6 @@ dist/
 .aider*
 clinerules.md
 
-
 # Database
 *.db
 *.sqlite
@@ -79,10 +78,22 @@ secrets/
 gha-creds-*.json
 *.gguf
 backend/celerybeat-schedule
-#tmp
+
+# Temp files
+tmp/
 .continue/
 docs/CONTAINER_LOGS_ANALYSIS.md
 mini-assistant.py
 task.txt
 test.md
+
+# Runtime data
 data/
+
+# Python cache
+*.pyc
+.pytest_cache/
+
+# Virtual environments
+venv/
+backend/venv/
