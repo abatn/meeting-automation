@@ -90,3 +90,8 @@ test.md
 
 data/
 >>>>>>> origin/fix/p1-critical-issues-20260405
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+backend/venv/
