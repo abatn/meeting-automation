@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.api import deps
 from app.models.user import User as UserModel
 from app.models.recording import Recording as RecordingModel
+from app.models.meeting import Meeting as MeetingModel
 from app.schemas.recording import (
     Recording,
     StreamStartResponse,
@@ -51,7 +52,18 @@ async def start_stream(
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
 ):
-    """Start a chunked audio stream upload."""
+    """Start a chunked audio stream upload. Only meeting creator can start recording."""
+    result = await db.execute(
+        select(MeetingModel)
+        .where(MeetingModel.id == meeting_id)
+        .where(MeetingModel.client_id == current_user.client_id)
+    )
+    meeting = result.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    if meeting.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only meeting creator can start recording")
+    
     service = RecordingService(db)
     result = await service.start_stream(meeting_id, current_user.client_id)
     return StreamStartResponse(**result)
@@ -82,7 +94,26 @@ async def stop_stream(
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
 ):
-    """Stop the stream and complete the upload."""
+    """Stop the stream and complete the upload. Only meeting creator can stop recording."""
+    result = await db.execute(
+        select(RecordingModel)
+        .where(RecordingModel.id == recording_id)
+        .where(RecordingModel.client_id == current_user.client_id)
+    )
+    recording = result.scalar_one_or_none()
+    if not recording:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    
+    result = await db.execute(
+        select(MeetingModel)
+        .where(MeetingModel.id == recording.meeting_id)
+    )
+    meeting = result.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    if meeting.creator_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only meeting creator can stop recording")
+    
     service = RecordingService(db)
     parts = [{"PartNumber": p.PartNumber, "ETag": p.ETag} for p in request.parts]
     return await service.stop_stream(recording_id, current_user.client_id, file_key, upload_id, parts)
