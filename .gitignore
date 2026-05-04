@@ -87,11 +87,13 @@ mini-assistant.py
 task.txt
 test.md
 
-# Runtime data (IMPORTANT)
+# Runtime data
 data/
 
 # Python cache
+*.pyc
 .pytest_cache/
 
 # Virtual environments
+venv/
 backend/venv/
