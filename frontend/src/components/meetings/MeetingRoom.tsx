@@ -25,7 +25,9 @@ import AudioRecorder from "./AudioRecorder";
 import TranscriptionViewer from "./TranscriptionViewer";
 import PVValidator from "./PVValidator";
 import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
 import api from "../../services/api";
+import { RootState } from "../../store";
 
 interface ActionSuggestion {
   id: string;
@@ -42,27 +44,34 @@ const MeetingRoom: React.FC = () => {
   const [suggestions, setSuggestions] = useState<ActionSuggestion[]>([]);
   const [exportLanguage, setExportLanguage] = useState<string>(i18n.language.split('-')[0] || "fr");
   const [translating, setTranslating] = useState(false);
+  const [meetingCreatorId, setMeetingCreatorId] = useState<string>("");
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+  const isCreator = currentUser?.id === meetingCreatorId;
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !currentUser) return;
     
-    const fetchSuggestions = async () => {
+    const fetchMeetingAndSuggestions = async () => {
       try {
+        const meetingRes = await api.get(`/meetings/${id}`);
+        const meeting = meetingRes.data;
+        setMeetingCreatorId(meeting.creator_id || "");
+        
         const lang = i18n.language.split('-')[0] || "fr";
         const suggestionsRes = await api.get(`/actions/suggestions/${id}?lang=${lang}`);
         if (suggestionsRes.data) {
           setSuggestions(suggestionsRes.data.filter((s: ActionSuggestion) => s.status.toLowerCase() === "suggested"));
         }
       } catch (err) {
-        console.error("Failed to fetch action suggestions", err);
+        console.error("Failed to fetch meeting or suggestions", err);
       }
     };
 
-    fetchSuggestions();
-    const interval = setInterval(fetchSuggestions, 30000); // Polling suggestions less frequently
+    fetchMeetingAndSuggestions();
+    const interval = setInterval(fetchMeetingAndSuggestions, 30000);
 
     return () => clearInterval(interval);
-  }, [id, i18n.language]);
+  }, [id, i18n.language, currentUser, meetingCreatorId]);
 
   const handleSuggestionFeedback = async (suggestionId: string, action: "accept" | "reject") => {
     try {
@@ -101,6 +110,7 @@ const MeetingRoom: React.FC = () => {
             <Box>
               <AudioRecorder
                 meetingId={id!}
+                isCreator={isCreator}
                 onUploadSuccess={() => setActiveTab(1)}
               />
             </Box>

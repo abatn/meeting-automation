@@ -1,0 +1,122 @@
+{
+  "id": "5",
+  "name": "PV Validated Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pv-validated",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "pv-validated-webhook-id"
+    },
+    {
+      "parameters": {
+        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/meeting/{{$json.body.meeting_id}}",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-API-Key",
+              "value": "super-secret-automation-key-2026"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-meeting-details-node",
+      "name": "Get Meeting Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/pdf/{{$('Webhook').item.json.body.meeting_id}}",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-API-Key",
+              "value": "super-secret-automation-key-2026"
+            }
+          ]
+        },
+        "responseFormat": "file",
+        "options": {}
+      },
+      "id": "download-pdf-node",
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [670, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "no-reply@meeting.tn",
+        "toEmail": "={{$('Get Meeting Details').item.json.attendees.join(',')}}",
+        "subject": "=✅ Protokoll freigegeben: {{$('Get Meeting Details').item.json.title}}",
+        "text": "",
+        "html": "=<html><body><h2>Protokoll freigegeben</h2><p>Das Protokoll für die Sitzung <b>{{$('Get Meeting Details').item.json.title}}</b> wurde offiziell validiert und freigegeben.</p><p>Das finale Protokoll-PDF finden Sie im Anhang dieser E-Mail.</p><p style=\"margin-top:16px;\">Mit freundlichen Grüßen,<br>Ihr Meeting-Assistent</p></body></html>",
+        "attachments": "data",
+        "options": {}
+      },
+      "id": "send-email-node",
+      "name": "Send Email with PDF",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [900, 300],
+      "credentials": {
+        "smtp": {
+          "id": "eHaPFftWKgcTTXQc",
+          "name": "SMTP Account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting Details": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Send Email with PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {}
+}

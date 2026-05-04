@@ -1,7 +1,7 @@
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import httpx
 import boto3
@@ -67,7 +67,7 @@ class RecordingService:
                 file_path=file_key,
                 status="uploaded",  # Ensure status is always a string
                 format=file.content_type,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             self.db.add(db_recording)
 
@@ -102,7 +102,7 @@ class RecordingService:
             )
             meeting = meeting_result.scalar_one_or_none()
             if meeting:
-                meeting.start_time = datetime.utcnow()
+                meeting.start_time = datetime.now(timezone.utc)
                 logger.info(f"Updated meeting {meeting.id} start_time to {meeting.start_time}")
 
             # Save placeholder to DB
@@ -113,7 +113,7 @@ class RecordingService:
                 file_path=file_key,
                 status="streaming",
                 format=content_type,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             self.db.add(db_recording)
             await self.db.commit()
@@ -183,7 +183,7 @@ class RecordingService:
         )
         meeting = meeting_result.scalar_one_or_none()
         if meeting:
-            meeting.end_time = datetime.utcnow()
+            meeting.end_time = datetime.now(timezone.utc)
             logger.info(f"Updated meeting {meeting.id} end_time to {meeting.end_time}")
 
         await self.db.commit()

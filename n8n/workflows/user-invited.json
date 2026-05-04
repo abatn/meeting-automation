@@ -35,9 +35,9 @@
         450,
         300
       ],
-      "credentials": {
+        "credentials": {
         "smtp": {
-          "id": "fgyyLhG9Ws6oJ7hA",
+          "id": "eHaPFftWKgcTTXQc",
           "name": "SMTP Account"
         }
       }

@@ -861,139 +861,142 @@ class TestRealSaasPipeline:
         print(f"\n  ✓ ISO 27001 audit logging VERIFIED")
 
     async def test_11_audio_counter_synchronization(
-        self, client: AsyncClient, db_session: AsyncSession
-    ):
-        """
-        BONUS TEST: Audio Counter Synchronization
-
-        Tests that DG and Participant see the SAME recording duration
-        when polling /meetings/{id}/recording-status endpoint.
-
-        This verifies the fix for: "Audio counter increments for DG but stays at 0 for participant"
-        """
-        import asyncio
-        from jose import jwt
-
-        print("\n🎙️ BONUS: Audio Counter Synchronization Test")
-
-        # 1. Login as DG
-        print("\n  [1/5] DG Login...")
-        dg_login = await client.post(
-            "/api/v1/auth/login",
-            data={
-                "username": "dg@meeting.tn",
-                "password": "Password123!",
-            },
-        )
-        assert dg_login.status_code == 200
-        dg_token = dg_login.json()["access_token"]
-        dg_headers = {"Authorization": f"Bearer {dg_token}"}
-
-        dg_decoded = jwt.decode(dg_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        dg_client_id = dg_decoded.get("client_id")
-
-        print(f"    ✓ DG logged in (client_id={dg_client_id[:8]}...)")
-
-        # 2. Create a new meeting
-        print("\n  [2/5] Create Meeting...")
-        meeting_data = {
-            "title": "Audio Counter Sync Test Meeting",
-            "description": "Test synchronized audio counter between DG and Participant",
-            "start_time": datetime.now(timezone.utc).isoformat(),
-            "end_time": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
-        }
-
-        create_meeting = await client.post(
-            "/api/v1/meetings/",
-            json=meeting_data,
-            headers=dg_headers,
-        )
-        assert create_meeting.status_code == 201, f"Failed to create meeting: {create_meeting.json()}"
-        meeting_id = create_meeting.json()["id"]
-        print(f"    ✓ Meeting created (id={meeting_id[:8]}...)")
-
-        # 3. Get a participant user from database (not DG)
-        print("\n  [3/5] Get Participant User...")
-        participant_result = await db_session.execute(
-            select(User).where(
-                User.client_id == dg_client_id,
-                User.email != "dg@meeting.tn",
-                User.status == UserStatus.ACTIVE.value,
+            self, client: AsyncClient, db_session: AsyncSession
+        ):
+            """
+            Audio Counter Synchronization Test (Frontend Polling Verifikation).
+            
+            This test verifies that /meetings/{id}/recording-status returns consistent
+            recording_duration values for both DG and Participant when polling from
+            different clients simultaneously.
+            
+            This verifies the fix for: "Audio counter increments for DG but stays at 0 for participant"
+            """
+            import asyncio
+            from jose import jwt
+            
+            print("\n🎙️ BONUS: Audio Counter Synchronization Test")
+            
+            # 1. DG is already authenticated via fixture (client has JWT)
+            print("\n  [1/5] DG Context Ready...")
+            
+            # Get token from login (same credentials as test_01)
+            dg_login = await client.post(
+                "/api/v1/auth/login",
+                data={
+                    "username": "dg@meeting.tn",
+                    "password": "Password123!",
+                },
             )
-        )
-        participant = participant_result.scalars().first()
+            assert dg_login.status_code == 200
+            dg_token = dg_login.json()["access_token"]
+            dg_headers = {"Authorization": f"Bearer {dg_token}"}
 
-        if not participant:
-            # Create a test participant if needed
-            print("    ⚠️ No existing participant, using DG for both roles (simulated sync test)")
-            participant = None
-        else:
-            print(f"    ✓ Participant found: {participant.email}")
+            dg_decoded = jwt.decode(dg_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            dg_client_id = dg_decoded.get("client_id")
 
-        # 4. Start recording via backend
-        print("\n  [4/5] Start Recording...")
-        recording = Recording(
-            id=str(uuid.uuid4()),
-            client_id=dg_client_id,
-            meeting_id=meeting_id,
-            file_path="s3://test-bucket/recording.webm",
-            status="recording",
-            created_at=datetime.now(timezone.utc),
-        )
-        db_session.add(recording)
-        await db_session.commit()
-        print(f"    ✓ Recording started at {recording.created_at.strftime('%H:%M:%S')}")
+            print(f"    ✓ DG authenticated (client_id={dg_client_id[:8]}...)")
 
-        # 5. Poll recording status from both "clients"
-        print("\n  [5/5] Poll Recording Status (Synchronization Check)...")
+            # 2. Create a new meeting
+            print("\n  [2/5] Create Meeting...")
+            meeting_data = {
+                "title": "Audio Counter Sync Test Meeting",
+                "description": "Test synchronized audio counter between DG and Participant",
+                "start_time": datetime.now(timezone.utc).isoformat(),
+                "end_time": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+            }
 
-        durations = []
-        for poll_iteration in range(5):  # Poll 5 times over 4 seconds
-            # DG polls
-            dg_status = await client.get(
-                f"/api/v1/meetings/{meeting_id}/recording-status",
+            create_meeting = await client.post(
+                "/api/v1/meetings/",
+                json=meeting_data,
                 headers=dg_headers,
             )
-            assert dg_status.status_code == 200, f"DG status poll failed: {dg_status.json()}"
-            dg_duration = dg_status.json()["recording_duration"]
+            assert create_meeting.status_code == 201, f"Failed to create meeting: {create_meeting.json()}"
+            meeting_id = create_meeting.json()["id"]
+            print(f"    ✓ Meeting created (id={meeting_id[:8]}...)")
 
-            # Participant polls (use same token for simulation, or different if available)
-            participant_headers = dg_headers if not participant else {"Authorization": f"Bearer {dg_token}"}
-            p_status = await client.get(
-                f"/api/v1/meetings/{meeting_id}/recording-status",
-                headers=participant_headers,
+            # 3. Get a participant user from database (not DG)
+            print("\n  [3/5] Get Participant User...")
+            participant_result = await db_session.execute(
+                select(User).where(
+                    User.client_id == dg_client_id,
+                    User.email != "dg@meeting.tn",
+                    User.status == UserStatus.ACTIVE.value,
+                )
             )
-            assert p_status.status_code == 200
-            p_duration = p_status.json()["recording_duration"]
+            participant = participant_result.scalars().first()
 
-            # Record durations
-            durations.append({
-                "iteration": poll_iteration,
-                "dg_duration": dg_duration,
-                "p_duration": p_duration,
-                "diff": abs(dg_duration - p_duration),
-            })
+            if not participant:
+                # Create a test participant if needed
+                print("    ⚠️ No existing participant, using DG for both roles (simulated sync test)")
+                participant = None
+            else:
+                print(f"    ✓ Participant found: {participant.email}")
 
-            print(f"    Poll {poll_iteration + 1}: DG={dg_duration}s, Participant={p_duration}s, Diff={durations[-1]['diff']}s")
+            # 4. Start recording via backend
+            print("\n  [4/5] Start Recording...")
+            recording = Recording(
+                id=str(uuid.uuid4()),
+                client_id=dg_client_id,
+                meeting_id=meeting_id,
+                file_path="s3://test-bucket/recording.webm",
+                status="recording",
+                created_at=datetime.now(timezone.utc),
+            )
+            db_session.add(recording)
+            await db_session.commit()
+            print(f"    ✓ Recording started at {recording.created_at.strftime('%H:%M:%S')}")
 
-            # Assert synchronization (allow ±1 second tolerance for polling jitter)
-            assert durations[-1]['diff'] <= 1, \
-                f"Audio counters out of sync! DG={dg_duration}s, Participant={p_duration}s"
+            # 5. Poll recording status from both "clients"
+            print("\n  [5/5] Poll Recording Status (Synchronization Check)...")
 
-            if poll_iteration < 4:
-                await asyncio.sleep(0.8)  # Wait before next poll
+            durations = []
+            for poll_iteration in range(5):  # Poll 5 times over 4 seconds
+                # DG polls
+                dg_status = await client.get(
+                    f"/api/v1/meetings/{meeting_id}/recording-status",
+                    headers=dg_headers,
+                )
+                assert dg_status.status_code == 200, f"DG status poll failed: {dg_status.json()}"
+                dg_duration = dg_status.json()["recording_duration"]
 
-        # 6. Verify results
-        print(f"\n  ✓ All 5 polls synchronized (max diff: {max(d['diff'] for d in durations)}s)")
-        print(f"  ✓ Final DG duration: {durations[-1]['dg_duration']}s")
-        print(f"  ✓ Final Participant duration: {durations[-1]['p_duration']}s")
+                # Participant polls (use same token for simulation, or different if available)
+                participant_headers = dg_headers if not participant else {"Authorization": f"Bearer {dg_token}"}
+                p_status = await client.get(
+                    f"/api/v1/meetings/{meeting_id}/recording-status",
+                    headers=participant_headers,
+                )
+                assert p_status.status_code == 200
+                p_duration = p_status.json()["recording_duration"]
 
-        # Cleanup
-        await db_session.delete(recording)
-        await db_session.delete(
-            (await db_session.execute(select(Meeting).where(Meeting.id == meeting_id))).scalar_one()
-        )
-        await db_session.commit()
+                # Record durations
+                durations.append({
+                    "iteration": poll_iteration,
+                    "dg_duration": dg_duration,
+                    "p_duration": p_duration,
+                    "diff": abs(dg_duration - p_duration),
+                })
 
-        print(f"\n  ✓✓ Audio Counter Synchronization Test PASSED ✓✓")
+                print(f"    Poll {poll_iteration + 1}: DG={dg_duration}s, Participant={p_duration}s, Diff={durations[-1]['diff']}s")
+
+                # Assert synchronization (allow ±1 second tolerance for polling jitter)
+                assert durations[-1]['diff'] <= 1, \
+                    f"Audio counters out of sync! DG={dg_duration}s, Participant={p_duration}s"
+
+                if poll_iteration < 4:
+                    await asyncio.sleep(0.8)  # Wait before next poll
+
+            # 6. Verify results
+            print(f"\n  ✓ All 5 polls synchronized (max diff: {max(d['diff'] for d in durations)}s)")
+            print(f"  ✓ Final DG duration: {durations[-1]['dg_duration']}s")
+            print(f"  ✓ Final Participant duration: {durations[-1]['p_duration']}s")
+
+            # Cleanup
+            await db_session.delete(recording)
+            await db_session.delete(
+                (await db_session.execute(select(Meeting).where(Meeting.id == meeting_id))).scalar_one()
+            )
+            await db_session.commit()
+
+            print(f"\n  ✓✓ Audio Counter Synchronization Test PASSED ✓✓")
 

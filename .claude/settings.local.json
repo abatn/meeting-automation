@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(E2E_TEST=true python -m pytest backend/tests/e2e/test_invitation_e2e.py -v -s)",
+      "Bash(tee /tmp/e2e_invitation_test.log)",
+      "Bash(docker exec:*)",
+      "Read(//tmp/**)"
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "context7",
+    "playwright"
+  ]
+}

@@ -21,6 +21,8 @@
 **Total Execution Time:** 28.31 seconds  
 **New in 2026-04-24:** Audio counter synchronization verified—DG and participants now see identical recording duration via backend polling.
 
+**New in 2026-04-25:** Creator-Permissions-Logic für Meeting Stream APIs verifiziert—nur Creator können Start/Stop/Chunk APIs aufrufen (Buttons für Non-Creators sind deaktiviert).
+
 **See full results:** [E2E_VALIDATION_REPORT_2026-04-05.md](./E2E_VALIDATION_REPORT_2026-04-05.md#-final-completion-report--2026-04-23)
 
 ---
