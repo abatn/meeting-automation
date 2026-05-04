@@ -92,13 +92,19 @@ const MeetingPlanner: React.FC = () => {
   const fetchMeetings = async () => {
     try {
       const meetings = await meetingsApi.getMeetings();
+      console.log("DEBUG: fetchMeetings() - All meetings from API:", meetings);
+      console.log("DEBUG: currentUser from Redux:", currentUser);
+      
       const nowTs = dayjs().valueOf();
       
       // 1. Define what is "Active" vs "History/Past"
       const processed = meetings.map((m: any) => {
         const mStart = dayjs(m.start_time).valueOf();
         const mEnd = m.end_time ? dayjs(m.end_time).valueOf() : mStart + (3600 * 1000);
-        return { ...m, isExpired: nowTs > mEnd && m.status === 'planned' };
+        const result = { ...m, isExpired: nowTs > mEnd && m.status === 'planned' };
+        const isCreatorCheck = currentUser?.id && m.creator_id && String(currentUser.id) === String(m.creator_id);
+        console.log(`DEBUG: Meeting "${m.title}" - creator_id: "${m.creator_id}" (type: ${typeof m.creator_id}), currentUser.id: "${currentUser?.id}" (type: ${typeof currentUser?.id}), isCreator: ${isCreatorCheck}`);
+        return result;
       });
 
       const activeMeetings = processed.filter((m: any) => 
@@ -256,15 +262,16 @@ const MeetingPlanner: React.FC = () => {
                 <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{t("meetings.recent_meetings")}</Typography>
               </Box>
               <List disablePadding>
-                {recentMeetings.map((m) => {
-                   const now = dayjs();
-                   const mStart = dayjs(m.start_time);
-                   const mEnd = m.end_time ? dayjs(m.end_time) : mStart.add(1, 'hour');
-                   
-                   const isLate = now.isAfter(mStart) && now.isBefore(mEnd);
-                   const isExpired = now.isAfter(mEnd) && m.status === 'planned';
-                   const isSoon = mStart.diff(now, 'minute') <= 15 && mStart.diff(now, 'minute') >= 0;
-                   const isCreator = currentUser?.id === m.creator_id;
+                 {recentMeetings.map((m) => {
+                    const now = dayjs();
+                    const mStart = dayjs(m.start_time);
+                    const mEnd = m.end_time ? dayjs(m.end_time) : mStart.add(1, 'hour');
+                    
+                     const isLate = now.isAfter(mStart) && now.isBefore(mEnd);
+                     const isExpired = now.isAfter(mEnd) && m.status === 'planned';
+                     const isSoon = mStart.diff(now, 'minute') <= 15 && mStart.diff(now, 'minute') >= 0;
+                     const isCreator = currentUser?.id && m.creator_id && String(currentUser.id) === String(m.creator_id);
+                     console.log(`DEBUG: Rendering meeting "${m.title}" - currentUser?.id: "${currentUser?.id}" (type: ${typeof currentUser?.id}) vs m.creator_id: "${m.creator_id}" (type: ${typeof m.creator_id}), isCreator: ${isCreator}`);
 
                    return (
                     <ListItem key={m.id} divider sx={{ px: 3, py: 2, display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
@@ -277,27 +284,29 @@ const MeetingPlanner: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><RoomIcon sx={{ fontSize: 14 }} /><Typography variant="caption">{m.location || "Office"}</Typography></Box>
                       </Stack>
                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                         {m.status === 'planned' && !isExpired && isCreator && (
-                           <>
-                             <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'cancel')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t('common.cancel', 'Cancel')}</Button>
-                             <Button 
-                               size="small" variant="contained" onClick={() => navigate(`/meetings/live/${m.id}`)}
-                               startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
-                               sx={{ 
-                                 borderRadius: '8px', fontWeight: 800, textTransform: 'none',
-                                 bgcolor: (isSoon || isLate) ? 'success.main' : 'primary.main',
-                                 color: '#fff', animation: isSoon ? 'pulse 2s infinite' : 'none',
-                                 '&:hover': { bgcolor: (isSoon || isLate) ? 'success.dark' : 'primary.dark' }
-                               }}
-                             >
-                               {isSoon || isLate ? t('meetings.join_room', 'Join') : t('meetings.start_now', 'Start Now')}
-                             </Button>
-                           </>
-                         )}
-                         {isExpired && isCreator && <Button size="small" color="error" startIcon={<DeleteIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'delete')} sx={{ textTransform: 'none', fontWeight: 700 }}>{t('common.delete', 'Delete')}</Button>}
-                         {m.status === 'in_progress' && <Button size="small" variant="contained" color="primary" onClick={() => navigate(`/meetings/live/${m.id}`)} sx={{ borderRadius: '8px', fontWeight: 800, textTransform: 'none' }}>{t('meetings.join_room', 'Join Room')}</Button>}
-                         {m.status === 'completed' && pvMap[m.id] && <Button size="small" variant="outlined" startIcon={<EditIcon sx={{ fontSize: 14 }} />} onClick={() => window.open(`/editor/${pvMap[m.id]}`, '_blank')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t("pv.edit_online", "Edit PV")}</Button>}
-                       </Stack>
+                          {m.status === 'planned' && !isExpired && (
+                            <>
+                              {isCreator && (
+                                <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'cancel')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t('common.cancel', 'Cancel')}</Button>
+                              )}
+                              <Button 
+                                size="small" variant="contained" onClick={() => navigate(`/meetings/live/${m.id}`)}
+                                startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
+                                sx={{ 
+                                  borderRadius: '8px', fontWeight: 800, textTransform: 'none',
+                                  bgcolor: (isSoon || isLate) ? 'success.main' : 'primary.main',
+                                  color: '#fff', animation: isSoon ? 'pulse 2s infinite' : 'none',
+                                  '&:hover': { bgcolor: (isSoon || isLate) ? 'success.dark' : 'primary.dark' }
+                                }}
+                              >
+                                {isCreator ? (isSoon || isLate ? t('meetings.join_room', 'Join') : t('meetings.start_now', 'Start Now')) : t('meetings.join_room', 'Join')}
+                              </Button>
+                            </>
+                          )}
+                          {isExpired && isCreator && <Button size="small" color="error" startIcon={<DeleteIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'delete')} sx={{ textTransform: 'none', fontWeight: 700 }}>{t('common.delete', 'Delete')}</Button>}
+                          {m.status === 'in_progress' && <Button size="small" variant="contained" color="primary" onClick={() => navigate(`/meetings/live/${m.id}`)} sx={{ borderRadius: '8px', fontWeight: 800, textTransform: 'none' }}>{t('meetings.join_room', 'Join Room')}</Button>}
+                          {m.status === 'completed' && pvMap[m.id] && <Button size="small" variant="outlined" startIcon={<EditIcon sx={{ fontSize: 14 }} />} onClick={() => window.open(`/editor/${pvMap[m.id]}`, '_blank')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t("pv.edit_online", "Edit PV")}</Button>}
+                        </Stack>
                     </ListItem>
                   );
                 })}
