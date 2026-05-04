@@ -283,26 +283,54 @@ const MeetingPlanner: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><ScheduleIcon sx={{ fontSize: 14 }} /><Typography variant="caption">{mStart.format('HH:mm')}</Typography></Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><RoomIcon sx={{ fontSize: 14 }} /><Typography variant="caption">{m.location || "Office"}</Typography></Box>
                       </Stack>
-                       <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          {m.status === 'planned' && !isExpired && (
-                            <>
-                              {isCreator && (
-                                <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'cancel')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t('common.cancel', 'Cancel')}</Button>
-                              )}
-                              <Button 
-                                size="small" variant="contained" onClick={() => navigate(`/meetings/live/${m.id}`)}
-                                startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
-                                sx={{ 
-                                  borderRadius: '8px', fontWeight: 800, textTransform: 'none',
-                                  bgcolor: (isSoon || isLate) ? 'success.main' : 'primary.main',
-                                  color: '#fff', animation: isSoon ? 'pulse 2s infinite' : 'none',
-                                  '&:hover': { bgcolor: (isSoon || isLate) ? 'success.dark' : 'primary.dark' }
-                                }}
-                              >
-                                {isCreator ? (isSoon || isLate ? t('meetings.join_room', 'Join') : t('meetings.start_now', 'Start Now')) : t('meetings.join_room', 'Join')}
-                              </Button>
-                            </>
-                          )}
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                           {m.status === 'planned' && !isExpired && (
+                             <>
+                               {isCreator && (
+                                 <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'cancel')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t('common.cancel', 'Cancel')}</Button>
+                               )}
+                               {isCreator ? (
+                                 <Button 
+                                   size="small" variant="contained" onClick={() => navigate(`/meetings/live/${m.id}`)}
+                                   startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
+                                   sx={{ 
+                                     borderRadius: '8px', fontWeight: 800, textTransform: 'none',
+                                     bgcolor: (isSoon || isLate) ? 'success.main' : 'primary.main',
+                                     color: '#fff', animation: isSoon ? 'pulse 2s infinite' : 'none',
+                                     '&:hover': { bgcolor: (isSoon || isLate) ? 'success.dark' : 'primary.dark' }
+                                   }}
+                                 >
+                                   {isSoon || isLate ? t('meetings.join_room', 'Join') : t('meetings.start_now', 'Start Now')}
+                                 </Button>
+                               ) : (
+                                 <>
+                                   {(isSoon || isLate) && (
+                                     <Button 
+                                       size="small" variant="contained" onClick={() => navigate(`/meetings/live/${m.id}`)}
+                                       startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
+                                       sx={{ 
+                                         borderRadius: '8px', fontWeight: 800, textTransform: 'none',
+                                         bgcolor: 'success.main',
+                                         color: '#fff', animation: 'pulse 2s infinite',
+                                         '&:hover': { bgcolor: 'success.dark' }
+                                       }}
+                                     >
+                                       {t('meetings.join_room', 'Join')}
+                                     </Button>
+                                   )}
+                                   {!(isSoon || isLate) && (
+                                     <Button 
+                                       size="small" variant="outlined" onClick={() => navigate(`/meetings/live/${m.id}`)}
+                                       startIcon={<PlayArrowIcon sx={{ fontSize: 14 }} />}
+                                       sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}
+                                     >
+                                       {t('meetings.view_details', 'View Details')}
+                                     </Button>
+                                   )}
+                                 </>
+                               )}
+                             </>
+                           )}
                           {isExpired && isCreator && <Button size="small" color="error" startIcon={<DeleteIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'delete')} sx={{ textTransform: 'none', fontWeight: 700 }}>{t('common.delete', 'Delete')}</Button>}
                           {m.status === 'in_progress' && <Button size="small" variant="contained" color="primary" onClick={() => navigate(`/meetings/live/${m.id}`)} sx={{ borderRadius: '8px', fontWeight: 800, textTransform: 'none' }}>{t('meetings.join_room', 'Join Room')}</Button>}
                           {m.status === 'completed' && pvMap[m.id] && <Button size="small" variant="outlined" startIcon={<EditIcon sx={{ fontSize: 14 }} />} onClick={() => window.open(`/editor/${pvMap[m.id]}`, '_blank')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t("pv.edit_online", "Edit PV")}</Button>}
