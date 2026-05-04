@@ -85,3 +85,6 @@ docs/CONTAINER_LOGS_ANALYSIS.md
 mini-assistant.py
 task.txt
 test.md
+data/
+*.db
+*.log
