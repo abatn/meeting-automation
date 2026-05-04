@@ -61,6 +61,7 @@ async def read_meetings(
             selectinload(MeetingModel.agendas),
             selectinload(MeetingModel.pv)
         )
+        .order_by(MeetingModel.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
@@ -88,6 +89,7 @@ async def list_my_meetings(
         )
         .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
         .where(ParticipantModel.user_id == current_user.id)
+        .order_by(MeetingModel.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
@@ -127,6 +129,7 @@ async def list_team_meetings(
         )
         .join(ParticipantModel, MeetingModel.id == ParticipantModel.meeting_id)
         .where(ParticipantModel.user_id.in_(managed_user_ids))
+        .order_by(MeetingModel.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
