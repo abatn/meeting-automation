@@ -1,0 +1,210 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    n8n WORKFLOWS STATUS DASHBOARD                              ║
+║                          May 5, 2026 - 20:58 UTC                               ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+OVERALL SYSTEM STATUS: 🔴 CRITICAL - NOT PRODUCTION READY
+├─ Reason: Missing workflows, credential setup incomplete, webhook paths wrong
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ WORKFLOW IMPORT STATUS                                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ ✅ IMPORTED (6/7):                                                          │
+│    [2] Meeting Created Automation              ACTIVE  ⚠️  Path: 2/webhook/ │
+│    [3] Transcription Completed Notification    ACTIVE  ⚠️  Path: 3/webhook/ │
+│    [4] Daily Reminders Automation              ACTIVE  ❌  Not registered  │
+│    [5] PV Validated Notification               ACTIVE  ✅  Path: pv-vali.. │
+│    [6] User Invited Webhook                    ACTIVE  ✅  Path: user-inv.. │
+│    [7] Meeting Status Changed Webhook          ACTIVE  ❌  Not registered  │
+│                                                                             │
+│ ❌ MISSING (1/7):                                                           │
+│    [1] Audio Uploaded Automation               ------  ❌  No JSON file    │
+│                                                                             │
+│ Legend: ✅=Working  ⚠️=Needs fix  ❌=Broken                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ WEBHOOK REGISTRATION STATUS                                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ IN DATABASE (webhook_entity):                        Expected from .env:   │
+│ ✅ 2/webhook/meeting-created              →  2         ⚠️  /webhook/...   │
+│ ✅ 3/webhook/transcription-completed      →  3         ⚠️  /webhook/...   │
+│ ❌ daily-reminders                        →  4         ⚠️  /webhook/4/...  │
+│ ✅ pv-validated                           →  5         ✅  /webhook/...   │
+│ ✅ user-invited                           →  6         ✅  /webhook/...   │
+│ ❌ meeting-status-changed                 →  7         ❌  NOT FOUND      │
+│ ❌ audio-uploaded                         →  1         ❌  NOT FOUND      │
+│                                                                             │
+│ Total Registered: 4/7  ❌ INCOMPLETE                                        │
+│ Path Format Issues: 2/4 registered have wrong format (include workflow ID)  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CREDENTIALS STATUS                                                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ Credential Type          Required  Present  Status   Impact               │
+│ ─────────────────────────────────────────────────────────────────────────  │
+│ SMTP (Email)             6/6       0/6      ❌ FAIL  All email nodes fail │
+│ WhatsApp API             1/1       0/1      ❌ FAIL  Daily reminders fail │
+│ HTTP Headers             3/3       0/3      ⚠️  OK*  Using hardcoded keys │
+│                                                      (* Security risk)     │
+│ Database Record: credentials_entity IS EMPTY                              │
+│                                                                             │
+│ ACTIONS NEEDED:                                                            │
+│ 1. Create SMTP credential in n8n UI                                       │
+│ 2. Create WhatsApp credential (optional, for SMS feature)                 │
+│ 3. Move hardcoded API keys to n8n variables                               │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ENVIRONMENT CONFIGURATION STATUS                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ DATABASE:                                                                   │
+│   Host:      postgresql+asyncpg://postgres:5432  ✅ CONFIGURED             │
+│   Database:  meeting_db                           ✅ EXISTS                │
+│   n8n Use:   N8N_DATABASE_TYPE=postgresdb        ✅ CONFIGURED             │
+│                                                                             │
+│ SMTP:                                                                       │
+│   Host:      smtp.gmail.com                       ✅ SET                   │
+│   Port:      587                                  ✅ CORRECT               │
+│   User:      bkta3beispiel@gmail.com              ✅ SET                   │
+│   Password:  [CONFIGURED]                         ✅ SET                   │
+│   Status:    NOT in n8n credentials                ❌ MISSING              │
+│                                                                             │
+│ WEBHOOKS (WRONG - NEEDS FIX):                                              │
+│   N8N_WEBHOOK_DAILY_REMINDER                      ❌ WRONG FORMAT          │
+│     Current:  .../webhook/4/webhook/daily-reminders                       │
+│     Correct:  .../webhook/daily-reminders                                 │
+│                                                                             │
+│   N8N_WEBHOOK_TRANSCRIPTION_COMPLETED             ❌ WRONG FORMAT          │
+│     Current:  .../webhook/3/webhook/transcription-completed               │
+│     Correct:  .../webhook/transcription-completed                         │
+│                                                                             │
+│   N8N_WEBHOOK_AUDIO_UPLOADED                      ❌ NO WORKFLOW           │
+│     Current:  .../webhook/audio-uploaded                                  │
+│     Status:   Workflow not created                                         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ INFRASTRUCTURE STATUS                                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ Container:       meeting-automation-n8n-1          ✅ RUNNING              │
+│ Port:            5678                              ✅ EXPOSED              │
+│ Uptime:          ~53 minutes                        ✅ OK                   │
+│ Database Link:   To PostgreSQL meeting_db           ✅ CONNECTED            │
+│ Backend Access:  meeting-automation-backend-1:8000 ✅ REACHABLE            │
+│ Task Broker:     127.0.0.1:5679                     ✅ READY                │
+│ Python Runner:   ⚠️ FAILED TO START (not needed for basic workflows)      │
+│                                                                             │
+│ Editor:          http://localhost:5678             ✅ ACCESSIBLE           │
+│ Workflow Sync:   PostgreSQL persistence             ✅ WORKING              │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CRITICAL ISSUES BLOCKING PRODUCTION                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ 🔴 ISSUE #1: Audio Uploaded Workflow Missing                              │
+│    ├─ Impact: Transcription pipeline won't start                          │
+│    ├─ Affected: Backend webhook /webhook/audio-uploaded (returns 404)     │
+│    └─ Fix: Create audio-uploaded.json and import                          │
+│                                                                             │
+│ 🔴 ISSUE #2: SMTP Credentials Not in n8n                                  │
+│    ├─ Impact: ALL email notifications fail at runtime                     │
+│    ├─ Affected: 6 of 7 workflows send emails                              │
+│    └─ Fix: Create SMTP credential in n8n Settings                         │
+│                                                                             │
+│ 🔴 ISSUE #3: Webhook Paths Wrong in .env                                  │
+│    ├─ Impact: Meeting Created and Transcription webhooks return 404       │
+│    ├─ Reason: Paths include workflow ID (e.g., 2/webhook/meeting-created) │
+│    └─ Fix: Remove workflow ID prefix from .env URLs                       │
+│                                                                             │
+│ 🔴 ISSUE #4: Webhooks Not Registered                                      │
+│    ├─ Impact: Meeting Status Changed and Daily Reminders return 404       │
+│    ├─ Workflows Affected: #4 (Daily Reminders), #7 (Meeting Status)       │
+│    └─ Fix: Open workflows in n8n UI, ensure ACTIVE toggle ON, save        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ WORKFLOW EXECUTION HISTORY                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ Total Executions: 0                                                         │
+│ Last Execution:   Never                                                     │
+│ Status:           ⚠️  No test executions yet                               │
+│                                                                             │
+│ (System not tested - awaiting credential setup and webhook fixes)          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ ACTION PLAN (PRIORITY ORDER)                                                │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ ① FIX .env Webhook URLs                                          [ 5 min]  │
+│    └─ Remove workflow ID prefixes                                          │
+│                                                                             │
+│ ② CREATE SMTP Credential in n8n                                 [ 10 min]  │
+│    └─ Via Settings → Credentials → New "Email (SMTP)"                     │
+│                                                                             │
+│ ③ CREATE Audio Uploaded Workflow                                [ 20 min]  │
+│    └─ Create audio-uploaded.json and import via n8n UI                     │
+│                                                                             │
+│ ④ REGISTER Missing Webhooks                                    [ 10 min]  │
+│    └─ Open workflows #4 and #7, save with ACTIVE toggle ON                │
+│                                                                             │
+│ ⑤ TEST & VERIFY                                                 [ 5 min]  │
+│    └─ curl test webhooks, check database, run workflow tests              │
+│                                                                             │
+│ ESTIMATED TOTAL: ~50 minutes | DIFFICULTY: Easy-Medium                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ FILE REFERENCES                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│ Full Analysis Report:                                                       │
+│   /home/opc/meeting-automation/N8N_ANALYSIS_REPORT_2026-05-05.md          │
+│                                                                             │
+│ Quick Fix Guide:                                                            │
+│   /home/opc/meeting-automation/N8N_CRITICAL_ACTIONS.md                    │
+│                                                                             │
+│ Configuration Files:                                                        │
+│   .env - Webhook URLs, SMTP config                                        │
+│   /n8n/workflows/*.json - 6 workflow definitions                          │
+│                                                                             │
+│ Docker Logs:                                                                │
+│   docker compose logs n8n --tail=200                                      │
+│   docker compose logs backend | grep webhook                              │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+SUMMARY:
+────────
+✅ Infrastructure working (n8n container, PostgreSQL, Docker network)
+✅ 6 of 7 workflows imported and marked ACTIVE
+⚠️  4 of 7 webhooks properly registered (2 have wrong paths, 2 not registered)
+❌ Missing: 1 workflow (Audio Uploaded)
+❌ Missing: All credentials (SMTP, WhatsApp)
+❌ Wrong: .env webhook URLs for 2 workflows
+❌ Broken: 4 out of 7 webhooks will return 404 errors
+
+RISK LEVEL: 🔴 CRITICAL - System is non-functional for notifications
+TIME TO FIX: ~50 minutes of manual work
+COMPLEXITY: Easy-Medium (mostly UI clicks + JSON editing)
+
+NEXT STEP: Read N8N_CRITICAL_ACTIONS.md and execute steps 1-4
+────────────────────────────────────────────────────────────────────────────────
+
+Generated: 2026-05-05 20:58 UTC
