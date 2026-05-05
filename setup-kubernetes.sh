@@ -126,6 +126,25 @@ kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTH
 echo -e "${YELLOW}Creating S3 bucket 'meeting-recordings'...${NC}"
 kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python -" < scripts/create_s3_bucket.py || echo -e "${RED}Warning: S3 bucket creation failed or already exists.${NC}"
 
+# 7. Import n8n Workflows
+echo -e "${YELLOW}Importing n8n workflows...${NC}"
+WORKFLOWS_DIR="./n8n/workflows"
+if [ -d "$WORKFLOWS_DIR" ]; then
+    # Copy workflows to n8n pod for import
+    kubectl cp "$WORKFLOWS_DIR" n8n-0:/tmp/n8n-workflows/ -n meeting-automation 2>/dev/null || true
+    IMPORTED=0
+    for workflow_file in "$WORKFLOWS_DIR"/*.json; do
+        if [ -f "$workflow_file" ]; then
+            WORKFLOW_NAME=$(basename "$workflow_file" .json)
+            echo -e "${BLUE}Importing workflow: $WORKFLOW_NAME...${NC}"
+            kubectl exec -i n8n-0 -n meeting-automation -- bash -c "n8n import:workflow --input=/tmp/n8n-workflows/$WORKFLOW_NAME.json" 2>/dev/null && IMPORTED=$((IMPORTED + 1)) || echo -e "${YELLOW}Warning: Failed to import $WORKFLOW_NAME (may already exist)${NC}"
+        fi
+    done
+    echo -e "${GREEN}n8n workflows imported: $IMPORTED${NC}"
+else
+    echo -e "${YELLOW}n8n workflows directory not found, skipping...${NC}"
+fi
+
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${GREEN}   KUBERNETES SETUP COMPLETED SUCCESSFULLY!        ${NC}"
 echo -e "${BLUE}====================================================${NC}"

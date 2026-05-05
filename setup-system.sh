@@ -75,6 +75,23 @@ echo -e "${YELLOW}Creating S3 bucket 'meeting-recordings'...${NC}"
 $DOCKER_COMPOSE exec -T backend python - < scripts/create_s3_bucket.py
 echo -e "${GREEN}S3 infrastructure ready.${NC}"
 
+# 7. Import n8n Workflows
+echo -e "${YELLOW}Importing n8n workflows...${NC}"
+WORKFLOWS_DIR="./n8n/workflows"
+if [ -d "$WORKFLOWS_DIR" ]; then
+    IMPORTED=0
+    for workflow_file in "$WORKFLOWS_DIR"/*.json; do
+        if [ -f "$workflow_file" ]; then
+            WORKFLOW_NAME=$(basename "$workflow_file" .json)
+            echo -e "${BLUE}Importing workflow: $WORKFLOW_NAME...${NC}"
+            $DOCKER_COMPOSE exec -T n8n n8n import:workflow --input="$workflow_file" 2>/dev/null && IMPORTED=$((IMPORTED + 1)) || echo -e "${YELLOW}Warning: Failed to import $WORKFLOW_NAME (may already exist)${NC}"
+        fi
+    done
+    echo -e "${GREEN}n8n workflows imported: $IMPORTED/${IMPORTED}${NC}"
+else
+    echo -e "${YELLOW}n8n workflows directory not found, skipping...${NC}"
+fi
+
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${GREEN}   SETUP COMPLETED SUCCESSFULLY!                   ${NC}"
 echo -e "${BLUE}====================================================${NC}"
