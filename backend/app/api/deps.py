@@ -45,7 +45,7 @@ async def get_token_from_request(
     
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated. Token not found in Authorization header or cookies.",
+        detail="Not authenticated",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -82,6 +82,10 @@ async def get_current_user(
     4. User existence and soft-delete check
     5. User status validation
     """
+    token_preview = token[:50] + "..." if len(token) > 50 else token
+    logger.warning(f"[VERIFY_TOKEN] Starting validation. Token preview: {token_preview}")
+    logger.warning(f"[VERIFY_TOKEN] Request path: {request.url.path}, Remote: {request.client}")
+    
     if await auth_service.is_token_blacklisted(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

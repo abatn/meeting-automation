@@ -116,10 +116,10 @@ async def confirm_activation(
     response.set_cookie(
         key="accessToken",
         value=access_token,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
-        httponly=True,  # JavaScript cannot access the cookie
-        secure=settings.COOKIE_SECURE,  # HTTPS only in production
-        samesite="lax",  # Lax to allow cross-origin in dev/testing
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=True,
+        secure=not settings.DEBUG,  # HTTPS only in production
+        samesite="strict",  # CSRF protection
         path="/",
     )
     
@@ -178,10 +178,10 @@ async def login(
     response.set_cookie(
         key="accessToken",
         value=access_token,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
-        httponly=True,  # JavaScript cannot access the cookie
-        secure=settings.COOKIE_SECURE,  # HTTPS only in production
-        samesite="lax",  # Lax to allow cross-origin in dev/testing
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=True,
+        secure=not settings.DEBUG,  # HTTPS only in production
+        samesite="strict",  # CSRF protection
         path="/",
     )
     
@@ -431,10 +431,10 @@ async def refresh_token(
     response.set_cookie(
         key="accessToken",
         value=access_token,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
-        httponly=True,  # JavaScript cannot access the cookie
-        secure=settings.COOKIE_SECURE,  # HTTPS only in production
-        samesite="lax",  # Lax to allow cross-origin in dev/testing
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=True,
+        secure=not settings.DEBUG,  # HTTPS only in production
+        samesite="strict",  # CSRF protection
         path="/",
     )
     
