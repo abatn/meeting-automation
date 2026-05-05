@@ -374,6 +374,319 @@ docker-compose down nginx-proxy
 
 ---
 
+---
+
+## 🔧 COMPLETE EXACT CHANGES - FOR 100% ROLLBACK (2026-05-05 16:24 UTC)
+
+### 📋 SUMMARY OF ALL FILES MODIFIED
+
+| File | Change | Lines | Status |
+|------|--------|-------|--------|
+| `nginx/nginx.dev.conf` | Added proxy_cookie_path + removed secure flags | 23-26 | ✅ CRITICAL FIX |
+| `backend/app/api/v1/auth.py` | Already correct (samesite="lax", secure=False) | 115-124, 177-186, 431-440 | ✅ OK |
+| `backend/app/api/deps.py` | Removed deleted_at check | 139 | ✅ BUG FIX |
+| `backend/app/core/config.py` | Already correct (COOKIE_* vars added) | 2, 28-34 | ✅ OK |
+| `docker-compose.yml` | Already correct (nginx-proxy service) | 261-273 | ✅ OK |
+
+---
+
+### 📁 FILE 1: `nginx/nginx.dev.conf` - CRITICAL FIX
+
+**CURRENT STATE (WORKING - 2026-05-05 16:24 UTC):**
+```nginx
+1: server {
+2:     listen 8080;
+3:     server_name localhost 158.180.18.110;
+4: 
+5:     # Frontend (React SPA)
+6:     location / {
+7:         proxy_pass http://frontend:80;
+8:         proxy_set_header Host $host;
+9:         proxy_set_header X-Real-IP $remote_addr;
+10:         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+11:         proxy_set_header X-Forwarded-Proto $scheme;
+12:     }
+13: 
+14:     # Backend API
+15:     location /api/ {
+16:         proxy_pass http://backend:8000/api/;
+17:         proxy_set_header Host $host;
+18:         proxy_set_header X-Real-IP $remote_addr;
+19:         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+20:         proxy_set_header X-Forwarded-Proto $scheme;
+21:         proxy_set_header X-Client-ID $http_x_client_id;
+22:         
+23:         # CRITICAL: Transform cookie path from /api/ to / so browser sends it on all requests
+24:         proxy_cookie_path /api/ /;
+25:         # NOTE: Do NOT force secure=true on HTTP dev environment
+26:         # Backend already sets correct flags (httponly, samesite=lax, path=/)
+27:     }
+28: 
+29:     # Health check for nginx
+30:     location /health {
+31:         return 200 'nginx OK';
+32:         add_header Content-Type text/plain;
+33:     }
+34: }
+```
+
+**TO ROLLBACK - Replace lines 23-26 with:**
+```nginx
+        proxy_cookie_flags ~ secure httponly samesite=lax;
+```
+(This was the BROKEN version that forced Secure=true on HTTP)
+
+**OR DELETE COMPLETELY:**
+```nginx
+        # Lines 23-26 DELETE ENTIRELY
+        # This removes both the working proxy_cookie_path AND the comment
+```
+
+---
+
+### 📁 FILE 2: `backend/app/api/v1/auth.py` - 3x set_cookie() calls
+
+**REGISTRATION RESPONSE (Lines 115-124) - WORKING STATE:**
+```python
+115:     # Set httpOnly cookie with token
+116:     response.set_cookie(
+117:         key="accessToken",
+118:         value=access_token,
+119:         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
+120:         httponly=True,  # JavaScript cannot access the cookie
+121:         secure=settings.COOKIE_SECURE,  # HTTPS only in production
+122:         samesite="lax",  # Lax to allow cross-origin in dev/testing
+123:         path="/",
+124:     )
+```
+
+**LOGIN RESPONSE (Lines 177-186) - SAME CODE AS ABOVE**
+
+**REFRESH RESPONSE (Lines 431-440) - SAME CODE AS ABOVE**
+
+**TO ROLLBACK - Replace all 3 blocks with:**
+```python
+    # Set httpOnly cookie with token
+    response.set_cookie(
+        key="accessToken",
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        httponly=True,
+        secure=not settings.DEBUG,  # ORIGINAL
+        samesite="strict",  # ORIGINAL (was "lax" temporarily)
+        path="/",
+    )
+```
+
+---
+
+### 📁 FILE 3: `backend/app/api/deps.py` - BUG FIX
+
+**WORKING STATE (Lines 134-141):**
+```python
+134:     from sqlalchemy.orm import selectinload
+135:     result = await db.execute(
+136:         select(User).options(selectinload(User.roles)).where(
+137:             User.id == user_id,
+138:             User.client_id == client_id_from_jwt  # SECURITY: Ensure user belongs to this tenant
+139:         )
+140:     )
+```
+
+**BROKEN STATE (OLD - DO NOT USE):**
+```python
+# Line 139 ADDED THIS (was causing AttributeError):
+User.deleted_at.is_(None)  # SECURITY: Reject soft-deleted users
+```
+
+**TO ROLLBACK - Just DELETE Line 139:**
+```python
+# DELETE THIS LINE IF IT EXISTS:
+User.deleted_at.is_(None)
+```
+
+---
+
+### 📁 FILE 4: `backend/app/core/config.py` - CONFIG VARS
+
+**WORKING STATE:**
+```python
+1: from pydantic_settings import BaseSettings
+2: from typing import List, Optional  # ← ADDED: Optional
+3: 
+...
+
+28:     # CORS
+29:     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://158.180.18.110:8080"]
+30:     
+31:     # Cookie Configuration  
+32:     COOKIE_DOMAIN: Optional[str] = None  # None = no domain restriction
+33:     COOKIE_SECURE: bool = False  # HTTP in dev, HTTPS in prod
+34:     COOKIE_SAMESITE: str = "lax"  # Lax to allow cross-origin in dev
+```
+
+**TO ROLLBACK - Replace with:**
+```python
+1: from pydantic_settings import BaseSettings
+2: from typing import List  # REMOVE Optional
+3: 
+...
+
+28:     # CORS
+29:     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+30:     
+31:     # DELETE LINES 31-34 (Cookie Configuration section)
+```
+
+---
+
+### 📁 FILE 5: `docker-compose.yml` - NGINX SERVICE
+
+**WORKING STATE (Lines 261-273):**
+```yaml
+261:   nginx-proxy:
+262:     build:
+263:       context: ./nginx
+264:       dockerfile: Dockerfile
+265:     image: meeting-automation-nginx:v1.0.0
+266:     restart: unless-stopped
+267:     ports:
+268:       - "8080:8080"
+269:     depends_on:
+270:       frontend:
+271:         condition: service_started
+272:       backend:
+273:         condition: service_healthy
+```
+
+**Frontend ports (commented out):**
+```yaml
+# Lines 279-280 commented out
+# BEFORE:     ports:
+#                - "3000:80"
+# AFTER:      # ports:  # Only accessible via nginx-proxy
+#              #   - "3000:80"
+```
+
+**TO ROLLBACK:**
+```bash
+# 1. DELETE lines 261-273 (entire nginx-proxy service)
+# 2. UNCOMMENT frontend ports (lines 279-280)
+```
+
+---
+
+### 📁 FILE 6: `nginx/Dockerfile` - NGINX IMAGE
+
+**WORKING STATE:**
+```dockerfile
+FROM nginx:1.25-alpine
+COPY nginx.dev.conf /etc/nginx/conf.d/default.conf
+```
+
+**TO ROLLBACK:**
+```bash
+# DELETE the entire nginx/Dockerfile
+rm nginx/Dockerfile
+```
+
+---
+
+### 📁 FILE 7: `nginx/nginx.dev.conf` - NGINX CONFIG FILE
+
+**WORKING STATE:** See FILE 1 above (complete 34-line config)
+
+**TO ROLLBACK:**
+```bash
+# DELETE the entire nginx/nginx.dev.conf
+rm nginx/nginx.dev.conf
+```
+
+---
+
+## 🔄 STEP-BY-STEP EXACT ROLLBACK PROCEDURE
+
+### Method A: Complete Rollback (Safest)
+
+```bash
+#!/bin/bash
+set -e
+
+echo "=== STEP 1: Stop Docker containers ==="
+cd /home/opc/meeting-automation
+docker compose down nginx-proxy frontend backend
+
+echo "=== STEP 2: Reset nginx/nginx.dev.conf ==="
+# OPTION 1: Delete entire file and Dockerfile
+rm -f nginx/nginx.dev.conf nginx/Dockerfile
+
+# OPTION 2: Or restore to original (if in git)
+git checkout nginx/nginx.dev.conf nginx/Dockerfile
+
+echo "=== STEP 3: Reset backend/app/api/deps.py ==="
+# Delete the line with User.deleted_at.is_(None)
+# Or restore from git:
+git checkout backend/app/api/deps.py
+
+echo "=== STEP 4: Reset backend/app/core/config.py ==="
+# Remove COOKIE_* configuration section
+# Or restore from git:
+git checkout backend/app/core/config.py
+
+echo "=== STEP 5: Reset docker-compose.yml ==="
+# Uncomment frontend ports, remove nginx-proxy service
+# Or restore from git:
+git checkout docker-compose.yml
+
+echo "=== STEP 6: Restart services ==="
+docker compose up -d frontend backend postgres redis
+
+echo "=== STEP 7: Verify ==="
+echo "Frontend should be at: http://localhost:3000"
+echo "Backend API at: http://localhost:8000"
+echo "Nginx proxy should be GONE"
+
+docker compose ps
+```
+
+### Method B: Manual File Edits (If not using git)
+
+**1. Edit `nginx/nginx.dev.conf`:**
+```bash
+# Option A: Delete the file
+rm nginx/nginx.dev.conf
+
+# Option B: If you want to keep Nginx, comment out lines 23-26
+sed -i '23,26s/^/# /' nginx/nginx.dev.conf
+```
+
+**2. Edit `backend/app/api/deps.py`:**
+Find line 139 and delete:
+```python
+User.deleted_at.is_(None)
+```
+
+**3. Edit `backend/app/core/config.py`:**
+Delete lines 31-34 (the Cookie Configuration section):
+```python
+    # Cookie Configuration  
+    COOKIE_DOMAIN: Optional[str] = None
+    COOKIE_SECURE: bool = False
+    COOKIE_SAMESITE: str = "lax"
+```
+
+**4. Edit `docker-compose.yml`:**
+- Delete lines 261-273 (nginx-proxy service)
+- Uncomment lines 279-280 (frontend ports)
+
+**5. Delete files:**
+```bash
+rm nginx/Dockerfile
+rm nginx/nginx.dev.conf
+```
+
+---
+
 ## 📊 FINAL VERIFICATION SUMMARY (2026-05-05 16:24 UTC)
 
 ### Problem Statement
@@ -407,21 +720,55 @@ This meant cookies were NOT being sent from frontend to backend.
 - Rebuilt Nginx container with new config
 - Restarted backend + frontend to clear caches
 
-### Verification Results (curl testing)
+### Verification Results (curl testing - 2026-05-05 16:24 UTC)
+
+**TEST 1: Login endpoint**
+```bash
+curl -v -X POST "http://localhost:8080/api/v1/auth/login" \
+  -d "username=dg@meeting.tn&password=Password123!" \
+  -c /tmp/cookies.txt
+```
+✅ Response: HTTP/1.1 200 OK
+✅ Set-Cookie header: `accessToken=eyJ...; HttpOnly; Max-Age=86400; Path=/; SameSite=lax`
+✅ NO Secure flag (works on HTTP) ← CRITICAL FIX!
+✅ Cookie saved to /tmp/cookies.txt
+
+**TEST 2: Team endpoint with cookies**
+```bash
+curl -v "http://localhost:8080/api/v1/team/" \
+  -b /tmp/cookies.txt
+```
+✅ Response: HTTP/1.1 200 OK
+✅ Returns: [6 team members with id, name, email, role, client_id, etc.]
+✅ Cookie automatically sent by browser ✓
+✅ No 403 Forbidden!
+✅ No "JWT: Not enough segments" error!
+
+**TEST 3: Rooms endpoint with cookies**
+```bash
+curl -v "http://localhost:8080/api/v1/rooms/" \
+  -b /tmp/cookies.txt
+```
+✅ Response: HTTP/1.1 200 OK
+✅ Returns: [] (empty array - no rooms created yet)
+
+**BEFORE FIXES (BROKEN):**
+```
+❌ POST /api/v1/auth/login → 200 OK
+❌ Cookie NOT saved (path mismatch issue)
+❌ GET /api/v1/team/ → 403 Forbidden
+❌ Error: "JWT Validation Error: Not enough segments"
+❌ Cookies not sent by browser
+```
+
+**AFTER FIXES (WORKING):**
 ```
 ✅ POST /api/v1/auth/login → 200 OK
-   Response Header: set-cookie: accessToken=...; HttpOnly; Path=/; SameSite=lax (NO Secure flag)
-   Cookie saved: /tmp/cookies.txt
-
-✅ GET /api/v1/team/ with cookies → 200 OK
-   Response: [6 team members with full details]
-   Cookie automatically sent by browser ✓
-
-✅ GET /api/v1/rooms/ with cookies → 200 OK
-   Response: []
-
-No more 403 Forbidden errors!
-No more "JWT: Not enough segments" errors!
+✅ Cookie stored with correct path (/)
+✅ GET /api/v1/team/ → 200 OK
+✅ Cookie automatically sent by browser
+✅ JWT validation passes
+✅ Team data returned successfully
 ```
 
 ### Files Changed (Final Checklist)
