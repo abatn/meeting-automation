@@ -1,4 +1,5 @@
 import api from "./api";
+import auditService from "./auditService";
 
 export const meetingsApi = {
   getUsers: async () => {
@@ -18,6 +19,10 @@ export const meetingsApi = {
 
   createMeeting: async (data: any) => {
     const response = await api.post("/meetings/", data);
+    // Log creation for audit trail
+    if (response.data?.id) {
+      await auditService.logCreate('meetings', response.data.id, { title: data.title });
+    }
     return response.data;
   },
 

@@ -336,8 +336,8 @@ async def get_onlyoffice_config(pv_id: str, language: str = "fr", db: AsyncSessi
     file_key = f"tmp_edits/{pv_id}/{os.path.basename(local_path)}"
     s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
     with open(local_path, "rb") as f: s3.upload_fileobj(f, settings.S3_BUCKET_NAME, file_key)
-    download_url = f"{settings.ONLYOFFICE_BACKEND_URL}/api/v1/pv/{pv_id}/onlyoffice/download?file_key={file_key}"
-    callback_url = f"{settings.ONLYOFFICE_BACKEND_URL}/api/v1/pv/{pv_id}/onlyoffice/callback"
+    download_url = f"{settings.PUBLIC_BACKEND_URL}/api/v1/pv/{pv_id}/onlyoffice/download?file_key={file_key}"
+    callback_url = f"{settings.PUBLIC_BACKEND_URL}/api/v1/pv/{pv_id}/onlyoffice/callback"
     oo_lang = "ar-SA" if (language == "ar") else language
     config = {
         "document": {"fileType": "docx", "key": f"{pv_id}_{int(datetime.utcnow().timestamp())}", "title": f"PV_{pv.title}.docx", "url": download_url, "permissions": {"edit": True, "download": True}},

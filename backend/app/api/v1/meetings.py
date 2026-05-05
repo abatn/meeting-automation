@@ -242,7 +242,8 @@ async def cancel_meeting(
         raise HTTPException(status_code=400, detail="Only planned meetings can be cancelled")
 
     update_data = MeetingUpdate(status=MeetingStatus.CANCELLED)
-    updated_meeting = await meeting_service.update_meeting(meeting_id, current_user.client_id, update_data)
+    # P2-3: Pass current_user_id for authorization check
+    updated_meeting = await meeting_service.update_meeting(meeting_id, current_user.client_id, update_data, current_user_id=current_user.id)
     
     return updated_meeting
 

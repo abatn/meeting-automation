@@ -1,6 +1,6 @@
 import logging
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,10 +18,36 @@ from sqlalchemy import select
 logger = logging.getLogger(__name__)
 
 reusable_oauth2 = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.PROJECT_NAME}/api/v1/auth/login"
+    tokenUrl=f"{settings.PROJECT_NAME}/api/v1/auth/login",
+    auto_error=False,  # Don't auto-error; we'll handle cookie extraction manually
 )
 
 api_key_header = APIKeyHeader(name="X-Internal-API-Key", auto_error=False)
+
+
+async def get_token_from_request(
+    request: Request,
+    token_from_header: Optional[str] = Depends(reusable_oauth2),
+) -> str:
+    """
+    Extract JWT token from either:
+    1. Authorization header (Bearer token)
+    2. httpOnly cookie (accessToken)
+    """
+    # Try header first (for API clients, swagger docs, etc.)
+    if token_from_header:
+        return token_from_header
+    
+    # Try cookie (for browser-based clients)
+    token_from_cookie = request.cookies.get("accessToken")
+    if token_from_cookie:
+        return token_from_cookie
+    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated. Token not found in Authorization header or cookies.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 async def verify_internal_api_key(
@@ -43,10 +69,19 @@ async def get_auth_service(
 
 
 async def get_current_user(
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    token: str = Depends(reusable_oauth2),
+    token: str = Depends(get_token_from_request),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
+    """
+    Enhanced token validation with comprehensive security checks:
+    1. Token blacklist check
+    2. JWT signature and expiration validation
+    3. Cross-tenant validation (client_id match)
+    4. User existence and soft-delete check
+    5. User status validation
+    """
     if await auth_service.is_token_blacklisted(token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -63,11 +98,20 @@ async def get_current_user(
         logger.debug(f"JWT Decode ALGORITHM: {settings.ALGORITHM}")
 
         user_id: str = payload.get("sub")
+        client_id_from_jwt: str = payload.get("client_id")
+        
         if user_id is None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Could not validate credentials",
             )
+    except jwt.ExpiredSignatureError:
+        logger.warning("Token has expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except (JWTError, ValidationError) as e:
         logger.warning(f"JWT Validation Error: {e}")
         raise HTTPException(
@@ -75,16 +119,34 @@ async def get_current_user(
             detail="Could not validate credentials",
         )
 
+    # SECURITY: Validate X-Client-ID header matches JWT client_id (Multi-Tenancy)
+    header_client_id = request.headers.get("X-Client-ID")
+    if header_client_id and client_id_from_jwt:
+        if header_client_id != client_id_from_jwt:
+            logger.warning(
+                f"Client ID mismatch: Header={header_client_id}, JWT={client_id_from_jwt}, User={user_id}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Client ID in header does not match token",
+            )
+
     from sqlalchemy.orm import selectinload
     result = await db.execute(
-        select(User).options(selectinload(User.roles)).where(User.id == user_id)
+        select(User).options(selectinload(User.roles)).where(
+            User.id == user_id,
+            User.client_id == client_id_from_jwt  # SECURITY: Ensure user belongs to this tenant
+        )
     )
     user = result.scalars().first()
 
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found, inactive, or does not belong to this tenant"
+        )
     if user.status != UserStatus.ACTIVE.value:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
     return user
 
 

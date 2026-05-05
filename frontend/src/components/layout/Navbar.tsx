@@ -16,7 +16,8 @@ import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { RootState } from "../../store";
-import { logout } from "../../store/authSlice";
+import { logoutThunk } from "../../store/authSlice";
+import type { AppDispatch } from "../../store";
 
 import TranslateIcon from "@mui/icons-material/Translate";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -32,7 +33,7 @@ interface NavbarProps {
 
 const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const { t, i18n } = useTranslation();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const { isAuthenticated, user } = useSelector((state: RootState) => state.auth);
   
@@ -148,7 +149,22 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 
                 <Divider sx={{ my: 1 }} />
                 
-                <MenuItem onClick={() => { dispatch(logout()); setAnchorElProfile(null); }} sx={{ borderRadius: 1.5, py: 1, color: "#D32F2F" }}>
+                <MenuItem 
+                  onClick={() => { 
+                    setAnchorElProfile(null);
+                    // Dispatch logoutThunk which:
+                    // 1. Calls API logout endpoint (clears httpOnly cookie)
+                    // 2. Resets Redux auth state
+                    // 3. Then redirects to login
+                    dispatch(logoutThunk()).then(() => {
+                      navigate("/login");
+                    }).catch((error: unknown) => {
+                      console.error("Logout error:", error);
+                      navigate("/login");
+                    });
+                  }} 
+                  sx={{ borderRadius: 1.5, py: 1, color: "#D32F2F" }}
+                >
                   <ListItemIcon><LogoutIcon fontSize="small" sx={{ color: "#D32F2F" }} /></ListItemIcon>
                   <Typography variant="body2" fontWeight="500">{t("auth.logout")}</Typography>
                 </MenuItem>

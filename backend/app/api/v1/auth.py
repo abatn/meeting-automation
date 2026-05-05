@@ -4,8 +4,9 @@ import uuid
 import secrets
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
@@ -58,14 +59,14 @@ async def verify_activation_token(
 
     return {"email": token_obj.user.email}
 
-@router.post("/activate/confirm", response_model=Token)
+@router.post("/activate/confirm")
 async def confirm_activation(
     body: ActivationConfirm,
     db: AsyncSession = Depends(deps.get_db),
     _: None = Depends(activate_confirm_limiter),
 ) -> Any:
     """Confirms user activation by setting a password and changing status to ACTIVE.
-    Returns JWT token for automatic login after activation."""
+    Returns JWT token in httpOnly cookie for automatic login after activation."""
     stmt = select(ActivationToken).where(
         ActivationToken.token == body.token
     ).options(selectinload(ActivationToken.user).selectinload(UserModel.roles))
@@ -91,11 +92,13 @@ async def confirm_activation(
     await db.commit()
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return {
-        "access_token": security.create_access_token(
-            {"sub": str(user.id), "client_id": str(user.client_id), "role": user.role},
-            expires_delta=access_token_expires
-        ),
+    access_token = security.create_access_token(
+        {"sub": str(user.id), "client_id": str(user.client_id), "role": user.role},
+        expires_delta=access_token_expires
+    )
+    
+    # Create response with user data (NO access_token in body for security)
+    response_data = {
         "token_type": "bearer",
         "user": {
             "id": user.id,
@@ -106,9 +109,24 @@ async def confirm_activation(
             "created_at": user.created_at,
         },
     }
+    
+    response = JSONResponse(content=response_data)
+    
+    # Set httpOnly cookie with token
+    response.set_cookie(
+        key="accessToken",
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
+        httponly=True,  # JavaScript cannot access the cookie
+        secure=settings.COOKIE_SECURE,  # HTTPS only in production
+        samesite="lax",  # Lax to allow cross-origin in dev/testing
+        path="/",
+    )
+    
+    return response
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login")
 async def login(
     db: AsyncSession = Depends(deps.get_db),
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -136,10 +154,13 @@ async def login(
 
     # Generate token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return {
-        "access_token": security.create_access_token(
-            {"sub": str(user.id), "client_id": str(user.client_id), "role": user.role}, expires_delta=access_token_expires
-        ),
+    access_token = security.create_access_token(
+        {"sub": str(user.id), "client_id": str(user.client_id), "role": user.role}, 
+        expires_delta=access_token_expires
+    )
+    
+    # Create response with user data (NO access_token in body for security)
+    response_data = {
         "token_type": "bearer",
         "user": {
             "id": user.id,
@@ -147,9 +168,24 @@ async def login(
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role,
-            "created_at": user.created_at,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
         },
     }
+    
+    response = JSONResponse(content=response_data)
+    
+    # Set httpOnly cookie with token
+    response.set_cookie(
+        key="accessToken",
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
+        httponly=True,  # JavaScript cannot access the cookie
+        secure=settings.COOKIE_SECURE,  # HTTPS only in production
+        samesite="lax",  # Lax to allow cross-origin in dev/testing
+        path="/",
+    )
+    
+    return response
 
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
@@ -265,12 +301,10 @@ async def register(
     token = secrets.token_urlsafe(32)
     # Token expires after 48 hours (Best Practice: 24-72 hours maximum for one-time-use tokens)
     expiration = datetime.now(timezone.utc) + timedelta(hours=48)
-    # Store token hash instead of plaintext for security
-    token_hash = hash_token(token)
     activation_entry = ActivationToken(
         id=str(uuid.uuid4()),
         user_id=db_obj.id,
-        token_hash=token_hash,
+        token=token,
         expires_at=expiration
     )
     db.add(activation_entry)
@@ -355,24 +389,53 @@ async def logout(
     token: str = Depends(deps.reusable_oauth2),
 ) -> Any:
     """
-    Logout user. In a stateless JWT setup, the client discards the token.
-    For enhanced security, a token blacklist could be implemented here.
+    Logout user. Deletes httpOnly cookie and blacklists token.
+    For enhanced security, a token blacklist is implemented.
     """
     await auth_service.add_token_to_blacklist(token)
-    return {"msg": "Successfully logged out"}
+    
+    # Create response and delete the httpOnly cookie
+    response = JSONResponse(content={"msg": "Successfully logged out"})
+    response.delete_cookie(
+        key="accessToken",
+        path="/",
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite="lax",  # Temporary: lax for dev/testing from external IP
+    )
+    
+    return response
 
 
-@router.post("/refresh", response_model=Token)
+@router.post("/refresh")
 async def refresh_token(
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
     """
-    Refresh JWT token.
+    Refresh JWT token. Returns new token in httpOnly cookie.
     """
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return {
-        "access_token": security.create_access_token(
-            {"sub": str(current_user.id), "client_id": str(current_user.client_id), "role": current_user.role}, expires_delta=access_token_expires
-        ),
+    access_token = security.create_access_token(
+        {"sub": str(current_user.id), "client_id": str(current_user.client_id), "role": current_user.role}, 
+        expires_delta=access_token_expires
+    )
+    
+    # Create response with token_type only (NO access_token in body)
+    response_data = {
         "token_type": "bearer",
     }
+    
+    response = JSONResponse(content=response_data)
+    
+    # Set httpOnly cookie with new token
+    response.set_cookie(
+        key="accessToken",
+        value=access_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert to seconds
+        httponly=True,  # JavaScript cannot access the cookie
+        secure=settings.COOKIE_SECURE,  # HTTPS only in production
+        samesite="lax",  # Lax to allow cross-origin in dev/testing
+        path="/",
+    )
+    
+    return response

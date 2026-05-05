@@ -1,4 +1,5 @@
 import api from './api';
+import auditService from './auditService';
 
 export interface Client {
   id: string;
@@ -35,11 +36,15 @@ const adminService = {
 
   updateClientStatus: async (clientId: string, status: string) => {
     const response = await api.patch(`/admin/clients/${clientId}/status`, { status });
+    // Log for audit trail
+    await auditService.logUpdate('admin_clients', clientId, { status });
     return response.data;
   },
 
   addClientObservation: async (clientId: string, text: string) => {
     const response = await api.post(`/admin/clients/${clientId}/observations`, { text });
+    // Log for audit trail
+    await auditService.logCreate('admin_observations', clientId, { text });
     return response.data;
   },
 
@@ -53,11 +58,11 @@ const adminService = {
     return response.data;
   },
 
-  getClientUsage: async (clientId: string) => {
+  getClientUsage: async () => {
     // Note: This endpoint is handled via billing/usage if we are logged in as that user, 
     // but for admin we might need a specific admin/clients/{id}/usage endpoint later.
-    // For now we query the general usage if permitted or mock.
-    const response = await api.get(`/billing/usage?client_id=${clientId}`);
+    // client_id is now injected automatically via X-Client-ID header interceptor
+    const response = await api.get('/billing/usage');
     return response.data;
   }
 };

@@ -23,6 +23,7 @@ import {
   CheckCircle,
   Warning,
   NotificationsActive,
+  Event as EventIcon,
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { useDispatch, useSelector } from "react-redux";
@@ -354,6 +355,52 @@ const DashboardDG: React.FC = () => {
         </Grid>
       </Grid>
 
+      {/* Recent Completed Meetings Section */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12}>
+          <Paper sx={glassStyle}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", display: 'flex', alignItems: 'center' }}>
+              <EventIcon sx={{ marginInlineEnd: 1 }} /> {t("dashboard.recent_meetings")}
+            </Typography>
+            <Divider sx={{ mb: 2 }} />
+            
+            {dashboardData?.recent_completed_meetings?.length === 0 ? (
+              <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
+                {t("dashboard.no_recent_meetings")}
+              </Typography>
+            ) : (
+              <List>
+                {dashboardData?.recent_completed_meetings?.map((meeting: any, idx: number) => (
+                  <React.Fragment key={meeting.id}>
+                    <ListItem disableGutters>
+                      <ListItemText
+                        primary={meeting.title}
+                        secondary={`${t("dashboard.ended")}: ${new Date(meeting.end_time).toLocaleString(i18n.language)} • ${meeting.duration_minutes} min • ${meeting.participants_count} ${t("dashboard.attendees")}`}
+                        primaryTypographyProps={{ fontWeight: 600 }}
+                      />
+                      <ListItemSecondaryAction>
+                        <Stack direction="row" spacing={1}>
+                          {meeting.has_recording && (
+                            <Chip label="🎥 Recording" size="small" color="primary" variant="outlined" />
+                          )}
+                          {meeting.has_transcript && (
+                            <Chip label="📝 Transcript" size="small" color="success" variant="outlined" />
+                          )}
+                          {meeting.has_recap && (
+                            <Chip label="✨ Recap" size="small" color="info" variant="outlined" />
+                          )}
+                        </Stack>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                    {idx < (dashboardData?.recent_completed_meetings?.length - 1) && <Divider component="li" />}
+                  </React.Fragment>
+                ))}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+
       <Grid container spacing={3}>
         {/* Recent Activity */}
         <Grid item xs={12} md={8}>
@@ -369,7 +416,7 @@ const DashboardDG: React.FC = () => {
             </Typography>
             <Divider sx={{ mb: 2 }} />
             <List>
-              {recentActivities.length > 0 ? recentActivities.map((activity, idx) => (
+              {recentActivities.length > 0 ? recentActivities.map((activity: any, idx: number) => (
                 <React.Fragment key={activity.id}>
                   <ListItem disableGutters>
                     <ListItemText

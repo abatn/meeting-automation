@@ -216,6 +216,54 @@ class RecordingService:
         except Exception as e:
             logger.error(f"Failed to trigger n8n audio-uploaded: {e}")
 
+    def get_presigned_upload_url(
+        self, file_key: str, expires_in: int = 3600
+    ) -> str:
+        """Generate presigned URL for direct frontend-to-MinIO upload
+        
+        Args:
+            file_key: S3/MinIO file key (includes client_id prefix)
+            expires_in: URL expiry time in seconds (default: 1 hour)
+        
+        Returns:
+            Presigned URL for direct upload
+        """
+        try:
+            url = self.s3_client.generate_presigned_url(
+                "put_object",
+                Params={"Bucket": settings.S3_BUCKET_NAME, "Key": file_key},
+                ExpiresIn=expires_in,
+            )
+            logger.info(f"Generated presigned upload URL for {file_key}")
+            return url
+        except Exception as e:
+            logger.error(f"Failed to generate presigned URL: {e}")
+            raise
+
+    def get_presigned_download_url(
+        self, file_key: str, expires_in: int = 3600
+    ) -> str:
+        """Generate presigned URL for direct frontend-from-MinIO download
+        
+        Args:
+            file_key: S3/MinIO file key
+            expires_in: URL expiry time in seconds (default: 1 hour)
+        
+        Returns:
+            Presigned URL for direct download
+        """
+        try:
+            url = self.s3_client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": settings.S3_BUCKET_NAME, "Key": file_key},
+                ExpiresIn=expires_in,
+            )
+            logger.info(f"Generated presigned download URL for {file_key}")
+            return url
+        except Exception as e:
+            logger.error(f"Failed to generate presigned URL: {e}")
+            raise
+
     async def get_recording_status(self, recording_id: str) -> Optional[str]:
         """Status von n8n/Whisper abfragen (simplified)"""
         # Status usually comes via webhook or we check DB

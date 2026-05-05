@@ -10,6 +10,7 @@ from . import (
     reports,
     websockets,
     settings,
+    audit,
 )
 
 router = APIRouter()
@@ -24,3 +25,4 @@ router.include_router(actions.router, prefix="/actions", tags=["Actions"])
 router.include_router(reports.router, prefix="/reports", tags=["Reports"])
 router.include_router(websockets.router, prefix="/websockets", tags=["WebSockets"])
 router.include_router(settings.router, prefix="/settings", tags=["Settings"])
+router.include_router(audit.router, prefix="/audit", tags=["Audit Logging"])

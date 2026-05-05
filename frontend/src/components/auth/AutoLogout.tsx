@@ -17,8 +17,9 @@ const AutoLogout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       clearTimeout(timerRef.current);
     }
     if (authState === "authenticated") {
-      timerRef.current = setTimeout(() => {
-        dispatch(performLogout());
+      timerRef.current = setTimeout(async () => {
+        // Backend will delete httpOnly cookie and clear session
+        await dispatch(performLogout());
         navigate("/login");
       }, TIMEOUT_MS);
     }

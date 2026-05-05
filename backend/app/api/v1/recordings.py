@@ -1,4 +1,5 @@
 from typing import Optional
+import uuid
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -138,3 +139,76 @@ async def get_recording(
     if not recording:
         raise HTTPException(status_code=404, detail="Recording not found")
     return recording
+
+
+@router.post("/presigned/upload/{meeting_id}")
+async def get_presigned_upload_url(
+    meeting_id: str,
+    filename: str,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+):
+    """
+    Generate a presigned URL for direct frontend-to-MinIO upload.
+    
+    Returns:
+        - presigned_url: URL for direct upload
+        - file_key: S3/MinIO file key (client_id/recordings/{meeting_id}/{uuid}_{filename})
+        - recording_id: Temporary recording_id for later reference
+    """
+    # Verify meeting exists and user has access
+    result = await db.execute(
+        select(MeetingModel)
+        .where(MeetingModel.id == meeting_id)
+        .where(MeetingModel.client_id == current_user.client_id)
+    )
+    meeting = result.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+    
+    # Generate file key with client_id prefix for multi-tenant isolation
+    file_key = f"{current_user.client_id}/recordings/{meeting_id}/{uuid.uuid4()}_{filename}"
+    
+    service = RecordingService(db)
+    presigned_url = service.get_presigned_upload_url(file_key)
+    
+    return {
+        "presigned_url": presigned_url,
+        "file_key": file_key,
+        "bucket": "meeting-recordings",
+    }
+
+
+@router.post("/presigned/download/{recording_id}")
+async def get_presigned_download_url(
+    recording_id: str,
+    expires_in: int = 3600,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+):
+    """
+    Generate a presigned URL for direct frontend-from-MinIO download.
+    
+    Returns:
+        - presigned_url: URL for direct download
+        - file_key: S3/MinIO file key
+        - expires_in: URL expiry in seconds
+    """
+    # Verify recording exists and user has access
+    result = await db.execute(
+        select(RecordingModel)
+        .where(RecordingModel.id == recording_id)
+        .where(RecordingModel.client_id == current_user.client_id)
+    )
+    recording = result.scalar_one_or_none()
+    if not recording:
+        raise HTTPException(status_code=404, detail="Recording not found")
+    
+    service = RecordingService(db)
+    presigned_url = service.get_presigned_download_url(recording.file_path, expires_in)
+    
+    return {
+        "presigned_url": presigned_url,
+        "file_key": recording.file_path,
+        "expires_in": expires_in,
+    }

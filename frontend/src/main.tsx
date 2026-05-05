@@ -11,8 +11,12 @@ import { useTranslation } from "react-i18next";
 import App from "./App";
 import { store } from "./store";
 import { createAppTheme } from "./styles/theme";
+import { initializeApiStore } from "./services/api";
 import "./i18n/config";
 import "./styles/globals.css";
+
+// Initialize API store reference for multi-tenancy client_id injection
+initializeApiStore(store);
 
 const RootApp = () => {
   const { i18n } = useTranslation();

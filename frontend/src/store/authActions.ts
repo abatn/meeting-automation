@@ -1,15 +1,10 @@
 import { AppDispatch } from "./index";
-import { setAuthenticatedUser, logout, setLoading } from "./authSlice";
+import { setAuthenticatedUser, logout } from "./authSlice";
 import authService from "../services/auth";
 
 export const initializeAuth = () => async (dispatch: AppDispatch) => {
-  const token = localStorage.getItem("accessToken");
-
-  if (!token) {
-    dispatch(logout());
-    return;
-  }
-
+  // Token is now in httpOnly cookie, managed by browser
+  // Try to validate the cookie-based token with backend
   try {
     const response = await authService.validateToken();
     if (response && response.user) {
@@ -25,7 +20,7 @@ export const initializeAuth = () => async (dispatch: AppDispatch) => {
 
 export const performLogout = () => async (dispatch: AppDispatch) => {
   try {
-    // Notify the backend to blacklist the token
+    // Backend will delete httpOnly cookie on logout
     await authService.logout();
   } catch (error) {
     console.error("Backend logout failed, proceeding with local logout", error);

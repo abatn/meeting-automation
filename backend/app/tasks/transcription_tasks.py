@@ -292,8 +292,16 @@ async def _notify_n8n_completion(recording_id, meeting_id):
             await client.post(settings.N8N_WEBHOOK_TRANSCRIPTION_COMPLETED, json={"event": "transcription.completed", "recording_id": recording_id, "meeting_id": meeting_id})
     except: pass
 
-@celery_app.task(name="process_recording")
-def process_recording(recording_id: str) -> None:
+@celery_app.task(
+    name="process_recording",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,  # 10 minutes max backoff
+    retry_jitter=True,
+    max_retries=3,
+)
+def process_recording(self, recording_id: str) -> None:
     loop = asyncio.get_event_loop()
     if not loop.is_running():
         loop.run_until_complete(_process_recording_pipeline(recording_id))

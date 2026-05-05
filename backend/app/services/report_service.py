@@ -261,6 +261,114 @@ class ReportService:
 
         return await self._get_cached_or_compute(f"reports_trends_{client_id}", compute, ttl=3600)
 
+    async def get_recent_completed_meetings(
+        self, client_id: str, user_id: str, limit: int = 10
+    ) -> List[dict]:
+        """
+        Retrieves recently completed meetings where the user participated.
+        ISO 27001 COMPLIANT: Filters by client_id (multi-tenant) and user attendance.
+        ENHANCED: Validates user belongs to client_id (security).
+        Returns meeting details with recording/transcript/recap status.
+        Caches for 30 minutes (1800s) as data changes frequently.
+        """
+        from app.models.participant import Participant
+        from app.models.recording import Recording
+        from app.models.transcription import Transcription
+        from app.models.pv import PV
+        from app.models.user import User as UserModel
+
+        # SECURITY: Validate user belongs to client_id
+        user_check = await self.db.execute(
+            select(UserModel.id).where(
+                UserModel.id == user_id,
+                UserModel.client_id == client_id,
+                UserModel.deleted_at.is_(None)
+            )
+        )
+        if not user_check.scalar():
+            raise PermissionError(f"User {user_id} does not belong to client {client_id}")
+
+        async def compute():
+            now = datetime.utcnow()
+
+            # Query: JOIN meetings with recordings, transcriptions, pvs
+            # Filter: completed meetings in last 30 days where user attended
+            # ENHANCED: Include creator_id and recording access_policy for security checks
+            query = (
+                select(
+                    Meeting.id,
+                    Meeting.title,
+                    Meeting.end_time,
+                    Meeting.start_time,
+                    Meeting.creator_id,
+                    Recording.id.isnot(None).label("has_recording"),
+                    Recording.file_path.label("recording_url"),
+                    Recording.access_policy.label("recording_access_policy"),
+                    Transcription.id.isnot(None).label("has_transcript"),
+                    PV.id.isnot(None).label("has_recap"),
+                    func.count(Participant.id).label("participants_count"),
+                )
+                .where(
+                    Meeting.client_id == client_id,
+                    Meeting.status == "COMPLETED",
+                    Meeting.end_time > (now - timedelta(days=30)),
+                )
+                .outerjoin(Participant, Meeting.id == Participant.meeting_id)
+                .filter(Participant.user_id == user_id)
+                .outerjoin(Recording, Meeting.id == Recording.meeting_id)
+                .outerjoin(Transcription, Meeting.id == Transcription.meeting_id)
+                .outerjoin(PV, Meeting.id == PV.meeting_id)
+                .group_by(
+                    Meeting.id,
+                    Meeting.title,
+                    Meeting.end_time,
+                    Meeting.start_time,
+                    Meeting.creator_id,
+                    Recording.id,
+                    Recording.file_path,
+                    Recording.access_policy,
+                    Transcription.id,
+                    PV.id,
+                )
+                .order_by(Meeting.end_time.desc())
+                .limit(limit)
+            )
+
+            result = await self.db.execute(query)
+            rows = result.all()
+
+            return [
+                {
+                    "id": str(row[0]),
+                    "title": row[1],
+                    "end_time": row[2].isoformat(),
+                    "start_time": row[3].isoformat(),
+                    "duration_minutes": int((row[2] - row[3]).total_seconds() / 60)
+                    if row[2] and row[3]
+                    else 0,
+                    "has_recording": bool(row[5]),
+                    # SECURITY: Show recording_url only if user is organizer or policy is "everyone"
+                    "recording_url": (
+                        row[6]  # Show file_path if user is organizer or access_policy allows
+                        if (user_id == row[4] or row[7] == "everyone")  # creator_id or access_policy
+                        else None  # Hide from non-organizers with organizer_only policy
+                    ),
+                    # NEW: Flag to indicate recording access permission
+                    "can_access_recording": bool(
+                        user_id == row[4] or row[7] == "everyone"
+                    ) if row[5] else False,
+                    "has_transcript": bool(row[8]),
+                    "has_recap": bool(row[9]),
+                    "participants_count": row[10] or 0,
+                }
+                for row in rows
+            ]
+
+        return await self._get_cached_or_compute(
+            f"recent_meetings_{client_id}_{user_id}", compute, ttl=1800
+        )
+
+
     async def get_manager_dashboard(self, manager_id: str, client_id: str, role: str = "manager") -> dict:
         """Haupt-Dashboard zusammenstellen. Trennt zwischen 'dg' (ganze Firma) und 'manager' (nur Team)."""
         meeting_stats = await self.get_meeting_stats(client_id)
@@ -277,6 +385,9 @@ class ReportService:
         # NEU: Team-Listen für Meetings und Actions (Rollenbasiert gefiltert!)
         upcoming_meetings = await self.get_team_upcoming_meetings(manager_id, client_id, role=role)
         open_actions = await self.get_team_open_actions(manager_id, client_id, role=role)
+
+        # NEU: Recent Completed Meetings (Microsoft Teams logic)
+        recent_completed_meetings = await self.get_recent_completed_meetings(client_id, manager_id)
 
         # NEU: Audit Logs (letzte 5)
         from app.models.audit_log import AuditLog
@@ -322,6 +433,7 @@ class ReportService:
             "team_members_count": len(team_prod),
             "kpi_trends": kpi_trends,
             "recent_audit_logs": recent_audit_logs,
+            "recent_completed_meetings": recent_completed_meetings,
             "system_health": health_summary
         }
 

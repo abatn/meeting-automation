@@ -28,6 +28,9 @@ class Recording(Base):
     file_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     duration: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     format: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    access_policy: Mapped[str] = mapped_column(
+        String, default="everyone"
+    )  # everyone, organizer_only, specific_people
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

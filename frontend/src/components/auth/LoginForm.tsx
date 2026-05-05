@@ -44,7 +44,9 @@ const LoginForm: React.FC = () => {
 
     try {
       const data = await authService.login(email, password);
-      dispatch(setCredentials(data));
+      // Backend now sets httpOnly cookie automatically
+      // Only extract user from response
+      dispatch(setCredentials({ user: data.user }));
       navigate("/");
     } catch (err: any) {
       setError(err.response?.data?.detail || "Email ou mot de passe incorrect.");

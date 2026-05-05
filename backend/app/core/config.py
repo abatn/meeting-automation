@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -25,7 +25,12 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: bytes = b"12345678901234567890123456789012"
 
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://158.180.18.110:8080"]
+    
+    # Cookie Configuration  
+    COOKIE_DOMAIN: Optional[str] = None  # None = no domain restriction
+    COOKIE_SECURE: bool = False  # HTTP in dev, HTTPS in prod
+    COOKIE_SAMESITE: str = "lax"  # Lax to allow from different origins
 
     # S3 Storage
     S3_ENDPOINT: str = "http://minio:9000"

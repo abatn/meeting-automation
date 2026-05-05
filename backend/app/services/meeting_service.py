@@ -88,12 +88,29 @@ class MeetingService:
         return result.scalars().first()
 
     async def update_meeting(
-        self, meeting_id: str, client_id: str, meeting_in: MeetingUpdate
+        self, meeting_id: str, client_id: str, meeting_in: MeetingUpdate, current_user_id: str = None
     ) -> Optional[Meeting]:
-        """Status-Änderungen -> n8n Benachrichtigung"""
+        """Status-Änderungen -> n8n Benachrichtigung
+        
+        P2-3: Authorization check - only creator, admin, or dg can update meeting
+        """
         db_meeting = await self.get_meeting(meeting_id, client_id)
         if not db_meeting:
             return None
+
+        # P2-3: Authorization check - verify user owns the meeting or is admin/dg
+        if current_user_id and current_user_id != db_meeting.creator_id:
+            # Import current_user to get role
+            from app.models.user import User
+            user_result = await self.db.execute(
+                select(User).where(User.id == current_user_id)
+            )
+            current_user = user_result.scalar_one_or_none()
+            if not current_user or current_user.role not in ["admin", "dg"]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only meeting creator, admin, or dg can update meeting"
+                )
 
         update_data = meeting_in.model_dump(exclude_unset=True)
 

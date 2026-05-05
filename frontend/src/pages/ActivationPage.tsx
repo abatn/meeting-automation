@@ -73,11 +73,10 @@ const ActivationPage: React.FC = () => {
         new_password: password,
       });
 
-      // Dispatch setCredentials to store JWT and user data (auto-login)
+      // Dispatch setCredentials to store user data (token is in httpOnly cookie)
       dispatch(setCredentials({
         user: response.data.user,
-        access_token: response.data.access_token,
-        refresh_token: response.data.refresh_token,
+        // Token is now in httpOnly cookie set by backend
       }));
 
       setSuccess(true);

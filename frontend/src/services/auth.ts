@@ -11,6 +11,7 @@ export const authService = {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
+      withCredentials: true, // Ensure httpOnly cookie is set
     });
     return response.data;
   },
@@ -20,7 +21,8 @@ export const authService = {
   },
   logout: async () => {
     try {
-      await api.post("/auth/logout");
+      // Backend should delete httpOnly cookie on logout
+      await api.post("/auth/logout", {}, { withCredentials: true });
     } catch (e) {
       console.error("Logout error", e);
     }
@@ -30,6 +32,7 @@ export const authService = {
     return response.data;
   },
   validateToken: async () => {
+    // Backend validates cookie-based token, no need to send anything
     const response = await api.get("/auth/validate");
     return response.data;
   },
