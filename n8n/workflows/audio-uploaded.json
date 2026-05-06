@@ -1,6 +1,6 @@
 {
   "id": "1",
-  "name": "Audio Uploaded Automation",
+  "activeVersionId": "6133b985-abbc-41d7-8693-71f9e4945b53",
   "nodes": [
     {
       "parameters": {
@@ -9,15 +9,32 @@
         "responseMode": "onReceived",
         "options": {}
       },
-      "id": "webhook-node",
+      "id": "audio-uploaded-webhook-node",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [100, 300]
+      "position": [
+        100,
+        300
+      ],
+      "webhookId": "audio-uploaded-webhook-id"
     },
     {
       "parameters": {
-        "url": "=http://backend:8000/api/v1/transcription/start",
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nif (!body || !body.meeting_id || !body.audio_url) {\n  throw new Error('Missing required fields: meeting_id and audio_url are required');\n}\nreturn {\n  json: body\n};"
+      },
+      "id": "validate-audio-payload",
+      "name": "Validate Audio Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        225,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://backend:8000/api/v1/transcription/start",
         "method": "POST",
         "sendHeaders": true,
         "headerParameters": {
@@ -37,25 +54,41 @@
           "parameters": [
             {
               "name": "meeting_id",
-              "value": "={{$json.body.meeting_id}}"
+              "value": "={{$json.meeting_id}}"
             },
             {
               "name": "audio_url",
-              "value": "={{$json.body.audio_url}}"
+              "value": "={{$json.audio_url}}"
             }
           ]
         },
-        "options": {}
+        "options": {
+          "maxRetries": 3
+        }
       },
       "id": "start-transcription",
       "name": "Start Transcription",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [350, 300]
+      "position": [
+        400,
+        300
+      ]
     }
   ],
   "connections": {
     "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Audio Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Audio Payload": {
       "main": [
         [
           {
@@ -66,7 +99,5 @@
         ]
       ]
     }
-  },
-  "active": true,
-  "settings": {}
+  }
 }

@@ -166,7 +166,7 @@ services:
       - N8N_WEBHOOK_MEETING_CREATED=http://n8n:5678/webhook/meeting-created
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
-      - INTERNAL_API_SECRET=test-internal-api-secret-key-2026
+      - INTERNAL_API_SECRET=super-secret-automation-key-2026
     ports:
       - "8000:8000"
     volumes:
@@ -210,7 +210,7 @@ services:
       - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
-      - INTERNAL_API_SECRET=test-internal-api-secret-key-2026
+      - INTERNAL_API_SECRET=super-secret-automation-key-2026
     volumes:
       - ./backend:/app
     depends_on:
@@ -243,7 +243,7 @@ services:
       - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
-      - INTERNAL_API_SECRET=test-internal-api-secret-key-2026
+      - INTERNAL_API_SECRET=super-secret-automation-key-2026
     volumes:
       - ./backend:/app
     depends_on:

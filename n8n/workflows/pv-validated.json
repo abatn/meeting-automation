@@ -1,6 +1,6 @@
 {
   "id": "5",
-  "name": "PV Validated Notification",
+  "activeVersionId": "6de9e553-b21b-4461-a60c-15dab8cb2db1",
   "nodes": [
     {
       "parameters": {
@@ -13,12 +13,15 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "webhookId": "pv-validated-webhook-id"
     },
     {
       "parameters": {
-        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/meeting/{{$json.body.meeting_id}}",
+        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/meeting/{{$json.meeting_id || $json.body.meeting_id}}",
         "method": "GET",
         "sendHeaders": true,
         "headerParameters": {
@@ -35,11 +38,14 @@
       "name": "Get Meeting Details",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [460, 300]
+      "position": [
+        460,
+        300
+      ]
     },
     {
       "parameters": {
-        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/pdf/{{$('Webhook').item.json.body.meeting_id}}",
+        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/pdf/{{$node[\"Get Meeting Details\"].json.id}}",
         "method": "GET",
         "sendHeaders": true,
         "headerParameters": {
@@ -51,21 +57,25 @@
           ]
         },
         "responseFormat": "file",
-        "options": {}
+        "options": {},
+        "continueOnFail": true
       },
       "id": "download-pdf-node",
       "name": "Download PDF",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [670, 300]
+      "position": [
+        670,
+        300
+      ]
     },
     {
       "parameters": {
         "fromEmail": "no-reply@meeting.tn",
-        "toEmail": "={{$('Get Meeting Details').item.json.attendees.join(',')}}",
-        "subject": "=✅ Protokoll freigegeben: {{$('Get Meeting Details').item.json.title}}",
+        "toEmail": "={{$node[\"Get Meeting Details\"].json.attendees.join(',')}}",
+        "subject": "=✅ Protokoll freigegeben: {{$node[\"Get Meeting Details\"].json.title}}",
         "text": "",
-        "html": "=<html><body><h2>Protokoll freigegeben</h2><p>Das Protokoll für die Sitzung <b>{{$('Get Meeting Details').item.json.title}}</b> wurde offiziell validiert und freigegeben.</p><p>Das finale Protokoll-PDF finden Sie im Anhang dieser E-Mail.</p><p style=\"margin-top:16px;\">Mit freundlichen Grüßen,<br>Ihr Meeting-Assistent</p></body></html>",
+        "html": "=<html><body><h2>Protokoll freigegeben</h2><p>Das Protokoll für die Sitzung <b>{{$node[\"Get Meeting Details\"].json.title}}</b> wurde offiziell validiert und freigegeben.</p><p>Das finale Protokoll-PDF finden Sie im Anhang dieser E-Mail.</p><p style=\"margin-top:16px;\">Mit freundlichen Grüßen,<br>Ihr Meeting-Assistent</p></body></html>",
         "attachments": "data",
         "options": {}
       },
@@ -73,11 +83,14 @@
       "name": "Send Email with PDF",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [900, 300],
+      "position": [
+        900,
+        300
+      ],
       "credentials": {
         "smtp": {
-          "id": "eHaPFftWKgcTTXQc",
-          "name": "SMTP Account"
+          "id": "Z4QPw36ZE0HkHiHP",
+          "name": "SMTP account"
         }
       }
     }
@@ -116,7 +129,5 @@
         ]
       ]
     }
-  },
-  "active": true,
-  "settings": {}
+  }
 }

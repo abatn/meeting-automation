@@ -1,0 +1,147 @@
+{
+  "id": "2",
+  "name": "Meeting Created Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "meeting-created",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nif (!body || !body.attendees || body.attendees.length === 0) {\n  throw new Error('Missing required field: attendees array cannot be empty');\n}\nif (!body.title) {\n  throw new Error('Missing required field: title');\n}\nreturn {\n  json: {\n    body: body,\n    attendees_str: body.attendees.join(',')\n  }\n};"
+      },
+      "id": "validate-payload",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        325,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "noreply@meeting-automation.tn",
+        "toEmail": "={{$json.attendees_str}}",
+        "subject": "=Invitation: {{$json.body.title}}",
+        "text": "=You are invited to a new meeting: {{$json.body.title}} at {{$json.body.start_time || 'TBD'}}.",
+        "options": {},
+        "continueOnFail": true
+      },
+      "name": "Send Invitations",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        550,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "Z4QPw36ZE0HkHiHP",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "success",
+        "responseBody": "={\"status\":\"invitations_sent\",\"meeting_id\":\"{{$json.body.meeting_id}}\",\"attendees_count\":{{$json.attendees_str.split(',').length}},\"timestamp\":\"{{$now.toISOString()}}\"}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nconst timestamp = new Date().toISOString();\nreturn {\n  json: {\n    status: \"error\",\n    meeting_id: $json.body.meeting_id || null,\n    error_message: error?.message || 'Unknown error',\n    timestamp: timestamp\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        450
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload": {
+      "main": [
+        [
+          {
+            "node": "Send Invitations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Invitations": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Handler",
+            "type": "error",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {}
+}

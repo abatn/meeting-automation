@@ -1,6 +1,4 @@
 {
-  "id": "6",
-  "name": "User Invited Webhook",
   "nodes": [
     {
       "parameters": {
@@ -25,7 +23,7 @@
         "toEmail": "={{$json.body.email}}",
         "subject": "You have been invited to Meeting Automation",
         "text": "",
-        "html": "=<html><body><h2>Welcome {{$json.body.full_name}}!</h2><p>You have been invited to join <b>{{$json.body.company_name}}</b> on Meeting Automation.</p><p>Please click the link below to set your password and activate your account:</p><a href=\"{{$json.body.activation_link}}\" style=\"display: inline-block; padding: 10px 20px; color: white; background-color: #007bff; text-decoration: none; border-radius: 5px;\">Activate Account</a></body></html>",
+        "html": "=<html><body style=\"font-family:sans-serif\"><h2>Willkommen bei Meeting Automation!</h2><p>Hallo <b>{{$json.body.full_name}}</b>,</p><p>Sie wurden eingeladen, <b>{{$json.body.company_name}}</b> auf Meeting Automation beizutreten.</p><p>Bitte klicken Sie auf den Link unten, um Ihr Passwort zu setzen und Ihr Konto zu aktivieren:</p><br/><a href=\"{{$json.body.activation_link}}\" style=\"display:inline-block;padding:12px 24px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px\">Konto aktivieren</a><br/><br/><p style=\"color:#666;font-size:12px\">Dieser Link ist 7 Tage gültig.</p></body></html>",
         "options": {}
       },
       "id": "send-email-node",
@@ -36,10 +34,10 @@
         450,
         300
       ],
-        "credentials": {
+      "credentials": {
         "smtp": {
-          "id": "eHaPFftWKgcTTXQc",
-          "name": "SMTP Account"
+          "id": "Z4QPw36ZE0HkHiHP",
+          "name": "SMTP account"
         }
       }
     }
@@ -56,7 +54,5 @@
         ]
       ]
     }
-  },
-  "active": true,
-  "settings": {}
+  }
 }

@@ -1,0 +1,232 @@
+{
+  "id": "3",
+  "name": "Transcription Completed Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "transcription-completed",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nif (!body || !body.meeting_id) {\n  throw new Error('Missing required field: meeting_id');\n}\nreturn {\n  json: body\n};"
+      },
+      "id": "validate-transcription-payload",
+      "name": "Validate Transcription Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        225,
+        300
+      ]
+    },
+     {
+       "parameters": {
+         "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/meeting/{{$json.meeting_id}}",
+         "method": "GET",
+         "sendHeaders": true,
+         "headerParameters": {
+           "parameters": [
+             {
+               "name": "X-Internal-API-Key",
+               "value": "=internal-api-key-default"
+             }
+           ]
+         },
+         "options": {
+           "maxRetries": 3,
+           "retryWait": "exponential"
+         },
+         "continueOnFail": true
+       },
+       "name": "Get Meeting Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        375,
+        300
+      ]
+    },
+     {
+       "parameters": {
+         "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/pdf/{{$node[\"Get Meeting Details\"].json.id}}",
+         "method": "GET",
+         "sendHeaders": true,
+         "headerParameters": {
+           "parameters": [
+             {
+               "name": "X-Internal-API-Key",
+               "value": "=internal-api-key-default"
+             }
+           ]
+         },
+         "responseFormat": "file",
+         "options": {
+           "maxRetries": 2,
+           "retryWait": "exponential"
+         },
+         "continueOnFail": true
+       },
+       "name": "Download PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        550,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "noreply@meeting-automation.tn",
+        "toEmail": "={{$node[\"Get Meeting Details\"].json.attendees.join(',')}}",
+        "subject": "=Meeting Minutes: {{$node[\"Get Meeting Details\"].json.title}}",
+        "text": "=Dear participants,\n\nPlease find attached the minutes for the meeting: {{$node[\"Get Meeting Details\"].json.title}}.\n\nBest regards,\nYour Meeting Assistant",
+        "attachments": "data",
+        "options": {},
+        "continueOnFail": true
+      },
+      "name": "Send Email with PDF",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        750,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "Z4QPw36ZE0HkHiHP",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "success",
+        "responseBody": "={\"status\":\"email_sent\",\"meeting_id\":\"{{$json.meeting_id}}\",\"timestamp\":\"{{$now.toISOString()}}\"}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nreturn {\n  json: {\n    status: \"error\",\n    meeting_id: $json.meeting_id,\n    error_message: error?.message || error?.error || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        450
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Transcription Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Transcription Payload": {
+      "main": [
+        [
+          {
+            "node": "Get Meeting Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Meeting Details": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Send Email with PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Handler",
+            "type": "error",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email with PDF": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Handler",
+            "type": "error",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {}
+}

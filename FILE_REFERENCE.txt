@@ -1,0 +1,219 @@
+================================================================================
+MEETING AUTOMATION - COMPLETE FILE REFERENCE
+================================================================================
+
+1. N8N WORKFLOW FILES
+================================================================================
+Location: /home/opc/meeting-automation/n8n/workflows/
+
+- /home/opc/meeting-automation/n8n/workflows/user-invited.json (ID: 6)
+- /home/opc/meeting-automation/n8n/workflows/meeting-created.json (ID: 2)
+- /home/opc/meeting-automation/n8n/workflows/meeting-status-changed.json (ID: 7)
+- /home/opc/meeting-automation/n8n/workflows/audio-uploaded.json (ID: 1)
+- /home/opc/meeting-automation/n8n/workflows/transcription-completed.json (ID: 3)
+- /home/opc/meeting-automation/n8n/workflows/pv-validated.json (ID: 5)
+- /home/opc/meeting-automation/n8n/workflows/daily-reminders.json (ID: 4)
+
+2. BACKEND WEBHOOK UTILITIES & ENDPOINTS
+================================================================================
+
+Webhook Utilities:
+- /home/opc/meeting-automation/backend/app/utils/webhook_utils.py
+  ✓ trigger_user_invited_webhook()
+  
+Meeting Service (Outbound Webhooks):
+- /home/opc/meeting-automation/backend/app/services/meeting_service.py
+  ✓ _trigger_n8n_meeting_created() [lines 152-200]
+  ✓ _trigger_n8n_meeting_status_change() [lines 202-221]
+
+Recording Service (Outbound Webhooks):
+- /home/opc/meeting-automation/backend/app/services/recording_service.py
+  ✓ after_upload() (triggers audio-uploaded webhook)
+
+Team Service:
+- /home/opc/meeting-automation/backend/app/services/team_service.py
+  ✓ Calls trigger_user_invited_webhook() when user invited
+
+Webhook Endpoints (Inbound):
+- /home/opc/meeting-automation/backend/app/api/v1/webhooks.py
+  ✓ transcription_complete() [lines 17-84]
+  ✓ pv_generated() [lines 87-105]
+  ✓ actions_extracted() [lines 108-123]
+
+3. DATABASE MODELS
+================================================================================
+Location: /home/opc/meeting-automation/backend/app/models/
+
+- /home/opc/meeting-automation/backend/app/models/meeting.py
+  ✓ Meeting (meetings table)
+  ✓ Participant (participants table)
+  ✓ Agenda (agendas table)
+
+- /home/opc/meeting-automation/backend/app/models/recording.py
+  ✓ Recording (recordings table)
+  ✓ Chunk (recording_chunks table)
+
+- /home/opc/meeting-automation/backend/app/models/transcription.py
+  ✓ Transcription (transcriptions table)
+  ✓ Segment (transcription_segments table)
+  ✓ Speaker (speakers table)
+
+- /home/opc/meeting-automation/backend/app/models/pv.py
+  ✓ PV (pv table)
+
+- /home/opc/meeting-automation/backend/app/models/action.py
+  ✓ Action (actions table)
+  ✓ Assignment (action_assignments table)
+
+4. DATABASE MIGRATIONS
+================================================================================
+Location: /home/opc/meeting-automation/backend/alembic/versions/
+
+Key Migration:
+- /home/opc/meeting-automation/backend/alembic/versions/b4c5d6e7f8a9_add_missing_constraints_and_indices.py
+  ✓ Creates n8n_meetings table (lines 28-36)
+  ✓ Adds UNIQUE constraint on participants(meeting_id, email)
+  ✓ CHECK constraint on meetings.end_time > start_time
+  ✓ Indices on actions, action_assignments, recordings for performance
+
+5. CONFIGURATION
+================================================================================
+
+Main Config:
+- /home/opc/meeting-automation/backend/app/core/config.py
+  ✓ N8N_WEBHOOK_URL
+  ✓ N8N_WEBHOOK_USER_INVITED
+  ✓ N8N_WEBHOOK_MEETING_CREATED
+  ✓ N8N_WEBHOOK_MEETING_STATUS_CHANGED
+  ✓ N8N_WEBHOOK_AUDIO_UPLOADED
+  ✓ N8N_WEBHOOK_PV_VALIDATED
+  ✓ N8N_WEBHOOK_DAILY_REMINDER
+  ✓ N8N_WEBHOOK_TRANSCRIPTION_COMPLETED
+  ✓ INTERNAL_API_SECRET
+  ✓ BACKEND_CALLBACK_URL
+
+6. TEST FILES
+================================================================================
+
+E2E Tests:
+- /home/opc/meeting-automation/backend/tests/e2e/test_n8n_webhook_integration.py
+
+Test Configuration:
+- /home/opc/meeting-automation/backend/tests/conftest.py
+  ✓ Database setup for SQLite (default) or PostgreSQL (E2E_MODE=true)
+  ✓ Test fixtures: db_session, client, normal_user_token_headers
+
+================================================================================
+WEBHOOK SUMMARY TABLE
+================================================================================
+
+┌─────────────────────────────┬─────────────────────────────────────────┐
+│ WEBHOOK TYPE                │ PAYLOAD FIELDS                          │
+├─────────────────────────────┼─────────────────────────────────────────┤
+│ user-invited                │ email, full_name, company_name,         │
+│ (OUTBOUND)                  │ activation_link                         │
+├─────────────────────────────┼─────────────────────────────────────────┤
+│ meeting-created             │ id, title, description, location,       │
+│ (OUTBOUND)                  │ start_time, end_time, status,           │
+│                             │ attendees[], participants[]             │
+├─────────────────────────────┼─────────────────────────────────────────┤
+│ meeting-status-changed      │ meeting_id, status, previous_status,    │
+│ (OUTBOUND)                  │ attendees[], title, start_time          │
+├─────────────────────────────┼─────────────────────────────────────────┤
+│ audio-uploaded              │ event, recording_id, meeting_id,        │
+│ (OUTBOUND)                  │ file_path, callback_url                 │
+├─────────────────────────────┼─────────────────────────────────────────┤
+│ transcription-complete      │ recording_id, meeting_id,               │
+│ (INBOUND)                   │ transcription|transcription_text        │
+├─────────────────────────────┼─────────────────────────────────────────┤
+│ pv-generated                │ meeting_id, pv_content                  │
+│ (INBOUND)                   │                                         │
+├─────────────────────────────┼─────────────────────────────────────────┤
+│ actions-extracted           │ pv_id, actions[]                        │
+│ (INBOUND)                   │                                         │
+├─────────────────────────────┼─────────────────────────────────────────┤
+│ daily-reminders             │ (Cron-triggered, not webhook-based)     │
+│ (N8N CRON)                  │ Queries GET /api/v1/actions/pending     │
+└─────────────────────────────┴─────────────────────────────────────────┘
+
+================================================================================
+SECURITY DETAILS
+================================================================================
+
+Authentication:
+  - Header: X-Internal-API-Key: super-secret-automation-key-2026
+  - Verified via: deps.verify_internal_api_key dependency
+
+Multi-Tenant Isolation:
+  - All database queries filter by client_id from JWT token
+  - Webhook payloads derived from client_id context
+
+Encryption:
+  - Transcription.full_text: encrypted via EncryptedText type
+  - Transcription_segments.text: encrypted
+
+Audit Logging:
+  - ISO 27001 A.12.4.1 compliance
+  - Each outbound webhook logged to audit_log table
+  - Action: "N8N_MEETING_CREATED_TRIGGERED", etc.
+
+================================================================================
+DATABASE CONSTRAINTS & INDICES
+================================================================================
+
+meetings table:
+  - PK: id
+  - FK: client_id → clients.id (CASCADE)
+  - FK: creator_id → users.id
+  - FK: room_id → meeting_rooms.id
+  - CHECK: end_time IS NULL OR end_time > start_time
+  - INDEX: (created_at DESC)
+
+participants table:
+  - PK: id
+  - FK: meeting_id → meetings.id (CASCADE)
+  - FK: user_id → users.id
+  - UNIQUE: (meeting_id, email)
+
+recordings table:
+  - PK: id
+  - FK: client_id → clients.id (CASCADE)
+  - FK: meeting_id → meetings.id (CASCADE)
+  - INDEX: (meeting_id, status)
+
+transcriptions table:
+  - PK: id
+  - FK: client_id → clients.id (CASCADE)
+  - FK: meeting_id → meetings.id (CASCADE)
+  - FK: recording_id → recordings.id (CASCADE)
+  - Idempotency check: (recording_id, client_id)
+
+actions table:
+  - PK: id
+  - FK: meeting_id → meetings.id (CASCADE)
+  - FK: pv_id → pv.id
+  - INDEX: (meeting_id, status)
+
+n8n_meetings table (audit trail):
+  - PK: id
+  - FK: meeting_id → meetings.id (CASCADE)
+
+================================================================================
+Quick Start Testing
+================================================================================
+
+Run all backend tests:
+  cd /home/opc/meeting-automation/backend
+  pytest tests/ -v
+
+Run E2E tests (PostgreSQL):
+  E2E_MODE=true pytest tests/e2e/ -v
+
+Run specific webhook test:
+  pytest tests/e2e/test_n8n_webhook_integration.py -v
+
+Run webhook endpoint test:
+  pytest tests/e2e/test_phase6_n8n_automation.py -v
+
+================================================================================
+Last Updated: 2026-05-06

@@ -1,6 +1,6 @@
 {
   "id": "4",
-  "activeVersionId": "7508d913-c30c-4189-9c13-7a6c4b9b16d0",
+  "name": "Daily Reminders Automation",
   "nodes": [
     {
       "parameters": {
@@ -12,37 +12,42 @@
           ]
         }
       },
+      "id": "cron-trigger-node",
       "name": "Cron Trigger",
       "type": "n8n-nodes-base.cron",
       "typeVersion": 1,
       "position": [
-        112,
-        304
-      ],
-      "id": "3edbfbaf-0bf4-4be0-9cf1-881f07494c06"
+        100,
+        300
+      ]
     },
     {
       "parameters": {
         "url": "http://meeting-automation-backend-1:8000/api/v1/actions/pending",
+        "method": "GET",
+        "authentication": "none",
         "sendHeaders": true,
         "headerParameters": {
-          "parameters": [
-            {
-              "name": "X-Internal-API-Key",
-              "value": "super-secret-automation-key-2026"
-            }
-          ]
+           "parameters": [
+             {
+               "name": "X-Internal-API-Key",
+               "value": "=internal-api-key-default"
+             }
+           ]
         },
-        "options": {}
+        "options": {
+          "maxRetries": 3,
+          "retryWait": "exponential"
+        },
+        "continueOnFail": true
       },
       "name": "Get Pending Actions",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        304,
-        304
-      ],
-      "id": "f2fa9c35-78bc-453f-9ac8-6978853f8536"
+        300,
+        300
+      ]
     },
     {
       "parameters": {
@@ -53,8 +58,8 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        416,
-        304
+        410,
+        300
       ]
     },
     {
@@ -72,27 +77,73 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
       "position": [
-        512,
-        304
+        500,
+        300
+      ]
+    },
+    {
+       "parameters": {
+         "url": "=https://graph.facebook.com/v18.0/YOUR_WHATSAPP_PHONE_ID/messages",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messaging_product",
+              "value": "whatsapp"
+            },
+            {
+              "name": "to",
+              "value": "={{$json.assignee_phone}}"
+            },
+            {
+              "name": "type",
+              "value": "text"
+            },
+            {
+              "name": "text",
+              "value": "={{ { body: 'Reminder: Your action item ' + $json.title + ' is due today!' } }}"
+            }
+          ]
+        },
+        "options": {
+          "maxRetries": 3,
+          "retryWait": "exponential"
+        },
+        "continueOnFail": true
+      },
+      "name": "WhatsApp Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        750,
+        200
       ],
-      "id": "ba148bf1-287d-434e-a640-74354c5eb4cb"
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "3",
+          "name": "WhatsApp Token"
+        }
+      }
     },
     {
       "parameters": {
+        "resource": "email",
+        "operation": "send",
         "fromEmail": "escalations@meeting-automation.tn",
         "toEmail": "={{$json[\"manager_email\"]}}",
         "subject": "=Action Item Escalation: {{$json[\"title\"]}}",
+        "text": "=The following action item is overdue: {{$json[\"title\"]}}. Assigned to: {{$json[\"assignee_name\"]}}.",
         "options": {}
       },
       "name": "Escalate to Manager",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        784,
-        288
+        750,
+        400
       ],
-      "id": "a78ace35-d7ad-4c2b-aa67-e35eaea7c117",
-      "webhookId": "1597089c-831c-4648-80b6-fde71abdf1b3",
       "credentials": {
         "smtp": {
           "id": "Z4QPw36ZE0HkHiHP",
@@ -139,13 +190,21 @@
       "main": [
         [
           {
-            "node": "Escalate to Manager",
+            "node": "WhatsApp Reminder",
             "type": "main",
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "Escalate to Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
-  }
+  },
+  "active": true,
+  "settings": {}
 }

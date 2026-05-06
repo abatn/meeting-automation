@@ -1,12 +1,13 @@
 {
   "id": "3",
-  "name": "Transcription Completed Notification",
+  "activeVersionId": "12ce0e98-c136-4cef-aa66-21df5e6eec52",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "transcription-completed",
-        "options": {}
+        "options": {},
+        "responseMode": "onReceived"
       },
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
@@ -14,59 +15,82 @@
       "position": [
         100,
         300
+      ],
+      "id": "transcription-completed-webhook-node",
+      "webhookId": "transcription-completed-webhook-id"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nif (!body || !body.meeting_id) {\n  throw new Error('Missing required field: meeting_id');\n}\nreturn { json: body };"
+      },
+      "id": "validate-transcription-payload",
+      "name": "Validate Transcription Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        225,
+        300
       ]
     },
     {
       "parameters": {
-        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/meeting/{{$node[\"Webhook\"].json[\"body\"][\"meeting_id\"]}}",
+        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/meeting/{{$json.meeting_id}}",
         "method": "GET",
-        "queryParameters": {
+        "sendHeaders": true,
+        "headerParameters": {
           "parameters": [
             {
-              "name": "x_secret",
+              "name": "X-Internal-API-Key",
               "value": "super-secret-automation-key-2026"
             }
           ]
         },
-        "options": {}
+        "options": {
+          "maxRetries": 3
+        }
       },
       "name": "Get Meeting Details",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        300,
+        375,
         300
-      ]
+      ],
+      "id": "1692794a-b550-45ba-89fe-b95c310b5ded"
     },
     {
       "parameters": {
-        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/pdf/{{$node[\"Webhook\"].json[\"body\"][\"meeting_id\"]}}",
+        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/pdf/{{$node[\"Get Meeting Details\"].json.id}}",
         "method": "GET",
-        "queryParameters": {
+        "sendHeaders": true,
+        "headerParameters": {
           "parameters": [
             {
-              "name": "x_secret",
+              "name": "X-Internal-API-Key",
               "value": "super-secret-automation-key-2026"
             }
           ]
         },
         "responseFormat": "file",
-        "options": {}
+        "options": {
+          "maxRetries": 2
+        }
       },
       "name": "Download PDF",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        500,
+        550,
         300
-      ]
+      ],
+      "id": "b8dbd21f-82be-4b39-87ab-b706f19323d5"
     },
     {
       "parameters": {
         "fromEmail": "noreply@meeting-automation.tn",
-        "toEmail": "={{$node[\"Get Meeting Details\"].json[\"attendees\"].join(',')}}",
-        "subject": "=Meeting Minutes: {{$node[\"Get Meeting Details\"].json[\"title\"]}}",
-        "text": "=Dear participants,\n\nPlease find attached the minutes for the meeting: {{$node[\"Get Meeting Details\"].json[\"title\"]}}.\n\nBest regards,\nYour Meeting Assistant",
+        "toEmail": "={{$node[\"Get Meeting Details\"].json.attendees.join(',')}}",
+        "subject": "=Meeting Minutes: {{$node[\"Get Meeting Details\"].json.title}}",
+        "text": "=Dear participants,\n\nPlease find attached the minutes for the meeting: {{$node[\"Get Meeting Details\"].json.title}}.\n\nBest regards,\nYour Meeting Assistant",
         "attachments": "data",
         "options": {}
       },
@@ -79,14 +103,26 @@
       ],
       "credentials": {
         "smtp": {
-          "id": "eHaPFftWKgcTTXQc",
+          "id": "Z4QPw36ZE0HkHiHP",
           "name": "SMTP account"
         }
-      }
+      },
+      "id": "4ef77e49-0e74-4b2c-a35a-8a45c1397ef5"
     }
   ],
   "connections": {
     "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Transcription Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Transcription Payload": {
       "main": [
         [
           {

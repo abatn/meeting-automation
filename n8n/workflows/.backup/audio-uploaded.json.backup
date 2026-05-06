@@ -1,0 +1,148 @@
+{
+  "id": "1",
+  "name": "Audio Uploaded Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "audio-uploaded",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nif (!body || !body.meeting_id || !body.audio_url) {\n  throw new Error('Missing required fields: meeting_id and audio_url are required');\n}\nreturn {\n  json: body\n};"
+      },
+      "id": "validate-audio-payload",
+      "name": "Validate Audio Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        225,
+        300
+      ]
+    },
+     {
+       "parameters": {
+         "url": "=http://meeting-automation-backend-1:8000/api/v1/transcription/start",
+         "method": "POST",
+         "sendHeaders": true,
+         "headerParameters": {
+           "parameters": [
+             {
+               "name": "X-Internal-API-Key",
+               "value": "=internal-api-key-default"
+             },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "meeting_id",
+              "value": "={{$json.meeting_id}}"
+            },
+            {
+              "name": "audio_url",
+              "value": "={{$json.audio_url}}"
+            }
+          ]
+        },
+        "options": {
+          "maxRetries": 3,
+          "retryWait": "exponential"
+        },
+        "continueOnFail": true
+      },
+      "id": "start-transcription",
+      "name": "Start Transcription",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "success",
+        "responseBody": "={\"status\":\"transcription_started\",\"meeting_id\":\"{{$json.meeting_id}}\",\"timestamp\":\"{{$now.toISOString()}}\"}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        550,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nif (error.error || error.message) {\n  throw new Error(`Transcription failed: ${error.message || error.error}`);\n}\nreturn {json: error};"
+      },
+      "id": "error-handler",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        550,
+        450
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Audio Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Audio Payload": {
+      "main": [
+        [
+          {
+            "node": "Start Transcription",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Transcription": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Error",
+            "type": "error",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {}
+}

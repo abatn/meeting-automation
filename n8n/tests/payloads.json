@@ -1,0 +1,191 @@
+{
+  "test_payloads": {
+    "audio_uploaded": {
+      "valid": {
+        "meeting_id": "meeting-20260506-001",
+        "audio_url": "https://s3.example.com/meeting-20260506-001/audio.mp3",
+        "duration_seconds": 3600,
+        "format": "mp3",
+        "sample_rate": 16000
+      },
+      "invalid_missing_meeting_id": {
+        "audio_url": "https://s3.example.com/audio.mp3",
+        "duration_seconds": 3600
+      },
+      "invalid_missing_audio_url": {
+        "meeting_id": "meeting-20260506-001",
+        "duration_seconds": 3600
+      }
+    },
+    "meeting_created": {
+      "valid": {
+        "body": {
+          "meeting_id": "meeting-20260506-002",
+          "title": "Team Standup",
+          "description": "Daily team synchronization",
+          "start_time": "2026-05-06T10:00:00Z",
+          "end_time": "2026-05-06T10:30:00Z",
+          "location": "Conference Room A",
+          "attendees": [
+            "alice@example.com",
+            "bob@example.com",
+            "charlie@example.com"
+          ]
+        }
+      },
+      "invalid_missing_attendees": {
+        "body": {
+          "meeting_id": "meeting-20260506-002",
+          "title": "Team Standup",
+          "start_time": "2026-05-06T10:00:00Z"
+        }
+      },
+      "invalid_empty_attendees": {
+        "body": {
+          "meeting_id": "meeting-20260506-002",
+          "title": "Team Standup",
+          "start_time": "2026-05-06T10:00:00Z",
+          "attendees": []
+        }
+      }
+    },
+    "transcription_completed": {
+      "valid": {
+        "body": {
+          "meeting_id": "meeting-20260506-003",
+          "transcription_id": "trans-20260506-001",
+          "content": "This is the transcribed meeting content with full text...",
+          "duration_seconds": 3600,
+          "language": "en-US",
+          "confidence_score": 0.95,
+          "speaker_count": 3,
+          "has_diarization": true
+        }
+      },
+      "invalid_missing_meeting_id": {
+        "body": {
+          "transcription_id": "trans-20260506-001",
+          "content": "Meeting content"
+        }
+      }
+    },
+    "pv_validated": {
+      "valid": {
+        "body": {
+          "meeting_id": "meeting-20260506-004",
+          "pv_id": "pv-20260506-001",
+          "status": "validated",
+          "version": 1,
+          "validated_by": "user-001",
+          "validated_at": "2026-05-06T11:00:00Z",
+          "content_html": "<h1>Meeting Minutes</h1><p>Content here</p>",
+          "content_text": "Meeting Minutes\nContent here"
+        }
+      },
+      "invalid_missing_meeting_id": {
+        "body": {
+          "pv_id": "pv-20260506-001",
+          "status": "validated"
+        }
+      }
+    },
+    "user_invited": {
+      "valid": {
+        "body": {
+          "email": "newuser@example.com",
+          "full_name": "John Doe",
+          "company_name": "Acme Corporation",
+          "role": "participant",
+          "activation_link": "https://example.com/activate?token=abc123def456",
+          "expires_at": "2026-05-13T10:00:00Z"
+        }
+      },
+      "invalid_missing_email": {
+        "body": {
+          "full_name": "John Doe",
+          "company_name": "Acme Corp",
+          "activation_link": "https://example.com/activate"
+        }
+      },
+      "invalid_missing_activation_link": {
+        "body": {
+          "email": "newuser@example.com",
+          "full_name": "John Doe",
+          "company_name": "Acme Corp"
+        }
+      }
+    },
+    "meeting_status_changed": {
+      "valid": {
+        "body": {
+          "meeting_id": "meeting-20260506-005",
+          "title": "Board Meeting",
+          "status": "in_progress",
+          "previous_status": "planned",
+          "start_time": "2026-05-06T14:00:00Z",
+          "end_time": "2026-05-06T15:00:00Z",
+          "changed_by": "user-001",
+          "changed_at": "2026-05-06T14:00:00Z",
+          "attendees": [
+            "executive1@example.com",
+            "executive2@example.com",
+            "executive3@example.com"
+          ]
+        }
+      },
+      "invalid_missing_status": {
+        "body": {
+          "meeting_id": "meeting-20260506-005",
+          "title": "Board Meeting",
+          "attendees": ["exec@example.com"]
+        }
+      },
+      "invalid_empty_attendees": {
+        "body": {
+          "meeting_id": "meeting-20260506-005",
+          "title": "Board Meeting",
+          "status": "in_progress",
+          "attendees": []
+        }
+      }
+    }
+  },
+  "expected_responses": {
+    "audio_uploaded": {
+      "status": "transcription_started",
+      "required_fields": ["status", "meeting_id", "timestamp"]
+    },
+    "meeting_created": {
+      "status": "invitations_sent",
+      "required_fields": ["status", "meeting_id", "attendees_count", "timestamp"]
+    },
+    "transcription_completed": {
+      "status": "email_sent",
+      "required_fields": ["status", "meeting_id", "timestamp"]
+    },
+    "pv_validated": {
+      "status": "pv_distributed",
+      "required_fields": ["status", "meeting_id", "timestamp"]
+    },
+    "user_invited": {
+      "status": "invitation_sent",
+      "required_fields": ["status", "email", "timestamp"]
+    },
+    "meeting_status_changed": {
+      "status": "notification_sent",
+      "required_fields": ["status", "status_change", "timestamp"]
+    }
+  },
+  "error_responses": {
+    "validation_error": {
+      "status": "error",
+      "error_message": "Missing required field: ...",
+      "timestamp": "2026-05-06T10:00:00Z"
+    },
+    "api_error": {
+      "status": "error",
+      "error_message": "Backend API error: ...",
+      "timestamp": "2026-05-06T10:00:00Z"
+    }
+  }
+}

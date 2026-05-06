@@ -1,39 +1,55 @@
 {
-  "id": "2",
-  "name": "Meeting Created Automation",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "meeting-created",
+        "responseMode": "onReceived",
         "options": {}
       },
+      "id": "meeting-created-webhook-node",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        100,
+        250,
+        300
+      ],
+      "webhookId": "meeting-created-webhook-id"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst body = data.body || {};\nconst attendees = body.attendees || [];\nconst toEmail = Array.isArray(attendees) ? attendees.join(',') : String(attendees);\nif (!toEmail) throw new Error('No attendees found in payload');\nreturn { json: { ...data, toEmail: toEmail } };"
+      },
+      "id": "meeting-created-prepare-node",
+      "name": "Prepare Attendees",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
         300
       ]
     },
     {
       "parameters": {
         "fromEmail": "noreply@meeting-automation.tn",
-        "toEmail": "={{$node[\"Webhook\"].json[\"body\"][\"attendees\"].join(',')}}",
-        "subject": "=Invitation: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}}",
-        "text": "=You are invited to a new meeting: {{$node[\"Webhook\"].json[\"body\"][\"title\"]}} at {{$node[\"Webhook\"].json[\"body\"][\"start_time\"]}}.",
+        "toEmail": "={{$json.toEmail}}",
+        "subject": "=📅 Meeting-Einladung: {{$json.body.title}}",
+        "text": "=Sie wurden zum Meeting eingeladen: {{$json.body.title}}\nDatum: {{$json.body.start_time || 'TBD'}}",
+        "html": "=<html><body style=\"font-family:sans-serif\"><h2>📅 Meeting-Einladung</h2><p>Sie wurden zum folgenden Meeting eingeladen:</p><h3>{{$json.body.title}}</h3><p><b>Datum:</b> {{$json.body.start_time || 'TBD'}}</p><p><b>Beschreibung:</b> {{$json.body.description || '-'}}</p><p><b>Ort:</b> {{$json.body.location || 'Online'}}</p><br/><a href=\"{{$json.body.meeting_link || '#'}}\" style=\"display:inline-block;padding:12px 24px;color:white;background-color:#28a745;text-decoration:none;border-radius:5px\">Am Meeting teilnehmen</a></body></html>",
         "options": {}
       },
-      "name": "Send Invitations",
+      "id": "meeting-created-send-email-node",
+      "name": "Send Meeting Invitation",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2,
       "position": [
-        550,
+        690,
         300
       ],
       "credentials": {
         "smtp": {
-          "id": "eHaPFftWKgcTTXQc",
+          "id": "Z4QPw36ZE0HkHiHP",
           "name": "SMTP account"
         }
       }
@@ -44,14 +60,23 @@
       "main": [
         [
           {
-            "node": "Send Invitations",
+            "node": "Prepare Attendees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Attendees": {
+      "main": [
+        [
+          {
+            "node": "Send Meeting Invitation",
             "type": "main",
             "index": 0
           }
         ]
       ]
     }
-  },
-  "active": true,
-  "settings": {}
+  }
 }
