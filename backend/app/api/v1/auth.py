@@ -106,7 +106,7 @@ async def confirm_activation(
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role,
-            "created_at": user.created_at,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
         },
     }
     

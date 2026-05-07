@@ -38,59 +38,44 @@ done
 echo -e "${GREEN}PostgreSQL is ready!${NC}"
 
 # 3. Run Database Migrations (Alembic)
-echo -e "${YELLOW}Checking database state for Alembic migrations...${NC}"
-TABLE_EXISTS=$($DOCKER_COMPOSE exec -T postgres psql -U meeting_user -d meeting_db -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename  = 'users');")
-
-if [ "$TABLE_EXISTS" = "t" ]; then
-    echo -e "${BLUE}Tables already auto-created by backend. Syncing Alembic state...${NC}"
-    $DOCKER_COMPOSE exec -T backend alembic stamp head
-else
-    echo -e "${YELLOW}Running Alembic migrations from scratch...${NC}"
-    $DOCKER_COMPOSE exec -T backend alembic upgrade head
-fi
+echo -e "${YELLOW}Running Alembic migrations...${NC}"
+$DOCKER_COMPOSE exec -T backend alembic upgrade head
 echo -e "${GREEN}Database schema is up to date.${NC}"
 
-# 4. Create n8n Helper Table (Not in standard migrations)
-echo -e "${YELLOW}Initializing n8n auxiliary table (n8n_meetings)...${NC}"
-$DOCKER_COMPOSE exec -T postgres psql -U meeting_user -d meeting_db -c "
-CREATE TABLE IF NOT EXISTS n8n_meetings (
-    id SERIAL PRIMARY KEY,
-    meeting_id VARCHAR(255) NOT NULL,
-    title TEXT,
-    start_time VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);"
-echo -e "${GREEN}n8n table initialized.${NC}"
-
-# 5. Seed Test Users
+# 4. Seed Test Users
 echo -e "${YELLOW}Seeding enterprise test users...${NC}"
 $DOCKER_COMPOSE exec -T backend python scripts/seed_users.py
 echo -e "${GREEN}Users seeded successfully.${NC}"
 
-# 6. Initialize MinIO / S3 Buckets
+# 5. Initialize MinIO / S3 Buckets
 echo -e "${YELLOW}Waiting for MinIO API...${NC}"
 sleep 5
-echo -e "${YELLOW}Creating S3 bucket 'meeting-recordings'...${NC}"
-# Use the local script content to ensure it runs inside the container
-$DOCKER_COMPOSE exec -T backend python - < scripts/create_s3_bucket.py
+echo -e "${YELLOW}Creating S3 bucket 'recordings'...${NC}"
+# Create bucket using MinIO client (mc) inside MinIO container
+$DOCKER_COMPOSE exec -T minio mc alias set myminio http://localhost:9000 minio_user minio_password
+$DOCKER_COMPOSE exec -T minio mc mb myminio/recordings --ignore-existing
 echo -e "${GREEN}S3 infrastructure ready.${NC}"
 
-# 7. Import n8n Workflows
-echo -e "${YELLOW}Importing n8n workflows...${NC}"
-WORKFLOWS_DIR="./n8n/workflows"
-if [ -d "$WORKFLOWS_DIR" ]; then
-    IMPORTED=0
-    for workflow_file in "$WORKFLOWS_DIR"/*.json; do
-        if [ -f "$workflow_file" ]; then
-            WORKFLOW_NAME=$(basename "$workflow_file" .json)
-            echo -e "${BLUE}Importing workflow: $WORKFLOW_NAME...${NC}"
-            $DOCKER_COMPOSE exec -T n8n n8n import:workflow --input="$workflow_file" 2>/dev/null && IMPORTED=$((IMPORTED + 1)) || echo -e "${YELLOW}Warning: Failed to import $WORKFLOW_NAME (may already exist)${NC}"
-        fi
-    done
-    echo -e "${GREEN}n8n workflows imported: $IMPORTED/${IMPORTED}${NC}"
-else
-    echo -e "${YELLOW}n8n workflows directory not found, skipping...${NC}"
-fi
+# 6. n8n Workflow Setup
+# NOTE: CLI import does NOT properly register webhooks!
+# Workflows MUST be imported and activated via n8n UI for webhooks to work.
+echo -e "${YELLOW}==================================================${NC}"
+echo -e "${RED}IMPORTANT: n8n Workflow Manual Setup Required!${NC}"
+echo -e "${YELLOW}==================================================${NC}"
+echo -e "1. Open n8n UI at: ${BLUE}http://localhost:5678${NC}"
+echo -e "2. Complete initial owner account setup"
+echo -e "3. Import workflows from: ${BLUE}./n8n/workflows/*.json${NC}"
+echo -e "4. Configure SMTP credentials in each workflow"
+echo -e "5. ${RED}ACTIVATE${NC} each workflow (Toggle → Green)"
+echo -e "${YELLOW}==================================================${NC}"
+echo -e ""
+# Automated import is DISABLED - webhooks will not work via CLI
+# WORKFLOWS_DIR="./n8n/workflows"
+# if [ -d "$WORKFLOWS_DIR" ]; then
+#     for workflow_file in "$WORKFLOWS_DIR"/*.json; do
+#         $DOCKER_COMPOSE exec -T n8n n8n import:workflow --input="$workflow_file"
+#     done
+# fi
 
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${GREEN}   SETUP COMPLETED SUCCESSFULLY!                   ${NC}"
