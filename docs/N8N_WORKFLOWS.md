@@ -54,6 +54,10 @@ n8n dient nun ausschließlich als **orchestrator für externe Kommunikation** (E
     - Ruft Meeting-Details vom Backend ab.
     - Lädt das finale PDF-Protokoll herunter.
     - Sendet das PDF als E-Mail-Anhang an alle Teilnehmer.
+- **Status**: ✅ Produktiv (PDF-Attachment Fix: 09.05.2026)
+- **Konfiguration**:
+    - HTTP Request Node: `options.response.responseFormat: "file"`, `outputPropertyName: "data"`
+    - Email Send Node: `options.attachments: "data"`
 
 ## Setup & Aktivierung
 

@@ -1,5 +1,6 @@
 {
-  "id": "5",
+  "name": "pv-validated",
+  "id": "5_dJFUYSTiynU5Oe0CEBag",
   "activeVersionId": "6de9e553-b21b-4461-a60c-15dab8cb2db1",
   "nodes": [
     {
@@ -21,7 +22,20 @@
     },
     {
       "parameters": {
-        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/meeting/{{$json.meeting_id || $json.body.meeting_id}}",
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nif (!body || !body.meeting_id) {\n  throw new Error('Missing required field: meeting_id');\n}\nreturn { json: body };"
+      },
+      "id": "normalize-payload-node",
+      "name": "Normalize Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=http://meeting-automation-backend-1:8000/api/v1/reports/automation/meeting/{{$json.meeting_id}}",
         "method": "GET",
         "sendHeaders": true,
         "headerParameters": {
@@ -39,7 +53,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        460,
+        670,
         300
       ]
     },
@@ -56,8 +70,14 @@
             }
           ]
         },
-        "responseFormat": "file",
-        "options": {},
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        },
         "continueOnFail": true
       },
       "id": "download-pdf-node",
@@ -65,7 +85,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [
-        670,
+        880,
         300
       ]
     },
@@ -76,15 +96,16 @@
         "subject": "=✅ Protokoll freigegeben: {{$node[\"Get Meeting Details\"].json.title}}",
         "text": "",
         "html": "=<html><body><h2>Protokoll freigegeben</h2><p>Das Protokoll für die Sitzung <b>{{$node[\"Get Meeting Details\"].json.title}}</b> wurde offiziell validiert und freigegeben.</p><p>Das finale Protokoll-PDF finden Sie im Anhang dieser E-Mail.</p><p style=\"margin-top:16px;\">Mit freundlichen Grüßen,<br>Ihr Meeting-Assistent</p></body></html>",
-        "attachments": "data",
-        "options": {}
+        "options": {
+          "attachments": "data"
+        }
       },
       "id": "send-email-node",
       "name": "Send Email with PDF",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        900,
+        1100,
         300
       ],
       "credentials": {
@@ -97,6 +118,17 @@
   ],
   "connections": {
     "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Payload": {
       "main": [
         [
           {

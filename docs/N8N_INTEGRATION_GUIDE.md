@@ -217,6 +217,11 @@ async def trigger_n8n_webhook(url: str, payload: dict, headers: dict = None):
 }
 ```
 
+**Note:** PDF attachment requires proper HTTP Request node configuration:
+- `responseFormat: "file"` in `options.response.responseFormat`
+- `outputPropertyName: "data"`
+- Email Send node: `attachments: "data"`
+
 ### 6.6 User Invited
 
 ```json

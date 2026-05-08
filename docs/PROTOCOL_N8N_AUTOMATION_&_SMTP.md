@@ -218,7 +218,17 @@ Alle Dokumentationen aktualisiert mit den neuen Security-Verbesserungen:
 - ✅ `docs/N8N_INTEGRATION_GUIDE.md` - Backend-Integration mit Authentication-Details
 - ✅ `docs/PROTOCOL_N8N_AUTOMATION_&_SMTP.md` - Vollständiges Protokoll mit allen Fixes
 
-### 20. Next Steps (06.05.2026)
+### 20. PDF Attachment Fix (09.05.2026)
+- **Problem:** `pv-validated` Workflow sendete E-Mail ohne PDF-Anhang.
+- **Ursache:** HTTP Request Node konfigurierte `responseFormat: "file"` falsch in `options.response.responseFormat` statt `responseFormat`.
+- **Lösung:** Korrektur der Node-Konfiguration:
+  - HTTP Request Node: `options.response.responseFormat: "file"` und `outputPropertyName: "data"`
+  - Email Send Node: `options.attachments: "data"`
+- **Verifizierung:** E2E-Test bestätigt – E-Mail mit PDF-Anhang (25 KB) erfolgreich gesendet.
+- **Workflow ID:** 5_dJFUYSTiynU5Oe0CEBag (aktiviert via n8n UI)
+- **Test-Daten:** Meeting ID: a685f868-15b8-43a5-81e3-9f0a1304db59, Empfänger: batniniabdelkader@yahoo.com
+
+### 21. Next Steps (09.05.2026)
 
 🎯 **Phase 2 - WICHTIG (nächste 2 Wochen):**
 - [ ] Error Catches zu allen HTTP Nodes hinzufügen
