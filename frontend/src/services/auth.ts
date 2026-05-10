@@ -19,6 +19,12 @@ export const authService = {
     const response = await api.post("/auth/register", userData);
     return response.data;
   },
+  resendActivation: async (email: string) => {
+    const response = await api.post("/auth/resend-activation", { email }, {
+      withCredentials: true,
+    });
+    return response.data;
+  },
   logout: async () => {
     try {
       // Backend should delete httpOnly cookie on logout

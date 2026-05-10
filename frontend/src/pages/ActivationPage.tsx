@@ -13,6 +13,7 @@ import { useDispatch } from "react-redux";
 import { AppDispatch } from "../store";
 import { setCredentials, logout } from "../store/authSlice";
 import axios from "axios";
+import PasswordStrengthIndicator from "../components/common/PasswordStrengthIndicator";
 
 const ActivationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -140,6 +141,7 @@ const ActivationPage: React.FC = () => {
                 margin="normal"
                 required
               />
+              <PasswordStrengthIndicator password={password} />
               <TextField
                 fullWidth
                 label="Confirm Password"

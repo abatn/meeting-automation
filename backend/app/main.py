@@ -24,6 +24,7 @@ from app.api.v1 import (
     team,
     rooms,
     audit,
+    cms,
 )
 from app.core.websocket import manager
 import asyncio
@@ -139,6 +140,7 @@ app.include_router(team.router, prefix="/api/v1/team", tags=["Team Management"])
 app.include_router(rooms.router, prefix="/api/v1/rooms", tags=["Meeting Rooms"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit Logging"])
 app.include_router(webhooks_stripe.router, prefix="/api/v1/webhooks/stripe", tags=["Stripe Webhooks"])
+app.include_router(cms.router, prefix="/api/v1/cms", tags=["CMS"])
 
 if __name__ == "__main__":
     import uvicorn

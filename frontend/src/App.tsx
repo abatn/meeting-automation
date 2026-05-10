@@ -28,6 +28,7 @@ import TechnikDashboard from "./pages/admin/TechnikDashboard";
 import BillingPanel from "./pages/billing/BillingPanel";
 import LandingPage from "./pages/LandingPage";
 import ActivationPage from "./pages/ActivationPage";
+import CheckEmailPage from "./pages/CheckEmailPage";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -126,20 +127,21 @@ function App() {
   }
 
   // PUBLIC ROUTES
-  return (
-    <ErrorBoundary>
-      <Box sx={{ minHeight: "100vh" }}>
-        <CssBaseline />
-        <Routes>
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/register" element={<RegisterForm />} />
-          <Route path="/activate" element={<ActivationPage />} />
-          <Route path="/" element={<LandingPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Box>
-    </ErrorBoundary>
-  );
+   return (
+     <ErrorBoundary>
+       <Box sx={{ minHeight: "100vh" }}>
+         <CssBaseline />
+         <Routes>
+           <Route path="/login" element={<LoginForm />} />
+           <Route path="/register" element={<RegisterForm />} />
+           <Route path="/check-email" element={<CheckEmailPage />} />
+           <Route path="/activate" element={<ActivationPage />} />
+           <Route path="/" element={<LandingPage />} />
+           <Route path="*" element={<Navigate to="/" replace />} />
+         </Routes>
+       </Box>
+     </ErrorBoundary>
+   );
 }
 
 export default App;

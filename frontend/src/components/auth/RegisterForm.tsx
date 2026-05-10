@@ -27,6 +27,7 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../../store';
 import { setCredentials } from '../../store/authSlice';
 import authService from '../../services/auth';
+import PasswordStrengthIndicator from '../../components/common/PasswordStrengthIndicator';
 
 const RegisterForm: React.FC = () => {
   const navigate = useNavigate();
@@ -71,9 +72,8 @@ const RegisterForm: React.FC = () => {
         plan: formData.plan
       });
 
-      const loginData = await authService.login(formData.email, formData.password);
-      dispatch(setCredentials(loginData));
-      navigate('/');
+      // Navigate to check email page instead of auto-login
+      navigate('/check-email', { state: { email: formData.email } });
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Une erreur est survenue lors de l\'inscription.');
     } finally {
@@ -128,26 +128,27 @@ const RegisterForm: React.FC = () => {
                 InputProps={{ startAdornment: (<InputAdornment position="start"><EmailIcon fontSize="small" color="action" /></InputAdornment>) }}
               />
 
-              <TextField
-                label="Mot de passe"
-                name="password"
-                type={showPassword ? 'text' : 'password'}
-                required
-                fullWidth
-                size="small"
-                value={formData.password}
-                onChange={handleChange}
-                InputProps={{
-                  startAdornment: (<InputAdornment position="start"><LockIcon fontSize="small" color="action" /></InputAdornment>),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setShowPassword(!showPassword)} edge="end">
-                        {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
+               <TextField
+                 label="Mot de passe"
+                 name="password"
+                 type={showPassword ? 'text' : 'password'}
+                 required
+                 fullWidth
+                 size="small"
+                 value={formData.password}
+                 onChange={handleChange}
+                 InputProps={{
+                   startAdornment: (<InputAdornment position="start"><LockIcon fontSize="small" color="action" /></InputAdornment>),
+                   endAdornment: (
+                     <InputAdornment position="end">
+                       <IconButton size="small" onClick={() => setShowPassword(!showPassword)} edge="end">
+                         {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                       </IconButton>
+                     </InputAdornment>
+                   ),
+                 }}
+               />
+               <PasswordStrengthIndicator password={formData.password} />
 
               <TextField
                 select

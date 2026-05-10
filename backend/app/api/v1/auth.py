@@ -20,7 +20,10 @@ from app.models.team import TeamMember
 from app.schemas.user import User, UserCreate, Token, ActivationConfirm
 from app.services.auth_service import AuthService
 from app.services.audit_service import AuditService
+from app.services.client_service import ClientService
+from app.services.user_service import UserService
 from app.utils.rate_limit import create_rate_limiter
+from app.utils.password_validation import validate_password
 from app.tasks.email_tasks import send_invitation_email
 from datetime import timezone
 
@@ -190,169 +193,95 @@ async def login(
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 async def register(
-    *, db: AsyncSession = Depends(deps.get_db), user_in: UserCreate
+    *, db: AsyncSession = Depends(deps.get_db), user_in: UserCreate,
+    user_service: UserService = Depends(deps.get_user_service),
+    client_service: ClientService = Depends(deps.get_client_service),
 ) -> Any:
     """
-    Self-Service Registration.
-
-    Flow:
-    1. Check if email already exists in users (ACTIVE or PENDING) → Error
-    2. Check if email exists in team_members → delete (upgrade to registered user)
-    3. Create Client if not provided
-    4. Create User with status=PENDING (not ACTIVE!)
-    5. Create ActivationToken (expires in 7 days)
-    6. Trigger user-invited webhook (sends email with activation link)
-    7. AuditLog for Client creation and User creation
-    8. Single transaction (commit at end)
+    Self-Service Registration using UserService and ClientService.
     """
-    # 1. Prüfe Duplicate in users (ACTIVE oder PENDING)
-    stmt = select(UserModel).where(UserModel.email == user_in.email)
-    res = await db.execute(stmt)
-    existing_user = res.scalar_one_or_none()
+    # Check for duplicate email
+    existing_user = await user_service.get_by_email(user_in.email)
     if existing_user:
         raise HTTPException(
             status_code=400,
             detail="A user with this email already exists.",
         )
 
-    # 2. Prüfe team_members und lösche falls vorhanden (upgrade)
-    stmt_tm = select(TeamMember).where(TeamMember.email == user_in.email)
-    res_tm = await db.execute(stmt_tm)
-    existing_tm = res_tm.scalar_one_or_none()
-    if existing_tm:
-        await db.delete(existing_tm)
-        await db.flush()
-
-    # 3. Client Handling
-    client_id = user_in.client_id
-    if not client_id:
-        client_id = str(uuid.uuid4())
-
-        # Determine plan
-        plan_enum = SubscriptionPlan.GRATUIT
-        minutes = 600
-
-        if user_in.plan == "PRO":
-            plan_enum = SubscriptionPlan.PRO
-            minutes = 3000
-        elif user_in.plan == "ENTREPRISE":
-            plan_enum = SubscriptionPlan.ENTREPRISE
-            minutes = 12000
-
-        new_client = Client(
-            id=client_id,
-            company_name=user_in.company_name or f"{user_in.full_name or user_in.email}'s Company",
-            subscription_plan=plan_enum,
-            subscription_status=SubscriptionStatus.ACTIVE,
-            minutes_included=minutes
-        )
-        db.add(new_client)
-        await db.flush()  # Get client_id for user FK
-
-        # AuditLog für Client-Erstellung
-        await AuditService.log_action(
-            db,
-            client_id=client_id,
-            action="CREATE_CLIENT",
-            user_id=None,  # Self-Service, kein User-ID verfügbar
-            table_name="clients",
-            record_id=new_client.id,
-            new_values={
-                "company_name": new_client.company_name,
-                "subscription_plan": new_client.subscription_plan.value,
-                "minutes_included": new_client.minutes_included
-            }
-        )
-
-    # 4. Determine Role
-    if not user_in.client_id:
-        target_role = "dg"  # First user of tenant becomes 'dg'
-    else:
-        target_role = user_in.role or "participant"
-
-    role_result = await db.execute(
-        select(RoleModel).where(RoleModel.name == target_role)
-    )
-    role = role_result.scalar_one_or_none()
-    if not role:
+    # Check for duplicate company name and create or get client
+    company_name = user_in.company_name or f"{user_in.full_name or user_in.email}'s Company"
+    existing_client = await client_service.get_by_company_name(company_name)
+    if existing_client:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid role: {target_role}. Please contact administrator."
+            detail="A company with this name already exists.",
         )
+    
+    client = await client_service.create_client(
+        company_name=company_name,
+        plan=SubscriptionPlan[user_in.plan] if hasattr(SubscriptionPlan, user_in.plan) else SubscriptionPlan.GRATUIT
+    )
 
-    # 5. Create User mit status=PENDING (nicht ACTIVE!)
-    db_obj = UserModel(
-        id=str(uuid.uuid4()),
-        client_id=client_id,
+    # Determine role (first user = dg, otherwise participant)
+    role_name = "dg"
+    if user_in.client_id:
+        role_name = user_in.role or "participant"
+
+    # Create user
+    user = await user_service.create_user(
         email=user_in.email,
-        hashed_password=security.get_password_hash(user_in.password),
+        password=user_in.password,
         full_name=user_in.full_name,
-        status=UserStatus.PENDING.value,  # ✅ PENDING för E-Mail-Verifikation
-        is_superuser=False,
-        is_mfa_enabled=False,
-        created_at=datetime.now(timezone.utc) if hasattr(datetime, "UTC") else datetime.utcnow(),
+        client_id=client.id,
+        role_name=role_name,
+        status=UserStatus.PENDING
     )
 
-    db_obj.roles = [role]
-    db.add(db_obj)
-    await db.flush()
+    # Create activation token
+    activation_token = await user_service.create_activation_token(user.id)
 
-    # 6. ActivationToken erstellen
-    token = secrets.token_urlsafe(32)
-    # Token expires after 48 hours (Best Practice: 24-72 hours maximum for one-time-use tokens)
-    expiration = datetime.now(timezone.utc) + timedelta(hours=48)
-    activation_entry = ActivationToken(
-        id=str(uuid.uuid4()),
-        user_id=db_obj.id,
-        token=token,
-        expires_at=expiration
-    )
-    db.add(activation_entry)
-    await db.flush()
-
-    # 7. Client laden für Company Name im Webhook
-    client_stmt = select(Client).where(Client.id == client_id)
-    client_res = await db.execute(client_stmt)
-    client_obj = client_res.scalar_one()
-
-    # 8. AuditLog für User-Erstellung
+    # Audit log
     await AuditService.log_action(
         db,
-        client_id=client_id,
+        client_id=client.id,
         action="CREATE_USER",
-        user_id=db_obj.id,  # Self-Service: User erstellt sich selbst
+        user_id=user.id,
         table_name="users",
-        record_id=db_obj.id,
-        new_values={
-            "email": db_obj.email,
-            "status": db_obj.status,
-            "role": target_role
-        }
+        record_id=user.id,
+        new_values={"email": user.email, "status": user.status}
+    )
+    await AuditService.log_action(
+        db,
+        client_id=client.id,
+        action="CREATE_CLIENT",
+        user_id=user.id,
+        table_name="clients",
+        record_id=client.id,
+        new_values={"company_name": client.company_name}
     )
 
-    # 9. Commit ALLES atomar (Client + User + Token + AuditLogs)
     await db.commit()
-    await db.refresh(db_obj)
+    await db.refresh(user)
 
-    # 10. Enqueue invitation email task with automatic retries
-    activation_link = f"{settings.FRONTEND_URL}/activate?token={token}"
+    # Send activation email (Multi-Tenant: client_id for audit)
+    activation_link = f"{settings.FRONTEND_URL}/activate?token={activation_token.token}"
     send_invitation_email.delay(
-        email=db_obj.email,
-        full_name=db_obj.full_name or "Valued Customer",
-        company_name=client_obj.company_name,
+        client_id=client.id,
+        email=user.email,
+        full_name=user.full_name or "Valued Customer",
+        company_name=client.company_name,
         activation_link=activation_link
     )
-    logger.info(f"Enqueued invitation email task for {db_obj.email}")
 
     return User(
-        id=db_obj.id,
-        email=db_obj.email,
-        full_name=db_obj.full_name,
-        status=db_obj.status,
-        is_superuser=db_obj.is_superuser,
-        is_mfa_enabled=db_obj.is_mfa_enabled,
-        created_at=db_obj.created_at,
-        role=target_role,
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        status=user.status,
+        is_superuser=user.is_superuser,
+        is_mfa_enabled=user.is_mfa_enabled,
+        created_at=user.created_at,
+        role=role_name,
     )
 
 
@@ -405,6 +334,65 @@ async def logout(
     )
     
     return response
+
+
+@router.post("/resend-activation")
+async def resend_activation(
+    email_data: dict,
+    db: AsyncSession = Depends(deps.get_db),
+) -> Any:
+    """
+    Resend activation email for a given email address.
+    """
+    email = email_data.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    
+    # Check if user exists and is pending
+    stmt = select(UserModel).where(
+        UserModel.email == email,
+        UserModel.status == UserStatus.PENDING.value
+    )
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        # For security, don't reveal if email exists or not
+        return {"msg": "If the email exists and is pending activation, a new link has been sent"}
+    
+    # Check if user has an activation token
+    stmt_token = select(ActivationToken).where(
+        ActivationToken.user_id == user.id
+    )
+    result_token = await db.execute(stmt_token)
+    token_obj = result_token.scalar_one_or_none()
+    
+    if token_obj:
+        # Delete old token and create new one
+        await db.delete(token_obj)
+        await db.flush()
+    
+    # Create new activation token
+    activation_entry = ActivationToken(
+        id=str(uuid.uuid4()),
+        user_id=user.id,
+        token=secrets.token_urlsafe(32),
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=48)
+    )
+    db.add(activation_entry)
+    await db.commit()
+    
+    # Send email via Celery (Multi-Tenant: client_id for audit)
+    send_invitation_email.delay(
+        client_id=user.client_id,
+        email=user.email,
+        full_name=user.full_name,
+        company_name=user.client.company_name if user.client else "",
+        activation_link=f"{settings.FRONTEND_URL}/activate?token={activation_entry.token}"
+    )
+    
+    # For security, don't reveal if email exists or not
+    return {"msg": "If the email exists and is pending activation, a new link has been sent"}
 
 
 @router.post("/refresh")

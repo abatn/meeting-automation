@@ -15,22 +15,48 @@ import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import UsageProgressBar from '../../components/common/UsageProgressBar';
 
+// Interface for CMS pricing plans
+interface PricingPlan {
+  id: string;
+  name: Record<string, string>;
+  plan_code: string;
+  price_monthly: number;
+  minutes_included: number;
+  features: string[];
+  is_popular: boolean;
+}
+
+// Fallback prices if CMS API fails
+const FALLBACK_PRICES: Record<string, number> = {
+  PRO: 99,
+  ENTREPRISE: 499
+};
+
 const BillingPanel: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [usage, setUsage] = useState<any>(null);
+  const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Get price from CMS or fallback
+  const getPrice = (planCode: string): number => {
+    const plan = pricingPlans.find(p => p.plan_code === planCode);
+    return plan?.price_monthly ?? FALLBACK_PRICES[planCode] ?? 0;
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [invoicesRes, usageRes] = await Promise.all([
+        const [invoicesRes, usageRes, pricingRes] = await Promise.all([
           api.get('/billing/invoices'),
-          api.get('/billing/usage')
+          api.get('/billing/usage'),
+          api.get('/cms/pricing')
         ]);
         setInvoices(invoicesRes.data);
         setUsage(usageRes.data);
+        setPricingPlans(pricingRes.data);
       } catch (error) {
         console.error('Failed to fetch billing data', error);
       } finally {
@@ -110,7 +136,7 @@ const BillingPanel: React.FC = () => {
                     <Typography variant="h6" fontWeight="700">{t('billing.proPlan')}</Typography>
                   </Box>
                   <Typography variant="h3" fontWeight="800" sx={{ mb: 3 }}>
-                    $99<Typography component="span" variant="subtitle1" color="text.secondary">/mo</Typography>
+                    ${getPrice('PRO')}<Typography component="span" variant="subtitle1" color="text.secondary">/mo</Typography>
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>• {t('billing.unlimitedMeetings')}</Typography>
                   <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>• {t('billing.proHours')}</Typography>
@@ -130,7 +156,7 @@ const BillingPanel: React.FC = () => {
                     <Typography variant="h6" fontWeight="700">{t('billing.enterprisePlan')}</Typography>
                   </Box>
                   <Typography variant="h3" fontWeight="800" sx={{ mb: 3 }}>
-                    $499<Typography component="span" variant="subtitle1" color="text.secondary">/mo</Typography>
+                    ${getPrice('ENTREPRISE')}<Typography component="span" variant="subtitle1" color="text.secondary">/mo</Typography>
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>• {t('billing.dedicatedSupport')}</Typography>
                   <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>• {t('billing.entHours')}</Typography>

@@ -1,7 +1,8 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from app.models.user import UserStatus
+from app.utils.password_validation import validate_password
 
 
 class UserBase(BaseModel):
@@ -17,6 +18,14 @@ class UserCreate(UserBase):
     password: str
     company_name: Optional[str] = None
     plan: Optional[str] = "GRATUIT"
+    
+    @field_validator('password')
+    @classmethod
+    def validate_password_strength(cls, v):
+        is_valid, errors = validate_password(v)
+        if not is_valid:
+            raise ValueError(', '.join(errors))
+        return v
 
 
 class UserUpdate(BaseModel):
@@ -59,3 +68,11 @@ class TokenData(BaseModel):
 class ActivationConfirm(BaseModel):
     token: str
     new_password: str
+    
+    @field_validator('new_password')
+    @classmethod
+    def validate_password_strength(cls, v):
+        is_valid, errors = validate_password(v)
+        if not is_valid:
+            raise ValueError(', '.join(errors))
+        return v

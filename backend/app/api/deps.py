@@ -13,6 +13,8 @@ from app.core.redis_client import get_redis_client
 from app.models.user import User, UserRole, UserStatus
 from app.services.meeting_service import MeetingService
 from app.services.auth_service import AuthService
+from app.services.user_service import UserService
+from app.services.client_service import ClientService
 from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,14 @@ async def get_auth_service(
     redis_client: redis.Redis = Depends(get_redis_client),
 ) -> AuthService:
     return AuthService(db, redis_client)
+
+
+async def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
+    return UserService(db)
+
+
+async def get_client_service(db: AsyncSession = Depends(get_db)) -> ClientService:
+    return ClientService(db)
 
 
 async def get_current_user(
@@ -170,3 +180,19 @@ def check_permissions(allowed_roles: list[UserRole]):
         return current_user
 
     return permission_checker
+
+
+async def get_current_system_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Dependency for system_admin only endpoints.
+    Used for platform-wide operations (CMS, tenant management, etc.)
+    Multi-Tenant: system_admin is the only role that can access cross-tenant data.
+    """
+    if current_user.role != UserRole.SYSTEM_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="System administrator privileges required",
+        )
+    return current_user

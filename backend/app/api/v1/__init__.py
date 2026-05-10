@@ -11,6 +11,7 @@ from . import (
     websockets,
     settings,
     audit,
+    cms,
 )
 
 router = APIRouter()
@@ -26,3 +27,4 @@ router.include_router(reports.router, prefix="/reports", tags=["Reports"])
 router.include_router(websockets.router, prefix="/websockets", tags=["WebSockets"])
 router.include_router(settings.router, prefix="/settings", tags=["Settings"])
 router.include_router(audit.router, prefix="/audit", tags=["Audit Logging"])
+router.include_router(cms.router, prefix="/cms", tags=["CMS"])

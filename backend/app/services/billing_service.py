@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.models.client import Client, SubscriptionPlan, SubscriptionStatus
 from app.models.facture import Facture, FactureStatus
 from app.models.usage_minute import UsageMinute
+from app.models.cms import PricingPlan
 from app.services.pdf_service import PDFService
 from app.services.audit_service import AuditService
 
@@ -19,10 +20,44 @@ logger = logging.getLogger(__name__)
 # Configure Stripe
 stripe.api_key = settings.STRIPE_API_KEY
 
+# Fallback values if CMS pricing_plans not found
+DEFAULT_PLAN_CONFIG = {
+    "GRATUIT": {"minutes": 600, "price": 0.0},
+    "PRO": {"minutes": 3000, "price": 99.0},
+    "ENTREPRISE": {"minutes": 12000, "price": 499.0}
+}
+
+
 class BillingService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.pdf_service = PDFService()
+
+    async def _get_plan_details_from_cms(self, plan_code: str) -> tuple:
+        """
+        Get minutes_included and price from CMS pricing_plans.
+        Returns (minutes_included, price_monthly) tuple.
+        Falls back to hardcoded defaults if not found.
+        """
+        try:
+            stmt = select(PricingPlan).where(
+                PricingPlan.plan_code == plan_code,
+                PricingPlan.is_active == True
+            )
+            result = await self.db.execute(stmt)
+            pricing_plan = result.scalar_one_or_none()
+            
+            if pricing_plan:
+                mins = pricing_plan.minutes_included or DEFAULT_PLAN_CONFIG.get(plan_code, {}).get("minutes", 0)
+                price = float(pricing_plan.price_monthly)
+                logger.info(f"Using CMS pricing for {plan_code}: {mins} minutes, ${price}")
+                return mins, price
+        except Exception as e:
+            logger.warning(f"Failed to get plan details from CMS for {plan_code}: {e}")
+        
+        # Fallback to defaults
+        config = DEFAULT_PLAN_CONFIG.get(plan_code, {"minutes": 0, "price": 0.0})
+        return config["minutes"], config["price"]
 
     async def record_usage(self, client_id: str, minutes: int, meeting_id: Optional[str] = None):
         """Records minutes used by a client for a specific meeting."""
@@ -103,8 +138,8 @@ class BillingService:
         client.subscription_status = SubscriptionStatus.ACTIVE
         client.subscription_start_date = datetime.now(timezone.utc)
         
-        # Set minute quota based on plan
-        mins_inc = 3000 if plan == "PRO" else 12000
+        # Get minute quota and price from CMS pricing_plans
+        mins_inc, amount = await self._get_plan_details_from_cms(plan)
         client.minutes_included = mins_inc
             
         self.db.add(client)
@@ -112,7 +147,6 @@ class BillingService:
         # Create initial invoice record
         facture_id = str(uuid.uuid4())
         invoice_num = f"INV-{datetime.now().strftime('%Y%m')}-{uuid.uuid4().hex[:4].upper()}"
-        amount = 99.0 if plan == "PRO" else 499.0
         
         facture = Facture(
             id=facture_id,

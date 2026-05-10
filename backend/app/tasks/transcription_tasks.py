@@ -179,6 +179,30 @@ async def _process_recording_pipeline(recording_id: str) -> None:
             except Exception as e:
                 logger.warning(f"Failed to delete temp file {temp_path}: {e}")
 
+async def _record_minutes_usage(db, recording, gladia_result):
+    """Calculate and record minutes used from transcription segments."""
+    segments = gladia_result.get("segments", [])
+    if not segments:
+        logger.warning(f"No segments found for recording {recording.id}, cannot calculate minutes")
+        return
+
+    max_end_time = max(seg.get("end", 0) for seg in segments)
+    minutes_used = int(max_end_time / 60) + (1 if max_end_time % 60 > 0 else 0)
+
+    if minutes_used > 0:
+        try:
+            from app.services.billing_service import BillingService
+            billing_service = BillingService(db)
+            await billing_service.record_usage(
+                client_id=str(recording.client_id),
+                minutes=minutes_used,
+                meeting_id=str(recording.meeting_id)
+            )
+            logger.info(f"Recorded {minutes_used} minutes usage for client {recording.client_id}")
+        except Exception as e:
+            logger.error(f"Failed to record minutes usage: {e}")
+
+
 async def _save_transcription(db, recording, gladia_result):
     db_trans = Transcription(
         id=str(uuid.uuid4()),
@@ -191,6 +215,8 @@ async def _save_transcription(db, recording, gladia_result):
     )
     db.add(db_trans)
     await db.flush()
+
+    await _record_minutes_usage(db, recording, gladia_result)
 
 async def _download_audio(file_key: str) -> Optional[str]:
     s3_client = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
