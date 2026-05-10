@@ -4,6 +4,55 @@
 
 **Complete E2E SaaS Pipeline Verified | 11/11 Tests Passing**
 
+---
+
+## 🎯 UPDATE — 2026-05-11: CMS ↔ Client Plan Connection & Usage Tracking ✅
+
+### Probleme Gelöst:
+1. `record_usage()` wurde nie aufgerufen — Minuten wurden nicht gezählt
+2. CMS `pricing_plans` und Client `subscription_plan` waren nicht verbunden
+3. Frontend BillingPanel hatte hardcodierte Preise ($99, $499)
+
+### Lösung Implementiert:
+
+#### Backend - Minutes Usage
+- `_record_minutes_usage()` in `transcription_tasks.py:182-203`
+- `BillingService.record_usage()` wird bei Transkription aufgerufen
+- `client.minutes_used` wird korrekt inkrementiert
+
+#### Backend - CMS ↔ Client Verbindung
+- `PricingPlan` Model: `plan_code` und `minutes_included` Felder
+- Migration `08439ee30c73` erstellt und ausgeführt
+- `ClientService._get_minutes_for_plan()` liest jetzt aus CMS
+- `BillingService._get_plan_details_from_cms()` liefert Minuten und Preis
+
+#### Frontend - Dynamische Preise
+- `BillingPanel.tsx` lädt Preise von `/cms/pricing` API
+- `getPrice()` Funktion mit Fallback
+- Dynamische Anzeige basierend auf CMS-Daten
+
+### Architektur (JETZT VERBUNDEN):
+
+```
+CMS pricing_plans            Client subscription_plan
+──────────────────           ────────────────────────
+plan_code: "GRATUIT"    ←→   subscription_plan: GRATUIT
+minutes_included: 600        minutes_included: 600 (aus CMS)
+price_monthly: 0
+
+plan_code: "PRO"        ←→   subscription_plan: PRO
+minutes_included: 3000       minutes_included: 3000 (aus CMS)
+price_monthly: 99
+
+plan_code: "ENTREPRISE" ←→   subscription_plan: ENTREPRISE
+minutes_included: 12000      minutes_included: 12000 (aus CMS)
+price_monthly: 499
+```
+
+### E2E-Tests: 7/7 BESTANDEN ✅
+
+---
+
 ```
 ✅ test_01: User Authentication & Multi-Tenancy
 ✅ test_02: Team Member Management (Creation)

@@ -1,6 +1,6 @@
 # Database Schema for Meeting Automation System
 
-## ✅ VALIDATED — 2026-04-24
+## ✅ VALIDATED — 2026-05-10
 
 This schema has been validated against all E2E test cases (11 SaaS pipeline tests + 5 invitation workflow tests) with real PostgreSQL infrastructure.
 
@@ -11,6 +11,10 @@ This schema has been validated against all E2E test cases (11 SaaS pipeline test
 - ✅ Referential integrity (all foreign key constraints)
 - ✅ User lifecycle management (PENDING → ACTIVE → DISABLED states)
 - ✅ Secure token-based activation (token_hash, one-time use, auto-login JWT)
+- ✅ CMS for Landing Page (platform-wide, multi-language JSON fields)
+- ✅ Password validation (frontend + backend)
+- ✅ CMS ↔ Client Plan Connection (plan_code, minutes_included)
+- ✅ Minutes-Usage Tracking (record_usage in transcription pipeline)
 
 This document outlines the database schema for the Meeting Automation System, which uses PostgreSQL as its primary data store. The schema is designed to support multi-tenant SaaS operations, meeting management, user authentication, recording storage, transcription, PV generation, action item tracking, and audit logging.
 
@@ -151,6 +155,70 @@ erDiagram
         TIMESTAMP updated_at
     }
 
+    LANDING_SECTIONS {
+        UUID id PK
+        VARCHAR section_key UNIQUE
+        JSON title
+        JSON subtitle
+        JSON content
+        VARCHAR image_url
+        JSON cta_text
+        VARCHAR cta_link
+        INT order
+        BOOLEAN is_active
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    FEATURES {
+        UUID id PK
+        VARCHAR icon
+        JSON title
+        JSON description
+        INT order
+        BOOLEAN is_active
+        TIMESTAMP created_at
+    }
+
+    PRICING_PLANS {
+        UUID id PK
+        JSON name
+        VARCHAR plan_code "GRATUIT, PRO, ENTREPRISE"
+        INT price_monthly
+        INT price_yearly
+        INT minutes_included "600, 3000, 12000"
+        JSON features
+        VARCHAR stripe_price_id
+        BOOLEAN is_popular
+        INT order
+        BOOLEAN is_active
+        TIMESTAMP created_at
+    }
+
+    FAQS {
+        UUID id PK
+        JSON question
+        JSON answer
+        VARCHAR category
+        INT order
+        BOOLEAN is_active
+        TIMESTAMP created_at
+    }
+
+    TESTIMONIALS {
+        UUID id PK
+        VARCHAR author_name
+        VARCHAR author_title
+        VARCHAR company
+        JSON content
+        VARCHAR avatar_url
+        INT rating
+        BOOLEAN is_featured
+        INT order
+        BOOLEAN is_active
+        TIMESTAMP created_at
+    }
+
     CLIENTS ||--o{ USERS : "has"
     CLIENTS ||--o{ MEETINGS : "has"
     CLIENTS ||--o{ RECORDINGS : "has"
@@ -170,6 +238,11 @@ erDiagram
     PVS ||--o{ ACTIONS : "generates"
     ACTIONS ||--o{ ACTION_ASSIGNMENTS : "has"
     USERS ||--o{ ACTION_ASSIGNMENTS : "assigned to"
+
+    LANDING_SECTIONS ||--o{ FEATURES : "contains"
+    LANDING_SECTIONS ||--o{ PRICING_PLANS : "has"
+    LANDING_SECTIONS ||--o{ FAQS : "has"
+    LANDING_SECTIONS ||--o{ TESTIMONIALS : "has"
 ```
 
 ## 2. Table Descriptions

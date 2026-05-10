@@ -345,7 +345,7 @@ const LandingPage: React.FC = () => {
                       </Stack>
                     ))}
                   </Stack>
-                  <Button fullWidth variant={p.h ? "contained" : "outlined"} sx={{ py: 2, borderRadius: '12px', fontWeight: 800, bgcolor: p.h ? '#FFF' : 'transparent', color: p.h ? '#000' : '#FFF', border: p.h ? 'none' : '1px solid rgba(255,255,255,0.2)' }} onClick={() => navigate('/register')}>{t('landing.nav.start')}</Button>
+                  <Button fullWidth variant={p.h ? "contained" : "outlined"} sx={{ py: 2, borderRadius: '12px', fontWeight: 800, bgcolor: p.h ? '#FFF' : 'transparent', color: p.h ? '#000' : '#FFF', border: p.h ? 'none' : '1px solid rgba(255,255,255,0.2)' }} onClick={() => navigate('/register')}>{[t('landing.pricing.start_free'), t('landing.pricing.start_pro'), t('landing.pricing.start_enterprise')][i]}</Button>
                 </Box>
               </Grid>
             ))}

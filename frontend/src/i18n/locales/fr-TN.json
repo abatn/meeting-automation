@@ -27,12 +27,21 @@
     "date_placeholder": "JJ/MM/AAAA"
   },
   "auth": {
-    "loginTitle": "Connexion Entreprise",
-    "email": "Adresse E-mail",
+    "loginTitle": "Connexion entreprise",
+    "email": "Adresse e-mail",
     "password": "Mot de passe",
     "signIn": "Se connecter",
-    "logout": "Se déconnecter",
-    "mfaTitle": "Authentification à deux facteurs"
+    "logout": "Déconnexion",
+    "mfaTitle": "Authentification à plusieurs facteurs",
+    "check_email": {
+      "title": "Vérifiez votre email",
+      "message": "Nous avons envoyé un lien d'activation à {{email}}. Veuillez vérifier votre boîte de réception et cliquer sur le lien pour activer votre compte.",
+      "resend": "Renvoyer le lien d'activation",
+      "resend_success": "Lien d'activation envoyé avec succès !",
+      "sending": "Envoi en cours...",
+      "back_to_login": "Retour à la connexion",
+      "spam_notice": "Vous n'avez pas reçu l'email ? Vérifiez votre dossier spam."
+    }
   },
   "sidebar": {
     "dashboard": "Tableau de Bord",
@@ -310,6 +319,9 @@
       "free_name": "Starter",
       "pro_name": "Professionnel",
       "ent_name": "Entreprise",
+      "start_free": "Essai Gratuit",
+      "start_pro": "Commencer Pro",
+      "start_enterprise": "Commencer Entreprise",
       "starter_feats": [
         "10 réunions / mois",
         "Transcription Standard"

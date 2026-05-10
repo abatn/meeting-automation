@@ -32,7 +32,16 @@
     "password": "Password",
     "signIn": "Sign In",
     "logout": "Logout",
-    "mfaTitle": "Multi-Factor Authentication"
+    "mfaTitle": "Multi-Factor Authentication",
+    "check_email": {
+      "title": "Check your email",
+      "message": "We've sent an activation link to {{email}}. Please check your inbox and click the link to activate your account.",
+      "resend": "Resend activation link",
+      "resend_success": "Activation link sent successfully!",
+      "sending": "Sending...",
+      "back_to_login": "Back to login",
+      "spam_notice": "Didn't receive the email? Check your spam folder."
+    }
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -313,6 +322,9 @@
       "free_name": "Starter",
       "pro_name": "Pro",
       "ent_name": "Enterprise",
+      "start_free": "Start Free Trial",
+      "start_pro": "Start Pro",
+      "start_enterprise": "Start Enterprise",
       "starter_feats": [
         "10 meetings / mo",
         "Standard Transcription"
