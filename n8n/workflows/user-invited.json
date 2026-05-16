@@ -1,4 +1,6 @@
 {
+  "id": "6",
+  "name": "User Invited Webhook",
   "nodes": [
     {
       "parameters": {
@@ -19,31 +21,85 @@
     },
     {
       "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nif (!body || !body.email || !body.full_name || !body.activation_link) {\n  throw new Error('Missing required fields: email, full_name, and activation_link are required');\n}\nreturn {\n  json: {\n    email: body.email,\n    full_name: body.full_name || 'New User',\n    company_name: body.company_name || 'Our Platform',\n    activation_link: body.activation_link\n  }\n};"
+      },
+      "id": "validate-user-payload",
+      "name": "Validate User Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        325,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
         "fromEmail": "no-reply@meeting.tn",
-        "toEmail": "={{$json.body.email}}",
+        "toEmail": "={{$json.email}}",
         "subject": "You have been invited to Meeting Automation",
         "text": "",
-        "html": "=<html><body style=\"font-family:sans-serif\"><h2>Willkommen bei Meeting Automation!</h2><p>Hallo <b>{{$json.body.full_name}}</b>,</p><p>Sie wurden eingeladen, <b>{{$json.body.company_name}}</b> auf Meeting Automation beizutreten.</p><p>Bitte klicken Sie auf den Link unten, um Ihr Passwort zu setzen und Ihr Konto zu aktivieren:</p><br/><a href=\"{{$json.body.activation_link}}\" style=\"display:inline-block;padding:12px 24px;color:white;background-color:#007bff;text-decoration:none;border-radius:5px\">Konto aktivieren</a><br/><br/><p style=\"color:#666;font-size:12px\">Dieser Link ist 7 Tage gültig.</p></body></html>",
-        "options": {}
+        "html": "=<html><body><h2>Welcome {{$json.full_name}}!</h2><p>You have been invited to join <b>{{$json.company_name}}</b> on Meeting Automation.</p><p>Please click the link below to set your password and activate your account:</p><a href=\"{{$json.activation_link}}\" style=\"display: inline-block; padding: 10px 20px; color: white; background-color: #007bff; text-decoration: none; border-radius: 5px;\">Activate Account</a></body></html>",
+        "options": {},
+        "continueOnFail": true
       },
       "id": "send-email-node",
       "name": "Send Email",
       "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2,
+      "typeVersion": 2.1,
       "position": [
-        450,
+        550,
         300
       ],
       "credentials": {
         "smtp": {
           "id": "Z4QPw36ZE0HkHiHP",
-          "name": "SMTP account"
+          "name": "SMTP Account"
         }
       }
+    },
+    {
+      "parameters": {
+        "respondWith": "success",
+        "responseBody": "={\"status\":\"invitation_sent\",\"email\":\"{{$json.email}}\",\"timestamp\":\"{{$now.toISOString()}}\"}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nreturn {\n  json: {\n    status: \"error\",\n    email: $json.email,\n    error_message: error?.message || error?.error || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        450
+      ]
     }
   ],
   "connections": {
     "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate User Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate User Payload": {
       "main": [
         [
           {
@@ -53,6 +109,42 @@
           }
         ]
       ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Handler",
+            "type": "error",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
-  }
+  },
+  "active": true,
+  "settings": {}
 }
