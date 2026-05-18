@@ -451,7 +451,7 @@ Example format:
         tomorrow = datetime.utcnow() + timedelta(days=1)
         result = await self.db.execute(
             select(Action).where(
-                Action.due_date <= tomorrow, Action.status != "completed"
+                Action.due_date <= tomorrow, Action.status != "COMPLETED"
             )
         )
         return list(result.scalars().all())

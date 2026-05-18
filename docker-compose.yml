@@ -105,6 +105,7 @@ services:
     env_file: .env
     environment:
       - N8N_SECURE_COOKIE=false #TOBEDEAKTIVATED
+      - N8N_RUNNERS_ENABLED=false 
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432

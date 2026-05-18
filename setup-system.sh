@@ -37,15 +37,9 @@ until $DOCKER_COMPOSE exec -T postgres pg_isready -U meeting_user -d meeting_db 
 done
 echo -e "${GREEN}PostgreSQL is ready!${NC}"
 
-# 3. Check if tables exist before migration
-TABLE_COUNT=$($DOCKER_COMPOSE exec -T postgres psql -U meeting_user -d meeting_db -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name='permissions';")
-if [ "$TABLE_COUNT" -gt 0 ]; then
-    echo -e "${YELLOW}Tables already exist, stamping migration...${NC}"
-    $DOCKER_COMPOSE exec -T backend alembic stamp head
-else
-    echo -e "${YELLOW}Running Alembic migrations...${NC}"
-    $DOCKER_COMPOSE exec -T backend alembic upgrade head
-fi
+# 3. Run Database Migrations (Alembic)
+echo -e "${YELLOW}Running Alembic migrations...${NC}"
+$DOCKER_COMPOSE exec -T backend alembic upgrade head
 echo -e "${GREEN}Database schema is up to date.${NC}"
 
 # 4. Seed Test Users
