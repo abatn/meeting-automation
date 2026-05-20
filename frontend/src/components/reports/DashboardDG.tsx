@@ -60,21 +60,31 @@ const DashboardDG: React.FC = () => {
   const [stats, setStats] = useState<ActionStatistics[]>([]);
 
   useEffect(() => {
-    dispatch(fetchDashboardData("dg"));
+    const fetchData = () => {
+      dispatch(fetchDashboardData("dg"));
 
-    const fetchAnalytics = async () => {
-      try {
-        const [patRes, statRes] = await Promise.all([
-          api.get(`/actions/patterns?lang=${i18n.language}`),
-          api.get(`/actions/statistics/recurring?lang=${i18n.language}`)
-        ]);
-        setPatterns(patRes.data);
-        setStats(statRes.data);
-      } catch (err) {
-        console.error("Failed to fetch analytics", err);
-      }
+      const fetchAnalytics = async () => {
+        try {
+          const [patRes, statRes] = await Promise.all([
+            api.get(`/actions/patterns?lang=${i18n.language}`),
+            api.get(`/actions/statistics/recurring?lang=${i18n.language}`)
+          ]);
+          setPatterns(patRes.data);
+          setStats(statRes.data);
+        } catch (err) {
+          console.error("Failed to fetch analytics", err);
+        }
+      };
+      fetchAnalytics();
     };
-    fetchAnalytics();
+
+    fetchData();
+
+    const refreshInterval = setInterval(() => {
+      fetchData();
+    }, 30000);
+
+    return () => clearInterval(refreshInterval);
   }, [dispatch, i18n.language]);
 
   if (loading && !dashboardData) {

@@ -271,7 +271,7 @@ class ReportService:
         Returns meeting details with recording/transcript/recap status.
         Caches for 30 minutes (1800s) as data changes frequently.
         """
-        from app.models.participant import Participant
+        from app.models.meeting import Participant
         from app.models.recording import Recording
         from app.models.transcription import Transcription
         from app.models.pv import PV
