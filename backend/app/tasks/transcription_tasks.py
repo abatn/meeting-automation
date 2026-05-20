@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
-from app.models.action import Action, Assignment
+from app.models.action import Action, Assignment, ActionStatus
 from app.models.pv import PV, Section
 from app.models.recording import Recording
 from app.models.transcription import Transcription
@@ -261,7 +261,7 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr"):
             title=description[:200] if description else "Action",
             description=description,
             due_date=due_date,
-            status="PENDING",
+            status=ActionStatus.PENDING,
             priority=act.get("priority", "medium"),
         )
         db.add(action)

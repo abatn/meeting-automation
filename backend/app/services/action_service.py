@@ -220,7 +220,7 @@ Return ONLY a JSON array of objects with the following structure:
                     if item.get("due_date")
                     else None
                 ),
-                status="pending",
+                status=ActionStatus.PENDING,
             )
             self.db.add(action)
             new_actions.append(action)
@@ -374,7 +374,7 @@ Return ONLY a JSON array of objects with the following structure:
                 meeting_id=suggestion.meeting_id,
                 title=suggestion.title,
                 description=suggestion.description,
-                status="PENDING",
+                status=ActionStatus.PENDING,
                 priority="medium"
             )
             self.db.add(new_action)
