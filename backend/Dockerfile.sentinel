@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    flask \
+    llama-cpp-python \
+    gunicorn
+
+# Create models directory
+RUN mkdir -p /app/models
+
+# Download Qwen2.5-1.5B model (GGUF format - ~1GB)
+# This is a smaller model that can run on limited RAM
+RUN curl -L -o /app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
+    "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+
+COPY sentinel_api.py /app/
+EXPOSE 8001
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8001", "--workers", "1", "--timeout", "120", "sentinel_api:app"]

@@ -16,6 +16,7 @@ celery_app.conf.update(
     timezone="Africa/Tunis",
     enable_utc=True,
     task_track_started=True,
+    broker_connection_retry_on_startup=True,
 )
 
 # Enable eager mode for E2E tests to run tasks synchronously in the same process

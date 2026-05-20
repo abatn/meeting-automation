@@ -81,6 +81,9 @@ class User(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), onupdate=func.now(), nullable=True
     )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Manager relationship
     manager_id: Mapped[Optional[str]] = mapped_column(

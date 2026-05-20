@@ -89,6 +89,7 @@ class TeamService:
             
             # Re-activate the DISABLED user
             existing_user.status = UserStatus.PENDING.value
+            existing_user.deleted_at = None  # Clear soft-delete for ISO 27001 compliance
             existing_user.full_name = obj_in.full_name
             # Secure random placeholder password (user will set via activation)
             existing_user.hashed_password = security.get_password_hash(secrets.token_urlsafe(32))
@@ -233,7 +234,9 @@ class TeamService:
         db_user = user_res.scalar_one_or_none()
         
         if db_user:
+            from datetime import datetime
             db_user.status = UserStatus.DISABLED.value
+            db_user.deleted_at = datetime.utcnow()  # Soft-delete for ISO 27001 compliance
             # Also cascade delete any tokens if pending
             token_stmt = delete(ActivationToken).where(ActivationToken.user_id == db_user.id)
             await self.db.execute(token_stmt)
