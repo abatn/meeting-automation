@@ -1,0 +1,115 @@
+name: '🤖 NVIDIA GLM-5.1 AI Assistant'
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: 'write'
+  issues: 'write'
+  pull-requests: 'write'
+
+jobs:
+  nvidia_ai_agent:
+    if: |
+      (github.event_name == 'issues' && github.event.action == 'opened') ||
+      (github.event_name == 'pull_request' && github.event.action == 'opened') ||
+      (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '/ai'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 'Checkout Code'
+        uses: 'actions/checkout@v4'
+        with:
+          fetch-depth: 0
+
+      - name: 'Determine Prompt'
+        id: determine_prompt
+        run: |
+          if [[ "${{ github.event_name }}" == "issues" && "${{ github.event.action }}" == "opened" ]]; then
+            PROMPT="Bitte analysiere dieses Issue und gib eine erste Einschätzung:"
+            PROMPT="$PROMPT\n\nTitel: ${{ github.event.issue.title }}"
+            PROMPT="$PROMPT\n\nBeschreibung: ${{ github.event.issue.body }}"
+            echo "PROMPT=$PROMPT" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.action }}" == "opened" ]]; then
+            PROMPT="Bitte review diesen Pull Request und gib Feedback:"
+            PROMPT="$PROMPT\n\nTitel: ${{ github.event.pull_request.title }}"
+            PROMPT="$PROMPT\n\nBeschreibung: ${{ github.event.pull_request.body }}"
+            echo "PROMPT=$PROMPT" >> $GITHUB_ENV
+          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            # Entferne den '/ai'-Befehl aus dem Prompt
+            COMMENT="${{ github.event.comment.body }}"
+            CLEAN_COMMENT="${COMMENT#/ai}"
+            echo "PROMPT=$CLEAN_COMMENT" >> $GITHUB_ENV
+          fi
+
+      - name: 'Call NVIDIA GLM-5.1 API'
+        id: call_nvidia_api
+        run: |
+          # JSON-Payload erstellen
+          cat > payload.json << EOF
+          {
+            "model": "z-ai/glm-5.1",
+            "messages": [
+              {
+                "role": "system",
+                "content": "Du bist ein hilfreicher KI-Assistent für GitHub Issues und Pull Requests. Antworte auf Deutsch, präzise und hilfreich."
+              },
+              {
+                "role": "user",
+                "content": "${{ env.PROMPT }}"
+              }
+            ],
+            "temperature": 0.7,
+            "max_tokens": 2000
+          }
+          EOF
+          
+          # API-Aufruf
+          RESPONSE=$(curl -s -X POST "https://integrate.api.nvidia.com/v1/chat/completions" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.NVIDIA_API_KEY }}" \
+            -d @payload.json)
+          
+          # Extrahiere die Antwort
+          AI_MESSAGE=$(echo $RESPONSE | jq -r '.choices[0].message.content')
+          
+          # Speichere für später
+          echo "AI_MESSAGE<<EOF" >> $GITHUB_OUTPUT
+          echo "$AI_MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 'Add Comment to Issue/PR'
+        uses: 'actions/github-script@v7'
+        env:
+          AI_MESSAGE: ${{ steps.call_nvidia_api.outputs.AI_MESSAGE }}
+        with:
+          script: |
+            const message = process.env.AI_MESSAGE;
+            
+            let commentBody = `## 🤖 NVIDIA GLM-5.1 AI Assistant\n\n`;
+            commentBody += `${message}\n\n`;
+            commentBody += `---\n`;
+            commentBody += `*Diese Antwort wurde von NVIDIA GLM-5.1 generiert.*\n`;
+            commentBody += `*Trigger mit \`/ai [deine Nachricht]\`*\n`;
+            
+            // Issue oder Pull Request kommentieren
+            if (context.payload.issue) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: commentBody
+              });
+            } else if (context.payload.pull_request) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: commentBody
+              });
+            }
