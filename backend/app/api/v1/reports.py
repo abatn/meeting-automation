@@ -144,19 +144,41 @@ async def get_meeting_pdf_for_automation(
 ) -> Any:
     """
     Returns the PV PDF for n8n attachment.
+    Prefers OnlyOffice-edited PDF from S3 if available.
+    Falls back to WeasyPrint generation from DB-HTML.
     """
     from app.models.pv import PV as PVModel
     from fastapi.responses import FileResponse
+    from fastapi import HTTPException
     from app.services.pdf_service import PDFService
+    from app.core.config import settings
+    import boto3
 
     pv_stmt = select(PVModel).where(PVModel.meeting_id == meeting_id)
     pv_res = await db.execute(pv_stmt)
     pv = pv_res.scalars().first()
     if not pv:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="PV not found for this meeting")
 
+    # Schritt 1: Prüfe S3 auf OnlyOffice PDF
+    pdf_key = f"pv_exports/{pv.id}/final_document.pdf"
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=settings.S3_ENDPOINT,
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY,
+    )
+
+    try:
+        s3.head_object(Bucket=settings.S3_BUCKET_NAME, Key=pdf_key)
+        # OnlyOffice PDF existiert → aus S3 laden
+        local_pdf_path = f"/tmp/automation_{pv.id}.pdf"
+        s3.download_file(settings.S3_BUCKET_NAME, pdf_key, local_pdf_path)
+        return FileResponse(path=local_pdf_path, filename=f"Protocol_{meeting_id}.pdf")
+    except Exception:
+        pass  # S3 nicht verfügbar oder PDF nicht vorhanden → Fallback
+
+    # Schritt 2: Generiere PDF aus DB-HTML via WeasyPrint
     pdf_service = PDFService(db)
     pdf_path = await pdf_service.generate_pv_pdf(pv_id=pv.id, client_id=pv.client_id)
-    
     return FileResponse(path=pdf_path, filename=f"Protocol_{meeting_id}.pdf")
