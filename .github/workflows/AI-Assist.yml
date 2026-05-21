@@ -27,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 'Determine Prompt'
+            - name: 'Determine Prompt'
         id: determine_prompt
         run: |
           if [[ "${{ github.event_name }}" == "issues" && "${{ github.event.action }}" == "opened" ]]; then
@@ -41,12 +41,11 @@ jobs:
             PROMPT="$PROMPT\n\nBeschreibung: ${{ github.event.pull_request.body }}"
             echo "PROMPT=$PROMPT" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            # Entferne den '/ai'-Befehl aus dem Prompt
-            COMMENT="${{ github.event.comment.body }}"
+            # Wichtig: Das # Zeichen escapen
+            COMMENT=$(echo "${{ github.event.comment.body }}" | sed 's/#/\\#/g')
             CLEAN_COMMENT="${COMMENT#/ai}"
             echo "PROMPT=$CLEAN_COMMENT" >> $GITHUB_ENV
           fi
-
       - name: 'Call NVIDIA GLM-5.1 API'
         id: call_nvidia_api
         run: |
