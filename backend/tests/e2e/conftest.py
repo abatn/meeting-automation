@@ -151,7 +151,10 @@ async def e2e_client(
         }
         resp = await e2e_client_no_auth.post("/api/v1/auth/login", data=login_data)
         resp.raise_for_status()
-        token = resp.json()["access_token"]
+        # Token is set in httpOnly cookie "accessToken" (auth.py:119-127)
+        token = resp.cookies.get("accessToken")
+        if not token:
+            raise RuntimeError(f"Login succeeded but no accessToken cookie found. Response: {resp.json()}")
         headers = {"Authorization": f"Bearer {token}"}
         async with AsyncClient(base_url=environment_config.base_url, headers=headers, timeout=30.0) as auth_client:
             yield auth_client

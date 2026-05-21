@@ -29,14 +29,14 @@ class TestPhase1Fixes:
         # Setup: Erstelle 2 Tenants
         client_a = Client(
             id=str(uuid.uuid4()),
-            name="Company A",
-            subscription_plan="premium",
+            company_name=f"Company A-{uuid.uuid4()}",
+            subscription_plan="GRATUIT",
             created_at=datetime.utcnow(),
         )
         client_b = Client(
             id=str(uuid.uuid4()),
-            name="Company B",
-            subscription_plan="premium",
+            company_name=f"Company B-{uuid.uuid4()}",
+            subscription_plan="GRATUIT",
             created_at=datetime.utcnow(),
         )
         db_session.add(client_a)
@@ -94,8 +94,8 @@ class TestPhase1Fixes:
         # Setup: Tenant
         client = Client(
             id=str(uuid.uuid4()),
-            name="Test Company",
-            subscription_plan="premium",
+            company_name=f"Test Company-{uuid.uuid4()}",
+            subscription_plan="GRATUIT",
             created_at=datetime.utcnow(),
         )
         db_session.add(client)
@@ -198,8 +198,8 @@ class TestPhase1Fixes:
         # Setup: Tenant
         client = Client(
             id=str(uuid.uuid4()),
-            name="Test Company",
-            subscription_plan="premium",
+            company_name=f"Test Company-{uuid.uuid4()}",
+            subscription_plan="GRATUIT",
             created_at=datetime.utcnow(),
         )
         db_session.add(client)

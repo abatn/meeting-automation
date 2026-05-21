@@ -32,11 +32,22 @@ from app.services.meeting_service import MeetingService
 @pytest.mark.asyncio
 async def test_p21_register_deletes_existing_team_member(client: AsyncClient, db_session: AsyncSession):
     """P2-1: Self-service registration should delete existing TeamMember with same email"""
-    # 1. Create TeamMember
+    # 1. Create client first
+    client_obj = Client(
+        id=str(uuid.uuid4()),
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
+        minutes_included=600
+    )
+    db_session.add(client_obj)
+    await db_session.flush()
+
+    # 2. Create TeamMember
     team_member = TeamMember(
         id=str(uuid.uuid4()),
-        client_id="test-client-1",
-        email="upgrade@example.com",
+        client_id=client_obj.id,
+        email=f"upgrade_{uuid.uuid4()}@example.com",
         full_name="Future User",
         position="Developer",
         department="Engineering"
@@ -44,11 +55,11 @@ async def test_p21_register_deletes_existing_team_member(client: AsyncClient, db
     db_session.add(team_member)
     await db_session.commit()
 
-    # 2. Self-service register with same email
+    # 3. Self-service register with same email
     response = await client.post(
         "/api/v1/auth/register",
         json={
-            "email": "upgrade@example.com",
+            "email": team_member.email,
             "password": "SecurePass123!",
             "full_name": "Future User",
             "company_name": "TestCorp"
@@ -56,14 +67,14 @@ async def test_p21_register_deletes_existing_team_member(client: AsyncClient, db
     )
     assert response.status_code == 201, f"Register failed: {response.text}"
 
-    # 3. Verify TeamMember was deleted (upgraded to User)
-    tm_stmt = select(TeamMember).where(TeamMember.email == "upgrade@example.com")
+    # 4. Verify TeamMember was deleted (upgraded to User)
+    tm_stmt = select(TeamMember).where(TeamMember.email == team_member.email)
     tm_res = await db_session.execute(tm_stmt)
     deleted_tm = tm_res.scalar_one_or_none()
     assert deleted_tm is None, "TeamMember should be deleted after registration"
 
-    # 4. Verify User was created with PENDING status
-    user_stmt = select(User).where(User.email == "upgrade@example.com")
+    # 5. Verify User was created with PENDING status
+    user_stmt = select(User).where(User.email == team_member.email)
     user_res = await db_session.execute(user_stmt)
     new_user = user_res.scalar_one_or_none()
     assert new_user is not None, "User should exist"
@@ -105,15 +116,20 @@ async def test_p22_team_member_has_secure_placeholder_password(db_session: Async
     # Create client
     client_obj = Client(
         id=str(uuid.uuid4()),
-        company_name="TestCorp",
-        subscription_plan="gratuit",
-        subscription_status="active",
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
         minutes_included=600
     )
     db_session.add(client_obj)
     await db_session.flush()
 
-    # Create admin user
+    # Add admin role
+    role_stmt = select(Role).where(Role.name == "admin")
+    role_res = await db_session.execute(role_stmt)
+    admin_role = role_res.scalar_one()
+
+    # Create admin user with role assigned at creation
     admin_user = User(
         id=str(uuid.uuid4()),
         client_id=client_obj.id,
@@ -122,16 +138,10 @@ async def test_p22_team_member_has_secure_placeholder_password(db_session: Async
         hashed_password=security.get_password_hash("Password123!"),
         status=UserStatus.ACTIVE.value,
         is_superuser=False,
-        is_mfa_enabled=False
+        is_mfa_enabled=False,
+        roles=[admin_role],
     )
     db_session.add(admin_user)
-    await db_session.flush()
-
-    # Add admin role
-    role_stmt = select(Role).where(Role.name == "admin")
-    role_res = await db_session.execute(role_stmt)
-    admin_role = role_res.scalar_one()
-    admin_user.roles = [admin_role]
     await db_session.commit()
 
     # Invite team member via TeamService
@@ -155,11 +165,22 @@ async def test_p22_team_member_has_secure_placeholder_password(db_session: Async
 @pytest.mark.asyncio
 async def test_p22_pending_user_cannot_login_before_activation(client: AsyncClient, db_session: AsyncSession):
     """P2-2: PENDING users should not be able to login (activation required)"""
+    # Create client first
+    client_obj = Client(
+        id=str(uuid.uuid4()),
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
+        minutes_included=600
+    )
+    db_session.add(client_obj)
+    await db_session.flush()
+
     # Create PENDING user
     pending_user = User(
         id=str(uuid.uuid4()),
-        client_id="test-client-1",
-        email="pending@example.com",
+        client_id=client_obj.id,
+        email=f"pending_{uuid.uuid4()}@example.com",
         full_name="Pending User",
         hashed_password=security.get_password_hash("Password123!"),
         status=UserStatus.PENDING.value  # ← PENDING, not ACTIVE
@@ -171,7 +192,7 @@ async def test_p22_pending_user_cannot_login_before_activation(client: AsyncClie
     response = await client.post(
         "/api/v1/auth/login",
         data={
-            "username": "pending@example.com",
+            "username": pending_user.email,
             "password": "Password123!"
         }
     )
@@ -186,9 +207,9 @@ async def test_p23_non_creator_cannot_update_meeting(db_session: AsyncSession):
     client_id = str(uuid.uuid4())
     client_obj = Client(
         id=client_id,
-        company_name="TestCorp",
-        subscription_plan="gratuit",
-        subscription_status="active",
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
         minutes_included=600
     )
     db_session.add(client_obj)
@@ -198,7 +219,7 @@ async def test_p23_non_creator_cannot_update_meeting(db_session: AsyncSession):
     creator = User(
         id=str(uuid.uuid4()),
         client_id=client_id,
-        email="creator@example.com",
+        email=f"creator_{uuid.uuid4()}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Pass123!"),
         status=UserStatus.ACTIVE.value
@@ -210,7 +231,7 @@ async def test_p23_non_creator_cannot_update_meeting(db_session: AsyncSession):
     other_user = User(
         id=str(uuid.uuid4()),
         client_id=client_id,
-        email="other@example.com",
+        email=f"other_{uuid.uuid4()}@example.com",
         full_name="Other User",
         hashed_password=security.get_password_hash("Pass123!"),
         status=UserStatus.ACTIVE.value
@@ -256,9 +277,9 @@ async def test_p23_creator_can_update_meeting(db_session: AsyncSession):
     client_id = str(uuid.uuid4())
     client_obj = Client(
         id=client_id,
-        company_name="TestCorp",
-        subscription_plan="gratuit",
-        subscription_status="active",
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
         minutes_included=600
     )
     db_session.add(client_obj)
@@ -268,7 +289,7 @@ async def test_p23_creator_can_update_meeting(db_session: AsyncSession):
     creator = User(
         id=str(uuid.uuid4()),
         client_id=client_id,
-        email="creator@example.com",
+        email=f"creator_{uuid.uuid4()}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Pass123!"),
         status=UserStatus.ACTIVE.value
@@ -312,23 +333,28 @@ async def test_p23_admin_can_update_any_meeting(db_session: AsyncSession):
     client_id = str(uuid.uuid4())
     client_obj = Client(
         id=client_id,
-        company_name="TestCorp",
-        subscription_plan="gratuit",
-        subscription_status="active",
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
         minutes_included=600
     )
     db_session.add(client_obj)
     await db_session.flush()
 
-    # Create admin user
+    # Load admin role
+    role_stmt = select(Role).where(Role.name == "admin")
+    role_res = await db_session.execute(role_stmt)
+    admin_role = role_res.scalar_one()
+
+    # Create admin user with role assigned at creation
     admin = User(
         id=str(uuid.uuid4()),
         client_id=client_id,
-        email="admin@example.com",
+        email=f"admin_{uuid.uuid4()}@example.com",
         full_name="Admin",
         hashed_password=security.get_password_hash("Pass123!"),
         status=UserStatus.ACTIVE.value,
-        role="admin"  # ← Admin role
+        roles=[admin_role],
     )
     db_session.add(admin)
     await db_session.flush()
@@ -337,7 +363,7 @@ async def test_p23_admin_can_update_any_meeting(db_session: AsyncSession):
     creator = User(
         id=str(uuid.uuid4()),
         client_id=client_id,
-        email="creator@example.com",
+        email=f"creator_{uuid.uuid4()}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Pass123!"),
         status=UserStatus.ACTIVE.value
@@ -381,9 +407,9 @@ async def test_p24_meeting_end_time_must_be_after_start_time(db_session: AsyncSe
     client_id = str(uuid.uuid4())
     client_obj = Client(
         id=client_id,
-        company_name="TestCorp",
-        subscription_plan="gratuit",
-        subscription_status="active",
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
         minutes_included=600
     )
     db_session.add(client_obj)
@@ -391,7 +417,7 @@ async def test_p24_meeting_end_time_must_be_after_start_time(db_session: AsyncSe
     creator = User(
         id=str(uuid.uuid4()),
         client_id=client_id,
-        email="creator@example.com",
+        email=f"creator_{uuid.uuid4()}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Pass123!"),
         status=UserStatus.ACTIVE.value
@@ -426,9 +452,9 @@ async def test_p24_meeting_with_null_end_time_is_allowed(db_session: AsyncSessio
     client_id = str(uuid.uuid4())
     client_obj = Client(
         id=client_id,
-        company_name="TestCorp",
-        subscription_plan="gratuit",
-        subscription_status="active",
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
         minutes_included=600
     )
     db_session.add(client_obj)
@@ -436,7 +462,7 @@ async def test_p24_meeting_with_null_end_time_is_allowed(db_session: AsyncSessio
     creator = User(
         id=str(uuid.uuid4()),
         client_id=client_id,
-        email="creator@example.com",
+        email=f"creator_{uuid.uuid4()}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Pass123!"),
         status=UserStatus.ACTIVE.value
@@ -473,9 +499,9 @@ async def test_p25_duplicate_participant_email_rejected(db_session: AsyncSession
     client_id = str(uuid.uuid4())
     client_obj = Client(
         id=client_id,
-        company_name="TestCorp",
-        subscription_plan="gratuit",
-        subscription_status="active",
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
         minutes_included=600
     )
     db_session.add(client_obj)
@@ -483,7 +509,7 @@ async def test_p25_duplicate_participant_email_rejected(db_session: AsyncSession
     creator = User(
         id=str(uuid.uuid4()),
         client_id=client_id,
-        email="creator@example.com",
+        email=f"creator_{uuid.uuid4()}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Pass123!"),
         status=UserStatus.ACTIVE.value
@@ -507,7 +533,7 @@ async def test_p25_duplicate_participant_email_rejected(db_session: AsyncSession
     p1 = Participant(
         id=str(uuid.uuid4()),
         meeting_id=meeting.id,
-        email="participant@example.com",
+        email=f"participant_{uuid.uuid4()}@example.com",
         name="Participant 1"
     )
     db_session.add(p1)
@@ -517,7 +543,7 @@ async def test_p25_duplicate_participant_email_rejected(db_session: AsyncSession
     p2 = Participant(
         id=str(uuid.uuid4()),
         meeting_id=meeting.id,
-        email="participant@example.com",  # ← Same email
+        email=p1.email,  # ← Same email
         name="Participant 2"
     )
     db_session.add(p2)
@@ -535,9 +561,9 @@ async def test_p25_same_email_different_meetings_allowed(db_session: AsyncSessio
     client_id = str(uuid.uuid4())
     client_obj = Client(
         id=client_id,
-        company_name="TestCorp",
-        subscription_plan="gratuit",
-        subscription_status="active",
+        company_name=f"TestCorp-{uuid.uuid4()}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
         minutes_included=600
     )
     db_session.add(client_obj)
@@ -545,7 +571,7 @@ async def test_p25_same_email_different_meetings_allowed(db_session: AsyncSessio
     creator = User(
         id=str(uuid.uuid4()),
         client_id=client_id,
-        email="creator@example.com",
+        email=f"creator_{uuid.uuid4()}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Pass123!"),
         status=UserStatus.ACTIVE.value
@@ -576,23 +602,24 @@ async def test_p25_same_email_different_meetings_allowed(db_session: AsyncSessio
     await db_session.flush()
 
     # Add same email to both meetings
+    shared_email = f"shared_{uuid.uuid4()}@example.com"
     p1 = Participant(
         id=str(uuid.uuid4()),
         meeting_id=meeting1.id,
-        email="shared@example.com",
+        email=shared_email,
         name="Shared Participant"
     )
     p2 = Participant(
         id=str(uuid.uuid4()),
         meeting_id=meeting2.id,
-        email="shared@example.com",  # ← Same email, different meeting
+        email=shared_email,  # ← Same email, different meeting
         name="Shared Participant"
     )
     db_session.add_all([p1, p2])
     await db_session.commit()  # ← Should succeed
 
     # Verify both were added
-    stmt = select(Participant).where(Participant.email == "shared@example.com")
+    stmt = select(Participant).where(Participant.email == shared_email)
     res = await db_session.execute(stmt)
     participants = res.scalars().all()
     assert len(participants) == 2
