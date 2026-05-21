@@ -45,13 +45,13 @@ jobs:
       - name: 'Workflow-Logs holen (bei Fehler)'
         if: env.STATUS == 'failure'
         run: |
-          # Versuche Logs zu bekommen (benötigt spezielle Berechtigungen)
           echo "Fehlerhafter Workflow: ${{ env.WORKFLOW_NAME }}"
           echo "Status: ${{ env.STATUS }}"
           
-          # Lese die Workflow-Datei
-          if [[ -f ".github/workflows/${WORKFLOW_NAME,,}.yml" ]]; then
-            cat ".github/workflows/${WORKFLOW_NAME,,}.yml" > workflow_config.txt
+          # Read workflow config safely
+          CONFIG_FILE=".github/workflows/${WORKFLOW_NAME,,}.yml"
+          if [[ -f "$CONFIG_FILE" ]]; then
+            cat "$CONFIG_FILE" > workflow_config.txt
           else
             echo "Workflow-Datei nicht gefunden" > workflow_config.txt
           fi
@@ -59,50 +59,55 @@ jobs:
       - name: 'AI analysiert Workflow'
         id: ai_analysis
         run: |
-          # Baue Analyse-Prompt
-          cat > prompt.txt << EOF
-          Analysiere diesen CI/CD Workflow und gib eine detaillierte Bewertung:
+          # Build prompt safely using jq (avoids heredoc injection from workflow config)
+          WORKFLOW_CONFIG=$(cat workflow_config.txt 2>/dev/null || echo "Keine Konfiguration verfügbar")
           
-          Workflow Name: ${{ env.WORKFLOW_NAME }}
-          Status: ${{ env.STATUS }}
-          
-          Workflow Konfiguration:
-          $(cat workflow_config.txt 2>/dev/null || echo "Keine Konfiguration verfügbar")
-          
-          Bitte bewerte:
-          1. **Best Practices**: Entspricht der Workflow den GitHub Actions Best Practices?
-          2. **Sicherheit**: Gibt es Sicherheitslücken (z.B. hardcoded Secrets, übermäßige Berechtigungen)?
-          3. **Performance**: Wie kann die Ausführungszeit optimiert werden?
-          4. **Fehleranfälligkeit**: Welche Schritte könnten häufig fehlschlagen?
-          5. **Verbesserungsvorschläge**: Konkrete Änderungen mit Code-Beispielen
-          
-          Antworte strukturiert auf Deutsch.
-          EOF
-          
-          cat > payload.json << EOF
-          {
-            "model": "z-ai/glm-5.1",
-            "messages": [
-              {
-                "role": "system",
-                "content": "Du bist ein GitHub Actions und CI/CD Experte. Analysiere Workflows kritisch und gib praxisnahe Verbesserungen."
-              },
-              {
-                "role": "user",
-                "content": $(cat prompt.txt | jq -Rs .)
-              }
-            ],
-            "temperature": 0.7,
-            "max_tokens": 2500
-          }
-          EOF
+          PROMPT=$(jq -n \
+            --arg name "${{ env.WORKFLOW_NAME }}" \
+            --arg status "${{ env.STATUS }}" \
+            --arg config "$WORKFLOW_CONFIG" \
+            "Analysiere diesen CI/CD Workflow und gib eine detaillierte Bewertung:
+
+Workflow Name: \($name)
+Status: \($status)
+
+Workflow Konfiguration:
+\($config)
+
+Bitte bewerte:
+1. **Best Practices**: Entspricht der Workflow den GitHub Actions Best Practices?
+2. **Sicherheit**: Gibt es Sicherheitslücken (z.B. hardcoded Secrets, übermäßige Berechtigungen)?
+3. **Performance**: Wie kann die Ausführungszeit optimiert werden?
+4. **Fehleranfälligkeit**: Welche Schritte könnten häufig fehlschlagen?
+5. **Verbesserungsvorschläge**: Konkrete Änderungen mit Code-Beispielen
+
+Antworte strukturiert auf Deutsch.")
+
+          # Build JSON payload safely
+          jq -n \
+            --arg prompt "$PROMPT" \
+            '{
+              "model": "z-ai/glm-5.1",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "Du bist ein GitHub Actions und CI/CD Experte. Analysiere Workflows kritisch und gib praxisnahe Verbesserungen."
+                },
+                {
+                  "role": "user",
+                  "content": $prompt
+                }
+              ],
+              "temperature": 0.7,
+              "max_tokens": 2500
+            }' > payload.json
           
           RESPONSE=$(curl -s -X POST "https://integrate.api.nvidia.com/v1/chat/completions" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.NVIDIA_API_KEY }}" \
             -d @payload.json)
           
-          AI_ANALYSIS=$(echo $RESPONSE | jq -r '.choices[0].message.content')
+          AI_ANALYSIS=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
           echo "AI_ANALYSIS<<EOF" >> $GITHUB_OUTPUT
           echo "$AI_ANALYSIS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
