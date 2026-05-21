@@ -30,7 +30,6 @@ jobs:
       - name: 'Determine Prompt'
         id: determine_prompt
         env:
-          # Der Schlüssel ist hier: toJSON() maskiert den gesamten Text sicher.
           ISSUE_TITLE: ${{ toJSON(github.event.issue.title) }}
           ISSUE_BODY: ${{ toJSON(github.event.issue.body) }}
           PR_TITLE: ${{ toJSON(github.event.pull_request.title) }}
@@ -38,22 +37,29 @@ jobs:
           COMMENT_BODY: ${{ toJSON(github.event.comment.body) }}
         run: |
           if [[ "${{ github.event_name }}" == "issues" && "${{ github.event.action }}" == "opened" ]]; then
-            # Die Daten sind sicher in den Umgebungsvariablen. eval/echo nicht nötig.
             TITLE=$(echo "$ISSUE_TITLE" | jq -r '.')
             BODY=$(echo "$ISSUE_BODY" | jq -r '.')
             PROMPT="Bitte analysiere dieses Issue und gib eine erste Einschätzung:\n\nTitel: $TITLE\n\nBeschreibung: $BODY"
-            echo "PROMPT=$PROMPT" >> $GITHUB_ENV
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "PROMPT<<$EOF" >> $GITHUB_ENV
+            echo "$PROMPT" >> $GITHUB_ENV
+            echo "$EOF" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.action }}" == "opened" ]]; then
             TITLE=$(echo "$PR_TITLE" | jq -r '.')
             BODY=$(echo "$PR_BODY" | jq -r '.')
             PROMPT="Bitte review diesen Pull Request und gib Feedback:\n\nTitel: $TITLE\n\nBeschreibung: $BODY"
-            echo "PROMPT=$PROMPT" >> $GITHUB_ENV
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "PROMPT<<$EOF" >> $GITHUB_ENV
+            echo "$PROMPT" >> $GITHUB_ENV
+            echo "$EOF" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
             COMMENT=$(echo "$COMMENT_BODY" | jq -r '.')
             CLEAN_COMMENT="${COMMENT#/ai}"
-            echo "PROMPT=$CLEAN_COMMENT" >> $GITHUB_ENV
+            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+            echo "PROMPT<<$EOF" >> $GITHUB_ENV
+            echo "$CLEAN_COMMENT" >> $GITHUB_ENV
+            echo "$EOF" >> $GITHUB_ENV
           fi
-
       - name: 'Call NVIDIA GLM-5.1 API'
         id: call_nvidia_api
         run: |
