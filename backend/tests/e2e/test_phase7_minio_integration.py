@@ -32,7 +32,6 @@ from app.models.recording import Recording
 from app.models.user import User, UserRole, UserStatus
 from app.models.client import Client
 from app.services.recording_service import RecordingService
-from tests.conftest import client_a, client_b, user_a1, user_b1
 
 
 client = TestClient(app)
