@@ -31,16 +31,10 @@ from app.models.facture import Facture as FactureModel
 from app.models.usage_minute import UsageMinute as UsageMinuteModel
 
 # Event loop policy (fixes pytest-asyncio DeprecationWarning)
+# Using event_loop_policy instead of custom event_loop fixture (recommended for pytest-asyncio >= 0.23)
 @pytest.fixture(scope="session")
 def event_loop_policy():
     return asyncio.get_event_loop_policy()
-
-# Use a single event loop for all tests to avoid asyncpg "different loop" errors
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 # Entscheide, welche Datenbank für Tests verwendet wird:
 # - Für E2E-Tests: Nutze die PostgreSQL-Datenbank aus settings.DATABASE_URL
