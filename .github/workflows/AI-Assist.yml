@@ -26,25 +26,30 @@ jobs:
         uses: 'actions/checkout@v4'
         with:
           fetch-depth: 0
+
       - name: 'Determine Prompt'
         id: determine_prompt
+        env:
+          # Der Schlüssel ist hier: toJSON() maskiert den gesamten Text sicher.
+          ISSUE_TITLE: ${{ toJSON(github.event.issue.title) }}
+          ISSUE_BODY: ${{ toJSON(github.event.issue.body) }}
+          PR_TITLE: ${{ toJSON(github.event.pull_request.title) }}
+          PR_BODY: ${{ toJSON(github.event.pull_request.body) }}
+          COMMENT_BODY: ${{ toJSON(github.event.comment.body) }}
         run: |
           if [[ "${{ github.event_name }}" == "issues" && "${{ github.event.action }}" == "opened" ]]; then
-            TITLE=$(echo "${{ github.event.issue.title }}" | sed 's/\[/\\[/g' | sed 's/\]/\\]/g' | sed "s/'/\\'/g")
-            BODY=$(echo "${{ github.event.issue.body }}" | sed 's/\[/\\[/g' | sed 's/\]/\\]/g' | sed "s/'/\\'/g")
-            PROMPT="Bitte analysiere dieses Issue und gib eine erste Einschätzung:"
-            PROMPT="$PROMPT\n\nTitel: $TITLE"
-            PROMPT="$PROMPT\n\nBeschreibung: $BODY"
+            # Die Daten sind sicher in den Umgebungsvariablen. eval/echo nicht nötig.
+            TITLE=$(echo "$ISSUE_TITLE" | jq -r '.')
+            BODY=$(echo "$ISSUE_BODY" | jq -r '.')
+            PROMPT="Bitte analysiere dieses Issue und gib eine erste Einschätzung:\n\nTitel: $TITLE\n\nBeschreibung: $BODY"
             echo "PROMPT=$PROMPT" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.action }}" == "opened" ]]; then
-            TITLE=$(echo "${{ github.event.pull_request.title }}" | sed 's/\[/\\[/g' | sed 's/\]/\\]/g' | sed "s/'/\\'/g")
-            BODY=$(echo "${{ github.event.pull_request.body }}" | sed 's/\[/\\[/g' | sed 's/\]/\\]/g' | sed "s/'/\\'/g")
-            PROMPT="Bitte review diesen Pull Request und gib Feedback:"
-            PROMPT="$PROMPT\n\nTitel: $TITLE"
-            PROMPT="$PROMPT\n\nBeschreibung: $BODY"
+            TITLE=$(echo "$PR_TITLE" | jq -r '.')
+            BODY=$(echo "$PR_BODY" | jq -r '.')
+            PROMPT="Bitte review diesen Pull Request und gib Feedback:\n\nTitel: $TITLE\n\nBeschreibung: $BODY"
             echo "PROMPT=$PROMPT" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            COMMENT=$(echo "${{ github.event.comment.body }}" | sed 's/\[/\\[/g' | sed 's/\]/\\]/g' | sed "s/'/\\'/g" | sed 's/#/\\#/g')
+            COMMENT=$(echo "$COMMENT_BODY" | jq -r '.')
             CLEAN_COMMENT="${COMMENT#/ai}"
             echo "PROMPT=$CLEAN_COMMENT" >> $GITHUB_ENV
           fi
