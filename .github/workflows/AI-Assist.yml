@@ -31,31 +31,29 @@ jobs:
         id: determine_prompt
         run: |
           if [[ "${{ github.event_name }}" == "issues" && "${{ github.event.action }}" == "opened" ]]; then
-            delimiter="EOF"
-            echo "PROMPT<<$delimiter" >> $GITHUB_ENV
-            echo "Titel: ${{ github.event.issue.title }}" >> $GITHUB_ENV
-            echo "Beschreibung: ${{ github.event.issue.body }}" >> $GITHUB_ENV
-            echo "$delimiter" >> $GITHUB_ENV
+            cat > /tmp/prompt.txt << 'PROMPT_EOF'
+            Titel: ${{ github.event.issue.title }}
+
+            Beschreibung: ${{ github.event.issue.body }}
+            PROMPT_EOF
           elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.action }}" == "opened" ]]; then
-            delimiter="EOF"
-            echo "PROMPT<<$delimiter" >> $GITHUB_ENV
-            echo "Titel: ${{ github.event.pull_request.title }}" >> $GITHUB_ENV
-            echo "Beschreibung: ${{ github.event.pull_request.body }}" >> $GITHUB_ENV
-            echo "$delimiter" >> $GITHUB_ENV
+            cat > /tmp/prompt.txt << 'PROMPT_EOF'
+            Titel: ${{ github.event.pull_request.title }}
+
+            Beschreibung: ${{ github.event.pull_request.body }}
+            PROMPT_EOF
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            CLEAN_COMMENT="${{ github.event.comment.body }}"
-            CLEAN_COMMENT="${CLEAN_COMMENT#/ai}"
-            delimiter="EOF"
-            echo "PROMPT<<$delimiter" >> $GITHUB_ENV
-            echo "$CLEAN_COMMENT" >> $GITHUB_ENV
-            echo "$delimiter" >> $GITHUB_ENV
+            cat > /tmp/prompt.txt << 'PROMPT_EOF'
+            ${{ github.event.comment.body }}
+            PROMPT_EOF
+            sed -i '1s|^/ai *||' /tmp/prompt.txt
           fi
 
       - name: 'Call NVIDIA GLM-5.1 API'
         id: call_nvidia_api
         run: |
-          cat > payload.json << EOF
-          {
+          PROMPT_CONTENT=$(cat /tmp/prompt.txt)
+          jq -n --arg prompt "$PROMPT_CONTENT" '{
             "model": "z-ai/glm-5.1",
             "messages": [
               {
@@ -64,24 +62,23 @@ jobs:
               },
               {
                 "role": "user",
-                "content": "${{ env.PROMPT }}"
+                "content": $prompt
               }
             ],
             "temperature": 0.7,
             "max_tokens": 2000
-          }
-          EOF
-          
+          }' > payload.json
+
           RESPONSE=$(curl -s -X POST "https://integrate.api.nvidia.com/v1/chat/completions" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.NVIDIA_API_KEY }}" \
             -d @payload.json)
-          
-          AI_MESSAGE=$(echo $RESPONSE | jq -r '.choices[0].message.content')
-          
-          echo "AI_MESSAGE<<EOF" >> $GITHUB_OUTPUT
+
+          AI_MESSAGE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+          echo "AI_MESSAGE<<MESSAGE_EOF" >> $GITHUB_OUTPUT
           echo "$AI_MESSAGE" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "MESSAGE_EOF" >> $GITHUB_OUTPUT
 
       - name: 'Add Comment to Issue/PR'
         uses: 'actions/github-script@v7'
