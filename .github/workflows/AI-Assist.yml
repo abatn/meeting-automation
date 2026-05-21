@@ -29,24 +29,27 @@ jobs:
 
       - name: 'Determine Prompt'
         id: determine_prompt
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          if [[ "${{ github.event_name }}" == "issues" && "${{ github.event.action }}" == "opened" ]]; then
-            cat > /tmp/prompt.txt << 'PROMPT_EOF'
-            Titel: ${{ github.event.issue.title }}
-
-            Beschreibung: ${{ github.event.issue.body }}
-            PROMPT_EOF
-          elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.action }}" == "opened" ]]; then
-            cat > /tmp/prompt.txt << 'PROMPT_EOF'
-            Titel: ${{ github.event.pull_request.title }}
-
-            Beschreibung: ${{ github.event.pull_request.body }}
-            PROMPT_EOF
-          elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            cat > /tmp/prompt.txt << 'PROMPT_EOF'
-            ${{ github.event.comment.body }}
-            PROMPT_EOF
-            sed -i '1s|^/ai *||' /tmp/prompt.txt
+          if [[ "$EVENT_NAME" == "issues" && "$EVENT_ACTION" == "opened" ]]; then
+            jq -n \
+              --arg title "$ISSUE_TITLE" \
+              --arg body "$ISSUE_BODY" \
+              '("Titel: " + $title + "\n\nBeschreibung: " + $body)' > /tmp/prompt.txt
+          elif [[ "$EVENT_NAME" == "pull_request" && "$EVENT_ACTION" == "opened" ]]; then
+            jq -n \
+              --arg title "$PR_TITLE" \
+              --arg body "$PR_BODY" \
+              '("Titel: " + $title + "\n\nBeschreibung: " + $body)' > /tmp/prompt.txt
+          elif [[ "$EVENT_NAME" == "issue_comment" ]]; then
+            echo "$COMMENT_BODY" | sed '1s|^/ai *||' > /tmp/prompt.txt
           fi
 
       - name: 'Call NVIDIA GLM-5.1 API'
@@ -74,11 +77,12 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.NVIDIA_API_KEY }}" \
             -d @payload.json)
 
-          AI_MESSAGE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+          AI_MESSAGE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
 
-          echo "AI_MESSAGE<<MESSAGE_EOF" >> $GITHUB_OUTPUT
+          # Use environment file for multi-line output (safe for special characters)
+          echo "AI_MESSAGE<<EOF" >> $GITHUB_OUTPUT
           echo "$AI_MESSAGE" >> $GITHUB_OUTPUT
-          echo "MESSAGE_EOF" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: 'Add Comment to Issue/PR'
         uses: 'actions/github-script@v7'
