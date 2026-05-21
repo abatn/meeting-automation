@@ -29,37 +29,28 @@ jobs:
 
       - name: 'Determine Prompt'
         id: determine_prompt
-        env:
-          ISSUE_TITLE: ${{ toJSON(github.event.issue.title) }}
-          ISSUE_BODY: ${{ toJSON(github.event.issue.body) }}
-          PR_TITLE: ${{ toJSON(github.event.pull_request.title) }}
-          PR_BODY: ${{ toJSON(github.event.pull_request.body) }}
-          COMMENT_BODY: ${{ toJSON(github.event.comment.body) }}
         run: |
           if [[ "${{ github.event_name }}" == "issues" && "${{ github.event.action }}" == "opened" ]]; then
-            TITLE=$(echo "$ISSUE_TITLE" | jq -r '.')
-            BODY=$(echo "$ISSUE_BODY" | jq -r '.')
-            PROMPT="Bitte analysiere dieses Issue und gib eine erste Einschätzung:\n\nTitel: $TITLE\n\nBeschreibung: $BODY"
-            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-            echo "PROMPT<<$EOF" >> $GITHUB_ENV
-            echo "$PROMPT" >> $GITHUB_ENV
-            echo "$EOF" >> $GITHUB_ENV
+            delimiter="EOF"
+            echo "PROMPT<<$delimiter" >> $GITHUB_ENV
+            echo "Titel: ${{ github.event.issue.title }}" >> $GITHUB_ENV
+            echo "Beschreibung: ${{ github.event.issue.body }}" >> $GITHUB_ENV
+            echo "$delimiter" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.action }}" == "opened" ]]; then
-            TITLE=$(echo "$PR_TITLE" | jq -r '.')
-            BODY=$(echo "$PR_BODY" | jq -r '.')
-            PROMPT="Bitte review diesen Pull Request und gib Feedback:\n\nTitel: $TITLE\n\nBeschreibung: $BODY"
-            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-            echo "PROMPT<<$EOF" >> $GITHUB_ENV
-            echo "$PROMPT" >> $GITHUB_ENV
-            echo "$EOF" >> $GITHUB_ENV
+            delimiter="EOF"
+            echo "PROMPT<<$delimiter" >> $GITHUB_ENV
+            echo "Titel: ${{ github.event.pull_request.title }}" >> $GITHUB_ENV
+            echo "Beschreibung: ${{ github.event.pull_request.body }}" >> $GITHUB_ENV
+            echo "$delimiter" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            COMMENT=$(echo "$COMMENT_BODY" | jq -r '.')
-            CLEAN_COMMENT="${COMMENT#/ai}"
-            EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-            echo "PROMPT<<$EOF" >> $GITHUB_ENV
+            CLEAN_COMMENT="${{ github.event.comment.body }}"
+            CLEAN_COMMENT="${CLEAN_COMMENT#/ai}"
+            delimiter="EOF"
+            echo "PROMPT<<$delimiter" >> $GITHUB_ENV
             echo "$CLEAN_COMMENT" >> $GITHUB_ENV
-            echo "$EOF" >> $GITHUB_ENV
+            echo "$delimiter" >> $GITHUB_ENV
           fi
+
       - name: 'Call NVIDIA GLM-5.1 API'
         id: call_nvidia_api
         run: |
