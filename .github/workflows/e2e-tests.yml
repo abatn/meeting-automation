@@ -40,7 +40,7 @@ jobs:
           sleep 2
         done
         # Run ONLY e2e tests (skip unit/integration); retry flaky tests up to 2 times
-        docker compose -f ../docker-compose.e2e.yml exec -T backend pip install pytest pytest-cov pytest-rerunfailures
+        docker compose -f ../docker-compose.e2e.yml exec -T backend pip install pytest pytest-cov pytest-rerunfailures pytest-asyncio
         docker compose -f ../docker-compose.e2e.yml exec -T backend pytest tests/e2e/ -v --tb=short --junitxml=report.xml --reruns 2 --reruns-delay 1
         #docker compose -f ../docker-compose.e2e.yml exec -T backend pytest tests/e2e/ -v --tb=short --junitxml=report.xml --reruns 2 --reruns-delay 1
       env:
