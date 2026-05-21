@@ -27,7 +27,7 @@ jobs:
         with:
           fetch-depth: 0
 
-            - name: 'Determine Prompt'
+      - name: 'Determine Prompt'
         id: determine_prompt
         run: |
           if [[ "${{ github.event_name }}" == "issues" && "${{ github.event.action }}" == "opened" ]]; then
@@ -41,15 +41,14 @@ jobs:
             PROMPT="$PROMPT\n\nBeschreibung: ${{ github.event.pull_request.body }}"
             echo "PROMPT=$PROMPT" >> $GITHUB_ENV
           elif [[ "${{ github.event_name }}" == "issue_comment" ]]; then
-            # Wichtig: Das # Zeichen escapen
             COMMENT=$(echo "${{ github.event.comment.body }}" | sed 's/#/\\#/g')
             CLEAN_COMMENT="${COMMENT#/ai}"
             echo "PROMPT=$CLEAN_COMMENT" >> $GITHUB_ENV
           fi
+
       - name: 'Call NVIDIA GLM-5.1 API'
         id: call_nvidia_api
         run: |
-          # JSON-Payload erstellen
           cat > payload.json << EOF
           {
             "model": "z-ai/glm-5.1",
@@ -68,16 +67,13 @@ jobs:
           }
           EOF
           
-          # API-Aufruf
           RESPONSE=$(curl -s -X POST "https://integrate.api.nvidia.com/v1/chat/completions" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.NVIDIA_API_KEY }}" \
             -d @payload.json)
           
-          # Extrahiere die Antwort
           AI_MESSAGE=$(echo $RESPONSE | jq -r '.choices[0].message.content')
           
-          # Speichere für später
           echo "AI_MESSAGE<<EOF" >> $GITHUB_OUTPUT
           echo "$AI_MESSAGE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -96,7 +92,6 @@ jobs:
             commentBody += `*Diese Antwort wurde von NVIDIA GLM-5.1 generiert.*\n`;
             commentBody += `*Trigger mit \`/ai [deine Nachricht]\`*\n`;
             
-            // Issue oder Pull Request kommentieren
             if (context.payload.issue) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
