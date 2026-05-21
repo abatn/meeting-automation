@@ -15,9 +15,11 @@ jobs:
     steps:
       - name: Extract message
         id: extract
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          COMMENT="${{ github.event.comment.body }}"
-          MESSAGE="${COMMENT#/ai }"
+          MESSAGE="${COMMENT_BODY#/ai }"
+          # Use environment file for safe multi-line output
           echo "MESSAGE<<EOF" >> $GITHUB_OUTPUT
           echo "$MESSAGE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -28,23 +30,28 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
           AI_MODEL: ${{ vars.AI_MODEL }}
+          USER_MESSAGE: ${{ steps.extract.outputs.MESSAGE }}
         run: |
+          # Build JSON payload safely with jq (avoids heredoc injection)
+          jq -n \
+            --arg model "$AI_MODEL" \
+            --arg content "$USER_MESSAGE" \
+            '{
+              "model": $model,
+              "messages": [
+                {
+                  "role": "user",
+                  "content": $content
+                }
+              ]
+            }' > payload.json
+
           RESPONSE=$(curl -s -X POST "${OPENAI_BASE_URL}/chat/completions" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${OPENAI_API_KEY}" \
-            -d @- <<EOF
-          {
-            "model": "${AI_MODEL}",
-            "messages": [
-              {
-                "role": "user",
-                "content": "${{ steps.extract.outputs.MESSAGE }}"
-              }
-            ]
-          }
-          EOF
-          )
-          AI_MESSAGE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+            -d @payload.json)
+
+          AI_MESSAGE=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
           echo "AI_MESSAGE<<EOF" >> $GITHUB_OUTPUT
           echo "$AI_MESSAGE" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
