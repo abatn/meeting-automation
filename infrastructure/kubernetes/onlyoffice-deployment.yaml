@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: onlyoffice
+  namespace: meeting-automation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: onlyoffice
+  template:
+    metadata:
+      labels:
+        app: onlyoffice
+    spec:
+      containers:
+      - name: onlyoffice
+        image: onlyoffice/documentserver:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: SERVER_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: onlyoffice-config
+              key: SERVER_NAME
+        - name: ONLYOFFICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: onlyoffice-config
+              key: ONLYOFFICE_URL
+        - name: AMQP_URI
+          valueFrom:
+            configMapKeyRef:
+              name: onlyoffice-config
+              key: AMQP_URI
+        - name: AMQP_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: onlyoffice-config
+              key: AMQP_TYPE
+        - name: DB_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: onlyoffice-config
+              key: DB_TYPE
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: onlyoffice-secret
+              key: JWT_SECRET
+        volumeMounts:
+        - name: onlyoffice-data
+          mountPath: /var/www/onlyoffice/Data
+        - name: onlyoffice-logs
+          mountPath: /var/log/onlyoffice
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 6
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: onlyoffice-data
+        persistentVolumeClaim:
+          claimName: onlyoffice-data-pvc
+      - name: onlyoffice-logs
+        persistentVolumeClaim:
+          claimName: onlyoffice-logs-pvc

@@ -208,6 +208,15 @@ async def register(
             detail="A user with this email already exists.",
         )
 
+    # Delete any existing TeamMember with this email (upgrade path: TeamMember → User)
+    from app.models.team import TeamMember
+    tm_stmt = select(TeamMember).where(TeamMember.email == user_in.email)
+    tm_result = await db.execute(tm_stmt)
+    existing_tm = tm_result.scalar_one_or_none()
+    if existing_tm:
+        await db.delete(existing_tm)
+        await db.flush()
+
     # Check for duplicate company name and create or get client
     company_name = user_in.company_name or f"{user_in.full_name or user_in.email}'s Company"
     existing_client = await client_service.get_by_company_name(company_name)

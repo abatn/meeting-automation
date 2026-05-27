@@ -61,7 +61,7 @@ async def main():
             data={"username": TEST_USER, "password": TEST_PASSWORD},
         )
         login_resp.raise_for_status()
-        token = login_resp.json()["access_token"]
+        token = login_resp.cookies.get("accessToken")
         headers = {"Authorization": f"Bearer {token}"}
         print("✅ Login successful.")
 

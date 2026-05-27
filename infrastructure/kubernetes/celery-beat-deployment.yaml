@@ -16,7 +16,7 @@ spec:
       containers:
       - name: celery-beat
         image: meeting-automation-backend:latest
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         command: ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info"]
         env:
         - name: PYTHONPATH

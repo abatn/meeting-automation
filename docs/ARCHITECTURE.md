@@ -172,6 +172,16 @@ graph TD
 - **Kubernetes**: Orchestrates containerized applications in production environments.
 - **Minio (S3-compatible Object Storage)**: Stores meeting recordings and other large files.
 
+### 3.6. OnlyOffice (Document Editing)
+
+- **Technology**: OnlyOffice Document Server
+- **Purpose**: Provides online document editing capabilities for meeting transcripts, PVs, and other documents.
+- **Key Features**:
+    - Real-time collaborative editing of documents, spreadsheets, and presentations
+    - Support for DOCX, XLSX, PPTX, ODT, ODS, ODP, PDF, and more
+    - Integration with the backend via JWT for secure document access
+    - Used for viewing and editing meeting transcriptions and generated PVs
+
 ## 4. CI/CD Pipelines (.github/workflows)
 
 - **Backend CI**: Runs tests, linting, type checking, and builds Docker image.

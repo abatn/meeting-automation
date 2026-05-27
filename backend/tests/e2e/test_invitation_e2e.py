@@ -82,8 +82,7 @@ class TestInvitationE2E:
 
         assert confirm_response.status_code == 200
         confirm_data = confirm_response.json()
-        # NEW: Should return JWT token (auto-login after activation)
-        assert "access_token" in confirm_data, "Response should contain access_token for auto-login"
+        # NEW: Should return user data and token_type (token is in httpOnly cookie)
         assert confirm_data["token_type"].lower() == "bearer"
         assert "user" in confirm_data, "Response should contain user data"
         assert confirm_data["user"]["email"] == new_email
@@ -114,8 +113,8 @@ class TestInvitationE2E:
 
         assert login_response.status_code == 200
         login_data = login_response.json()
-        assert "access_token" in login_data
         assert login_data["token_type"].lower() == "bearer"
+        assert "accessToken" in login_response.cookies, "Login should set accessToken cookie"
 
     async def test_expired_token_cannot_be_used(
         self, client: AsyncClient, db_session
@@ -229,9 +228,9 @@ class TestInvitationE2E:
 
         assert first_confirm.status_code == 200
         first_confirm_data = first_confirm.json()
-        # Should return JWT token for auto-login
-        assert "access_token" in first_confirm_data
+        # Should return token_type and user (token is in httpOnly cookie)
         assert first_confirm_data["token_type"].lower() == "bearer"
+        assert "user" in first_confirm_data
 
         # Second activation with same token should fail (token deleted)
         second_confirm = await client.post(

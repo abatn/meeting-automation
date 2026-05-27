@@ -21,8 +21,8 @@ async def test_login_success(client: AsyncClient, test_user_data):
     })
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
     assert data["token_type"] == "bearer"
+    assert "accessToken" in response.cookies, "Login should set accessToken cookie"
 
 @pytest.mark.asyncio
 async def test_login_failed_wrong_password(client: AsyncClient, test_user_data):

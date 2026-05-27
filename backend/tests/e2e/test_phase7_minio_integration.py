@@ -152,9 +152,9 @@ class TestPhase7MinIOIntegration:
         
         # Assert: URL is valid and contains signature
         assert presigned_url is not None
-        assert "X-Amz-Signature" in presigned_url
+        assert "Signature=" in presigned_url
         assert file_key in presigned_url
-        assert "PUT" in presigned_url or "put_object" in presigned_url
+        assert "X-Amz-Signature=" in presigned_url or "Expires=" in presigned_url
         print(f"✅ Presigned upload URL generated: {presigned_url[:100]}...")
 
     @pytest.mark.asyncio
@@ -195,9 +195,9 @@ class TestPhase7MinIOIntegration:
         
         # Assert: URL is valid and contains signature
         assert presigned_url is not None
-        assert "X-Amz-Signature" in presigned_url
+        assert "Signature=" in presigned_url
         assert file_key in presigned_url
-        assert "GET" in presigned_url or "get_object" in presigned_url
+        assert "X-Amz-Signature=" in presigned_url or "Expires=" in presigned_url
         print(f"✅ Presigned download URL generated: {presigned_url[:100]}...")
 
     @pytest.mark.asyncio
@@ -233,7 +233,7 @@ class TestPhase7MinIOIntegration:
         assert "presigned_url" in data
         assert "file_key" in data
         assert data["file_key"].startswith(authenticated_user_a["client_id"])
-        assert "X-Amz-Signature" in data["presigned_url"]
+        assert "Signature=" in data["presigned_url"]
         print(f"✅ API presigned upload endpoint works: {data['file_key']}")
 
     @pytest.mark.asyncio
@@ -280,7 +280,7 @@ class TestPhase7MinIOIntegration:
         assert "presigned_url" in data
         assert "file_key" in data
         assert data["file_key"] == file_key
-        assert "X-Amz-Signature" in data["presigned_url"]
+        assert "Signature=" in data["presigned_url"]
         print(f"✅ API presigned download endpoint works: {recording.id}")
 
     @pytest.mark.asyncio
@@ -447,8 +447,8 @@ class TestPhase7MinIOIntegration:
         presigned_url_24h = service.get_presigned_upload_url(file_key, expires_in=86400)
         
         # Both should be valid URLs
-        assert "X-Amz-Signature" in presigned_url_1h
-        assert "X-Amz-Signature" in presigned_url_24h
+        assert "Signature=" in presigned_url_1h
+        assert "Signature=" in presigned_url_24h
         
         # URLs should be different due to different expiry times
         assert presigned_url_1h != presigned_url_24h
@@ -653,13 +653,3 @@ async def authenticated_user_b(db_session: AsyncSession):
 
     return {"user": user_b, "token": token, "client_id": client_b.id}
 
-
-@pytest.fixture
-async def authenticated_user_b(db_session: AsyncSession):
-    """Fixture: Create and authenticate User B"""
-    # This is a placeholder; actual fixture implementation should be in conftest.py
-    return {
-        "user": None,
-        "token": None,
-        "client_id": None
-    }

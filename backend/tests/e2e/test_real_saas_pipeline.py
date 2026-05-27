@@ -34,7 +34,6 @@ from app.models.transcription import Transcription
 from app.models.pv import PV
 from app.models.audit_log import AuditLog
 from app.core.security import get_password_hash, verify_password
-from app.utils.token_utils import hash_token
 from app.core.config import settings
 
 
@@ -67,7 +66,7 @@ class TestRealSaasPipeline:
         assert response.status_code == 200, f"Login failed: {response.json()}"
 
         data = response.json()
-        access_token = data.get("access_token")
+        access_token = response.cookies.get("accessToken")
         assert access_token is not None
 
         print(f"  ✓ JWT token obtained")
@@ -166,8 +165,8 @@ class TestRealSaasPipeline:
         activation_token_obj = token_result.scalar_one_or_none()
 
         assert activation_token_obj is not None, "No activation token found"
-        assert activation_token_obj.token_hash is not None
-        assert len(activation_token_obj.token_hash) == 64  # SHA-256 hash
+        assert activation_token_obj.token is not None
+        assert len(activation_token_obj.token) > 32  # Plaintext token
 
         print(f"  ✓ Activation token exists (hash stored in DB)")
         print(f"  ✓ Token expires at: {activation_token_obj.expires_at}")
@@ -219,15 +218,14 @@ class TestRealSaasPipeline:
 
         print(f"  Created PENDING user: {team_email}")
 
-        # Create activation token
+        # Create activation token (store plaintext as the verify endpoint expects)
         plaintext_token = secrets.token_urlsafe(32)
-        token_hash = hash_token(plaintext_token)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=48)
 
         activation_token = ActivationToken(
             id=str(uuid.uuid4()),
             user_id=team_member_id,
-            token_hash=token_hash,
+            token=plaintext_token,
             expires_at=expires_at,
         )
         db_session.add(activation_token)
@@ -889,7 +887,7 @@ class TestRealSaasPipeline:
                 },
             )
             assert dg_login.status_code == 200
-            dg_token = dg_login.json()["access_token"]
+            dg_token = dg_login.cookies.get("accessToken")
             dg_headers = {"Authorization": f"Bearer {dg_token}"}
 
             dg_decoded = jwt.decode(dg_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])

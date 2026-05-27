@@ -96,4 +96,23 @@ data/
 
 # Virtual environments
 venv/
+.venv*/
+venv_*/
 backend/venv/
+backend/.venv*/
+backend/venv_*/
+backend/venv_build/
+backend/venv_test/
+
+# Temp & backup files
+*.bak
+nohup.out
+test_*.txt
+*_key.txt
+
+# OpenCode config
+.opencode/
+
+# AI prompts
+CONTINUE_SETUP_PROMPT.md
+ONLYOFFICE_STRUCTURE_CHECK_PROMPT.md

@@ -24,11 +24,15 @@ spec:
             command: ["pg_isready", "-U", "meeting_user", "-d", "meeting_db"]
           initialDelaySeconds: 5
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         livenessProbe:
           exec:
             command: ["pg_isready", "-U", "meeting_user", "-d", "meeting_db"]
-          initialDelaySeconds: 15
-          periodSeconds: 20
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
         envFrom:
         - secretRef:
             name: postgres-secrets

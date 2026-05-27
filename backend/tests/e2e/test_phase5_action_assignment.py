@@ -257,7 +257,7 @@ async def test_p15_action_status_pending_on_create(db_session: AsyncSession):
     source = inspect.getsource(_save_pv_and_actions)
     
     # Check that status is set to PENDING
-    assert 'status="PENDING"' in source, "Should set status to PENDING for new actions"
+    assert 'ActionStatus.PENDING' in source, "Should set status to PENDING for new actions"
 
 
 @pytest.mark.asyncio

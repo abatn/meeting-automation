@@ -62,7 +62,7 @@ async def test_p21_register_deletes_existing_team_member(client: AsyncClient, db
             "email": team_member.email,
             "password": "SecurePass123!",
             "full_name": "Future User",
-            "company_name": "TestCorp"
+            "company_name": f"TestCorp-{uuid.uuid4().hex[:6]}"
         }
     )
     assert response.status_code == 201, f"Register failed: {response.text}"
@@ -88,10 +88,22 @@ async def test_p21_register_rejects_duplicate_email(client: AsyncClient, db_sess
     response1 = await client.post(
         "/api/v1/auth/register",
         json={
-            "email": "duplicate@example.com",
+            "email": f"duplicate_{uuid.uuid4().hex[:6]}@example.com",
             "password": "SecurePass123!",
             "full_name": "First User",
-            "company_name": "TestCorp1"
+            "company_name": f"TestCorp1-{uuid.uuid4().hex[:6]}"
+        }
+    )
+    assert response1.status_code == 201
+
+    # 2. Try to register with same email
+    response2 = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": f"duplicate_{uuid.uuid4().hex[:6]}@example.com",
+            "password": "SecurePass123!",
+            "full_name": "Second User",
+            "company_name": f"TestCorp2-{uuid.uuid4().hex[:6]}"
         }
     )
     assert response1.status_code == 201
@@ -133,7 +145,7 @@ async def test_p22_team_member_has_secure_placeholder_password(db_session: Async
     admin_user = User(
         id=str(uuid.uuid4()),
         client_id=client_obj.id,
-        email="admin@example.com",
+        email=f"admin_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Admin User",
         hashed_password=security.get_password_hash("Password123!"),
         status=UserStatus.ACTIVE.value,
@@ -147,7 +159,7 @@ async def test_p22_team_member_has_secure_placeholder_password(db_session: Async
     # Invite team member via TeamService
     team_service = TeamService(db_session)
     team_member_data = TeamMemberCreate(
-        email="invite@example.com",
+        email=f"invite_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Invited User",
         role="participant"
     )

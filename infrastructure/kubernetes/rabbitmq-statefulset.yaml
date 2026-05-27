@@ -23,8 +23,9 @@ spec:
         readinessProbe:
           exec:
             command: ["rabbitmq-diagnostics", "check_running"]
-          initialDelaySeconds: 10
-          periodSeconds: 10
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 15
         envFrom:
         - secretRef:
             name: rabbitmq-secrets

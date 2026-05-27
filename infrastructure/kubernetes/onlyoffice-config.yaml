@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: onlyoffice-config
+  namespace: meeting-automation
+data:
+  SERVER_NAME: "onlyoffice-service.meeting-automation.svc.cluster.local"
+  ONLYOFFICE_URL: "http://onlyoffice-service.meeting-automation.svc.cluster.local"
+  # Use existing RabbitMQ service
+  AMQP_URI: "amqp://rabbit_user:rabbit_password@rabbitmq:5672/"
+  AMQP_TYPE: "rabbitmq"
+  DB_TYPE: "sqlite"
+  # JWT secret will be sourced from secret

@@ -39,27 +39,20 @@ async def test_create_meeting_basic(e2e_client: AsyncClient):
 @pytest.mark.e2e
 async def test_create_meeting_with_participants(e2e_client: AsyncClient, environment_config):
     """E2E: Meeting can be created with a list of participants."""
-    # First, get list of users to include as participants
-    users_resp = await e2e_client.get("/api/v1/meetings/users")
-    assert users_resp.status_code == 200
-    users = users_resp.json()
-    # If there are at least 2 users, pick first two; otherwise use empty
-    participant_ids = [user["id"] for user in users[:2]] if len(users) >= 2 else []
-
     meeting_data = {
         "title": "Team Sync",
         "description": "Weekly team sync",
         "start_time": "2026-04-16T14:00:00",
         "end_time": "2026-04-16T15:00:00",
         "location": "Virtual",
-        "participants": [{"user_id": pid, "role": "attendee"} for pid in participant_ids]
+        "participants": [
+            {"email": "participant1@example.com", "name": "Participant One", "role": "attendee"},
+            {"email": "participant2@example.com", "name": "Participant Two", "role": "attendee"}
+        ]
     }
     resp = await e2e_client.post("/api/v1/meetings/", json=meeting_data)
     assert resp.status_code == 201
     meeting = resp.json()
-    # Participants might be returned in response model; check if included
-    # Note: MeetingWithPV model includes participants? Possibly selectinload.
-    # We'll just check creation succeeded.
     assert meeting["title"] == meeting_data["title"]
 
 

@@ -133,19 +133,19 @@ services:
       - e2e-network
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        E2E_BUILD: "true"
     container_name: meeting-automation-backend-e2e
-    command: >
-      bash -c "
-        echo '=== Waiting for all services to be ready ===' &&
-        sleep 15 &&
-        cd /app &&
-        echo '=== Starting Backend Server ===' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000
-      "
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       - PYTHONPATH=/app
       - E2E_TEST=true
+      - DB_HOST=postgres-test
+      - DB_NAME=meeting_db_test
+      - DB_PASSWORD=meeting_password
+      - RUN_MIGRATIONS=true
       - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres-test:5432/meeting_db_test
       - REDIS_URL=redis://:redis_password@redis-test:6379/0
       - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq-test:5672/

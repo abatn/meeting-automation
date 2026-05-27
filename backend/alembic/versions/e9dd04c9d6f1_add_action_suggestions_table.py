@@ -26,6 +26,7 @@ def upgrade() -> None:
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('suggested_assignee', sa.String(), nullable=True),
     sa.Column('confidence_score', sa.Float(), nullable=True),
+    sa.Column('language', sa.String(), nullable=True, server_default=sa.text("'en'")),
     sa.Column('status', sa.Enum('SUGGESTED', 'ACCEPTED', 'REJECTED', name='suggestionstatus'), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),

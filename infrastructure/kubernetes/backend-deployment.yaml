@@ -13,10 +13,27 @@ spec:
       labels:
         app: backend
     spec:
+      initContainers:
+      - name: alembic-migrate
+        image: meeting-automation-backend:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c", "export PYTHONPATH=/app && cd /app && alembic upgrade head"]
+        envFrom:
+        - secretRef:
+            name: backend-secrets
+        - configMapRef:
+            name: backend-config
+        env:
+        - name: DB_HOST
+          value: "postgres"
+        - name: RUN_MIGRATIONS
+          value: "true"
+        - name: E2E_TEST
+          value: "false"
       containers:
       - name: backend
         image: meeting-automation-backend:latest
-        imagePullPolicy: Never
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
         livenessProbe:
@@ -43,3 +60,6 @@ spec:
             name: backend-secrets
         - configMapRef:
             name: backend-config
+        env:
+        - name: PYTHONPATH
+          value: "/app"

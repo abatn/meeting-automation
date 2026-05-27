@@ -149,3 +149,52 @@ spec:
     ports:
     - protocol: TCP
       port: 80
+
+# OnlyOffice: Allow Backend and Frontend ingress, egress to RabbitMQ
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: onlyoffice-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: onlyoffice
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 80
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: rabbitmq
+    ports:
+    - protocol: TCP
+      port: 5672
+
+# n8n: Allow Backend to access webhook port
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: n8n-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: n8n
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    ports:
+    - protocol: TCP
+      port: 5678

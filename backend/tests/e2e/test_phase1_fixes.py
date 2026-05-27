@@ -46,7 +46,7 @@ class TestPhase1Fixes:
         # User A: belongs to tenant_a
         user_a = User(
             id=str(uuid.uuid4()),
-            email="user_a@company-a.com",
+            email=f"user_a_{uuid.uuid4().hex[:6]}@company-a.com",
             full_name="User A",
             client_id=client_a.id,
             hashed_password="dummy",
@@ -57,7 +57,7 @@ class TestPhase1Fixes:
         # User B: belongs to tenant_b
         user_b = User(
             id=str(uuid.uuid4()),
-            email="user_b@company-b.com",
+            email=f"user_b_{uuid.uuid4().hex[:6]}@company-b.com",
             full_name="User B",
             client_id=client_b.id,
             hashed_password="dummy",
@@ -104,7 +104,7 @@ class TestPhase1Fixes:
         # Setup: Users
         organizer = User(
             id=str(uuid.uuid4()),
-            email="organizer@test.com",
+            email=f"organizer_{uuid.uuid4().hex[:6]}@test.com",
             full_name="Organizer",
             client_id=client.id,
             hashed_password="dummy",
@@ -113,7 +113,7 @@ class TestPhase1Fixes:
         )
         participant = User(
             id=str(uuid.uuid4()),
-            email="participant@test.com",
+            email=f"participant_{uuid.uuid4().hex[:6]}@test.com",
             full_name="Participant",
             client_id=client.id,
             hashed_password="dummy",
@@ -208,7 +208,7 @@ class TestPhase1Fixes:
         # Setup: Active User
         active_user = User(
             id=str(uuid.uuid4()),
-            email="active@test.com",
+            email=f"active_{uuid.uuid4().hex[:6]}@test.com",
             full_name="Active User",
             client_id=client.id,
             hashed_password="dummy",
@@ -219,7 +219,7 @@ class TestPhase1Fixes:
         # Setup: Soft-deleted User
         deleted_user = User(
             id=str(uuid.uuid4()),
-            email="deleted@test.com",
+            email=f"deleted_{uuid.uuid4().hex[:6]}@test.com",
             full_name="Deleted User",
             client_id=client.id,
             hashed_password="dummy",

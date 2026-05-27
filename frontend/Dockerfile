@@ -1,5 +1,5 @@
 # Stage 1: Build mit Node (Using Debian based to prevent esbuild bus errors)
-FROM node:20 as builder
+FROM node:20 AS builder
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 WORKDIR /app
 COPY package*.json ./

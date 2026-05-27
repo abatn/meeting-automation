@@ -13,7 +13,7 @@ async def test_analytics():
             print(f"Login failed: {response.text}")
             return
         
-        token = response.json()["access_token"]
+        token = response.cookies.get("accessToken")
         headers = {"Authorization": f"Bearer {token}"}
         
         print("\n--- Testing GET /actions/patterns ---")

@@ -125,6 +125,26 @@ async def db_session() -> Generator:
             )
             session.add(test_user)
 
+        dg_user_result = await session.execute(
+            select(UserModel).where(UserModel.email == "dg@meeting.tn")
+        )
+        dg_user = dg_user_result.scalar_one_or_none()
+        if not dg_user:
+            dg_role_result = await session.execute(
+                select(RoleModel).where(RoleModel.name == "dg")
+            )
+            dg_role = dg_role_result.scalar_one_or_none()
+            dg_user = UserModel(
+                id="dg-test-user-id",
+                client_id="test-client-id",
+                email="dg@meeting.tn",
+                hashed_password=get_password_hash("Password123!"),
+                status=UserStatus.ACTIVE.value,
+                is_superuser=True,
+                roles=[dg_role] if dg_role else []
+            )
+            session.add(dg_user)
+
         await session.commit()
 
         yield session

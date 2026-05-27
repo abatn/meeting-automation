@@ -18,6 +18,25 @@ spec:
         app: backend
         environment: staging
     spec:
+      initContainers:
+      - name: alembic-migrate
+        image: meeting-automation-backend:latest
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "cd /app && alembic upgrade head"]
+        envFrom:
+        - secretRef:
+            name: backend-secrets-staging
+        - configMapRef:
+            name: backend-config
+        env:
+        - name: PYTHONPATH
+          value: "/app"
+        - name: DB_HOST
+          value: "postgres-staging"
+        - name: RUN_MIGRATIONS
+          value: "true"
+        - name: E2E_TEST
+          value: "false"
       containers:
       - name: backend
         image: meeting-automation-backend:latest

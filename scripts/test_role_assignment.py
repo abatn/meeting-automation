@@ -11,7 +11,7 @@ async def test_role_assignment():
             "username": "admin@meeting.tn",
             "password": "Password123!"
         })
-        token = login_res.json()["access_token"]
+        token = login_res.cookies.get("accessToken")
         headers = {"Authorization": f"Bearer {token}"}
 
         # 2. Invite a MANAGER

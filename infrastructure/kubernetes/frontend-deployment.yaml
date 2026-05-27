@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: meeting-automation-frontend:v1.0.0
-        imagePullPolicy: Never
+        image: meeting-automation-frontend:latest
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
         volumeMounts:

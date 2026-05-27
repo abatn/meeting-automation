@@ -121,7 +121,7 @@ class MeetingService:
             setattr(db_meeting, key, value)
 
         await self.db.commit()
-        await self.db.refresh(db_meeting)
+        await self.db.refresh(db_meeting, attribute_names=["participants"])
 
         # Notify n8n about status change if relevant
         if "status" in update_data:

@@ -35,12 +35,12 @@ class TestPhase1Fixes:
         # Setup: 2 Tenants
         client_a = Client(
             id=str(uuid.uuid4()),
-            company_name="Company A",
+            company_name=f"Company A-{uuid.uuid4().hex[:8]}",
             subscription_plan="PRO",
         )
         client_b = Client(
             id=str(uuid.uuid4()),
-            company_name="Company B",
+            company_name=f"Company B-{uuid.uuid4().hex[:8]}",
             subscription_plan="PRO",
         )
         db_session.add(client_a)
@@ -50,7 +50,7 @@ class TestPhase1Fixes:
         # Users
         user_a = User(
             id=str(uuid.uuid4()),
-            email="user_a@company-a.com",
+            email=f"user_a_{uuid.uuid4().hex[:6]}@company-a.com",
             full_name="User A",
             client_id=client_a.id,
             hashed_password="dummy",
@@ -59,7 +59,7 @@ class TestPhase1Fixes:
         
         user_b = User(
             id=str(uuid.uuid4()),
-            email="user_b@company-b.com",
+            email=f"user_b_{uuid.uuid4().hex[:6]}@company-b.com",
             full_name="User B",
             client_id=client_b.id,
             hashed_password="dummy",
@@ -133,7 +133,7 @@ class TestPhase1Fixes:
         # Setup: Active vs Soft-deleted User
         active_user = User(
             id=str(uuid.uuid4()),
-            email="active@test.com",
+            email=f"active_{uuid.uuid4().hex[:6]}@test.com",
             full_name="Active User",
             client_id=client_a.id,
             hashed_password="dummy",
@@ -142,7 +142,7 @@ class TestPhase1Fixes:
         
         deleted_user = User(
             id=str(uuid.uuid4()),
-            email="deleted@test.com",
+            email=f"deleted_{uuid.uuid4().hex[:6]}@test.com",
             full_name="Deleted User",
             client_id=client_a.id,
             hashed_password="dummy",

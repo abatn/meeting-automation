@@ -1,6 +1,7 @@
 """Rate limiting utilities for FastAPI."""
 
 import logging
+import os
 from typing import Optional
 import redis.asyncio as redis
 from fastapi import HTTPException, Request, Depends, status
@@ -42,6 +43,10 @@ async def check_rate_limit(
         ):
             ...
     """
+    # Skip rate limiting in E2E tests to avoid 429 errors during test runs
+    if os.getenv("E2E_TEST", "").lower() == "true":
+        return
+
     # Get client IP
     client_ip = request.client.host if request.client else "unknown"
 

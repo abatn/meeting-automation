@@ -8,7 +8,7 @@ def get_token(email, password):
     resp = requests.post(f"{BASE_URL}/auth/login", data={"username": email, "password": password})
     if resp.status_code != 200:
         return None
-    return resp.json()["access_token"]
+    return resp.cookies.get("accessToken")
 
 def run_test():
     print("🧪 Starting Multi-Tenant Isolation Test...")

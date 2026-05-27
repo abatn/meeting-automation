@@ -10,7 +10,7 @@ spec:
     secretName: traefik-tls-cert
   routes:
     # Stricter route for Authentication Endpoints
-    - match: Host(`localhost`) && PathPrefix(`/api/v1/auth`) || Host(`127.0.0.1`) && PathPrefix(`/api/v1/auth`)
+    - match: (Host(`localhost`) || Host(`127.0.0.1`) || Host(`meeting-automate.tn`)) && PathPrefix(`/api/v1/auth`)
       kind: Rule
       services:
         - name: backend
@@ -19,7 +19,7 @@ spec:
         - name: rate-limit-auth
 
     # General Backend API Route
-    - match: Host(`localhost`) && PathPrefix(`/api`) || Host(`127.0.0.1`) && PathPrefix(`/api`)
+    - match: (Host(`localhost`) || Host(`127.0.0.1`) || Host(`meeting-automate.tn`)) && PathPrefix(`/api`)
       kind: Rule
       services:
         - name: backend
@@ -27,8 +27,16 @@ spec:
       middlewares:
         - name: rate-limit-general
 
+    - match: (Host(`localhost`) || Host(`127.0.0.1`) || Host(`meeting-automate.tn`)) && PathPrefix(`/onlyoffice`)
+      kind: Rule
+      services:
+        - name: onlyoffice
+          port: 80
+      middlewares:
+        - name: rate-limit-general
+
     # Frontend Route
-    - match: Host(`localhost`) && PathPrefix(`/`) || Host(`127.0.0.1`) && PathPrefix(`/`)
+    - match: (Host(`localhost`) || Host(`127.0.0.1`) || Host(`meeting-automate.tn`)) && PathPrefix(`/`)
       kind: Rule
       services:
         - name: frontend
@@ -46,7 +54,7 @@ spec:
   entryPoints:
     - web
   routes:
-    - match: Host(`localhost`) || Host(`127.0.0.1`)
+    - match: Host(`localhost`) || Host(`127.0.0.1`) || Host(`meeting-automate.tn`)
       kind: Rule
       services:
         - name: frontend # Placeholder, the middleware hijacks the request anyway

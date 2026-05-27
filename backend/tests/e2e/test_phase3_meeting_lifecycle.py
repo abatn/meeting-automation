@@ -28,7 +28,7 @@ def create_test_client(db_session, name: str):
     """Helper to create a test client"""
     return Client(
         id=str(uuid.uuid4()),
-        company_name=name,
+        company_name=f"{name}-{uuid.uuid4().hex[:8]}",
     )
 
 
@@ -40,7 +40,7 @@ async def test_p31_meeting_status_change_triggers_webhook(db_session: AsyncSessi
     
     creator = User(
         id=str(uuid.uuid4()),
-        email="creator@example.com",
+        email=f"creator_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Creator User",
         hashed_password=security.get_password_hash("Password123!"),
         client_id=test_client.id,
@@ -81,7 +81,7 @@ async def test_p31_cancelled_meeting_triggers_webhook(db_session: AsyncSession):
     
     creator = User(
         id=str(uuid.uuid4()),
-        email="creator2@example.com",
+        email=f"creator2_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Creator User 2",
         hashed_password=security.get_password_hash("Password123!"),
         client_id=test_client.id,
@@ -120,7 +120,7 @@ async def test_p32_non_creator_cannot_update_meeting(db_session: AsyncSession):
     
     creator = User(
         id=str(uuid.uuid4()),
-        email="creator3@example.com",
+        email=f"creator3_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Password123!"),
         client_id=test_client.id,
@@ -130,7 +130,7 @@ async def test_p32_non_creator_cannot_update_meeting(db_session: AsyncSession):
     
     other = User(
         id=str(uuid.uuid4()),
-        email="other@example.com",
+        email=f"other_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Other",
         hashed_password=security.get_password_hash("Password123!"),
         client_id=test_client.id,
@@ -169,7 +169,7 @@ async def test_p32_creator_can_update_meeting(db_session: AsyncSession):
     
     creator = User(
         id=str(uuid.uuid4()),
-        email="creator4@example.com",
+        email=f"creator4_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Password123!"),
         client_id=test_client.id,
@@ -208,7 +208,7 @@ async def test_p33_end_time_must_be_after_start_time(db_session: AsyncSession):
     
     creator = User(
         id=str(uuid.uuid4()),
-        email="creator5@example.com",
+        email=f"creator5_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Password123!"),
         client_id=test_client.id,
@@ -241,7 +241,7 @@ async def test_p33_end_time_can_be_null(db_session: AsyncSession):
     
     creator = User(
         id=str(uuid.uuid4()),
-        email="creator6@example.com",
+        email=f"creator6_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Password123!"),
         client_id=test_client.id,
@@ -273,7 +273,7 @@ async def test_p34_duplicate_participant_email_rejected(db_session: AsyncSession
     
     creator = User(
         id=str(uuid.uuid4()),
-        email="creator7@example.com",
+        email=f"creator7_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Password123!"),
         client_id=test_client.id,
@@ -292,10 +292,11 @@ async def test_p34_duplicate_participant_email_rejected(db_session: AsyncSession
         created_at=datetime.now(timezone.utc),
     )
     
+    dup_email = f"dup_{uuid.uuid4().hex[:6]}@example.com"
     p1 = Participant(
         id=str(uuid.uuid4()),
         meeting_id=meeting.id,
-        email="dup@example.com",
+        email=dup_email,
         name="P1",
     )
     db_session.add(meeting)
@@ -305,7 +306,7 @@ async def test_p34_duplicate_participant_email_rejected(db_session: AsyncSession
     p2 = Participant(
         id=str(uuid.uuid4()),
         meeting_id=meeting.id,
-        email="dup@example.com",
+        email=dup_email,
         name="P2",
     )
     db_session.add(p2)
@@ -322,7 +323,7 @@ async def test_p34_same_email_different_meetings_allowed(db_session: AsyncSessio
     
     creator = User(
         id=str(uuid.uuid4()),
-        email="creator8@example.com",
+        email=f"creator8_{uuid.uuid4().hex[:6]}@example.com",
         full_name="Creator",
         hashed_password=security.get_password_hash("Password123!"),
         client_id=test_client.id,
@@ -354,17 +355,19 @@ async def test_p34_same_email_different_meetings_allowed(db_session: AsyncSessio
     db_session.add(m1)
     db_session.add(m2)
     
+    shared_email = f"shared_{uuid.uuid4().hex[:6]}@example.com"
+    
     p1 = Participant(
         id=str(uuid.uuid4()),
         meeting_id=m1.id,
-        email="shared@example.com",
+        email=shared_email,
         name="P",
     )
     
     p2 = Participant(
         id=str(uuid.uuid4()),
         meeting_id=m2.id,
-        email="shared@example.com",
+        email=shared_email,
         name="P",
     )
     
@@ -372,6 +375,6 @@ async def test_p34_same_email_different_meetings_allowed(db_session: AsyncSessio
     db_session.add(p2)
     await db_session.commit()
     
-    stmt = select(Participant).where(Participant.email == "shared@example.com")
+    stmt = select(Participant).where(Participant.email == shared_email)
     result = await db_session.execute(stmt)
     assert len(result.scalars().all()) == 2
