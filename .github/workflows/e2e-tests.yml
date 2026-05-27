@@ -87,6 +87,12 @@ jobs:
 
     - name: Configure K8s context for staging
       run: |
+        # Abort early if secret is not set
+        if [ -z "${{ secrets.KUBE_CONFIG_STAGING }}" ]; then
+          echo "⚠️ KUBE_CONFIG_STAGING secret not set. Skipping staging deployment steps."
+          exit 0
+        fi
+        
         # KUBE_CONFIG_STAGING secret contains kubeconfig for staging cluster
         echo "${{ secrets.KUBE_CONFIG_STAGING }}" > kubeconfig-staging
         export KUBECONFIG=$(pwd)/kubeconfig-staging
