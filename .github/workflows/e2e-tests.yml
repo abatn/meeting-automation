@@ -90,7 +90,17 @@ jobs:
         # KUBE_CONFIG_STAGING secret contains kubeconfig for staging cluster
         echo "${{ secrets.KUBE_CONFIG_STAGING }}" > kubeconfig-staging
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        kubectl config use-context staging-cluster
+        
+        # Get the first available context (or specify the correct name)
+        CONTEXT=$(kubectl config get-contexts -o name | head -1)
+        if [ -z "$CONTEXT" ]; then
+          echo "❌ No contexts found in kubeconfig"
+          exit 1
+        fi
+        
+        echo "Using context: $CONTEXT"
+        kubectl config use-context "$CONTEXT"
+        
         # Create namespace if not exists
         kubectl get namespace meeting-automation-staging || kubectl apply -f infrastructure/kubernetes/staging/namespace.yaml
 
@@ -305,7 +315,16 @@ jobs:
       run: |
         echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" > kubeconfig-prod
         export KUBECONFIG=$(pwd)/kubeconfig-prod
-        kubectl config use-context production-cluster
+        
+        # Get the first available context (or specify the correct name)
+        CONTEXT=$(kubectl config get-contexts -o name | head -1)
+        if [ -z "$CONTEXT" ]; then
+          echo "❌ No contexts found in kubeconfig"
+          exit 1
+        fi
+        
+        echo "Using context: $CONTEXT"
+        kubectl config use-context "$CONTEXT"
 
     - name: Deploy to Production
       run: |
