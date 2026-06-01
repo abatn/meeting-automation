@@ -79,11 +79,9 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
       } catch (err: any) {
         console.error("Error fetching PV data:", err);
         if (err.response?.status === 404) {
-          setError(
-            "AI is still processing your meeting. Please wait a few seconds...",
-          );
+          setError(t("pv.processing"));
         } else {
-          setError("Failed to load real-time AI results.");
+          setError(t("pv.load_error"));
         }
       } finally {
         setLoading(false);
@@ -124,7 +122,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
       >
         <CircularProgress sx={{ mb: 2 }} />
         <Typography variant="body1">
-          Connecting to AI Engine...
+          {t('meeting_assistant.connecting')}
         </Typography>
       </Box>
     );
@@ -196,7 +194,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
               variant="body2"
               sx={{ whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: 13, lineHeight: 1.6 }}
             >
-              {originalTranscript || "No transcription available yet."}
+              {originalTranscript || t("pv.no_transcript")}
             </Typography>
           </Paper>
         </Grid>
@@ -220,7 +218,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
               <Typography sx={{ fontSize: 14, fontWeight: 600, color: "primary.main" }}>
                 {t("pv.ai_draft")}
               </Typography>
-              <Tooltip title="Save Draft">
+              <Tooltip title={t('meeting_assistant.save_draft_tooltip')}>
                 <IconButton size="small" sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}>
                   <SaveIcon sx={{ fontSize: 18, color: "text.secondary" }} />
                 </IconButton>
@@ -247,7 +245,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
                   lineHeight: 1.6
                 },
               }}
-              placeholder="Waiting for AI to generate the draft..."
+              placeholder={t("pv.waiting_for_draft")}
             />
             <Box
               sx={{

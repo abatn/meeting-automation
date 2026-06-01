@@ -24,12 +24,14 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import { AppDispatch } from '../../store';
 import { setCredentials } from '../../store/authSlice';
 import authService from '../../services/auth';
 import PasswordStrengthIndicator from '../../components/common/PasswordStrengthIndicator';
 
 const RegisterForm: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
@@ -75,7 +77,7 @@ const RegisterForm: React.FC = () => {
       // Navigate to check email page instead of auto-login
       navigate('/check-email', { state: { email: formData.email } });
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Une erreur est survenue lors de l\'inscription.');
+      setError(err.response?.data?.detail || t('auth.register.error'));
     } finally {
       setLoading(false);
     }
@@ -86,8 +88,8 @@ const RegisterForm: React.FC = () => {
       <Container maxWidth="xs">
         <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid #E5EAF2' }}>
           <Box sx={{ textAlign: 'center', mb: 2 }}>
-            <Typography variant="h5" fontWeight="800">Créer votre compte</Typography>
-            <Typography variant="caption" color="text.secondary">Commencez l'automatisation dès maintenant.</Typography>
+            <Typography variant="h5" fontWeight="800">{t('auth.register.title')}</Typography>
+            <Typography variant="caption" color="text.secondary">{t('auth.register.subtitle')}</Typography>
           </Box>
 
           {error && <Alert severity="error" sx={{ mb: 2, py: 0 }}>{error}</Alert>}
@@ -95,7 +97,7 @@ const RegisterForm: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <Stack spacing={1.5}>
               <TextField
-                label="Nom complet"
+                label={t('team.full_name')}
                 name="full_name"
                 required
                 fullWidth
@@ -106,7 +108,7 @@ const RegisterForm: React.FC = () => {
               />
 
               <TextField
-                label="Nom de l'entreprise"
+                label={t('auth.register.company_name')}
                 name="company_name"
                 required
                 fullWidth
@@ -117,7 +119,7 @@ const RegisterForm: React.FC = () => {
               />
 
               <TextField
-                label="Adresse Email"
+                label={t('auth.email')}
                 name="email"
                 type="email"
                 required
@@ -129,7 +131,7 @@ const RegisterForm: React.FC = () => {
               />
 
                <TextField
-                 label="Mot de passe"
+                  label={t('auth.password')}
                  name="password"
                  type={showPassword ? 'text' : 'password'}
                  required
@@ -152,16 +154,16 @@ const RegisterForm: React.FC = () => {
 
               <TextField
                 select
-                label="Plan"
+                label={t('auth.register.plan')}
                 name="plan"
                 fullWidth
                 size="small"
                 value={formData.plan}
                 onChange={handleChange}
               >
-                <MenuItem value="GRATUIT">Gratuit</MenuItem>
-                <MenuItem value="PRO">Pro (99$/m)</MenuItem>
-                <MenuItem value="ENTREPRISE">Entreprise (499$/m)</MenuItem>
+                <MenuItem value="GRATUIT">{t('auth.register.plan_free')}</MenuItem>
+                <MenuItem value="PRO">{t('auth.register.plan_pro')}</MenuItem>
+                <MenuItem value="ENTREPRISE">{t('auth.register.plan_enterprise')}</MenuItem>
               </TextField>
 
               <Button
@@ -171,12 +173,12 @@ const RegisterForm: React.FC = () => {
                 disabled={loading}
                 sx={{ py: 1, borderRadius: 1.5, fontWeight: 700, textTransform: 'none', mt: 1 }}
               >
-                {loading ? <CircularProgress size={20} color="inherit" /> : 'Créer mon compte'}
+                {loading ? <CircularProgress size={20} color="inherit" /> : t('auth.register.submit')}
               </Button>
 
               <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary">
-                  Déjà un compte ? <Link component="button" type="button" variant="caption" fontWeight="700" onClick={() => navigate('/login')}>Se connecter</Link>
+                  {t('auth.register.has_account')} <Link component="button" type="button" variant="caption" fontWeight="700" onClick={() => navigate('/login')}>{t('auth.signIn')}</Link>
                 </Typography>
               </Box>
             </Stack>

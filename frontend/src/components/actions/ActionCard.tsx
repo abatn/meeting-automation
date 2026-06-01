@@ -1,5 +1,6 @@
 import React from "react";
 import { ListItem, ListItemText, Chip } from "@mui/material";
+import { useTranslation } from "react-i18next";
 import StatusBadge from "./StatusBadge"; // Assuming StatusBadge is in the same directory
 
 interface Action {
@@ -15,11 +16,12 @@ interface ActionCardProps {
 }
 
 const ActionCard: React.FC<ActionCardProps> = ({ action }) => {
+  const { t } = useTranslation();
   return (
     <ListItem>
       <ListItemText
         primary={action.description}
-        secondary={`Assignee: ${action.assignee} - Due: ${new Date(action.dueDate).toLocaleDateString()}`}
+        secondary={t('actions.assignee_and_due', { assignee: action.assignee, due: new Date(action.dueDate).toLocaleDateString() })}
       />
       <StatusBadge status={action.status} />
     </ListItem>

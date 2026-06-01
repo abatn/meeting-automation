@@ -58,11 +58,8 @@ const adminService = {
     return response.data;
   },
 
-  getClientUsage: async () => {
-    // Note: This endpoint is handled via billing/usage if we are logged in as that user, 
-    // but for admin we might need a specific admin/clients/{id}/usage endpoint later.
-    // client_id is now injected automatically via X-Client-ID header interceptor
-    const response = await api.get('/billing/usage');
+  getClientUsage: async (clientId: string) => {
+    const response = await api.get(`/admin/clients/${clientId}/usage`);
     return response.data;
   }
 };

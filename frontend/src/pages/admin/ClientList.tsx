@@ -105,7 +105,7 @@ const ClientList: React.FC = () => {
             {clients.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                  Aucun client trouvé.
+                  {t('clientList.no_clients')}
                 </TableCell>
               </TableRow>
             )}

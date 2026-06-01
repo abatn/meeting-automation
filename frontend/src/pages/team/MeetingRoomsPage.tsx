@@ -92,7 +92,7 @@ const MeetingRooms: React.FC = () => {
       handleCloseDialog();
       fetchRooms();
     } catch (error: any) {
-      const errorMsg = error.response?.data?.detail || "Operation failed";
+      const errorMsg = error.response?.data?.detail || t("common.operation_failed");
       setSnackbar({ open: true, message: errorMsg, severity: "error" });
     } finally {
       setSubmitting(false);
@@ -106,7 +106,7 @@ const MeetingRooms: React.FC = () => {
         setSnackbar({ open: true, message: t("team.room_delete_success"), severity: "success" });
         fetchRooms();
       } catch (error) {
-        setSnackbar({ open: true, message: "Delete failed", severity: "error" });
+        setSnackbar({ open: true, message: t("common.delete_failed"), severity: "error" });
       }
     }
   };

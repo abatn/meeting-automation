@@ -32,14 +32,14 @@ async def create_team_member(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-@router.patch("/{member_id}", response_model=TeamMember)
+@router.patch("/{member_id}")
 async def update_team_member(
     member_id: str,
     member_in: TeamMemberUpdate,
     db: AsyncSession = Depends(deps.get_db),
     current_user: UserModel = Depends(deps.get_current_user),
 ) -> Any:
-    """Update a team member."""
+    """Update a team member or user."""
     service = TeamService(db)
     member = await service.update_team_member(current_user.client_id, member_id, member_in, current_user.id)
     if not member:

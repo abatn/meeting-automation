@@ -61,7 +61,7 @@ const TeamManagement: React.FC = () => {
 
         <Paper variant="outlined">
             <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs value={currentTab} onChange={handleTabChange} aria-label="team management tabs">
+                <Tabs value={currentTab} onChange={handleTabChange} aria-label={t("team.tabs_aria_label")}>
                     <Tab 
                         icon={<PersonIcon />} 
                         iconPosition="start" 

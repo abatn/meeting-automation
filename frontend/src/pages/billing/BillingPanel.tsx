@@ -194,7 +194,7 @@ const BillingPanel: React.FC = () => {
                   <TableRow key={inv.id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                     <TableCell>{new Date(inv.created_at).toLocaleDateString()}</TableCell>
                     <TableCell sx={{ fontFamily: 'monospace' }}>{inv.stripe_invoice_id}</TableCell>
-                    <TableCell fontWeight="bold">{inv.currency} {inv.amount}</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>{inv.currency} {inv.amount}</TableCell>
                     <TableCell>
                       <Chip label={inv.status} size="small" color="success" sx={{ fontWeight: 'bold' }} />
                     </TableCell>

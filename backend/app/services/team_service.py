@@ -181,34 +181,114 @@ class TeamService:
         
         return new_user
 
-    async def update_team_member(self, client_id: str, member_id: str, obj_in: TeamMemberUpdate, user_id: str) -> Optional[TeamMember]:
-        """Update a team member (legacy TeamMember model only)."""
+    async def update_team_member(self, client_id: str, member_id: str, obj_in: TeamMemberUpdate, user_id: str) -> Optional[dict]:
+        """Update a team member or user. Handles both team_members and users tables."""
+        # Security: Prevent assigning global admin roles via team management
+        if obj_in.role and obj_in.role in ["system_admin", "tech_admin"]:
+            raise ValueError("Unauthorized role assignment.")
+
+        # 1. Try to update TeamMember (legacy - not yet registered)
         stmt = select(TeamMember).where(TeamMember.id == member_id, TeamMember.client_id == client_id)
         result = await self.db.execute(stmt)
         db_obj = result.scalar_one_or_none()
-        
-        if not db_obj:
-            return None
-            
-        update_data = obj_in.model_dump(exclude_unset=True)
-        for field in update_data:
-            setattr(db_obj, field, update_data[field])
-            
-        await self.db.commit()
-        await self.db.refresh(db_obj)
-        
-        # Audit Log (ISO 27001)
-        await AuditService.log_action(
-            self.db, 
-            client_id=client_id, 
-            action="UPDATE_TEAM_MEMBER", 
-            user_id=user_id,
-            table_name="team_members",
-            record_id=member_id,
-            new_values=update_data
-        )
-        
-        return db_obj
+
+        if db_obj:
+            update_data = obj_in.model_dump(exclude_unset=True)
+            old_values = {field: getattr(db_obj, field, None) for field in update_data}
+
+            for field in update_data:
+                setattr(db_obj, field, update_data[field])
+
+            await self.db.commit()
+            await self.db.refresh(db_obj)
+
+            # Audit Log (ISO 27001 A.12.4.1)
+            await AuditService.log_action(
+                self.db,
+                client_id=client_id,
+                action="UPDATE_TEAM_MEMBER",
+                user_id=user_id,
+                table_name="team_members",
+                record_id=member_id,
+                old_values=old_values,
+                new_values=update_data
+            )
+
+            return {
+                "id": db_obj.id,
+                "client_id": db_obj.client_id,
+                "full_name": db_obj.full_name,
+                "email": db_obj.email,
+                "status": "TEAM_MEMBER",
+                "role": "participant",
+                "position": db_obj.position,
+                "department": db_obj.department,
+                "created_at": db_obj.created_at,
+                "source": "team_member"
+            }
+
+        # 2. Try to update User (registered user with active/pending account)
+        user_stmt = select(User).where(User.id == member_id, User.client_id == client_id)
+        user_res = await self.db.execute(user_stmt)
+        db_user = user_res.scalar_one_or_none()
+
+        if db_user:
+            update_data = obj_in.model_dump(exclude_unset=True)
+            old_values = {
+                "full_name": db_user.full_name,
+                "role": db_user.role,
+            }
+
+            # Update full_name if provided
+            if "full_name" in update_data:
+                db_user.full_name = update_data["full_name"]
+
+            # Update role if provided (via user_roles relationship)
+            if "role" in update_data:
+                role_stmt = select(Role).where(Role.name == update_data["role"])
+                role_res = await self.db.execute(role_stmt)
+                new_role = role_res.scalar_one_or_none()
+
+                if new_role:
+                    db_user.roles = [new_role]
+                else:
+                    # Fallback to participant if role doesn't exist
+                    role_stmt = select(Role).where(Role.name == "participant")
+                    role_res = await self.db.execute(role_stmt)
+                    db_user.roles = [role_res.scalar_one()]
+
+            await self.db.commit()
+            await self.db.refresh(db_user)
+
+            # Audit Log (ISO 27001 A.12.4.1) - Role change is security-relevant!
+            await AuditService.log_action(
+                self.db,
+                client_id=client_id,
+                action="UPDATE_USER_ROLE",
+                user_id=user_id,
+                table_name="users",
+                record_id=member_id,
+                old_values=old_values,
+                new_values={
+                    "full_name": db_user.full_name,
+                    "role": db_user.role,
+                }
+            )
+
+            return {
+                "id": db_user.id,
+                "client_id": db_user.client_id,
+                "full_name": db_user.full_name or db_user.email,
+                "email": db_user.email,
+                "status": db_user.status,
+                "role": db_user.role,
+                "position": "User",
+                "department": None,
+                "created_at": db_user.created_at,
+                "source": "user"
+            }
+
+        return None
 
     async def delete_team_member(self, client_id: str, member_id: str, user_id: str) -> bool:
         """Delete a team member or disable a User."""

@@ -1,15 +1,17 @@
 import React from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import OnlyOfficeEditor from "../components/meetings/OnlyOfficeEditor";
 import { Box } from "@mui/material";
 
 const OnlyOfficePage: React.FC = () => {
+  const { t } = useTranslation();
   const { pvId } = useParams<{ pvId: string }>();
   const [searchParams] = useSearchParams();
   const language = searchParams.get("lang") || "fr";
 
   if (!pvId) {
-    return <Box sx={{ p: 3 }}>Error: No PV ID provided.</Box>;
+    return <Box sx={{ p: 3 }}>{t('pv.no_id_error')}</Box>;
   }
 
   return (

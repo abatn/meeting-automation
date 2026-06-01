@@ -114,7 +114,7 @@ const TeamMembers: React.FC = () => {
       handleCloseDialog();
       fetchMembers();
     } catch (error: any) {
-      const errorMsg = error.response?.data?.detail || "Operation failed";
+      const errorMsg = error.response?.data?.detail || t("common.operation_failed");
       setSnackbar({ open: true, message: errorMsg, severity: "error" });
     } finally {
       setSubmitting(false);
@@ -128,7 +128,7 @@ const TeamMembers: React.FC = () => {
         setSnackbar({ open: true, message: t("team.delete_success"), severity: "success" });
         fetchMembers();
       } catch (error) {
-        setSnackbar({ open: true, message: "Delete failed", severity: "error" });
+        setSnackbar({ open: true, message: t("common.delete_failed"), severity: "error" });
       }
     }
   };
@@ -182,10 +182,10 @@ const TeamMembers: React.FC = () => {
                       <PersonIcon color="action" />
                       <Typography>{member.full_name}</Typography>
                       {member.status === "PENDING" && (
-                        <Chip label="Invitation Sent" size="small" color="warning" variant="outlined" />
+                        <Chip label={t('team.member_invitation_sent')} size="small" color="warning" variant="outlined" />
                       )}
                       {member.status === "ACTIVE" && (
-                        <Chip label="User" size="small" color="success" variant="outlined" />
+                        <Chip label={t('team.member_user')} size="small" color="success" variant="outlined" />
                       )}
                     </Box>
                   </TableCell>
@@ -195,7 +195,7 @@ const TeamMembers: React.FC = () => {
                       {t(`team.role_${member.role}`) || member.role}
                     </Typography>
                   </TableCell>
-                  <TableCell>{member.source === "user" ? "Registered User" : (member.position || "-")}</TableCell>
+                  <TableCell>{member.source === "user" ? t('team.member_registered_user') : (member.position || "-")}</TableCell>
                   <TableCell>{member.department || "-"}</TableCell>
                   <TableCell align="right">
                     <IconButton onClick={() => handleOpenDialog(member)} color="primary" size="small">
@@ -217,7 +217,7 @@ const TeamMembers: React.FC = () => {
         <DialogTitle>{editingMember ? t("team.edit_member") : t("team.add_member")}</DialogTitle>
         <DialogContent dividers>
           <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
-            <TextField label={t("team.full_name")} border="none" fullWidth value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} />
+            <TextField label={t("team.full_name")} fullWidth value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} />
             <TextField label={t("team.email")} fullWidth type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
             
             <TextField
@@ -230,6 +230,7 @@ const TeamMembers: React.FC = () => {
               <MenuItem value="participant">{t("team.role_participant")}</MenuItem>
               <MenuItem value="manager">{t("team.role_manager")}</MenuItem>
               <MenuItem value="admin">{t("team.role_admin")}</MenuItem>
+              <MenuItem value="dg">{t("team.role_dg")}</MenuItem>
             </TextField>
 
             <TextField label={t("team.phone")} fullWidth value={formData.phone_number} onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })} />

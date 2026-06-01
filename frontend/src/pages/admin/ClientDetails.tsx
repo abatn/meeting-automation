@@ -8,9 +8,11 @@ import {
 } from '@mui/material';
 import { ArrowBack as BackIcon, Save as SaveIcon } from '@mui/icons-material';
 import adminService, { Client } from '../../services/adminService';
+import { useTranslation } from 'react-i18next';
 import UsageProgressBar from '../../components/common/UsageProgressBar';
 
 const ClientDetails: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
@@ -52,12 +54,12 @@ const ClientDetails: React.FC = () => {
   };
 
   if (loading) return <CircularProgress />;
-  if (!client) return <Typography color="error">Client not found.</Typography>;
+  if (!client) return <Typography color="error">{t('clientList.not_found')}</Typography>;
 
   return (
     <Box sx={{ p: 3 }}>
       <Button startIcon={<BackIcon />} onClick={() => navigate('/admin/clients')} sx={{ mb: 2 }}>
-        Back to List
+        {t('clientList.back_to_list')}
       </Button>
       
       <Grid container spacing={3}>
@@ -73,8 +75,8 @@ const ClientDetails: React.FC = () => {
             </Box>
             <Divider sx={{ my: 2 }} />
             <Grid container spacing={2}>
-              <Grid item xs={6}><Typography variant="body2" color="text.secondary">Plan</Typography><Typography variant="body1">{client.subscription_plan}</Typography></Grid>
-              <Grid item xs={6}><Typography variant="body2" color="text.secondary">Joined At</Typography><Typography variant="body1">{new Date(client.created_at).toLocaleDateString()}</Typography></Grid>
+              <Grid item xs={6}><Typography variant="body2" color="text.secondary">{t('clientList.plan')}</Typography><Typography variant="body1">{client.subscription_plan}</Typography></Grid>
+              <Grid item xs={6}><Typography variant="body2" color="text.secondary">{t('clientList.createdAt')}</Typography><Typography variant="body1">{new Date(client.created_at).toLocaleDateString()}</Typography></Grid>
             </Grid>
           </Paper>
         </Grid>
@@ -84,21 +86,21 @@ const ClientDetails: React.FC = () => {
           <UsageProgressBar 
             used={client.minutes_used} 
             total={client.minutes_included} 
-            label="Transcription Usage"
+            label={t('clientList.transcription_usage')}
           />
         </Grid>
 
         {/* Invoices */}
         <Grid item xs={12} md={7}>
-          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Invoice History</Typography>
+          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>{t('billing.invoiceHistory')}</Typography>
           <TableContainer component={Paper}>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Date</TableCell>
-                  <TableCell>Amount</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Invoice #</TableCell>
+                  <TableCell>{t('billing.date')}</TableCell>
+                  <TableCell>{t('billing.amount')}</TableCell>
+                  <TableCell>{t('billing.status')}</TableCell>
+                  <TableCell>{t('billing.invoiceId')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -110,7 +112,7 @@ const ClientDetails: React.FC = () => {
                     <TableCell>{inv.stripe_invoice_id}</TableCell>
                   </TableRow>
                 )) : (
-                  <TableRow><TableCell colSpan={4} align="center">No invoices found.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} align="center">{t('billing.noHistory')}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -119,16 +121,16 @@ const ClientDetails: React.FC = () => {
 
         {/* Internal Observations */}
         <Grid item xs={12} md={5}>
-          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Internal Observations</Typography>
+          <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>{t('clientList.internal_observations')}</Typography>
           <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
             <Box sx={{ whiteSpace: 'pre-wrap', mb: 2, maxHeight: 200, overflowY: 'auto', fontSize: '0.875rem' }}>
-              {client.observations || "No observations recorded."}
+              {client.observations || t('clientList.no_observations')}
             </Box>
             <Box sx={{ display: 'flex', gap: 1 }}>
               <TextField 
                 fullWidth 
                 size="small" 
-                placeholder="Add note..." 
+                placeholder={t('clientList.add_note_placeholder')} 
                 value={obsText}
                 onChange={(e) => setObsText(e.target.value)}
               />

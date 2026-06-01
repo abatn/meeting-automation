@@ -238,10 +238,10 @@ const MeetingPlanner: React.FC = () => {
                 <FormControl fullWidth>
                   <InputLabel id="dur-lbl">{t("meetings.duration")}</InputLabel>
                   <Select labelId="dur-lbl" value={plannedDuration} onChange={(e) => setPlannedDuration(Number(e.target.value))} label={t("meetings.duration")}>
-                    <MenuItem value={30}>30 min</MenuItem>
-                    <MenuItem value={60}>1 hour</MenuItem>
-                    <MenuItem value={90}>1.5 hours</MenuItem>
-                    <MenuItem value={120}>2 hours</MenuItem>
+                    <MenuItem value={30}>{t('meetings.duration_options.30min')}</MenuItem>
+                    <MenuItem value={60}>{t('meetings.duration_options.1hour')}</MenuItem>
+                    <MenuItem value={90}>{t('meetings.duration_options.1_5hours')}</MenuItem>
+                    <MenuItem value={120}>{t('meetings.duration_options.2hours')}</MenuItem>
                   </Select>
                 </FormControl>
                 <Autocomplete freeSolo options={availableRooms} getOptionLabel={(o) => typeof o === 'string' ? o : o.name} value={location} onChange={(_, v) => setLocation(v)} renderInput={(p) => <TextField {...p} label={t("meetings.location")} />} />
@@ -281,7 +281,7 @@ const MeetingPlanner: React.FC = () => {
                       </Stack>
                       <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><ScheduleIcon sx={{ fontSize: 14 }} /><Typography variant="caption">{mStart.format('HH:mm')}</Typography></Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><RoomIcon sx={{ fontSize: 14 }} /><Typography variant="caption">{m.location || "Office"}</Typography></Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><RoomIcon sx={{ fontSize: 14 }} /><Typography variant="caption">{m.location || t('meetings.default_location')}</Typography></Box>
                       </Stack>
                         <Stack direction="row" spacing={1} justifyContent="flex-end">
                            {m.status === 'planned' && !isExpired && (

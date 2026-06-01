@@ -52,6 +52,17 @@ erDiagram
         TIMESTAMP updated_at
     }
 
+    ROLES {
+        UUID id PK
+        VARCHAR name UNIQUE "system_admin, tech_admin, admin, dg, manager, participant"
+        VARCHAR description OPTIONAL
+    }
+
+    USER_ROLES {
+        UUID user_id PK, FK
+        UUID role_id PK, FK
+    }
+
     ACTIVATION_TOKENS {
         UUID id PK
         UUID user_id FK UNIQUE
@@ -231,6 +242,7 @@ erDiagram
     USERS ||--o| ACTIVATION_TOKENS : "has"
     USERS ||--o{ MEETINGS : "creates"
     USERS ||--o{ USERS : "managed by (manager_id)"
+    USERS }o--o{ ROLES : "has via user_roles"
     MEETINGS ||--o{ RECORDINGS : "has"
     MEETINGS ||--o{ PVS : "has"
     MEETINGS ||--o{ ACTIONS : "has"
@@ -381,3 +393,64 @@ erDiagram
     - `department` (VARCHAR).
     - `created_at` (TIMESTAMP).
     - `updated_at` (TIMESTAMP).
+
+### 2.11. `roles` Table
+
+- **Description**: Defines available user roles for RBAC (Role-Based Access Control). System-wide, not tenant-specific.
+- **Fields**:
+    - `id` (UUID, Primary Key).
+    - `name` (VARCHAR, Unique): Role identifier (`system_admin`, `tech_admin`, `admin`, `dg`, `manager`, `participant`).
+    - `description` (VARCHAR, Optional): Human-readable description.
+- **Available Roles**:
+    - `system_admin`: Global Business Administrator (full system access)
+    - `tech_admin`: Technical Administrator (Mission Control access)
+    - `admin`: Tenant Administrator
+    - `dg`: Director General (sees all tenant data)
+    - `manager`: Department Manager (sees team data via `manager_id`)
+    - `participant`: Regular user (sees own data only)
+- **Security Notes**:
+    - `system_admin` and `tech_admin` cannot be assigned via Team Management UI (security restriction in `team_service.py`)
+    - Roles are managed via direct database operations or admin API only
+
+### 2.12. `user_roles` Table
+
+- **Description**: Many-to-many junction table linking users to roles. Supports future multi-role assignments.
+- **Fields**:
+    - `user_id` (UUID, Primary Key, FK to `users.id`).
+    - `role_id` (UUID, Primary Key, FK to `roles.id`).
+- **Relationships**:
+    - `users` 1:N `user_roles` N:1 `roles`
+- **Usage**:
+    - User's effective role is determined by `user_roles[0].name` (see `User.role` property in `app/models/user.py`)
+    - Role updates via Team Management API modify this table (delete old, insert new)
+    - All role changes are audit-logged with `UPDATE_USER_ROLE` action (ISO 27001 A.12.4.1)
+
+### 2.13. Behavioral Note: `update_team_member` Endpoint
+
+The `PATCH /api/v1/team/{member_id}` endpoint (implemented in `team_service.py`) handles two distinct entity types:
+
+1. **TeamMember** (from `team_members` table): Not-yet-registered invitees
+   - Updates: `full_name`, `email`, `phone_number`, `position`, `department`
+   - Role is always `participant` (fixed for invitees)
+
+2. **User** (from `users` table): Registered users with active/pending accounts
+   - Updates: `full_name`, `role` (via `user_roles` table)
+   - Role update: Deletes old `user_roles` entry, inserts new one
+   - Security: Blocks assignment of `system_admin` and `tech_admin` roles
+   - Audit: Logs `UPDATE_USER_ROLE` with `old_values` and `new_values`
+
+**API Response Format** (Dictionary, not ORM object):
+```json
+{
+    "id": "uuid",
+    "client_id": "uuid",
+    "full_name": "string",
+    "email": "string",
+    "status": "ACTIVE|PENDING|DISABLED|TEAM_MEMBER",
+    "role": "string",
+    "position": "string|null",
+    "department": "string|null",
+    "created_at": "timestamp",
+    "source": "user|team_member"
+}
+```

@@ -80,7 +80,7 @@ const DocumentExportMenu: React.FC<Props> = ({
           "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
         }}
       >
-        PDF
+        {t('pv.format_pdf')}
       </Button>
 
       {showDocx && (
@@ -101,7 +101,7 @@ const DocumentExportMenu: React.FC<Props> = ({
             "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
           }}
         >
-          Word
+          {t('pv.format_docx')}
         </Button>
       )}
 

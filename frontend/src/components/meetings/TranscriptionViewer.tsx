@@ -73,7 +73,7 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({
       setError(null);
     } catch (err: any) {
       if (err.response?.status !== 404) {
-        setError("Failed to load transcription");
+        setError(t('meeting_assistant.transcription_load_error'));
       }
     } finally {
       setLoading(false);
@@ -128,7 +128,7 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({
     return (
       <Paper sx={{ p: 4, textAlign: "center", bgcolor: "action.hover" }}>
         <Typography variant="body1" color="textSecondary">
-          No transcription available yet. Start recording to generate one.
+          {t('meeting_assistant.no_transcription')}
         </Typography>
       </Paper>
     );
@@ -164,12 +164,12 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({
           />
         </Box>
         <Box>
-          <Tooltip title="Refresh">
+          <Tooltip title={t('common.refresh_tooltip')}>
             <IconButton onClick={fetchTranscription} disabled={loading}>
               <RefreshIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          <Tooltip title="Download">
+          <Tooltip title={t('common.download_tooltip')}>
             <IconButton disabled={transcription.status !== "completed"}>
               <DownloadIcon fontSize="small" />
             </IconButton>
@@ -182,14 +182,14 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({
           <Box display="flex" alignItems="center" gap={2} mb={2}>
             <CircularProgress size={20} />
             <Typography variant="body2" color="textSecondary italic">
-              AI is currently transcribing the meeting...
+              {t('meeting_assistant.transcribing')}
             </Typography>
           </Box>
         )}
 
         {hasSegments ? (
           transcription.segments.map((segment: any, index: number) => {
-            const originalSpeaker = segment.speaker || "Unknown Speaker";
+            const originalSpeaker = segment.speaker || t('meeting_assistant.unknown_speaker');
             const displaySpeaker =
               speakerMapping[originalSpeaker] || originalSpeaker;
             const speakerColor = getSpeakerColor(originalSpeaker);
@@ -271,7 +271,7 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({
           </Box>
         ) : (
           <Typography variant="body2" color="textSecondary">
-            No text available.
+            {t('meeting_assistant.no_text')}
           </Typography>
         )}
       </Box>

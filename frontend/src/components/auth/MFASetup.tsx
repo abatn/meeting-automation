@@ -29,8 +29,8 @@ const MFASetup: React.FC<MFASetupProps> = ({ qrCodeUrl, secret }) => {
     <Box>
       <Typography variant="h6">{t("mfaSetup")}</Typography>
       <Box my={2}>
-        <img src={qrCodeUrl} alt="QR Code" />
-        <Typography>Secret: {secret}</Typography>
+        <img src={qrCodeUrl} alt={t('auth.mfa_qr_code_alt')} />
+        <Typography>{t('auth.mfa_secret_label', { secret })}</Typography>
       </Box>
       <TextField
         label={t("otpCode")}

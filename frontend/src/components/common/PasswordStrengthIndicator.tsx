@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, LinearProgress, Stack } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { validatePassword } from '../../utils/passwordValidation';
 
 interface PasswordStrengthIndicatorProps {
@@ -9,8 +10,10 @@ interface PasswordStrengthIndicatorProps {
 
 const PasswordStrengthIndicator: React.FC<PasswordStrengthIndicatorProps> = ({ 
   password, 
-  label = 'Password Strength' 
+  label 
 }) => {
+  const { t } = useTranslation();
+  const effectiveLabel = label || t('common.password_strength');
   const validation = validatePassword(password);
   
   // Define colors based on strength
@@ -25,48 +28,50 @@ const PasswordStrengthIndicator: React.FC<PasswordStrengthIndicatorProps> = ({
   
   const getStrengthText = (strength: 'weak' | 'medium' | 'strong') => {
     switch (strength) {
-      case 'weak': return 'Weak';
-      case 'medium': return 'Medium';
-      case 'strong': return 'Strong';
-      default: return 'Very Weak';
+      case 'weak': return t('common.password_weak');
+      case 'medium': return t('common.password_medium');
+      case 'strong': return t('common.password_strong');
+      default: return t('common.password_very_weak');
     }
   };
   
   return (
     <Box sx={{ mb: 2 }}>
       <Typography variant="caption" color="text.secondary" sx={{ mb: 1 }}>
-        {label}
+        {effectiveLabel}
       </Typography>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <LinearProgress
-          variant="determinate"
-          value={validation.isValid ? 100 : Math.max(0, (3 - validation.errors.length) * 33)}
-          sx={{ 
-            width: 200, 
-            height: 4, 
-            borderRadius: 2,
-            bgcolor: validation.isValid ? 'success.main' : 'grey.200'
-          }}
-        >
+        <Box sx={{ width: 200, position: 'relative' }}>
+          <LinearProgress
+            variant="determinate"
+            value={validation.isValid ? 100 : Math.max(0, (3 - validation.errors.length) * 33)}
+            sx={{ 
+              height: 4, 
+              borderRadius: 2,
+              bgcolor: validation.isValid ? 'success.main' : 'grey.200'
+            }}
+          />
           {validation.isValid && (
-            <Box 
-              sx={{ 
-                width: '100%', 
-                height: '100%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
+            <Typography
+              variant="caption"
+              sx={{
+                position: 'absolute',
+                top: -2,
+                left: 0,
+                right: 0,
+                textAlign: 'center',
+                fontWeight: 600,
                 color: 'white',
-                fontWeight: 600
+                fontSize: 10,
               }}
             >
               {getStrengthText(validation.strength)}
-            </Box>
+            </Typography>
           )}
-        </LinearProgress>
+        </Box>
         <Typography variant="body2" sx={{ minWidth: 80 }}>
           {validation.isValid ? getStrengthText(validation.strength) : 
-            `${validation.errors.length} issues`}
+            t('common.password_issues', { count: validation.errors.length })}
         </Typography>
       </Box>
       

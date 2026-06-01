@@ -29,7 +29,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
 
   return (
     <Chip
-      label={config.label || "Unknown"}
+      label={config.label || t("common.unknown")}
       color={config.color}
       size="small"
     />

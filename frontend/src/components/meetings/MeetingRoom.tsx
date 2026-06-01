@@ -96,7 +96,7 @@ const MeetingRoom: React.FC = () => {
       <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 4 }}>
         <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#3B82F6", animation: "pulse 2s infinite" }} />
         <Typography sx={{ fontSize: 18, fontWeight: 600, color: "text.primary" }}>
-          Meeting Room: {id}
+          {t('meeting_assistant.meeting_room_title', { id })}
         </Typography>
         <style>
           {`@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }`}
@@ -117,14 +117,14 @@ const MeetingRoom: React.FC = () => {
 
             <Box sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
               <Typography sx={{ fontSize: 15, fontWeight: 600, mb: 2 }}>
-                Meeting Info
+                {t('meeting_assistant.info')}
               </Typography>
               <Stack spacing={1}>
                 <Typography sx={{ fontSize: 13, color: "text.secondary", display: 'flex', justifyContent: 'space-between' }}>
-                  <span>ID:</span> <strong style={{ color: '#000' }}>{id}</strong>
+                  <span>{t('meeting_assistant.meeting_id')}:</span> <strong style={{ color: '#000' }}>{id}</strong>
                 </Typography>
                 <Typography sx={{ fontSize: 13, color: "text.secondary", display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Status:</span> <strong style={{ color: '#3B82F6' }}>Live</strong>
+                  <span>{t('meeting_assistant.status_label')}</span> <strong style={{ color: '#3B82F6' }}>{t('meetings.in_progress')}</strong>
                 </Typography>
               </Stack>
             </Box>
@@ -150,7 +150,7 @@ const MeetingRoom: React.FC = () => {
               )}
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2.5 }}>
                 <Typography sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: 15, fontWeight: 600, color: "text.primary" }}>
-                  <SuggestionIcon sx={{ fontSize: 20 }} /> AI Recommendations
+                  <SuggestionIcon sx={{ fontSize: 20 }} /> {t('meeting_assistant.ai_recommendations')}
                 </Typography>
                 <Badge 
                   badgeContent={suggestions.length} 
@@ -163,7 +163,7 @@ const MeetingRoom: React.FC = () => {
               {suggestions.length === 0 ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1, color: 'text.secondary', textAlign: 'center', p: 4 }}>
                   <Typography sx={{ fontSize: 13 }}>
-                    No suggestions yet. Once the meeting is processed, AI will recommend tasks here.
+                    {t('meeting_assistant.no_suggestions')}
                   </Typography>
                 </Box>
               ) : (
@@ -174,7 +174,7 @@ const MeetingRoom: React.FC = () => {
                       <Typography sx={{ fontSize: 12, color: "text.secondary", mb: 2, display: 'block', lineHeight: 1.5 }}>{suggestion.description}</Typography>
                       {suggestion.suggested_assignee && (
                         <Typography sx={{ display: 'inline-block', bgcolor: alpha("#000", 0.04), px: 1, py: 0.5, borderRadius: 1, fontSize: 11, fontWeight: 500, mb: 2 }}>
-                          👤 For: <strong>{suggestion.suggested_assignee}</strong>
+                            👤 {t('meeting_assistant.suggested_for')} <strong>{suggestion.suggested_assignee}</strong>
                         </Typography>
                       )}
                       <Stack direction="row" spacing={1}>
@@ -188,7 +188,7 @@ const MeetingRoom: React.FC = () => {
                             "&:hover": { bgcolor: "#27272A" }
                           }}
                         >
-                          Accept
+                          {t('meeting_assistant.accept')}
                         </Button>
                         <Button 
                           size="small" 
@@ -199,7 +199,7 @@ const MeetingRoom: React.FC = () => {
                             "&:hover": { borderColor: "text.primary", bgcolor: "transparent" }
                           }}
                         >
-                          Reject
+                          {t('meeting_assistant.reject')}
                         </Button>
                       </Stack>
                     </Box>

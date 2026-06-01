@@ -17,6 +17,7 @@ import {
 } from "@mui/icons-material";
 import { useAudioRecorder } from "../../hooks/useAudioRecorder";
 import { meetingsApi } from "../../services/meetings";
+import { useTranslation } from "react-i18next";
 
 interface AudioRecorderProps {
   meetingId: string;
@@ -29,6 +30,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   isCreator = false,
   onUploadSuccess,
 }) => {
+  const { t } = useTranslation();
   const {
     isRecording,
     isPaused,
@@ -90,11 +92,11 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
       if (recordingResponse && onUploadSuccess) {
         onUploadSuccess(recordingResponse);
       } else if (!recordingResponse) {
-        setUploadError("Failed to save the recording.");
+        setUploadError(t('meetings.recording_save_error'));
       }
     } catch (err: any) {
       setUploadError(
-        err.message || "An error occurred while finishing recording.",
+        err.message || t('meetings.recording_finish_error'),
       );
     } finally {
       setIsFinishing(false);
@@ -104,7 +106,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
   return (
     <Paper sx={{ p: 3, textAlign: "center", bgcolor: "background.default" }}>
       <Typography variant="h6" gutterBottom>
-        Live Meeting Assistant
+        {t('meeting_assistant.live_assistant')}
       </Typography>
 
       {(recorderError || uploadError) && (
@@ -134,7 +136,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         {isFinishing && (
           <Box sx={{ width: "100%", mb: 2 }}>
             <Typography variant="body2" sx={{ mb: 1 }}>
-              Finalizing Protocol...
+              {t('meeting_assistant.finalizing')}
             </Typography>
             <LinearProgress color="primary" />
           </Box>
@@ -158,7 +160,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
                 "&.Mui-disabled": { bgcolor: "#CCC", color: "#666" } 
               }}
             >
-              Start Meeting
+              {t('meeting_assistant.start_meeting_btn')}
             </Button>
           )}
 
@@ -188,7 +190,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
                   "&.Mui-disabled": { bgcolor: "#CCC", color: "#666" } 
                 }}
               >
-                Finish Meeting
+                {t('meeting_assistant.finish_meeting_btn')}
               </Button>
             </>
           )}
@@ -197,10 +199,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
       <Typography variant="caption" color="textSecondary">
         {isFinishing
-          ? "Saving recording to server..."
+          ? t('meetings.saving_recording')
           : isRecording
-            ? "Recording in progress (Streaming)..."
-            : "Ready to record live"}
+            ? t('meetings.recording_in_progress')
+            : t('meetings.ready_to_record')}
       </Typography>
     </Paper>
   );

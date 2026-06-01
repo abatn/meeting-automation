@@ -18,8 +18,8 @@ import { motion } from 'framer-motion';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
-};
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" as const } }
+} as const;
 
 const LandingPage: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -201,7 +201,7 @@ const LandingPage: React.FC = () => {
             <Grid item xs={12} md={6}>
               <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.12 } } }}>
                 <motion.div variants={fadeIn}>
-                  <Chip label="v2.0 - MODERN ENTERPRISE" sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#FFF', fontWeight: 700, mb: 3, borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} />
+                  <Chip label={t('landing.hero.version_badge')} sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#FFF', fontWeight: 700, mb: 3, borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }} />
                 </motion.div>
                 <motion.div variants={fadeIn}>
                   <Typography variant="h1" sx={{ 
@@ -331,7 +331,7 @@ const LandingPage: React.FC = () => {
             ].map((p, i) => (
               <Grid item xs={12} md={4} key={i}>
                 <Box className="glass-card" sx={{ p: { xs: 4, md: 6 }, border: p.h ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
-                  {p.h && <Chip label="POPULAR" size="small" sx={{ position: 'absolute', top: 20, right: 20, bgcolor: '#FFF', color: '#000', fontWeight: 900, borderRadius: '4px' }} />}
+                  {p.h && <Chip label={t('landing.pricing.popular_badge')} size="small" sx={{ position: 'absolute', top: 20, right: 20, bgcolor: '#FFF', color: '#000', fontWeight: 900, borderRadius: '4px' }} />}
                   <Typography variant="h6" fontWeight="800" sx={{ mb: 1, color: p.h ? '#FFF' : '#71717A' }}>{t(p.nameKey)}</Typography>
                   <Stack direction="row" alignItems="baseline" spacing={1} sx={{ mb: 4 }}>
                     <Typography variant="h3" fontWeight="800">${p.price}</Typography>

@@ -24,15 +24,75 @@
     "all": "الكل",
     "view": "عرض",
     "date_format": "LL",
-    "date_placeholder": "يوم/شهر/سنة"
+    "date_placeholder": "يوم/شهر/سنة",
+    "password_strength": "قوة كلمة المرور",
+    "password_weak": "ضعيفة",
+    "password_medium": "متوسطة",
+    "password_strong": "قوية",
+    "password_very_weak": "ضعيفة جداً",
+    "password_issues": "{count} مشاكل",
+    "refresh_tooltip": "تحديث",
+    "refresh": "تحديث",
+    "download_tooltip": "تحميل",
+    "minutes_usage": "الدقائق المستخدمة",
+    "minutes_abbrev": "دقيقة",
+    "unknown": "غير معروف",
+    "not_available": "غير متاح",
+    "operation_failed": "فشلت العملية",
+    "delete_failed": "فشل الحذف",
+    "no_date": "لا يوجد تاريخ",
+    "has_recording": "تسجيل",
+    "has_transcript": "نص",
+    "has_recap": "ملخص"
   },
   "auth": {
     "loginTitle": "تسجيل دخول المؤسسة",
     "email": "البريد الإلكتروني",
     "password": "كلمة المرور",
+    "password_validation": {
+      "min_length": "يجب أن يكون طوله 8 أحرف على الأقل",
+      "require_uppercase": "يجب أن يحتوي على حرف كبير واحد على الأقل",
+      "require_lowercase": "يجب أن يحتوي على حرف صغير واحد على الأقل",
+      "require_number": "يجب أن يحتوي على رقم واحد على الأقل"
+    },
     "signIn": "تسجيل الدخول",
     "logout": "تسجيل الخروج",
     "mfaTitle": "المصادقة الثنائية",
+    "mfa_qr_code_alt": "رمز QR",
+    "mfa_secret_label": "السر: {secret}",
+    "login": {
+      "welcome_back": "مرحباً بعودتك!",
+      "subtitle": "تسجيل الدخول إلى مساحة العمل الخاصة بك.",
+      "invalid_credentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة.",
+      "forgot_password": "هل نسيت كلمة المرور؟",
+      "no_account": "جديد هنا؟",
+      "create_account": "إنشاء حساب"
+    },
+    "register": {
+      "title": "إنشاء حسابك",
+      "subtitle": "ابدأ الأتمتة اليوم.",
+      "company_name": "اسم الشركة",
+      "plan": "الباقة",
+      "plan_free": "مجاني",
+      "plan_pro": "احترافية (99$/شهرياً)",
+      "plan_enterprise": "مؤسسات (499$/شهرياً)",
+      "submit": "إنشاء حسابي",
+      "has_account": "لديك حساب بالفعل؟",
+      "error": "حدث خطأ أثناء التسجيل."
+    },
+    "activate": {
+      "invalid_token": "رابط التفعيل غير صالح: لم يتم توفير رمز.",
+      "expired_link": "رابط التفعيل غير صالح أو منتهي الصلاحية.",
+      "passwords_mismatch": "كلمتا المرور غير متطابقتين",
+      "password_min_length": "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
+      "failed": "فشل تفعيل الحساب. يرجى المحاولة مرة أخرى.",
+      "title": "تفعيل الحساب",
+      "success": "تم تفعيل الحساب بنجاح! جاري إعادة التوجيه إلى لوحة التحكم...",
+      "welcome_message": "مرحباً! يرجى تعيين كلمة مرور لحسابك (<b>{email}</b>) لإكمال الإعداد.",
+      "new_password": "كلمة المرور الجديدة",
+      "confirm_password": "تأكيد كلمة المرور",
+      "button": "تفعيل الحساب"
+    },
     "check_email": {
       "title": "تحقق من بريدك الإلكتروني",
       "message": "لقد أرسلنا رابط التفعيل إلى {{email}}. يرجى فحص بريدك الوارد والنقر على الرابط لتفعيل حسابك.",
@@ -40,7 +100,9 @@
       "resend_success": "تم إرسال رابط التفعيل بنجاح!",
       "sending": "جاري الإرسال...",
       "back_to_login": "العودة إلى تسجيل الدخول",
-      "spam_notice": "لم تستلم البريد الإلكتروني؟ تحقق من مجلد الرسائل غير المرغوب فيها."
+        "spam_notice": "لم تستلم البريد الإلكتروني؟ تحقق من مجلد الرسائل غير المرغوب فيها.",
+        "no_email": "لم يتم توفير البريد الإلكتروني",
+        "resend_failed": "فشل إعادة إرسال بريد التفعيل"
     }
   },
   "sidebar": {
@@ -67,6 +129,9 @@
     "role_participant": "مشارك",
     "role_manager": "مدير",
     "role_admin": "مسؤول",
+    "role_dg": "المدير العام",
+    "role_system_admin": "مدير النظام",
+    "role_tech_admin": "المدير التقني",
     "actions": "الإجراءات",
     "delete_confirm": "هل أنت متأكد من حذف هذا العضو؟",
     "save_success": "تم حفظ العضو بنجاح",
@@ -83,7 +148,11 @@
     "room_save_success": "تم حفظ القاعة بنجاح",
     "room_delete_success": "تم حذف القاعة بنجاح",
     "no_rooms": "لم يتم العثور على قاعات اجتماعات. أضف قاعتك الأولى للبدء.",
-    "members_list": "دليل الفريق"
+    "members_list": "دليل الفريق",
+    "member_invitation_sent": "تم إرسال الدعوة",
+    "member_user": "مستخدم",
+    "member_registered_user": "مستخدم مسجل",
+    "tabs_aria_label": "علامات تبويب إدارة الفريق"
   },
   "dashboard": {
     "dg_title": "لوحة المدير العام",
@@ -179,7 +248,20 @@
     "cancelled": "ملغى",
     "completed": "مكتمل",
     "expired": "منتهي",
-    "in_progress": "جاري الآن"
+    "in_progress": "جاري الآن",
+    "recording_save_error": "فشل حفظ التسجيل.",
+    "recording_finish_error": "حدث خطأ أثناء إنهاء التسجيل.",
+    "saving_recording": "جاري حفظ التسجيل على الخادم...",
+    "recording_in_progress": "جاري التسجيل (بث مباشر)...",
+    "ready_to_record": "جاهز للتسجيل المباشر",
+    "duration_options": {
+      "30min": "30 دقيقة",
+      "1hour": "ساعة واحدة",
+      "1_5hours": "1.5 ساعة",
+      "2hours": "ساعتين"
+    },
+    "default_location": "المكتب",
+    "confirm_cancel": "إلغاء هذا الاجتماع؟"
   },
   "actions": {
     "tracker_title": "متتبع المهام",
@@ -194,7 +276,8 @@
     "priority_low": "منخفضة",
     "mock_fix_bug": "إصلاح خطأ API",
     "mock_update_docs": "تحديث الوثائق",
-    "mock_client_prep": "التحضير لاجتماع العميل"
+    "mock_client_prep": "التحضير لاجتماع العميل",
+    "assignee_and_due": "مسند إلى: {assignee} - تاريخ الاستحقاق: {due}"
   },
   "pv": {
     "validator_title": "سير عمل المصادقة",
@@ -210,7 +293,15 @@
     "loading_editor": "جاري تحميل محرر المستندات...",
     "validated": "تمت المصادقة",
     "approved_success": "تمت المصادقة على المحضر بنجاح! تم تعيين المهام.",
-    "approved_error": "خطأ في المصادقة على المحضر."
+    "approved_error": "خطأ في المصادقة على المحضر.",
+    "processing": "لا يزال الذكاء الاصطناعي يعالج اجتماعك. يرجى الانتظار بضع ثوانٍ...",
+    "load_error": "فشل تحميل نتائج الذكاء الاصطناعي في الوقت الفعلي.",
+    "no_transcript": "لا يتوفر نص بعد.",
+    "waiting_for_draft": "في انتظار الذكاء الاصطناعي لإنشاء المسودة...",
+    "format_pdf": "PDF",
+    "format_docx": "Word",
+    "editor_load_error": "فشل تحميل إعدادات المحرر.",
+    "no_id_error": "خطأ: لم يتم توفير معرف المحضر."
   },
   "admin": {
     "clientManagement": "إدارة العملاء (مسؤول)",
@@ -236,7 +327,34 @@
     "activeClients": "العملاء النشطون",
     "pendingClients": "العملاء قيد الانتظار",
     "plansDistribution": "توزيع الباقات",
-    "statusDistribution": "توزيع الحالات"
+    "statusDistribution": "توزيع الحالات",
+    "container_backend": "الخادم الخلفي",
+    "container_frontend": "الواجهة الأمامية",
+    "container_celery": "Celery",
+    "container_telemetry": "قياس أداء الحاويات",
+    "postgresql": "PostgreSQL",
+    "redis": "Redis",
+    "rabbitmq": "RabbitMQ",
+    "n8n": "n8n",
+    "mistral_ai": "Mistral AI",
+    "gladia_ai": "Gladia AI",
+    "postgresql_active_connections": "الاتصالات النشطة",
+    "postgresql_slow_queries": "الاستعلامات البطيئة (>100ms)",
+    "postgresql_cache_hit_ratio": "نسبة نجاح التخزين المؤقت",
+    "postgresql_latency": "زمن الاستجابة",
+    "redis_cache": "ذاكرة Redis المؤقتة",
+    "redis_hit_ratio": "نسبة النجاح",
+    "redis_evicted_keys": "المفاتيح المُزالة:",
+    "s3_minio": "S3 / MinIO",
+    "storage_total_size": "الحجم الإجمالي",
+    "storage_objects": "الكائنات",
+    "rabbitmq_queues": "طوابير RabbitMQ",
+    "rabbitmq_total_unacked": "إجمالي غير المؤكد:",
+    "ai_latency_errors": "زمن استجابة وأخطاء الذكاء الاصطناعي",
+    "ai_avg_latency": "متوسط زمن الاستجابة",
+    "ai_error_rate": "معدل الخطأ",
+    "gladia_v2": "Gladia V2",
+    "service_status": "حالة الخدمات"
   },
   "billing": {
     "title": "الاشتراك والفواتير",
@@ -272,7 +390,14 @@
     "createdAt": "تاريخ الإنشاء",
     "actions": "إجراءات",
     "activate": "تفعيل",
-    "disable": "تعطيل"
+    "disable": "تعطيل",
+    "not_found": "العميل غير موجود.",
+    "back_to_list": "العودة إلى القائمة",
+    "transcription_usage": "استخدام النسخ",
+    "internal_observations": "ملاحظات داخلية",
+    "no_observations": "لا توجد ملاحظات مسجلة.",
+    "add_note_placeholder": "إضافة ملاحظة...",
+    "no_clients": "لم يتم العثور على عملاء."
   },
   "landing": {
     "nav": {
@@ -289,7 +414,8 @@
       "subtitle": "وفّر 5 ساعات أسبوعياً. نسخ دقيق، استخراج للقرارات، ومهام تلقائية.",
       "cta_primary": "ابدأ الآن",
       "cta_secondary": "شاهد العرض",
-      "alt_dashboard": "لوحة تحكم النظام"
+      "alt_dashboard": "لوحة تحكم النظام",
+      "version_badge": "v2.0 - مؤسسة عصرية"
     },
     "features": {
       "title": "ذكاء المؤسسات",
@@ -313,6 +439,7 @@
     },
     "pricing": {
       "title": "أسعار شفافة",
+      "popular_badge": "الأكثر طلباً",
       "monthly": "شهر",
       "free_name": "الباقة الأساسية",
       "pro_name": "الباقة الاحترافية",
@@ -356,7 +483,25 @@
     "transcription_card": "النص الأصلي",
     "draft_card": "مسودة الذكاء الاصطناعي",
     "complete": "إكمال وحفظ",
-    "info": "تفاصيل الاجتماع"
+    "info": "تفاصيل الاجتماع",
+    "meeting_room_title": "قاعة الاجتماع: {id}",
+    "status_label": "الحالة:",
+    "ai_recommendations": "توصيات الذكاء الاصطناعي",
+    "no_suggestions": "لا توجد اقتراحات بعد. بمجرد معالجة الاجتماع، سيوصي الذكاء الاصطناعي بالمهام هنا.",
+    "suggested_for": "لـ:",
+    "accept": "قبول",
+    "reject": "رفض",
+    "live_assistant": "مساعد الاجتماع المباشر",
+    "finalizing": "جاري إنهاء المحضر...",
+    "connecting": "جاري الاتصال بمحرك الذكاء الاصطناعي...",
+    "transcription_load_error": "فشل تحميل النص",
+    "no_transcription": "لا يتوفر نص بعد. ابدأ التسجيل لإنشاء واحد.",
+    "transcribing": "يقوم الذكاء الاصطناعي بنسخ الاجتماع حالياً...",
+    "unknown_speaker": "متحدث غير معروف",
+    "no_text": "لا يوجد نص متاح.",
+    "save_draft_tooltip": "حفظ المسودة",
+    "start_meeting_btn": "بدء الاجتماع",
+    "finish_meeting_btn": "إنهاء الاجتماع"
   },
   "archive": {
     "subtitle": "تصفح وابحث في سجل اجتماعات شركتك.",
@@ -366,5 +511,8 @@
     "filter_topic": "تصفية حسب الموضوع...",
     "topics": "مواضيع الذكاء الاصطناعي",
     "search_placeholder": "مثل تخطيط الميزانية"
+  },
+  "error": {
+    "react_error_boundary": "حدث خطأ ما (React Error Boundary)"
   }
 }

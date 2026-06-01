@@ -23,11 +23,13 @@ import {
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
+import { useTranslation } from "react-i18next";
 import { setCredentials } from "../../store/authSlice";
 import authService from "../../services/auth";
 import { AppDispatch } from "../../store";
 
 const LoginForm: React.FC = () => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -49,7 +51,7 @@ const LoginForm: React.FC = () => {
       dispatch(setCredentials({ user: data.user }));
       navigate("/");
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Email ou mot de passe incorrect.");
+      setError(err.response?.data?.detail || t('auth.login.invalid_credentials'));
     } finally {
       setLoading(false);
     }
@@ -62,13 +64,13 @@ const LoginForm: React.FC = () => {
             <Avatar sx={{ bgcolor: 'primary.main', mx: 'auto', mb: 1, width: 36, height: 36 }}>
                 <IAIcon sx={{ fontSize: 22 }} />
             </Avatar>
-            <Typography variant="h6" fontWeight="800">MeetingAutomation</Typography>
+            <Typography variant="h6" fontWeight="800">{t('common.appName')}</Typography>
         </Box>
 
         <Paper elevation={0} sx={{ p: 3, borderRadius: 2, border: '1px solid #E5EAF2' }}>
           <Box sx={{ mb: 2 }}>
-            <Typography variant="h5" fontWeight="800">Bon retour !</Typography>
-            <Typography variant="caption" color="text.secondary">Connectez-vous à votre espace.</Typography>
+            <Typography variant="h5" fontWeight="800">{t('auth.login.welcome_back')}</Typography>
+            <Typography variant="caption" color="text.secondary">{t('auth.login.subtitle')}</Typography>
           </Box>
 
           {error && <Alert severity="error" sx={{ mb: 2, py: 0 }}>{error}</Alert>}
@@ -76,7 +78,7 @@ const LoginForm: React.FC = () => {
           <form onSubmit={handleSubmit}>
             <Stack spacing={2}>
               <TextField
-                label="Adresse Email"
+                label={t('auth.email')}
                 fullWidth
                 required
                 size="small"
@@ -86,7 +88,7 @@ const LoginForm: React.FC = () => {
               />
 
               <TextField
-                label="Mot de passe"
+                label={t('auth.password')}
                 type={showPassword ? "text" : "password"}
                 fullWidth
                 required
@@ -106,7 +108,7 @@ const LoginForm: React.FC = () => {
               />
 
               <Box sx={{ textAlign: 'right' }}>
-                <Link component="button" type="button" variant="caption" fontWeight="600">Mot de passe oublié ?</Link>
+                <Link component="button" type="button" variant="caption" fontWeight="600">{t('auth.login.forgot_password')}</Link>
               </Box>
 
               <Button
@@ -116,12 +118,12 @@ const LoginForm: React.FC = () => {
                 disabled={loading}
                 sx={{ py: 1, borderRadius: 1.5, fontWeight: 700, textTransform: 'none', mt: 1 }}
               >
-                {loading ? <CircularProgress size={20} color="inherit" /> : "Se connecter"}
+                {loading ? <CircularProgress size={20} color="inherit" /> : t('auth.signIn')}
               </Button>
 
               <Box sx={{ textAlign: 'center' }}>
                 <Typography variant="caption" color="text.secondary">
-                  Nouveau ? <Link component="button" type="button" variant="caption" fontWeight="700" onClick={() => navigate('/register')}>Créer un compte</Link>
+                  {t('auth.login.no_account')} <Link component="button" type="button" variant="caption" fontWeight="700" onClick={() => navigate('/register')}>{t('auth.login.create_account')}</Link>
                 </Typography>
               </Box>
             </Stack>

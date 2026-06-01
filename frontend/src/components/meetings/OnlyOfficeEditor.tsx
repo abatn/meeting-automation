@@ -31,7 +31,7 @@ const OnlyOfficeEditor: React.FC<Props> = ({ pvId, language, onClose }) => {
         setLoading(false);
       } catch (err) {
         console.error("Failed to load OnlyOffice config", err);
-        setError("Failed to load editor configuration.");
+        setError(t("pv.editor_load_error"));
         setLoading(false);
       }
     };

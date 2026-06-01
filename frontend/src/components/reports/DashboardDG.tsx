@@ -391,13 +391,13 @@ const DashboardDG: React.FC = () => {
                       <ListItemSecondaryAction>
                         <Stack direction="row" spacing={1}>
                           {meeting.has_recording && (
-                            <Chip label="🎥 Recording" size="small" color="primary" variant="outlined" />
+                            <Chip label={t('common.has_recording')} size="small" color="primary" variant="outlined" />
                           )}
                           {meeting.has_transcript && (
-                            <Chip label="📝 Transcript" size="small" color="success" variant="outlined" />
+                            <Chip label={t('common.has_transcript')} size="small" color="success" variant="outlined" />
                           )}
                           {meeting.has_recap && (
-                            <Chip label="✨ Recap" size="small" color="info" variant="outlined" />
+                            <Chip label={t('common.has_recap')} size="small" color="info" variant="outlined" />
                           )}
                         </Stack>
                       </ListItemSecondaryAction>

@@ -30,7 +30,7 @@ const CheckEmailPage: React.FC = () => {
 
   const handleResend = async () => {
     if (!email) {
-      setError('No email provided');
+      setError(t('auth.check_email.no_email'));
       return;
     }
 
@@ -42,7 +42,7 @@ const CheckEmailPage: React.FC = () => {
       await authService.resendActivation(email);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to resend activation email');
+      setError(err.response?.data?.detail || t('auth.check_email.resend_failed'));
     } finally {
       setLoading(false);
     }

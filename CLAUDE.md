@@ -272,6 +272,33 @@ cd backend && python -c "from app.core.config import settings; import redis; r =
 - **Frontend API calls**: Check Network tab in browser DevTools; use Redux DevTools for state inspection.
 - **n8n workflows**: `http://localhost:5678` - visual debugging and test execution.
 
+## i18n / Internationalisierung (Stand: Mai 2026)
+
+Das Frontend verwendet **react-i18next** mit `useTranslation()` Hook und `t()`-Aufrufen – **durchgängig und korrekt**. Bei Analysen von hartcodierten Strings ist Vorsicht geboten:
+
+### Typische False Positives (keine Änderung nötig)
+| Kategorie | Beispiele | Grund |
+|-----------|-----------|-------|
+| Sprach-Labels | `Français`, `English`, `العربية` | Werden von i18n-Logik gesteuert, keine Übersetzung nötig |
+| Produkt-/Techniknamen | `PostgreSQL`, `Redis`, `RabbitMQ`, `n8n`, `Mistral AI`, `Gladia AI`, `Celery`, `Backend`, `Frontend` | Internationale Eigennamen |
+| Dateiformate | `PDF`, `Word` | Bereits via `t('pv.format_pdf')` u.ä. |
+| Dashboard-Keys | `dashboard.stat_*`, `dashboard.dg_title`, `dashboard.manager_title` | Existieren in Locale-Dateien |
+| Audit-Keys | `audit.action.*`, `audit.table.*` | Existieren in Locale-Dateien |
+| Allgemeine Keys | `transcription`, `common.language`, `common.language` | Bereits korrekt via `t()` |
+
+### Echte Lücken (wurden gefixt)
+- **Dateien ohne `useTranslation`**: `LoginForm.tsx`, `RegisterForm.tsx`, `ActivationPage.tsx`, `AudioRecorder.tsx`, `ClientDetails.tsx` → Import + Hook ergänzt, alle Strings auf `t()` umgestellt
+- **Dateien mit lückenhaften `t()`**: `TechnikDashboard.tsx` (35 Fehlstellen), `MeetingRoom.tsx`, `TranscriptionViewer.tsx`, `PVValidator.tsx`, `MeetingPlanner.tsx` → fehlende Strings ergänzt
+
+### Locale-Dateien
+- `src/i18n/locales/{en,fr-TN,ar-TN}.json` – alle 3 Sprachen vollständig synchronisiert
+- Keys nach Namespaces: `auth.*`, `meetings.*`, `meeting_assistant.*`, `pv.*`, `admin.*`, `clientList.*`, `billing.*`, `common.*`, `team.*`, `actions.*`, `dashboard.*`, `landing.*`, `error.*`, `audit.*`
+
+### Konvention
+- `t()` mit Punkt-Notation: `t('auth.login.welcome_back')`
+- Variablen: `t('key', { variable })`
+- Utility-Files (z.B. `passwordValidation.ts`) können `t()` nicht nutzen → Übersetzung in der rufenden Komponente
+
 ## Related Documentation
 
 - **Architecture & Design**: `docs/ARCHITECTURE.md`, `docs/DATABASE_SCHEMA.md`

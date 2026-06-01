@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, LinearProgress, Paper } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 
 interface UsageProgressBarProps {
   used: number;
@@ -8,16 +9,19 @@ interface UsageProgressBarProps {
   unit?: string;
 }
 
-const UsageProgressBar: React.FC<UsageProgressBarProps> = ({ used, total, label = "Minutes Usage", unit = "min" }) => {
+const UsageProgressBar: React.FC<UsageProgressBarProps> = ({ used, total, label, unit }) => {
+  const { t } = useTranslation();
+  const effectiveLabel = label || t('common.minutes_usage');
+  const effectiveUnit = unit || t('common.minutes_abbrev');
   const percentage = Math.min(Math.round((used / total) * 100), 100);
   const color = percentage > 90 ? 'error' : percentage > 75 ? 'warning' : 'primary';
 
   return (
     <Paper sx={{ p: 2, mb: 2 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-        <Typography variant="subtitle2" color="text.secondary">{label}</Typography>
+        <Typography variant="subtitle2" color="text.secondary">{effectiveLabel}</Typography>
         <Typography variant="subtitle2" fontWeight="bold">
-          {used} / {total} {unit} ({percentage}%)
+          {used} / {total} {effectiveUnit} ({percentage}%)
         </Typography>
       </Box>
       <LinearProgress 

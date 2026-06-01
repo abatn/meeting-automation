@@ -24,15 +24,75 @@
     "all": "Tous",
     "view": "Voir",
     "date_format": "LL",
-    "date_placeholder": "JJ/MM/AAAA"
+    "date_placeholder": "JJ/MM/AAAA",
+    "password_strength": "Force du mot de passe",
+    "password_weak": "Faible",
+    "password_medium": "Moyen",
+    "password_strong": "Fort",
+    "password_very_weak": "Très faible",
+    "password_issues": "{count} problèmes",
+    "refresh_tooltip": "Rafraîchir",
+    "refresh": "Rafraîchir",
+    "download_tooltip": "Télécharger",
+    "minutes_usage": "Minutes utilisées",
+    "minutes_abbrev": "min",
+    "unknown": "Inconnu",
+    "not_available": "N/D",
+    "operation_failed": "Échec de l'opération",
+    "delete_failed": "Échec de la suppression",
+    "no_date": "Aucune date",
+    "has_recording": "Enregistrement",
+    "has_transcript": "Transcription",
+    "has_recap": "Récapitulatif"
   },
   "auth": {
     "loginTitle": "Connexion entreprise",
     "email": "Adresse e-mail",
     "password": "Mot de passe",
+    "password_validation": {
+      "min_length": "Doit contenir au moins 8 caractères",
+      "require_uppercase": "Doit contenir au moins une lettre majuscule",
+      "require_lowercase": "Doit contenir au moins une lettre minuscule",
+      "require_number": "Doit contenir au moins un chiffre"
+    },
     "signIn": "Se connecter",
     "logout": "Déconnexion",
     "mfaTitle": "Authentification à plusieurs facteurs",
+    "mfa_qr_code_alt": "QR Code",
+    "mfa_secret_label": "Secret : {secret}",
+    "login": {
+      "welcome_back": "Bon retour !",
+      "subtitle": "Connectez-vous à votre espace.",
+      "invalid_credentials": "Email ou mot de passe incorrect.",
+      "forgot_password": "Mot de passe oublié ?",
+      "no_account": "Nouveau ?",
+      "create_account": "Créer un compte"
+    },
+    "register": {
+      "title": "Créer votre compte",
+      "subtitle": "Commencez l'automatisation dès maintenant.",
+      "company_name": "Nom de l'entreprise",
+      "plan": "Plan",
+      "plan_free": "Gratuit",
+      "plan_pro": "Pro (99$/m)",
+      "plan_enterprise": "Entreprise (499$/m)",
+      "submit": "Créer mon compte",
+      "has_account": "Déjà un compte ?",
+      "error": "Une erreur est survenue lors de l'inscription."
+    },
+    "activate": {
+      "invalid_token": "Lien d'activation invalide : aucun jeton fourni.",
+      "expired_link": "Lien d'activation invalide ou expiré.",
+      "passwords_mismatch": "Les mots de passe ne correspondent pas",
+      "password_min_length": "Le mot de passe doit contenir au moins 8 caractères",
+      "failed": "Échec de l'activation du compte. Veuillez réessayer.",
+      "title": "Activer le compte",
+      "success": "Compte activé avec succès ! Redirection vers votre tableau de bord...",
+      "welcome_message": "Bienvenue ! Veuillez définir un mot de passe pour votre compte (<b>{email}</b>) pour terminer la configuration.",
+      "new_password": "Nouveau mot de passe",
+      "confirm_password": "Confirmer le mot de passe",
+      "button": "Activer le compte"
+    },
     "check_email": {
       "title": "Vérifiez votre email",
       "message": "Nous avons envoyé un lien d'activation à {{email}}. Veuillez vérifier votre boîte de réception et cliquer sur le lien pour activer votre compte.",
@@ -40,7 +100,9 @@
       "resend_success": "Lien d'activation envoyé avec succès !",
       "sending": "Envoi en cours...",
       "back_to_login": "Retour à la connexion",
-      "spam_notice": "Vous n'avez pas reçu l'email ? Vérifiez votre dossier spam."
+        "spam_notice": "Vous n'avez pas reçu l'email ? Vérifiez votre dossier spam.",
+        "no_email": "Aucun email fourni",
+        "resend_failed": "Échec du renvoi de l'email d'activation"
     }
   },
   "sidebar": {
@@ -67,6 +129,9 @@
     "role_participant": "Participant",
     "role_manager": "Manager",
     "role_admin": "Admin",
+    "role_dg": "Directeur Général",
+    "role_system_admin": "Administrateur Système",
+    "role_tech_admin": "Administrateur Technique",
     "actions": "Actions",
     "delete_confirm": "Êtes-vous sûr de vouloir supprimer ce membre ?",
     "save_success": "Membre enregistré avec succès",
@@ -83,7 +148,11 @@
     "room_save_success": "Salle enregistrée avec succès",
     "room_delete_success": "Salle supprimée avec succès",
     "no_rooms": "Aucune salle de réunion trouvée. Ajoutez votre première salle pour commencer.",
-    "members_list": "Annuaire de l'Équipe"
+    "members_list": "Annuaire de l'Équipe",
+    "member_invitation_sent": "Invitation envoyée",
+    "member_user": "Utilisateur",
+    "member_registered_user": "Utilisateur enregistré",
+    "tabs_aria_label": "Onglets de gestion d'équipe"
   },
   "dashboard": {
     "dg_title": "Tableau de Bord DG",
@@ -181,7 +250,20 @@
     "cancelled": "Annulé",
     "completed": "Terminé",
     "expired": "Expiré",
-    "in_progress": "En cours"
+    "in_progress": "En cours",
+    "recording_save_error": "Échec de l'enregistrement.",
+    "recording_finish_error": "Une erreur est survenue lors de la finalisation de l'enregistrement.",
+    "saving_recording": "Enregistrement en cours sur le serveur...",
+    "recording_in_progress": "Enregistrement en cours (Streaming)...",
+    "ready_to_record": "Prêt à enregistrer",
+    "duration_options": {
+      "30min": "30 min",
+      "1hour": "1 heure",
+      "1_5hours": "1.5 heures",
+      "2hours": "2 heures"
+    },
+    "default_location": "Bureau",
+    "confirm_cancel": "Annuler cette réunion ?"
   },
   "actions": {
     "tracker_title": "Suivi des Actions",
@@ -196,7 +278,8 @@
     "priority_low": "Basse",
     "mock_fix_bug": "Corriger le bug API",
     "mock_update_docs": "Mettre à jour la doc",
-    "mock_client_prep": "Préparer la réunion"
+    "mock_client_prep": "Préparer la réunion",
+    "assignee_and_due": "Assigné à : {assignee} - Échéance : {due}"
   },
   "pv": {
     "validator_title": "Flux de Validation du PV",
@@ -212,7 +295,15 @@
     "loading_editor": "Chargement de l'éditeur de documents...",
     "validated": "Validé",
     "approved_success": "Protocole validé avec succès ! Les tâches ont été assignées.",
-    "approved_error": "Erreur lors de la validation du protocole."
+    "approved_error": "Erreur lors de la validation du protocole.",
+    "processing": "L'IA traite encore votre réunion. Veuillez patienter quelques secondes...",
+    "load_error": "Échec du chargement des résultats IA en temps réel.",
+    "no_transcript": "Aucune transcription disponible pour le moment.",
+    "waiting_for_draft": "En attente de la génération du brouillon par l'IA...",
+    "format_pdf": "PDF",
+    "format_docx": "Word",
+    "editor_load_error": "Échec du chargement de la configuration de l'éditeur.",
+    "no_id_error": "Erreur : aucun ID de PV fourni."
   },
   "admin": {
     "clientManagement": "Gestion des Clients (Admin)",
@@ -238,7 +329,34 @@
     "activeClients": "Clients actifs",
     "pendingClients": "Clients en attente",
     "plansDistribution": "Distribution des forfaits",
-    "statusDistribution": "Distribution des statuts"
+    "statusDistribution": "Distribution des statuts",
+    "container_backend": "Backend",
+    "container_frontend": "Frontend",
+    "container_celery": "Celery",
+    "container_telemetry": "Télémétrie des conteneurs",
+    "postgresql": "PostgreSQL",
+    "redis": "Redis",
+    "rabbitmq": "RabbitMQ",
+    "n8n": "n8n",
+    "mistral_ai": "Mistral IA",
+    "gladia_ai": "Gladia IA",
+    "postgresql_active_connections": "Connexions actives",
+    "postgresql_slow_queries": "Requêtes lentes (>100ms)",
+    "postgresql_cache_hit_ratio": "Taux de hit du cache",
+    "postgresql_latency": "Latence",
+    "redis_cache": "Cache Redis",
+    "redis_hit_ratio": "Taux de hit",
+    "redis_evicted_keys": "Clés expulsées :",
+    "s3_minio": "S3 / MinIO",
+    "storage_total_size": "Taille totale",
+    "storage_objects": "Objets",
+    "rabbitmq_queues": "Files RabbitMQ",
+    "rabbitmq_total_unacked": "Total non acquitté :",
+    "ai_latency_errors": "Latence et erreurs IA",
+    "ai_avg_latency": "Latence moyenne",
+    "ai_error_rate": "Taux d'erreur",
+    "gladia_v2": "Gladia V2",
+    "service_status": "État des services"
   },
   "billing": {
     "title": "Abonnement & Facturation",
@@ -274,7 +392,14 @@
     "createdAt": "Créé le",
     "actions": "Actions",
     "activate": "Activer",
-    "disable": "Désactiver"
+    "disable": "Désactiver",
+    "not_found": "Client introuvable.",
+    "back_to_list": "Retour à la liste",
+    "transcription_usage": "Utilisation de la transcription",
+    "internal_observations": "Observations internes",
+    "no_observations": "Aucune observation enregistrée.",
+    "add_note_placeholder": "Ajouter une note...",
+    "no_clients": "Aucun client trouvé."
   },
   "landing": {
     "nav": {
@@ -291,7 +416,8 @@
       "subtitle": "Gagnez 5 heures par semaine. Transcription précise, extraction de décisions et tâches automatisées.",
       "cta_primary": "Démarrer",
       "cta_secondary": "Voir la démo",
-      "alt_dashboard": "Tableau de bord enterprise"
+      "alt_dashboard": "Tableau de bord enterprise",
+      "version_badge": "v2.0 - ENTREPRISE MODERNE"
     },
     "features": {
       "title": "Intelligence d'Entreprise",
@@ -315,6 +441,7 @@
     },
     "pricing": {
       "title": "Tarifs transparents",
+      "popular_badge": "POPULAIRE",
       "monthly": "mois",
       "free_name": "Starter",
       "pro_name": "Professionnel",
@@ -358,7 +485,25 @@
     "transcription_card": "Transcription Originale",
     "draft_card": "Brouillon IA",
     "complete": "Terminer & Enregistrer",
-    "info": "Détails de la réunion"
+    "info": "Détails de la réunion",
+    "meeting_room_title": "Salle de réunion : {id}",
+    "status_label": "Statut :",
+    "ai_recommendations": "Recommandations IA",
+    "no_suggestions": "Pas encore de suggestions. Une fois la réunion traitée, l'IA recommandera des tâches ici.",
+    "suggested_for": "Pour :",
+    "accept": "Accepter",
+    "reject": "Refuser",
+    "live_assistant": "Assistant de réunion en direct",
+    "finalizing": "Finalisation du protocole...",
+    "connecting": "Connexion au moteur IA...",
+    "transcription_load_error": "Échec du chargement de la transcription",
+    "no_transcription": "Aucune transcription disponible pour le moment. Démarrez un enregistrement pour en générer une.",
+    "transcribing": "L'IA transcrit actuellement la réunion...",
+    "unknown_speaker": "Intervenant inconnu",
+    "no_text": "Aucun texte disponible.",
+    "save_draft_tooltip": "Enregistrer le brouillon",
+    "start_meeting_btn": "Démarrer la réunion",
+    "finish_meeting_btn": "Terminer la réunion"
   },
   "archive": {
     "subtitle": "Parcourez et recherchez dans l'historique des réunions de votre entreprise.",
@@ -387,5 +532,8 @@
       "cancel": "Annulation de Réunion",
       "unknown": "Enregistrement Système"
     }
+  },
+  "error": {
+    "react_error_boundary": "Une erreur est survenue (React Error Boundary)"
   }
 }

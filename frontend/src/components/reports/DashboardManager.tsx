@@ -74,7 +74,7 @@ const DashboardManager: React.FC = () => {
   }
 
   const handleCancelMeeting = async (id: string) => {
-    if (!window.confirm(t("common.confirm_cancel") || "Cancel this meeting?")) return;
+    if (!window.confirm(t("common.confirm_cancel") || t("meetings.confirm_cancel"))) return;
     try {
       await api.patch(`/meetings/${id}/cancel`);
       dispatch(fetchManagerDashboardData());
@@ -267,7 +267,7 @@ const DashboardManager: React.FC = () => {
 
         {/* Right: Open Actions */}
         <Grid item xs={12} md={5}>
-          <Paper glassStyle sx={glassStyle}>
+          <Paper sx={glassStyle}>
             <Box sx={{ px: 3, py: 2, borderBottom: "1px solid", borderColor: "divider", bgcolor: alpha(theme.palette.primary.main, 0.02) }}>
               <Typography sx={{ fontSize: 16, fontWeight: 600 }}>
                 {t("dashboard.my_open_actions")}
@@ -293,7 +293,7 @@ const DashboardManager: React.FC = () => {
                             • {act.assigned_to || t('common.unassigned')}
                           </Typography>
                           <Typography sx={{ fontSize: 11, color: "text.secondary" }}>
-                            • {act.due_date ? new Date(act.due_date).toLocaleDateString(i18n.language) : "No date"}
+                            • {act.due_date ? new Date(act.due_date).toLocaleDateString(i18n.language) : t('common.no_date')}
                           </Typography>
                         </Stack>
                       </Box>
