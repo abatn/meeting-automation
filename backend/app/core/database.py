@@ -9,16 +9,26 @@ import os
 # ISO 27001: Ensure connection string is loaded from secure environment variables
 # For E2E tests, use NullPool to avoid asyncpg enum OID caching issues after schema resets
 pool_class = None
+pool_kwargs = {
+    "pool_pre_ping": True,
+    "pool_recycle": 1800,
+    "echo": settings.DEBUG,
+}
 if os.getenv("E2E_TEST", "").lower() == "true":
     from sqlalchemy.pool import NullPool
     pool_class = NullPool
+else:
+    # Production pool settings (only for QueuePool, not NullPool)
+    pool_kwargs.update({
+        "pool_size": 20,
+        "max_overflow": 10,
+        "pool_timeout": 10,
+    })
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=1800,  # Recycle connections every 30 minutes to prevent stale connections
-    echo=settings.DEBUG,
     poolclass=pool_class,
+    **pool_kwargs,
 )
 
 # Async Session Factory

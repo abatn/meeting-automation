@@ -30,6 +30,7 @@ celery_app.autodiscover_tasks(
         "app.tasks.email_tasks",
         "app.tasks.transcription_tasks",
         "app.tasks.data_retention",
+        "app.tasks.feedback_tasks",
     ]
 )
 

@@ -26,6 +26,26 @@ class ActionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def update_suggestion_status(
+        self, suggestion_id: str, action: str, client_id: str
+    ) -> None:
+        """
+        Fast path: Update suggestion status immediately (~50ms).
+        Used by the Celery background task pattern to provide instant UI feedback.
+        """
+        stmt = select(ActionSuggestion).where(
+            ActionSuggestion.id == suggestion_id,
+            ActionSuggestion.client_id == client_id,
+        )
+        result = await self.db.execute(stmt)
+        suggestion = result.scalars().first()
+
+        if not suggestion:
+            raise ValueError(f"Suggestion {suggestion_id} not found for client {client_id}")
+
+        suggestion.status = SuggestionStatus.ACCEPTED if action == "accept" else SuggestionStatus.REJECTED
+        await self.db.commit()
+
     async def get_action_patterns(self, client_id: str, limit: int = 5, target_language: Optional[str] = None) -> List[Dict[str, Any]]:
         """Aggregates pending actions by title to identify patterns, with optional translation."""
         stmt = (

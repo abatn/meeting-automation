@@ -324,7 +324,7 @@ async def validate_token(
 async def logout(
     current_user: UserModel = Depends(deps.get_current_user),
     auth_service: AuthService = Depends(deps.get_auth_service),
-    token: str = Depends(deps.reusable_oauth2),
+    token: str = Depends(deps.get_token_from_request),
 ) -> Any:
     """
     Logout user. Deletes httpOnly cookie and blacklists token.

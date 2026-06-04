@@ -109,7 +109,7 @@ async def get_action_suggestions(
     )
     return suggestions
 
-@router.post("/suggestions/learn")
+@router.post("/suggestions/learn", status_code=202)
 async def learn_action_suggestion_feedback(
     feedback: FeedbackRequest,
     db: AsyncSession = Depends(deps.get_db),
@@ -117,23 +117,32 @@ async def learn_action_suggestion_feedback(
 ) -> Any:
     """
     Receives user feedback (accept/reject) on an ML-suggested action item.
-    In a fully realized ML system, this data would feed back into model fine-tuning.
+    Dispatches heavy processing to Celery background task for non-blocking response.
     """
     if feedback.action not in ["accept", "reject"]:
         raise HTTPException(status_code=400, detail="Action must be 'accept' or 'reject'")
 
     action_service = ActionService(db)
     try:
-        await action_service.learn_from_feedback(
-            feedback.suggestion_id,
-            current_user.client_id,
-            feedback.action,
-            user_id=current_user.id
+        # Fast path: Update suggestion status immediately (~50ms)
+        await action_service.update_suggestion_status(
+            feedback.suggestion_id, feedback.action, current_user.client_id
         )
     except Exception as e:
-        logger.error(f"Feedback processing failed: {e}", exc_info=True)
+        logger.error(f"Suggestion status update failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Feedback processing failed: {str(e)}")
-    return {"status": "success", "message": "Feedback recorded successfully."}
+
+    # Background path: Celery task for full resolution (S3, ONNX, Mistral)
+    if feedback.action == "accept":
+        from app.tasks.feedback_tasks import process_feedback_resolution
+        process_feedback_resolution.delay(
+            suggestion_id=feedback.suggestion_id,
+            client_id=str(current_user.client_id),
+            action=feedback.action,
+            user_id=str(current_user.id),
+        )
+
+    return {"status": "accepted", "suggestion_id": feedback.suggestion_id}
 
 @router.post("/suggestions/translate")
 async def translate_action_suggestions(
