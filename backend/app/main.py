@@ -47,9 +47,12 @@ async def lifespan(app: FastAPI):
     # Start Redis WebSocket Listener task
     asyncio.create_task(manager.listen_to_redis())
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database initialized")
+    if settings.DEBUG:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database initialized (dev mode)")
+    else:
+        logger.info("Database managed by Alembic (production mode)")
     yield
     # Shutdown
     logger.info("Shutting down...")

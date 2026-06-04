@@ -42,6 +42,10 @@ class AuditService:
             return audit_entry
         except Exception as e:
             logger.error(f"Failed to create audit log: {e}")
+            try:
+                await db.rollback()
+            except Exception:
+                pass
             # We don't raise here to prevent breaking the main flow, 
             # but in production you might want strict audit.
             return None

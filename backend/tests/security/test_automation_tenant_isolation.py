@@ -108,7 +108,7 @@ async def test_automation_meeting_cross_tenant_vulnerability(client: AsyncClient
     }
 
     response = await client.get(
-        f"/api/v1/reports/automation/meeting/{tenant_b_data['meeting_id']}",
+        f"/api/v1/reports/automation/meeting/{tenant_b_data['meeting_id']}?client_id={CLIENT_A_ID}",
         headers=headers,
     )
 
@@ -141,7 +141,7 @@ async def test_automation_pdf_cross_tenant_vulnerability(client: AsyncClient, db
     }
 
     response = await client.get(
-        f"/api/v1/reports/automation/pdf/{tenant_b_data['meeting_id']}",
+        f"/api/v1/reports/automation/pdf/{tenant_b_data['meeting_id']}?client_id={CLIENT_A_ID}",
         headers=headers,
     )
 
@@ -169,11 +169,10 @@ async def test_automation_meeting_with_client_id_header(client: AsyncClient, db_
 
     headers = {
         "X-Internal-API-Key": settings.INTERNAL_API_SECRET,
-        "X-Client-ID": CLIENT_A_ID,  # Client A tries to access Client B's data
     }
 
     response = await client.get(
-        f"/api/v1/reports/automation/meeting/{tenant_b_data['meeting_id']}",
+        f"/api/v1/reports/automation/meeting/{tenant_b_data['meeting_id']}?client_id={CLIENT_A_ID}",
         headers=headers,
     )
 

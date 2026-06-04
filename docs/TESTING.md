@@ -3,15 +3,37 @@
 ## Quick Start
 
 ### Backend Tests
+
+Alle Tests erfordern `E2E_TEST=true` + volle Docker-Infrastruktur.
+
+#### Erforderliche Umgebungsvariablen
+```bash
+export E2E_TEST=true
+export DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5432/meeting_db"
+export REDIS_URL="redis://localhost:6379/0"
+export CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//"
+export SECRET_KEY="dev-secret-key-meeting-automation-2026"
+export ENCRYPTION_KEY="6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4="
+export TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4="
+```
+
+#### Alle Tests ausführen
 ```bash
 cd backend
-# Run unit tests
-pytest tests/unit
-# Run integration tests
-pytest tests/integration
-# Run security tests
-pytest tests/security
+/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/ -v
 ```
+
+#### Nur E2E Smoke Tests
+```bash
+cd backend
+/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/e2e/test_smoke.py -v
+```
+
+#### Ergebnis (Stand 2026-06-04)
+| Kategorie | Ergebnis |
+|-----------|----------|
+| Unit Tests | 71/71 ✅ (+ 2 xfailed) |
+| E2E Smoke Tests | 5/5 ✅ |
 
 ### Frontend Tests
 ```bash

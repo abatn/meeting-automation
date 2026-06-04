@@ -295,6 +295,8 @@ async def list_pv_versions(pv_id: str, db: AsyncSession = Depends(deps.get_db), 
 
 @router.get("/{pv_id}/versions/{version_id}", response_model=PVVersionSchema)
 async def get_pv_version(pv_id: str, version_id: str, db: AsyncSession = Depends(deps.get_db), current_user: UserModel = Depends(deps.get_current_user)) -> Any:
+    pv_stmt = select(PVModel.id).where(PVModel.id == pv_id, PVModel.client_id == current_user.client_id)
+    if not (await db.execute(pv_stmt)).scalar_one_or_none(): raise HTTPException(status_code=404, detail="PV not found")
     stmt = select(PVVersionModel).where(PVVersionModel.id == version_id, PVVersionModel.pv_id == pv_id)
     result = await db.execute(stmt)
     version = result.scalars().first()

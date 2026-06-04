@@ -16,6 +16,7 @@ if os.getenv("E2E_TEST", "").lower() == "true":
 engine = create_async_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
+    pool_recycle=1800,  # Recycle connections every 30 minutes to prevent stale connections
     echo=settings.DEBUG,
     poolclass=pool_class,
 )

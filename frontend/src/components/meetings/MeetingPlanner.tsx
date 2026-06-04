@@ -284,7 +284,7 @@ const MeetingPlanner: React.FC = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><RoomIcon sx={{ fontSize: 14 }} /><Typography variant="caption">{m.location || t('meetings.default_location')}</Typography></Box>
                       </Stack>
                         <Stack direction="row" spacing={1} justifyContent="flex-end">
-                           {m.status === 'planned' && !isExpired && (
+                           {m.status?.toLowerCase() === 'planned' && !isExpired && (
                              <>
                                {isCreator && (
                                  <Button size="small" variant="outlined" color="error" startIcon={<CancelIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'cancel')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t('common.cancel', 'Cancel')}</Button>
@@ -332,7 +332,7 @@ const MeetingPlanner: React.FC = () => {
                              </>
                            )}
                           {isExpired && isCreator && <Button size="small" color="error" startIcon={<DeleteIcon sx={{ fontSize: 14 }} />} onClick={() => handleAction(m.id, 'delete')} sx={{ textTransform: 'none', fontWeight: 700 }}>{t('common.delete', 'Delete')}</Button>}
-                          {m.status === 'in_progress' && <Button size="small" variant="contained" color="primary" onClick={() => navigate(`/meetings/live/${m.id}`)} sx={{ borderRadius: '8px', fontWeight: 800, textTransform: 'none' }}>{t('meetings.join_room', 'Join Room')}</Button>}
+                           {m.status?.toLowerCase() === 'in_progress' && <Button size="small" variant="contained" color="primary" onClick={() => navigate(`/meetings/live/${m.id}`)} sx={{ borderRadius: '8px', fontWeight: 800, textTransform: 'none' }}>{t('meetings.join_room', 'Join Room')}</Button>}
                           {m.status === 'completed' && pvMap[m.id] && <Button size="small" variant="outlined" startIcon={<EditIcon sx={{ fontSize: 14 }} />} onClick={() => window.open(`/editor/${pvMap[m.id]}`, '_blank')} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}>{t("pv.edit_online", "Edit PV")}</Button>}
                         </Stack>
                     </ListItem>

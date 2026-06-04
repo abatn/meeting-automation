@@ -1,7 +1,7 @@
 """merge_heads_token_hash_and_team_constraint
 
 Revision ID: c3fe9e232652
-Revises: add_token_hash_activation, c6d7e8f9a0b1
+Revises: 0fe164eb0e4a, c6d7e8f9a0b1
 Create Date: 2026-04-24 02:29:00.356056
 
 """

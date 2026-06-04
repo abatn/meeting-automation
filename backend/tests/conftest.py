@@ -22,7 +22,7 @@ from app.models.meeting import Meeting as MeetingModel, Participant as Participa
 from app.models.action import Action as ActionModel, Assignment as AssignmentModel, ActionSuggestion as SuggestionModel, ActionStatus as DBActionStatus
 from app.models.pv import PV as PVModel
 from app.models.recording import Recording as RecordingModel
-from app.models.transcription import Transcription as TranscriptionModel
+from app.models.transcription import Transcription as TranscriptionModel, Speaker as SpeakerModel
 from app.models.audit_log import AuditLog as AuditLogModel
 from app.models.setting import BrandingSettings as BrandingSettingsModel
 from app.models.team import TeamMember as TeamModel
@@ -65,10 +65,14 @@ async def db_session() -> Generator:
     """
     # In non-E2E modes, create fresh schema; in E2E mode, use existing DB
     if not E2E_MODE:
+        # Delete stale test.db to avoid schema mismatch
+        import pathlib
+        test_db = pathlib.Path("./test.db")
+        if test_db.exists():
+            test_db.unlink()
         # Dispose engine to clear pooled connections and cached enum OIDs
         await engine.dispose()
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
     async with TestingSessionLocal() as session:
@@ -151,8 +155,12 @@ async def db_session() -> Generator:
 
     # Cleanup: only drop schema in non-E2E mode; in E2E mode DB is shared and managed by docker-compose
     if not E2E_MODE:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
+        await engine.dispose()
+        # Delete test.db instead of drop_all to avoid FK ordering issues
+        import pathlib
+        test_db = pathlib.Path("./test.db")
+        if test_db.exists():
+            test_db.unlink()
 
 
 @pytest_asyncio.fixture(scope="function")

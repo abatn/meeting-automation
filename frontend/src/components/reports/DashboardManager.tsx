@@ -222,7 +222,7 @@ const DashboardManager: React.FC = () => {
                         
                         <Stack direction="row" spacing={1}>
                           {/* PLANNED STATUS */}
-                          {mtg.status === 'planned' && (
+                          {mtg.status?.toLowerCase() === 'planned' && (
                             <>
                               <Button 
                                 size="small" variant="outlined" color="error" startIcon={<CancelIcon sx={{ fontSize: 14 }} />} 
@@ -247,7 +247,7 @@ const DashboardManager: React.FC = () => {
                           )}
 
                           {/* IN PROGRESS */}
-                          {mtg.status === 'in_progress' && (
+                          {mtg.status?.toLowerCase() === 'in_progress' && (
                             <Button 
                               size="small" variant="contained" onClick={() => navigate(`/meetings/live/${mtg.id}`)}
                               sx={{ borderRadius: 1.5, textTransform: "none", fontSize: 12, bgcolor: "primary.main" }}

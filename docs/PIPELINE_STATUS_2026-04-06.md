@@ -70,6 +70,42 @@
 - **Ursache**: IP-Adressen waren hardcodiert
 - **Fix**: `HOST_IP` in `.env` — alle URLs in `docker-compose.yml` abgeleitet
 
+### P6: DB Connection Pool Exhaustion (CRITICAL)
+- **Ursache**: `AuditMiddleware` verwendete `request.state.db_session` — durch FastAPI `BaseHTTPMiddleware` bereits geschlossen wenn `_log_audit()` lief
+- **Fix**: Dedizierte `AsyncSessionLocal()` Session in `_log_audit()`
+- **Datei**: `backend/app/middleware/audit_middleware.py:44-126`
+
+### P7: AuditService Rollback im except-Block
+- **Ursache**: Fehlender `db.rollback()` bei Fehler — verursachte "Session als FAILED markiert"
+- **Fix**: `await db.rollback()` im except-Block
+- **Datei**: `backend/app/services/audit_service.py:43-44`
+
+### P8: Stale DB Connections
+- **Ursache**: Kein `pool_recycle` — PostgreSQL schließt Idle Connections nach `idle_in_transaction_session_timeout`
+- **Fix**: `pool_recycle=1800` (30 Minuten)
+- **Datei**: `backend/app/core/database.py:16-21`
+
+### P9: Webhook Multi-Tenant Security
+- **Ursache**: `extract_actions_from_pv()` erwartete `client_id` — PV-Endpoint lieferte keinen
+- **Fix**: PV-Lookup für `client_id` extrahiert `client_id` aus DB
+- **Datei**: `backend/app/api/v1/webhooks.py:122`
+
+### P10: Tenant Isolation — Reports + PV
+- **Ursache**: Automation-Endpoints (`/automation/meeting/{id}`, `/automation/pdf/{id}`) und PV-Endpoint (`/pv/meeting/{id}`) hatten keinen `client_id` Parameter
+- **Fix**: `client_id` Query-Param hinzugefügt + Ownership-Check
+- **Dateien**: `backend/app/api/v1/reports.py`, `backend/app/api/v1/pv.py`
+
+### P11: Branding Duplicate Key Error
+- **Ursache**: `POST /settings/branding` machte blind INSERT — bei existierendem Record → 409
+- **Fix**: Upsert-Pattern (existierenden Record updaten, sonst neu erstellen)
+- **Datei**: `backend/app/api/v1/settings.py`
+
+### P12: Test Suite — 14 Fixes
+- **Ursache**: Diverse Issues (falsche Enums, sync/async Mismatch, numpy truth value, fehlende `client_id` Parameter)
+- **Fix**: Alle 14 Testfehler behoben, 2 Celery-Vulnerabilities als `xfail` markiert
+- **Testergebnis**: 71 passed, 0 failed, 2 xfailed, 1 xpassed, 1 skipped
+- **Dateien**: Siehe `docs/CRITICAL_FIXES_2026-06-04.md`
+
 ---
 
 ## Offene Punkte
@@ -81,6 +117,7 @@
 | 3 | OnlyOffice Callback → PDF Test | P2 | Edit Online → Speichern → PDF Download testen |
 | 4 | Phase 2 Commit ausstehend | P2 | `team_service.py` + Migration `c6d7e8f9a0b1` committen |
 | 5 | CORS_ORIGINS enthält keine VM-IP | P3 | Bei CORS-Fehlern: `158.180.18.110:3000` ergänzen |
+| 6 | Celery Task Tenant Isolation | P2 | `_process_recording_pipeline` — `client_id` Filter für alle Tasks (xfailed Tests) |
 
 ---
 

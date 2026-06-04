@@ -15,9 +15,9 @@ def test_sensitive_data_encryption():
     assert decrypted == sensitive_text
 
 def test_encryption_key_rotation_readiness():
-    # Testet ob das System mit verschiedenen Keys umgehen kann (Vorbereitung Key Rotation)
-    old_key = b"12345678901234567890123456789012"
-    new_key = b"09876543210987654321098765432109"
+    from cryptography.fernet import Fernet as _Fernet
+    old_key = _Fernet.generate_key().decode()
+    new_key = _Fernet.generate_key().decode()
     
     data = "Rotating keys is important for ISO 27001"
     
@@ -26,6 +26,5 @@ def test_encryption_key_rotation_readiness():
         encrypted_old = encrypt_data(data)
         
         m.setattr(settings, "ENCRYPTION_KEY", new_key)
-        # Sollte fehlschlagen beim Entschlüsseln mit falschem Key
         with pytest.raises(Exception):
             decrypt_data(encrypted_old)

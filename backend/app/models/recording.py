@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, ForeignKey, DateTime, Integer, Float
+from sqlalchemy import String, ForeignKey, DateTime, Integer, Float, Index
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -15,6 +15,9 @@ if TYPE_CHECKING:
 
 class Recording(Base):
     __tablename__ = "recordings"
+    __table_args__ = (
+        Index('ix_recordings_meeting_status', 'meeting_id', 'status'),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
     client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)

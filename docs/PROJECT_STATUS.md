@@ -199,10 +199,20 @@ Diese Phase konzentriert sich auf den stabilen Betrieb unter Last, die Benutzere
 - [x] **Online Document Editing (OnlyOffice)**: Integration für ISO-27001-konforme Online-Bearbeitung von KI-Protokollen. (Optimiert: PDF-Sync-Staleness behoben via Forcesave-Callback & Redis-Sync).
   > ⚠️ **TODO Produktion**: `ONLYOFFICE_URL` in `.env` ist aktuell auf VM-Test-IP gesetzt. Vor Produktion durch echte Domain ersetzen oder dynamische Host-Ableitung implementieren. Siehe `PROTOCOL_PART_41_ONLYOFFICE_INTEGRATION.md`.
 - [x] **Enterprise Onboarding (Way B)**: Implementierung eines sicheren, token-basierten Einladungssystems mit `PENDING` User-Status, n8n-Integration und automatisierter Passwort-Setzung.
-- [ ] **Auto-Scaling**: Konfiguration von Horizontal Pod Autoscaler (HPA) in Kubernetes für die AI-Worker (Gladia/Mistral Proxy).
-- [ ] **Mobile App Applikation**: Entwicklung einer progressiven Web App (PWA) oder nativen App für Meeting-Aufnahmen via Smartphone.
-- [ ] **Finetuning AI**: Optimierung der Mistral-Prompts für noch präzisere tunesische Dialekt-Zusammenfassungen.
-- [ ] **Disaster Recovery**: Validierung und Automatisierung der täglichen Offsite-Backups.
+
+## Phase 8: Speaker Identification (In Entwicklung)
+
+Diese Phase fügt automatische Sprecher-Identifizierung zur bestehenden Transkriptions-Pipeline hinzu.
+
+- [x] **ONNX-Modell-Integration**: ECAPA-TDNN Speaker Embedding via ONNX Runtime (CPU, ~80 MB)
+- [ ] **Speaker-Tabelle erweitern**: Neue Spalten für Embedding, Confidence, Mapping-Method
+- [ ] **Audio-Segment-Extraktion**: ffmpeg-basierte Segment-Extraktion pro Speaker
+- [ ] **Cosine Distance Matching**: Schwellenwert-basiertes Profil-Matching
+- [ ] **Mistral Fusion-Layer**: Kombination von Audio- und Text-Inferenz
+- [ ] **Automatisches Enrollment**: Profil-Erstellung bei manuellem Mapping
+- [ ] **Pipeline-Integration**: Einbettung in transcription_tasks.py
+
+**Siehe:** [PROTOCOL_PHASE_8_SPEAKER_IDENTIFICATION.md](./PROTOCOL_PHASE_8_SPEAKER_IDENTIFICATION.md)
 
 ## Historie & Protokolle
 
@@ -232,6 +242,7 @@ Die detaillierte Entwicklungshistorie und technische Dokumentation der Meilenste
 19. **[ISS Map-Reduce Pipeline Final Validation](PROTOCOL_ISS_FINAL_VALIDATION.md)**: Live-Test und Validierung der asynchronen Audio-Synthese-Pipeline (S3 -> Gladia -> Qwen-1.5B -> Mistral).
 20. **[Mobile-First Redesign & RTL Stabilization](PROTOCOL_PART_43_MOBILE_RTL_STABILIZATION.md)**: Smartphone-Optimierung der gesamten Applikation, Behebung von RTL-Scrollfehlern und Einführung des Modern Enterprise Stripe-Designs.
 21. **[Enterprise Onboarding Workflow](PROTOCOL_PART_44_ENTERPRISE_ONBOARDING_WORKFLOW.md)**: Sicheres Einladungssystem mit Token-Aktivierung, n8n-SMTP Integration und Soft-Delete Strategie für ISO 27001 Audit-Logs.
+22. **[Speaker Identification](PROTOCOL_PHASE_8_SPEAKER_IDENTIFICATION.md)**: Automatische Zuordnung von Speaker-Labels zu echten Namen durch Audio-Embeddings (ONNX) + LLM-Fusion (Mistral).
 
 ---
 

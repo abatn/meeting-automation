@@ -55,8 +55,16 @@ async def create_or_update_branding_settings(
     existing_branding = result.scalars().first()
 
     if existing_branding:
-        existing_branding.is_active = False
+        existing_branding.organization_name = branding_in.organization_name
+        existing_branding.logo_url = branding_in.logo_url
+        existing_branding.header_text = branding_in.header_text
+        existing_branding.footer_text = branding_in.footer_text
+        existing_branding.default_watermark = branding_in.default_watermark
+        existing_branding.is_active = True
         db.add(existing_branding)
+        await db.commit()
+        await db.refresh(existing_branding)
+        return existing_branding
 
     # Create new active branding setting
     new_branding = BrandingModel(

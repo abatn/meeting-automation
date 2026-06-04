@@ -21,9 +21,20 @@ from app.models.pv import PV, Section
 from app.models.recording import Recording
 from app.models.transcription import Transcription
 from app.models.user import User
+from app.models.meeting import Meeting
+from sqlalchemy.orm import selectinload
 from app.services.gladia_service import gladia_service
 from app.services.pv_service import PVService
 from app.services.sentinel_service import sentinel
+from app.services.speaker_embedding_service import speaker_embedding_service
+from app.services.speaker_profile_service import speaker_profile_service, SpeakerProfileService
+from app.services.mistral_fusion_service import mistral_fusion_service
+from app.services.auto_enrollment_service import AutoEnrollmentService
+from app.services.speaker_name_detector import detect_self_introduction
+from app.services.assignee_resolver import AssigneeResolver, AssigneeResolution
+from app.services.audit_service import AuditService
+import difflib
+from difflib import SequenceMatcher
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -115,6 +126,17 @@ async def _process_recording_pipeline(recording_id: str) -> None:
             recording.status = "transcribing"
             await db.commit()
 
+            await AuditService.log_action(
+                db=db,
+                client_id=str(recording.client_id),
+                action="RECORDING_TRANSCRIBING",
+                table_name="recordings",
+                record_id=recording_id,
+                new_values={"status": "transcribing"},
+                ip_address="internal",
+                user_agent="celery",
+            )
+
             # Download audio from S3
             temp_path = await _download_audio(str(recording.file_path))
             if not temp_path:
@@ -124,37 +146,91 @@ async def _process_recording_pipeline(recording_id: str) -> None:
             publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
             gladia_result = await gladia_service.transcribe_and_diarize(temp_path)
 
-            # 2. MAP PHASE (Local SLM Sentinel)
+            # 1.5 SPEAKER IDENTIFICATION PHASE (Audio + Text Fusion)
+            publish_status(recording_id, "transcribing", 30, "Identifying Speakers...")
+            await speaker_embedding_service.initialize()
+
+            # Load meeting with participants BEFORE speaker identification
+            stmt = select(Meeting).options(selectinload(Meeting.participants)).where(Meeting.id == recording.meeting_id)
+            meeting_res = await db.execute(stmt)
+            meeting = meeting_res.scalar_one_or_none()
+            participant_names = [p.name for p in meeting.participants if p.name] if meeting else []
+            meeting_id = str(recording.meeting_id)
+
+            speaker_mappings = await _identify_speakers(
+                db=db,
+                gladia_result=gladia_result,
+                client_id=str(recording.client_id),
+                recording_id=recording_id,
+                temp_path=temp_path,
+                meeting_id=meeting_id,
+                participant_names=participant_names,
+                meeting=meeting,
+            )
+
+            # 1.6 APPLY SPEAKER NAMES TO TRANSCRIPT (Display-Kopie, Original bleibt erhalten)
+            name_map = {
+                m["speaker_label"]: m["resolved_name"]
+                for m in speaker_mappings
+                if m.get("resolved_name") and m.get("confidence", 0) >= 0.50
+            }
+            display_text = gladia_result.get("full_text", "")
+            display_segments = [seg.copy() for seg in gladia_result.get("segments", [])]
+            if name_map:
+                for label, name in name_map.items():
+                    display_text = display_text.replace(f"{label}:", f"{name}:")
+                    for seg in display_segments:
+                        if seg.get("speaker") == label:
+                            seg["speaker"] = name
+                logger.info(f"Speaker names applied to display transcript: {name_map}")
+
+            # 2. MAP PHASE (Local SLM Sentinel) — verwendet DISPLAY transcript mit aufgelösten Namen
             publish_status(recording_id, "analyzing", 45, "Local Semantic Synthesis (Qwen-1.5B)...")
-            transcript_text = gladia_result.get("full_text", "")
 
             # Chunking: split by time or length
-            chunks = [transcript_text[i:i+3000] for i in range(0, len(transcript_text), 3000)]
+            chunks = [display_text[i:i+3000] for i in range(0, len(display_text), 3000)]
 
             # Parallel Map execution
             map_tasks = [sentinel.summarize_chunk(chunk) for chunk in chunks]
             partial_summaries = await asyncio.gather(*map_tasks)
 
-            enriched_context = "\n---\n".join(partial_summaries)
+            sentinel_summary = "\n---\n".join(partial_summaries)
 
-            # 3. REDUCE PHASE (Mistral Small)
+            # 3. REDUCE PHASE (Mistral) — dual context: Summary + Full Transcript (DISPLAY mit Namen)
             publish_status(recording_id, "analyzing", 75, "Final Protocol Refinement (Mistral)...")
 
-            from app.models.meeting import Meeting
-            from sqlalchemy.orm import selectinload
-            stmt = select(Meeting).options(selectinload(Meeting.participants)).where(Meeting.id == recording.meeting_id)
-            meeting_res = await db.execute(stmt)
-            meeting = meeting_res.scalar_one_or_none()
-            participant_names = [p.name for p in meeting.participants if p.name] if meeting else []
+            pv_data = await PVService.generate_pv(
+                sentinel_summary=sentinel_summary,
+                full_transcript=display_text,  # DISPLAY mit aufgelösten Namen
+                target_language="fr",
+                participant_names=participant_names,
+                speaker_mappings=speaker_mappings,
+                speaker_segments=display_segments,  # DISPLAY segments mit Namen
+            )
 
-            pv_data = await PVService.generate_pv(enriched_context, target_language="fr", participant_names=participant_names)
-
-            # 4. Persistence
-            await _save_transcription(db, recording, gladia_result)
-            await _save_pv_and_actions(db, recording, pv_data, language="fr")
+            # 4. Persistence — verwendet DISPLAY-Kopie für Storage
+            await _save_transcription(db, recording, {
+                "full_text": display_text,
+                "segments": display_segments,
+            })
+            await _save_pv_and_actions(
+                db, recording, pv_data, language="fr", speaker_mappings=speaker_mappings,
+                participant_names=participant_names
+            )
 
             recording.status = "completed"
             await db.commit()
+
+            await AuditService.log_action(
+                db=db,
+                client_id=str(recording.client_id),
+                action="RECORDING_COMPLETED",
+                table_name="recordings",
+                record_id=recording_id,
+                new_values={"status": "completed"},
+                ip_address="internal",
+                user_agent="celery",
+            )
 
             publish_status(recording_id, "completed", 100, "ISS Synthesis Successful (33.3s target).")
             await _notify_n8n_completion(str(recording.id), str(recording.meeting_id))
@@ -168,6 +244,18 @@ async def _process_recording_pipeline(recording_id: str) -> None:
             if recording:
                 recording.status = "failed"
                 await db.commit()
+
+                await AuditService.log_action(
+                    db=db,
+                    client_id=str(recording.client_id),
+                    action="RECORDING_FAILED",
+                    table_name="recordings",
+                    record_id=recording_id,
+                    new_values={"status": "failed", "error": str(e)},
+                    ip_address="internal",
+                    user_agent="celery",
+                )
+
                 publish_status(recording_id, "failed", 0, f"Processing failed: {str(e)}")
         # Re-raise untuk Celery retry
         raise
@@ -178,6 +266,373 @@ async def _process_recording_pipeline(recording_id: str) -> None:
                 os.remove(temp_path)
             except Exception as e:
                 logger.warning(f"Failed to delete temp file {temp_path}: {e}")
+
+async def _match_speaker_to_participant(
+    speaker_label: str,
+    speaker_segments: List[Dict],
+    participant_names: List[str],
+    meeting,
+    all_speaker_groups: Dict[str, List[Dict]],
+    speaker_index: int,
+) -> Optional[str]:
+    """
+    Deterministic heuristic to match speakers to participants without Mistral/ONNX.
+
+    Priority:
+    1. Single participant → return that name
+    2. Creator = main speaker heuristic (most words → creator)
+    3. Text reference matching ("as X said", "thank X")
+    4. Order heuristic (Speaker 0 → often creator/organizer)
+
+    Returns: matched name or None
+    """
+    if not participant_names:
+        return None
+
+    # 1. Single participant fallback
+    if len(participant_names) == 1:
+        return participant_names[0]
+
+    # 2. Creator = main speaker heuristic
+    if meeting and hasattr(meeting, 'creator_id'):
+        # Count words per speaker
+        word_counts = {}
+        for spk_label, segs in all_speaker_groups.items():
+            total_words = sum(len(seg.get("text", "").split()) for seg in segs)
+            word_counts[spk_label] = total_words
+
+        # Find speaker with most words
+        if word_counts:
+            main_speaker = max(word_counts, key=word_counts.get)
+            if main_speaker == speaker_label and word_counts[main_speaker] > 0:
+                # This speaker talks the most → likely the creator
+                # Try to find creator name from participants
+                for p in (meeting.participants if hasattr(meeting, 'participants') else []):
+                    if hasattr(p, 'user_id') and p.user_id == meeting.creator_id:
+                        if p.name and p.name in participant_names:
+                            logger.info(
+                                f"Heuristic: {speaker_label} is main speaker "
+                                f"({word_counts[main_speaker]} words) → matched to creator {p.name}"
+                            )
+                            return p.name
+                # Fallback: creator might not be in participants, use first participant
+                # Only if this is Speaker 0 (first speaker)
+                if speaker_index == 0:
+                    logger.info(
+                        f"Heuristic: {speaker_label} is main speaker → matched to first participant {participant_names[0]}"
+                    )
+                    return participant_names[0]
+
+    # 3. Text reference matching — check if other speakers mention names
+    for seg in speaker_segments:
+        text = seg.get("text", "").lower()
+        for name in participant_names:
+            name_lower = name.lower()
+            # Patterns: "wie X gesagt hat", "danke X", "X hat recht", "according to X"
+            patterns = [
+                f"wie {name_lower}",
+                f"danke {name_lower}",
+                f"{name_lower} hat",
+                f"according to {name_lower}",
+                f"thank you {name_lower}",
+                f"thanks {name_lower}",
+            ]
+            if any(p in text for p in patterns):
+                logger.info(f"Heuristic: text reference to '{name}' in {speaker_label}")
+                return name
+
+    # 4. Order heuristic — Speaker 0 is often the organizer/creator
+    if speaker_index == 0 and len(participant_names) > 0:
+        logger.info(f"Heuristic: {speaker_label} is first speaker → matched to {participant_names[0]}")
+        return participant_names[0]
+
+    return None
+
+
+async def _identify_speakers(
+    db: AsyncSession,
+    gladia_result: Dict[str, Any],
+    client_id: str,
+    recording_id: str,
+    temp_path: str,
+    meeting_id: str,
+    participant_names: List[str],
+    meeting=None,
+) -> List[Dict[str, Any]]:
+    """
+    Intelligent Speaker Identification Pipeline.
+
+    Flow:
+    0. Deterministic heuristic (participant matching, creator detection)
+    1. Build candidate list from meeting participants + enrolled ONNX profiles
+    2. Extract ONNX embedding per speaker
+    3. Match against enrolled profiles (cosine distance)
+    4. If high-confidence audio match → VERIFIED (skip Mistral)
+    5. If no audio match → Regex self-introduction detection
+    6. If regex found name in candidates → VERIFIED
+    7. If still no match → Mistral WITH candidate list (no hallucinations)
+    8. Validate: name MUST be in candidates, else reject
+    9. Auto-enroll with user_id linking
+
+    Returns:
+        List of speaker mapping dicts for downstream use.
+    """
+    segments = gladia_result.get("segments", [])
+    if not segments:
+        logger.warning("No segments found for speaker identification")
+        return []
+
+    # Build candidate list: participants + enrolled ONNX profiles
+    profile_service = SpeakerProfileService(db)
+    enrolled_profiles = await profile_service.get_profiles(client_id)
+    profile_names = [p.name for p in enrolled_profiles if p.name]
+    candidates = list(set(participant_names + profile_names))
+    logger.info(f"Speaker ID candidates: {candidates}")
+
+    # Group segments by speaker label
+    speaker_groups = {}
+    for seg in segments:
+        speaker = seg.get("speaker", "Speaker 0")
+        if speaker not in speaker_groups:
+            speaker_groups[speaker] = []
+        speaker_groups[speaker].append(seg)
+
+    enrollment_service = AutoEnrollmentService(db)
+    mappings = []
+    speaker_list = list(speaker_groups.items())
+
+    for speaker_index, (speaker_label, speaker_segments) in enumerate(speaker_list):
+        try:
+            text_context = " ".join(seg.get("text", "") for seg in speaker_segments)
+            embedding = await _extract_speaker_embedding(temp_path, speaker_segments)
+
+            # Collect ALL signals (no short-circuit)
+            signals = []
+
+            # SIGNAL 0: Deterministic Heuristic (participant matching, creator detection)
+            heuristic_name = await _match_speaker_to_participant(
+                speaker_label=speaker_label,
+                speaker_segments=speaker_segments,
+                participant_names=participant_names,
+                meeting=meeting,
+                all_speaker_groups=speaker_groups,
+                speaker_index=speaker_index,
+            )
+            if heuristic_name and heuristic_name in candidates:
+                signals.append({"source": "heuristic", "name": heuristic_name, "score": 0.75})
+                logger.info(
+                    f"Speaker {speaker_label} heuristic signal: {heuristic_name} (score=0.75)"
+                )
+
+            # SIGNAL 1: ONNX Audio Matching
+            audio_matches = []
+            if embedding is not None:
+                name, distance, conf_level = await profile_service.match_speaker(
+                    client_id=client_id,
+                    embedding=embedding,
+                )
+                if name:
+                    audio_matches.append({
+                        "name": name,
+                        "distance": distance,
+                        "confidence": conf_level,
+                    })
+                    audio_score = {"high": 0.90, "medium": 0.60, "low": 0.30}.get(conf_level, 0.30)
+                    signals.append({"source": "audio", "name": name, "score": audio_score})
+                    logger.info(
+                        f"Speaker {speaker_label} audio signal: {name} "
+                        f"(distance={distance:.3f}, conf={conf_level}, score={audio_score:.2f})"
+                    )
+
+            # SIGNAL 2: Regex Self-Introduction
+            if text_context.strip():
+                detected_name = detect_self_introduction(text_context, candidates)
+                if detected_name:
+                    signals.append({"source": "text", "name": detected_name, "score": 0.85})
+                    logger.info(
+                        f"Speaker {speaker_label} text signal: {detected_name} (score=0.85)"
+                    )
+
+            # SIGNAL 3: Mistral Fusion (only if no high-confidence consensus yet)
+            mistral_name = None
+            mistral_score = 0.0
+            if not signals or all(s["score"] < 0.70 for s in signals):
+                mistral_name, mistral_score, _ = await mistral_fusion_service.fuse_speaker_mapping(
+                    speaker_label=speaker_label,
+                    text_context=text_context,
+                    audio_matches=audio_matches,
+                    client_id=client_id,
+                    candidates=candidates,
+                )
+                if mistral_name:
+                    signals.append({"source": "llm", "name": mistral_name, "score": mistral_score})
+                    logger.info(
+                        f"Speaker {speaker_label} LLM signal: {mistral_name} (score={mistral_score:.2f})"
+                    )
+
+            # AGGREGATE: weighted consensus across sources
+            resolved_name = None
+            confidence = 0.0
+            method = "no_match"
+
+            if signals:
+                name_scores = {}
+                name_sources = {}
+                total_signal_weight = sum(s["score"] for s in signals)
+
+                for sig in signals:
+                    name = sig["name"]
+                    name_scores[name] = name_scores.get(name, 0) + sig["score"]
+                    name_sources[name] = name_sources.get(name, []) + [sig["source"]]
+
+                resolved_name = max(name_scores, key=name_scores.get)
+                raw_score = name_scores[resolved_name]
+                num_sources = len(name_sources[resolved_name])
+
+                # Base confidence: proportion of total signal weight
+                confidence = raw_score / total_signal_weight if total_signal_weight > 0 else 0.0
+
+                # Bonus for multi-source consensus
+                if num_sources > 1:
+                    confidence = min(confidence * (1.0 + 0.15 * (num_sources - 1)), 1.0)
+
+                # Penalty for conflicting signals (other names with significant scores)
+                other_score = total_signal_weight - raw_score
+                if other_score > 0:
+                    conflict_ratio = other_score / raw_score
+                    confidence *= max(1.0 - conflict_ratio * 0.5, 0.3)  # Minimum 0.3
+
+                method = "+".join(sorted(set(name_sources[resolved_name])))
+                logger.info(
+                    f"Speaker {speaker_label} → {resolved_name} "
+                    f"(confidence={confidence:.2f}, sources={method}, "
+                    f"raw_score={raw_score:.2f})"
+                )
+
+            # VALIDATION: name MUST be in candidates (fuzzy-checked by detect_self_introduction)
+            if resolved_name and resolved_name not in candidates:
+                logger.warning(
+                    f"Speaker {speaker_label}: '{resolved_name}' not in candidates. "
+                    f"Rejecting as unverified."
+                )
+                resolved_name = None
+                confidence = 0.0
+                method = "no_match"
+
+            # AUTO-ENROLL with user_id linking
+            if resolved_name:
+                if embedding is not None:
+                    await enrollment_service.enroll_or_update(
+                        client_id=client_id,
+                        speaker_label=speaker_label,
+                        resolved_name=resolved_name,
+                        embedding=embedding,
+                        confidence=confidence,
+                        method=method,
+                        meeting_id=meeting_id,
+                        candidates=candidates,
+                    )
+                else:
+                    # Bootstrap without embedding — will be filled on next meeting
+                    await enrollment_service.enroll_text_only(
+                        client_id=client_id,
+                        speaker_label=speaker_label,
+                        resolved_name=resolved_name,
+                        confidence=confidence,
+                        method=method,
+                        meeting_id=meeting_id,
+                        candidates=candidates,
+                    )
+
+                await AuditService.log_action(
+                    db=db,
+                    client_id=client_id,
+                    action="SPEAKER_IDENTIFIED",
+                    user_id=None,
+                    table_name="speakers",
+                    new_values={
+                        "speaker_label": speaker_label,
+                        "resolved_name": resolved_name,
+                        "confidence": confidence,
+                        "method": method,
+                        "meeting_id": meeting_id,
+                    },
+                    ip_address="internal",
+                    user_agent="celery",
+                )
+
+            mappings.append({
+                "speaker_label": speaker_label,
+                "resolved_name": resolved_name,
+                "confidence": confidence,
+                "method": method,
+            })
+
+            logger.info(
+                f"Speaker {speaker_label} → {resolved_name or 'Unknown'} "
+                f"(confidence={confidence:.2f}, method={method})"
+            )
+
+        except Exception as e:
+            logger.error(f"Speaker identification failed for {speaker_label}: {e}")
+            mappings.append({
+                "speaker_label": speaker_label,
+                "resolved_name": None,
+                "confidence": 0.0,
+                "method": "error",
+            })
+
+    return mappings
+
+
+async def _extract_speaker_embedding(
+    audio_path: str,
+    speaker_segments: List[Dict[str, Any]],
+) -> Optional[Any]:
+    """
+    Extract a combined embedding for a speaker from their segments.
+    Uses AudioSegmentService to extract and combine audio.
+    """
+    if not speaker_embedding_service.is_available:
+        return None
+
+    try:
+        from app.services.audio_segment_service import audio_segment_service
+
+        # Convert segments to format expected by AudioSegmentService
+        segments_for_service = [
+            {"speaker": "target", "start": seg.get("start", 0), "end": seg.get("end", 0)}
+            for seg in speaker_segments
+        ]
+
+        speaker_files = await audio_segment_service.extract_speaker_segments(
+            audio_file_path=audio_path,
+            segments=segments_for_service,
+        )
+
+        if not speaker_files:
+            return None
+
+        # Get the combined audio file for "target" speaker
+        target_audio = speaker_files.get("target")
+        if not target_audio or not os.path.exists(target_audio):
+            return None
+
+        embedding = await speaker_embedding_service.extract_embedding(target_audio)
+
+        # Cleanup temp file
+        if os.path.exists(target_audio):
+            try:
+                os.remove(target_audio)
+            except Exception:
+                pass
+
+        return embedding
+
+    except Exception as e:
+        logger.error(f"Failed to extract speaker embedding: {e}")
+        return None
+
 
 async def _record_minutes_usage(db, recording, gladia_result):
     """Calculate and record minutes used from transcription segments."""
@@ -216,23 +671,84 @@ async def _save_transcription(db, recording, gladia_result):
     db.add(db_trans)
     await db.flush()
 
+    await AuditService.log_action(
+        db=db,
+        client_id=str(recording.client_id),
+        action="TRANSCRIPTION_CREATED",
+        table_name="transcriptions",
+        record_id=db_trans.id,
+        new_values={
+            "recording_id": str(recording.id),
+            "meeting_id": str(recording.meeting_id),
+            "language": "auto",
+        },
+        ip_address="internal",
+        user_agent="celery",
+    )
+
     await _record_minutes_usage(db, recording, gladia_result)
 
 async def _download_audio(file_key: str) -> Optional[str]:
+    loop = asyncio.get_event_loop()
     s3_client = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-            s3_client.download_fileobj(settings.S3_BUCKET_NAME, file_key, tmp)
+            await loop.run_in_executor(None,
+                lambda: s3_client.download_fileobj(settings.S3_BUCKET_NAME, file_key, tmp))
             return tmp.name
-    except: return None
+    except Exception as e:
+        logger.error(f"S3 download failed: {e}")
+        return None
 
-async def _save_pv_and_actions(db, recording, pv_data, language="fr"):
-    """Save PV and Actions with fuzzy-matching assignments.
+async def _save_pv_and_actions(db, recording, pv_data, language="fr", speaker_mappings=None, participant_names=None):
+    """Save PV and Actions with professional assignee resolution.
 
-    Creates Assignment records by matching assignee names (from Mistral) to Users in the same client.
-    Uses ilike substring matching for simplicity and consistency with team_service.search_members.
-    If no User found, creates external assignment (external_name or external_email).
+    Uses AssigneeResolver (Microsoft Teams approach):
+    1. Speaker mappings (high confidence)
+    2. Meeting participant list (medium confidence)
+    3. Phonetic matching (lower confidence)
+    4. Fuzzy string matching (lowest confidence)
+    5. External assignment (no match)
     """
+    if speaker_mappings is None:
+        speaker_mappings = []
+    if participant_names is None:
+        participant_names = []
+
+    # Load all client users for directory resolution
+    all_users_stmt = select(User).where(
+        User.client_id == recording.client_id,
+        User.deleted_at.is_(None),
+    )
+    all_users_result = await db.execute(all_users_stmt)
+    all_users = list(all_users_result.scalars().all())
+
+    client_users = [
+        {"id": str(u.id), "full_name": u.full_name, "email": u.email}
+        for u in all_users
+        if u.full_name or u.email
+    ]
+
+    # Initialize professional assignee resolver
+    resolver = AssigneeResolver(
+        speaker_mappings=speaker_mappings,
+        participant_names=participant_names,
+        client_users=client_users,
+    )
+
+    # Determine single speaker for fallback
+    resolved_speakers = {}
+    for m in speaker_mappings:
+        name = m.get("resolved_name")
+        if name:
+            resolved_speakers[name] = m
+
+    single_speaker = None
+    if len(resolved_speakers) == 1:
+        single_speaker = list(resolved_speakers.keys())[0]
+        logger.info(f"Single speaker detected: '{single_speaker}' — will be default assignee")
+
+    # Save PV
     summary = pv_data.get("summary", "")
     decisions_list = pv_data.get("decisions", [])
     html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><ul>" + "".join([f"<li>{d}</li>" for d in decisions_list]) + "</ul>"
@@ -245,7 +761,8 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr"):
         content_html=html, language=language, status="draft", is_validated=False
     ))
 
-    created_actions = []  # List of (action, assignee_name) tuples
+    # Create actions and resolve assignees
+    created_actions = []
     for act in pv_data.get("actions", []):
         due_date = None
         if act.get("deadline"):
@@ -269,48 +786,87 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr"):
 
     await db.flush()
 
-    # Create assignments with fuzzy matching (Option A: ilike substring)
+    # Resolve assignees using professional resolver
     for action, assignee_name in created_actions:
         if not assignee_name:
             continue
 
-        # Search for user in the same client where full_name or email contains assignee_name (case-insensitive)
-        stmt = select(User).where(
-            User.client_id == recording.client_id
-        ).where(
-            or_(
-                User.full_name.ilike(f"%{assignee_name}%"),
-                User.email.ilike(f"%{assignee_name}%")
-            )
-        ).limit(1)
+        resolution = resolver.resolve(assignee_name, single_speaker=single_speaker)
 
-        result = await db.execute(stmt)
-        user = result.scalar_one_or_none()
-
-        if user:
-            # Internal user found
+        if resolution.user_id:
             assignment = Assignment(
                 id=str(uuid.uuid4()),
                 action_id=action.id,
-                user_id=user.id
+                user_id=resolution.user_id
+            )
+            await AuditService.log_action(
+                db=db,
+                client_id=str(recording.client_id),
+                action="ACTION_ASSIGNED",
+                table_name="assignments",
+                record_id=assignment.id,
+                new_values={
+                    "action_id": str(action.id),
+                    "user_id": resolution.user_id,
+                    "assignee_name": assignee_name,
+                    "matched_via": resolution.matched_via,
+                    "confidence": resolution.confidence,
+                },
+                ip_address="internal",
+                user_agent="celery",
             )
         else:
-            # No user found, treat as external contact
-            if '@' in assignee_name:
+            if resolution.external_email:
                 assignment = Assignment(
                     id=str(uuid.uuid4()),
                     action_id=action.id,
-                    external_email=assignee_name
+                    external_email=resolution.external_email
+                )
+            elif resolution.external_name:
+                assignment = Assignment(
+                    id=str(uuid.uuid4()),
+                    action_id=action.id,
+                    external_name=resolution.external_name
                 )
             else:
-                assignment = Assignment(
-                    id=str(uuid.uuid4()),
-                    action_id=action.id,
-                    external_name=assignee_name
-                )
+                continue  # No assignment
+
+            await AuditService.log_action(
+                db=db,
+                client_id=str(recording.client_id),
+                action="ACTION_ASSIGNED_EXTERNAL",
+                table_name="assignments",
+                record_id=assignment.id,
+                new_values={
+                    "action_id": str(action.id),
+                    "external_name": resolution.external_name,
+                    "external_email": resolution.external_email,
+                    "matched_via": resolution.matched_via,
+                    "confidence": resolution.confidence,
+                    "is_ambiguous": resolution.is_ambiguous,
+                },
+                ip_address="internal",
+                user_agent="celery",
+            )
         db.add(assignment)
 
     await db.flush()
+
+    await AuditService.log_action(
+        db=db,
+        client_id=str(recording.client_id),
+        action="PV_CREATED",
+        table_name="pvs",
+        record_id=pv_id,
+        new_values={
+            "meeting_id": str(recording.meeting_id),
+            "title": pv_data.get("title", "Meeting PV"),
+            "actions_count": len(created_actions),
+            "language": language,
+        },
+        ip_address="internal",
+        user_agent="celery",
+    )
 
 async def _notify_n8n_completion(recording_id, meeting_id):
     try:

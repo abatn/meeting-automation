@@ -486,7 +486,7 @@
     "draft_card": "Brouillon IA",
     "complete": "Terminer & Enregistrer",
     "info": "Détails de la réunion",
-    "meeting_room_title": "Salle de réunion : {id}",
+    "meeting_room_title": "Salle de réunion : {{id}}",
     "status_label": "Statut :",
     "ai_recommendations": "Recommandations IA",
     "no_suggestions": "Pas encore de suggestions. Une fois la réunion traitée, l'IA recommandera des tâches ici.",

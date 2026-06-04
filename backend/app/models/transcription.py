@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, DateTime, Float
+from sqlalchemy import Column, String, ForeignKey, DateTime, Float, Integer
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
@@ -60,10 +60,19 @@ class Speaker(Base):
 
     id = Column(String, primary_key=True, index=True)
     meeting_id = Column(
-        String, ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False
+        String, ForeignKey("meetings.id", ondelete="CASCADE"), nullable=True
     )
-    name = Column(String)  # e.g., "Speaker 1" or real name if identified
+    client_id = Column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=True)
+    name = Column(String)  # Gladia speaker label (e.g., "Speaker 0")
+    resolved_name = Column(String, nullable=True)  # Resolved real name from ONNX+Mistral fusion
     user_id = Column(String, ForeignKey("users.id"), nullable=True)
+
+    # Speaker profile fields for identification
+    embedding = Column(JSON, nullable=True)  # 192-dim float array
+    sample_count = Column(Integer, default=0)  # Number of samples averaged into embedding
+    mapping_confidence = Column(Float, nullable=True)  # 0.0-1.0 confidence score
+    mapping_method = Column(String, nullable=True)  # "embedding", "text_inference", "manual", "hybrid"
+    source = Column(String, default="auto_enrolled")  # "auto_enrolled", "manual", "auto_confirmed"
 
     # Relationships
     segments = relationship("Segment", back_populates="speaker")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, ForeignKey, DateTime, Text, Enum as SQLEnum, Float
+from sqlalchemy import String, ForeignKey, DateTime, Text, Enum as SQLEnum, Float, Index
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 import enum
@@ -55,6 +55,9 @@ class ActionSuggestion(Base):
 
 class Action(Base):
     __tablename__ = "actions"
+    __table_args__ = (
+        Index('ix_actions_meeting_status', 'meeting_id', 'status'),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
     client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
@@ -114,7 +117,7 @@ class Assignment(Base):
         String, ForeignKey("actions.id", ondelete="CASCADE")
     )
     user_id: Mapped[Optional[str]] = mapped_column(
-        String, ForeignKey("users.id"), nullable=True
+        String, ForeignKey("users.id"), nullable=True, index=True
     )
 
     # In case user is not in system yet

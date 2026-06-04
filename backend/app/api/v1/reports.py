@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -115,13 +115,21 @@ async def get_audit_logs(
 @router.get("/automation/meeting/{meeting_id}")
 async def get_meeting_details_for_automation(
     meeting_id: str,
+    client_id: str = Query(None),
     db: AsyncSession = Depends(deps.get_db),
     api_key_valid: bool = Depends(deps.verify_internal_api_key),
 ) -> Any:
     """
-    Returns meeting details for n8n.
+    Returns meeting details for n8n. Requires client_id for tenant isolation.
     """
-    stmt = select(MeetingModel).options(selectinload(MeetingModel.participants)).where(MeetingModel.id == meeting_id)
+    if not client_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="client_id query parameter is required")
+    
+    stmt = select(MeetingModel).options(selectinload(MeetingModel.participants)).where(
+        MeetingModel.id == meeting_id,
+        MeetingModel.client_id == client_id,
+    )
     result = await db.execute(stmt)
     m = result.scalars().first()
     if not m:
@@ -139,14 +147,17 @@ async def get_meeting_details_for_automation(
 @router.get("/automation/pdf/{meeting_id}")
 async def get_meeting_pdf_for_automation(
     meeting_id: str,
+    client_id: str = Query(None),
     db: AsyncSession = Depends(deps.get_db),
     api_key_valid: bool = Depends(deps.verify_internal_api_key),
 ) -> Any:
     """
-    Returns the PV PDF for n8n attachment.
-    Prefers OnlyOffice-edited PDF from S3 if available.
-    Falls back to WeasyPrint generation from DB-HTML.
+    Returns the PV PDF for n8n attachment. Requires client_id for tenant isolation.
     """
+    if not client_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="client_id query parameter is required")
+
     from app.models.pv import PV as PVModel
     from fastapi.responses import FileResponse
     from fastapi import HTTPException
@@ -154,7 +165,7 @@ async def get_meeting_pdf_for_automation(
     from app.core.config import settings
     import boto3
 
-    pv_stmt = select(PVModel).where(PVModel.meeting_id == meeting_id)
+    pv_stmt = select(PVModel).where(PVModel.meeting_id == meeting_id, PVModel.client_id == client_id)
     pv_res = await db.execute(pv_stmt)
     pv = pv_res.scalars().first()
     if not pv:
@@ -171,12 +182,11 @@ async def get_meeting_pdf_for_automation(
 
     try:
         s3.head_object(Bucket=settings.S3_BUCKET_NAME, Key=pdf_key)
-        # OnlyOffice PDF existiert → aus S3 laden
         local_pdf_path = f"/tmp/automation_{pv.id}.pdf"
         s3.download_file(settings.S3_BUCKET_NAME, pdf_key, local_pdf_path)
         return FileResponse(path=local_pdf_path, filename=f"Protocol_{meeting_id}.pdf")
     except Exception:
-        pass  # S3 nicht verfügbar oder PDF nicht vorhanden → Fallback
+        pass
 
     # Schritt 2: Generiere PDF aus DB-HTML via WeasyPrint
     pdf_service = PDFService(db)

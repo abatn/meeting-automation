@@ -35,3 +35,6 @@ psutil==5.9.8
 stripe==7.9.0
 docker
 kubernetes
+numpy==1.26.4
+onnxruntime==1.19.2
+librosa==0.10.2.post1

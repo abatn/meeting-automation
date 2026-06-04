@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import String, ForeignKey, DateTime
+from sqlalchemy import String, ForeignKey, DateTime, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -7,12 +7,15 @@ from app.core.database import Base
 
 class TeamMember(Base):
     __tablename__ = "team_members"
+    __table_args__ = (
+        Index('ix_team_members_client_email', 'client_id', 'email', unique=True),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
     client_id: Mapped[str] = mapped_column(String, ForeignKey("clients.id", ondelete="CASCADE"), index=True, nullable=False)
     
     full_name: Mapped[str] = mapped_column(String, nullable=False)
-    email: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    email: Mapped[str] = mapped_column(String, nullable=False)
     phone_number: Mapped[Optional[str]] = mapped_column(String, nullable=True) # Useful for WhatsApp
     
     position: Mapped[Optional[str]] = mapped_column(String, nullable=True) 

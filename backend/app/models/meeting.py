@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
-from sqlalchemy import String, ForeignKey, DateTime, Text, Integer, Enum as SQLEnum
+from sqlalchemy import String, ForeignKey, DateTime, Text, Integer, Enum as SQLEnum, UniqueConstraint
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 import enum
@@ -37,7 +37,7 @@ class Meeting(Base):
         String, ForeignKey("meeting_rooms.id"), nullable=True
     )
     status: Mapped[MeetingStatus] = mapped_column(
-        SQLEnum(MeetingStatus), default=MeetingStatus.PLANNED
+        SQLEnum(MeetingStatus, values_callable=lambda x: [e.value for e in x]), default=MeetingStatus.PLANNED
     )
 
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -81,6 +81,9 @@ class Meeting(Base):
 
 class Participant(Base):
     __tablename__ = "participants"
+    __table_args__ = (
+        UniqueConstraint('meeting_id', 'email', name='uq_participants_meeting_email'),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, index=True)
     meeting_id: Mapped[str] = mapped_column(

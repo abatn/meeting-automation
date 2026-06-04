@@ -118,7 +118,13 @@ async def actions_extracted(
     if not pv_id:
         raise HTTPException(status_code=400, detail="Missing pv_id")
 
+    # Lookup PV to get client_id for multi-tenant security
+    pv_result = await db.execute(select(PV).where(PV.id == pv_id))
+    pv = pv_result.scalar_one_or_none()
+    if not pv:
+        raise HTTPException(status_code=404, detail="PV not found")
+
     action_service = ActionService(db)
-    await action_service.extract_actions_from_pv(pv_id, actions_list)
+    await action_service.extract_actions_from_pv(pv_id, pv.client_id, actions_list)
 
     return {"status": "success"}

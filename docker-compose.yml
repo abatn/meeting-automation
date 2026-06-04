@@ -162,6 +162,7 @@ services:
       "
     env_file: .env
     environment:
+      - APP_ROLE=backend
       - PYTHONPATH=/app
       - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
       - REDIS_URL=redis://default:redis_password@redis:6379/0

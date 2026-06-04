@@ -13,6 +13,24 @@ from app.core.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
 
+REQUIRED_PV_KEYS = {"title", "summary", "decisions", "actions"}
+
+def _validate_pv_schema(data: dict) -> dict:
+    """Validate and fix PV schema from Mistral response."""
+    missing = REQUIRED_PV_KEYS - set(data.keys())
+    if missing:
+        logger.warning(f"PV missing keys: {missing}")
+        for key in missing:
+            data[key] = [] if key in ("decisions", "actions") else ""
+
+    for i, action in enumerate(data.get("actions", [])):
+        if not isinstance(action, dict) or "description" not in action:
+            logger.warning(f"Action {i} missing description, skipping")
+            data["actions"][i] = None
+    data["actions"] = [a for a in data.get("actions", []) if a is not None]
+
+    return data
+
 async def track_mistral_call(latency: float, success: bool):
     try:
         r = await get_redis_client()
@@ -35,10 +53,22 @@ class PVService:
         self.db = db
 
     @staticmethod
-    async def generate_pv(transcription_text: str, target_language: str = "fr", participant_names: Optional[List[str]] = None) -> Dict[str, Any]:
+    async def generate_pv(
+        sentinel_summary: str,
+        full_transcript: str,
+        target_language: str = "fr",
+        participant_names: Optional[List[str]] = None,
+        speaker_mappings: Optional[List[Dict[str, Any]]] = None,
+        speaker_segments: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
         """
-        Generates a Procès-Verbal (PV) from transcription text using Mistral.
-        Supports Arabic (ar), French (fr), English (en).
+        Generates a Procès-Verbal (PV) from meeting transcription using Mistral.
+        
+        Dual-context approach:
+        - sentinel_summary: Used for PV summary/decisions (compact, cost-efficient)
+        - full_transcript: Used for action assignment (preserves "who said what")
+        
+        This mirrors Microsoft Teams Copilot: summary for overview, full transcript for task extraction.
         """
         start_time = time.time()
         success = False
@@ -61,10 +91,74 @@ class PVService:
             if participant_names:
                 participants_context = f"The valid participants for this meeting are: {', '.join(participant_names)}."
 
+            speaker_context = ""
+            if speaker_mappings:
+                speaker_lines = ["Identified speakers in this meeting:"]
+                for m in speaker_mappings:
+                    label = m.get("speaker_label", "Unknown")
+                    name = m.get("resolved_name") or "Unknown"
+                    conf = m.get("confidence", 0.0)
+                    method = m.get("method", "unknown")
+                    speaker_lines.append(
+                        f"  {label} = {name} (confidence: {conf:.2f}, method: {method})"
+                    )
+                speaker_context = "\n".join(speaker_lines) + "\n"
+
+                if speaker_segments:
+                    name_map = {}
+                    for m in speaker_mappings:
+                        if m.get("resolved_name"):
+                            name_map[m["speaker_label"]] = m["resolved_name"]
+                    quote_lines = ["Key statements from the transcript:"]
+                    seen = set()
+                    for seg in speaker_segments:
+                        raw_speaker = seg.get("speaker", "Unknown")
+                        resolved = name_map.get(raw_speaker, raw_speaker)
+                        text = seg.get("text", "").strip()
+                        if text and len(text) > 15 and resolved not in seen:
+                            truncated = text[:200]
+                            if len(text) > 200:
+                                truncated += "..."
+                            quote_lines.append(f'  {resolved}: "{truncated}"')
+                            seen.add(resolved)
+                    if len(quote_lines) > 1:
+                        speaker_context += "\n".join(quote_lines) + "\n"
+
+            # Build explicit allowed names list for anti-hallucination
+            allowed_names = []
+            if participant_names:
+                allowed_names.extend(participant_names)
+            if speaker_mappings:
+                for m in speaker_mappings:
+                    name = m.get("resolved_name")
+                    if name and name not in allowed_names:
+                        allowed_names.append(name)
+            allowed_names_str = ", ".join(allowed_names) if allowed_names else "None (return null for assignee)"
+
             system_content = f"""You are a professional secretary creating a 'Procès-Verbal' (PV) from meeting transcriptions.
-Analyze the provided text and create a structured summary.
-CRITICAL: All content (titles, summaries, descriptions) MUST be written in {target_lang_name}.
+
+CONTEXT PROVIDED:
+1. MEETING SUMMARY (for overview):
+{sentinel_summary}
+
+2. FULL TRANSCRIPT (for understanding who said what):
+{full_transcript}
+
 {participants_context}
+{speaker_context}
+
+CRITICAL RULES FOR ASSIGNEE ASSIGNMENT:
+1. CLOSED LIST: You may ONLY use the following names as assignees: [{allowed_names_str}]
+2. EXACT MATCH: You MUST use the EXACT name as written above. No variants, no transliterations, no abbreviations.
+3. NO INVENTION: NEVER invent names, NEVER use names not in the closed list.
+4. SINGLE SPEAKER FALLBACK: If there is only one identified speaker and no other assignee is clearly mentioned, assign to that speaker.
+5. INVALID NAMES: If no valid person from the closed list is clearly assigned to a task, assign to the single identified speaker.
+
+Examples of INVALID assignees (NEVER use these):
+- "Mohammed Al-Arabi Al-Nakdi" (variant of a valid name)
+- "AbdulQader Rabteny" (invented name)
+- "N/A", "null", "none", tool names, generic terms
+
 The JSON keys MUST remain exactly as follows:
 
 {{
@@ -77,7 +171,7 @@ The JSON keys MUST remain exactly as follows:
       "description": "Task description",
       "priority": "high/medium/low",
       "priority_reason": "Short justification",
-      "assignee": "Name of the responsible person EXACTLY as mentioned in the transcript (prefer matching against the participant list if provided). If no specific person is assigned, return null.",
+      "assignee": "EXACT name from the closed list above",
       "deadline": "YYYY-MM-DD or null (Only return null if NO timeframe or date is mentioned. The current year is {current_year}.)"
     }}
   ]
@@ -85,18 +179,22 @@ The JSON keys MUST remain exactly as follows:
 
 Answer only in valid JSON format."""
 
+            # Build allowed names list for JSON schema constraint
+            allowed_names_list = [n for n in allowed_names if n] if allowed_names else []
+            schema_assignee_values = allowed_names_list + [None] if allowed_names_list else [None]
+
             payload = {
                 "model": "mistral-large-latest",
                 "messages": [
                     {"role": "system", "content": system_content},
                     {
                         "role": "user",
-                        "content": f"""Create a PV for the following transcription in {target_lang_name}:
-
-{transcription_text}""",
+                        "content": f"""Create a PV in {target_lang_name} based on the meeting summary and full transcript provided above.
+Use the summary for the PV overview, and the full transcript to determine who is responsible for each task.""",
                     },
                 ],
                 "response_format": {"type": "json_object"},
+                "temperature": 0.1,
             }
 
             async with httpx.AsyncClient() as client:
@@ -110,9 +208,34 @@ Answer only in valid JSON format."""
                 result = response.json()
                 content_str = result["choices"][0]["message"]["content"]
                 
+                # AUDIT LOGGING: Capture Mistral response for assignee audit
+                logger.info(f"[MISTRAL_AUDIT] Raw response keys: {list(result.keys())}")
+                logger.info(f"[MISTRAL_AUDIT] Usage: {result.get('usage', 'N/A')}")
+                logger.info(f"[MISTRAL_AUDIT] Model: {result.get('model', 'N/A')}")
+                
                 try:
                     parsed_content = json.loads(content_str)
                     if isinstance(parsed_content, dict):
+                        # AUDIT: Log extracted assignees
+                        assignees = [a.get("assignee") for a in parsed_content.get("actions", []) if isinstance(a, dict)]
+                        logger.info(f"[MISTRAL_AUDIT] Extracted assignees: {assignees}")
+                        logger.info(f"[MISTRAL_AUDIT] Allowed names were: {allowed_names}")
+                        logger.info(f"[MISTRAL_AUDIT] Participant names: {participant_names}")
+                        logger.info(f"[MISTRAL_AUDIT] Speaker mappings: {speaker_mappings}")
+                        
+                        # VALIDATION: Check assignees against closed list
+                        allowed_set = set(n.lower() for n in allowed_names if n)
+                        invalid_assignees = []
+                        for a in parsed_content.get("actions", []):
+                            if isinstance(a, dict) and a.get("assignee"):
+                                if a["assignee"].lower() not in allowed_set:
+                                    invalid_assignees.append(a["assignee"])
+                        
+                        if invalid_assignees:
+                            logger.warning(f"[MISTRAL_AUDIT] Invalid assignees detected: {invalid_assignees}")
+                            logger.info(f"[MISTRAL_AUDIT] Allowed names: {allowed_names}")
+                        
+                        parsed_content = _validate_pv_schema(parsed_content)
                         success = True
                         return parsed_content
                     else:

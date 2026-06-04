@@ -489,7 +489,7 @@
     "draft_card": "AI-Generated Draft",
     "complete": "Complete & Save",
     "info": "Meeting Details",
-    "meeting_room_title": "Meeting Room: {id}",
+    "meeting_room_title": "Meeting Room: {{id}}",
     "status_label": "Status:",
     "ai_recommendations": "AI Recommendations",
     "no_suggestions": "No suggestions yet. Once the meeting is processed, AI will recommend tasks here.",

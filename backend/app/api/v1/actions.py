@@ -1,4 +1,5 @@
 from typing import Any, List, Optional
+import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,8 @@ from app.models.action import Action as ActionModel, Assignment as AssignmentMod
 from app.models.user import User as UserModel, UserRole
 from app.services.action_service import ActionService
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -118,14 +121,18 @@ async def learn_action_suggestion_feedback(
     """
     if feedback.action not in ["accept", "reject"]:
         raise HTTPException(status_code=400, detail="Action must be 'accept' or 'reject'")
-        
+
     action_service = ActionService(db)
-    await action_service.learn_from_feedback(
-        feedback.suggestion_id, 
-        current_user.client_id, 
-        feedback.action,
-        user_id=current_user.id
-    )
+    try:
+        await action_service.learn_from_feedback(
+            feedback.suggestion_id,
+            current_user.client_id,
+            feedback.action,
+            user_id=current_user.id
+        )
+    except Exception as e:
+        logger.error(f"Feedback processing failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Feedback processing failed: {str(e)}")
     return {"status": "success", "message": "Feedback recorded successfully."}
 
 @router.post("/suggestions/translate")

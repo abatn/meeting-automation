@@ -19,7 +19,7 @@ class SentinelService:
     def __init__(self, model_path: str = "/app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"):
         self.model_path = model_path
         self.llm = None
-        self._lock = asyncio.Lock()
+        self._semaphore = asyncio.Semaphore(2)
         
         if Llama is None:
             logger.warning("llama-cpp-python not installed. SentinelService will operate in fallback mode.")
@@ -46,7 +46,7 @@ class SentinelService:
             
         prompt = f"<|im_start|>system\nYou are a semantic segmenter. Split the following meeting transcript into logical chapters. Return each chapter separated by '---'.<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n"
         
-        async with self._lock:
+        async with self._semaphore:
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=512, stop=["<|im_end|>"]))
             
@@ -56,11 +56,18 @@ class SentinelService:
     async def summarize_chunk(self, chunk: str, lang: str = "fr") -> str:
         """Rapidly synthesizes a 5-minute chunk (MAP phase)."""
         if not self.llm:
-            return chunk[:500] + "..."
+            # Fallback: Preserve full text with speaker info intact
+            # CRITICAL: Do NOT truncate speaker names - Mistral needs them for assignee resolution
+            import re
+            # Extract and preserve all speaker mentions
+            speaker_pattern = re.compile(r'(Speaker \d+|[A-Z][a-z]+ [A-Z][a-z]+)')
+            speakers_found = speaker_pattern.findall(chunk)
+            speaker_header = f"[Speakers detected: {', '.join(set(speakers_found))}]\n" if speakers_found else ""
+            return speaker_header + chunk[:1500] + "..." if len(chunk) > 1500 else chunk
             
-        prompt = f"<|im_start|>system\nSummarize this meeting segment in 2-3 sentences. Language: {lang}<|im_end|>\n<|im_start|>user\n{chunk}<|im_end|>\n<|im_start|>assistant\n"
+        prompt = f"<|im_start|>system\nSummarize this meeting segment in 2-3 sentences. CRITICAL: Preserve speaker names exactly as written (e.g. 'Ahmed proposed X', 'Fatima agreed'). Do NOT merge speakers or use generic terms like 'the team'. Language: {lang}<|im_end|>\n<|im_start|>user\n{chunk}<|im_end|>\n<|im_start|>assistant\n"
         
-        async with self._lock:
+        async with self._semaphore:
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=256))
             

@@ -84,6 +84,54 @@ To ensure stability during development and production, the following resource li
 
 These limits prevent a single container from exhausting host resources, which previously led to system freezes.
 
+### 1.2. Test Execution (Juni 2026 Update)
+
+Alle Tests erfordern `E2E_TEST=true` + volle Docker-Infrastruktur (PostgreSQL, Redis, RabbitMQ). Es gibt **keinen Weg** um Celery-Eager-Modus ohne PostgreSQL zu aktivieren.
+
+#### Benötigte Umgebungsvariablen
+```bash
+E2E_TEST=true
+DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5432/meeting_db"
+REDIS_URL="redis://localhost:6379/0"
+CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//"
+SECRET_KEY="dev-secret-key-meeting-automation-2026"
+ENCRYPTION_KEY="6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4="
+TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4="
+```
+
+#### Alle Unit Tests ausführen
+```bash
+cd backend
+E2E_TEST=true \
+DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5432/meeting_db" \
+REDIS_URL="redis://localhost:6379/0" \
+CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//" \
+SECRET_KEY="dev-secret-key-meeting-automation-2026" \
+ENCRYPTION_KEY="6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=" \
+TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=" \
+/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/ -v
+```
+
+#### E2E Smoke Tests ausführen
+```bash
+cd backend
+E2E_TEST=true \
+E2E_BASE_URL="http://localhost:8000" \
+DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5432/meeting_db" \
+REDIS_URL="redis://localhost:6379/0" \
+CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//" \
+SECRET_KEY="dev-secret-key-meeting-automation-2026" \
+ENCRYPTION_KEY="6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=" \
+TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=" \
+/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/e2e/test_smoke.py -v
+```
+
+#### Ergebnis (Stand 2026-06-04)
+| Kategorie | Ergebnis |
+|-----------|----------|
+| Unit Tests | 71/71 ✅ (+ 2 xfailed) |
+| E2E Smoke Tests | 5/5 ✅ |
+
 ## 2. Production Deployment (Kubernetes / Terraform)
 
 For production environments, the system is designed to be deployed on a cloud provider (e.g., AWS, GCP, Azure) using Kubernetes for orchestration and Terraform for infrastructure as code.

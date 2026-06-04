@@ -310,7 +310,7 @@ class ReportService:
                 )
                 .where(
                     Meeting.client_id == client_id,
-                    Meeting.status == "COMPLETED",
+                    Meeting.status == "completed",
                     Meeting.end_time > (now - timedelta(days=30)),
                 )
                 .outerjoin(Participant, Meeting.id == Participant.meeting_id)

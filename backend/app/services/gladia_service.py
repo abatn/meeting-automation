@@ -2,6 +2,7 @@ import httpx
 import logging
 import asyncio
 import time
+import mimetypes
 from app.core.config import settings
 from app.core.redis_client import get_redis_client
 
@@ -44,8 +45,9 @@ class GladiaService:
                 
                 # --- STEP 1: Upload the audio file (multipart/form-data) ---
                 logger.info(f"Step 1/3: Uploading {audio_file_path} to Gladia...")
+                mime_type, _ = mimetypes.guess_type(audio_file_path)
                 with open(audio_file_path, "rb") as f:
-                    files = {"audio": (audio_file_path, f, "audio/webm")}
+                    files = {"audio": (audio_file_path, f, mime_type or "audio/wav")}
                     upload_response = await client.post(
                         f"{self.base_url}/upload", headers=headers, files=files, timeout=120.0
                     )
@@ -104,13 +106,22 @@ class GladiaService:
         """
         Formats the Gladia V2 API response into the structure our system expects.
         """
-        transcription = gladia_result.get("result", {}).get("transcription", {})
+        # Debug: log raw response structure
+        logger.info(f"Gladia raw result keys: {list(gladia_result.keys())}")
+        result = gladia_result.get("result", {})
+        logger.info(f"Gladia result keys: {list(result.keys())}")
+        
+        transcription = result.get("transcription", {})
         if not transcription:
+            logger.warning(f"No transcription found in Gladia result. Full result: {result}")
             return {"full_text": "", "segments": []}
 
         full_text = transcription.get("full_transcript", "")
+        utterances = transcription.get("utterances", [])
+        logger.info(f"Gladia returned {len(utterances)} utterances")
+        
         segments = []
-        for utterance in transcription.get("utterances", []):
+        for utterance in utterances:
             segments.append({
                 "speaker": f"Speaker {utterance.get('speaker', 'Unknown')}",
                 "text": utterance.get("text", ""),

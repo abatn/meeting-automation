@@ -1,15 +1,22 @@
+import asyncio
 import httpx
 import logging
 import uuid
+import os
+import tempfile
+import boto3
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, desc
+from sqlalchemy import func, desc, or_
 from sqlalchemy.future import select
 from datetime import datetime, timedelta
 
 from app.models.action import Action, Assignment, ActionSuggestion, SuggestionStatus, ActionStatus
 from app.models.pv import PV
-from app.models.transcription import Transcription
+from app.models.transcription import Transcription, Speaker
+from app.models.recording import Recording
+from app.models.user import User
+from app.models.meeting import Meeting
 import json
 from app.core.config import settings
 
@@ -110,6 +117,10 @@ class ActionService:
 
     async def generate_suggestions_from_transcription(self, meeting_id: str, client_id: str, target_language: str = "fr") -> List[ActionSuggestion]:
         """Analyzes transcription to suggest new actions in the specified language."""
+        from sqlalchemy.orm import selectinload
+        from app.models.meeting import Meeting
+        from app.models.transcription import Speaker
+
         # 1. Fetch Transcription
         stmt = select(Transcription).where(Transcription.meeting_id == meeting_id).where(Transcription.client_id == client_id)
         res = await self.db.execute(stmt)
@@ -119,7 +130,30 @@ class ActionService:
             logger.warning(f"No transcription found for meeting {meeting_id}")
             return []
 
-        # 2. Call Mistral
+        # 2. Load speaker mappings for this meeting
+        speaker_stmt = select(Speaker).where(Speaker.meeting_id == meeting_id)
+        speaker_result = await self.db.execute(speaker_stmt)
+        speakers = speaker_result.scalars().all()
+        
+        # Build name map: "Speaker 0" -> "Abdelkader Batnini"
+        name_map = {}
+        for s in speakers:
+            resolved = s.resolved_name or s.name
+            if resolved and s.name != resolved:
+                name_map[s.name] = resolved
+        
+        # Apply name map to transcript
+        enriched_text = transcription.full_text
+        for label, name in name_map.items():
+            enriched_text = enriched_text.replace(f"{label}:", f"{name}:")
+
+        # 3. Load meeting with participants
+        meeting_stmt = select(Meeting).options(selectinload(Meeting.participants)).where(Meeting.id == meeting_id)
+        meeting_result = await self.db.execute(meeting_stmt)
+        meeting = meeting_result.scalar_one_or_none()
+        participant_names = [p.name for p in meeting.participants if p.name] if meeting else []
+
+        # 4. Call Mistral with enriched context
         headers = {
             "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
             "Content-Type": "application/json",
@@ -128,15 +162,25 @@ class ActionService:
         lang_names = {"ar": "Arabic", "fr": "French", "en": "English"}
         language_name = lang_names.get(target_language, "French")
 
+        allowed_names_str = ", ".join(participant_names) if participant_names else "any name mentioned in the transcript"
+
         system_content = f"""You are an AI assistant that analyzes meeting transcripts to identify potential action items, tasks, or follow-ups.
 Extract these implicit suggestions.
 CRITICAL: The 'title' and 'description' fields MUST be written in {language_name}.
+CRITICAL RULES FOR ASSIGNEE ASSIGNMENT:
+1. CLOSED LIST: You MUST assign EVERY action to a person from this list: [{allowed_names_str}]
+2. NO NULL: NEVER return null, empty, "N/A", "TBD", or any placeholder for suggested_assignee.
+3. NO INVENTION: NEVER invent names not in the closed list.
+4. EXACT MATCH: Use the EXACT name as written in the closed list above.
+5. SINGLE PERSON: If only one person is mentioned in the transcript, assign all actions to that person.
+6. EVERY ACTION MUST HAVE AN ASSIGNEE: There is no such thing as an unassigned action.
+
 Return ONLY a JSON array of objects with the following structure:
 [
   {{
     "title": "Short title of the task in {language_name}",
     "description": "More detailed description in {language_name}",
-    "suggested_assignee": "Name of the person if mentioned, else null",
+    "suggested_assignee": "EXACT name from the closed list (NEVER null)",
     "confidence_score": 0.0 to 1.0 indicating how likely this is a real task
   }}
 ]"""
@@ -145,7 +189,7 @@ Return ONLY a JSON array of objects with the following structure:
             "model": "mistral-large-latest",
             "messages": [
                 {"role": "system", "content": system_content},
-                {"role": "user", "content": f"Analyze this transcript and extract tasks in {language_name}:\n\n{transcription.full_text}"}
+                {"role": "user", "content": f"Analyze this transcript and extract tasks in {language_name}:\n\n{enriched_text}"}
             ],
             "response_format": {"type": "json_object"}
         }
@@ -173,6 +217,69 @@ Return ONLY a JSON array of objects with the following structure:
         except Exception as e:
             logger.error(f"Failed to generate suggestions via Mistral: {e}")
             return []
+
+        # CRITICAL RULE: Validate and fix assignees — null/empty/invalid are FORBIDDEN
+        INVALID_ASSIGNEES = {"n/a", "null", "none", "non défini", "undefined", "tbd", "tba", "gladia", "mistral", "sentinel", "ai", "assistant", ""}
+        
+        for item in suggestions_data:
+            raw_assignee = item.get("suggested_assignee")
+            
+            if not raw_assignee or str(raw_assignee).strip().lower() in INVALID_ASSIGNEES:
+                # Auto-resolve: find who spoke about this topic in the transcript
+                assignee_name = None
+                
+                # Strategy 1: Search transcript for keywords matching the task
+                task_text = f"{item.get('title', '')} {item.get('description', '')}".lower()
+                task_words = {w for w in task_text.split() if len(w) > 3}
+                
+                if transcription.segments:
+                    best_speaker = None
+                    best_score = 0
+                    for seg in transcription.segments:
+                        seg_text = seg.get("text", "").lower()
+                        seg_words = set(seg_text.split())
+                        overlap = len(task_words & seg_words)
+                        if overlap > best_score:
+                            best_score = overlap
+                            best_speaker = seg.get("speaker")
+                    
+                    if best_speaker and best_score >= 2:
+                        # Check if it's a resolved name (not "Speaker 0")
+                        if not best_speaker.startswith("Speaker "):
+                            assignee_name = best_speaker
+                        else:
+                            # Map "Speaker 0" to resolved name
+                            assignee_name = name_map.get(best_speaker)
+                
+                # Strategy 2: Single participant fallback
+                if not assignee_name and len(participant_names) == 1:
+                    assignee_name = participant_names[0]
+                
+                # Strategy 3: First participant fallback
+                if not assignee_name and participant_names:
+                    assignee_name = participant_names[0]
+                
+                item["suggested_assignee"] = assignee_name
+                logger.warning(
+                    f"[ASSIGNEE_FIX] Mistral returned invalid assignee '{raw_assignee}' — "
+                    f"auto-resolved to '{assignee_name}' for task '{item.get('title')}'"
+                )
+            elif raw_assignee not in participant_names:
+                # Validate against closed list — fix if not exact match
+                matched = None
+                for p in participant_names:
+                    if p.lower() == str(raw_assignee).lower():
+                        matched = p
+                        break
+                if matched:
+                    item["suggested_assignee"] = matched
+                else:
+                    # Not in closed list — use first participant
+                    item["suggested_assignee"] = participant_names[0] if participant_names else raw_assignee
+                    logger.warning(
+                        f"[ASSIGNEE_FIX] Mistral returned '{raw_assignee}' not in closed list — "
+                        f"fallback to '{item['suggested_assignee']}'"
+                    )
 
         suggestions = []
         for item in suggestions_data:
@@ -347,10 +454,232 @@ Return ONLY a JSON array of objects with the following structure:
             logger.error(f"Failed to trigger n8n status notification: {e}")
 
         return action
+
+    async def _resolve_assignee_with_full_signals(
+        self,
+        client_id: str,
+        meeting_id: str,
+        suggestion_title: str,
+        suggestion_description: Optional[str],
+        suggested_assignee: Optional[str],
+        participant_names: List[str],
+        speaker_mappings: List[Dict[str, Any]],
+        transcription: Optional[Transcription],
+    ) -> Dict[str, Any]:
+        """
+        Full multi-signal assignee resolution mirroring _identify_speakers pipeline.
+
+        Signals:
+        1. ONNX audio embedding matching (cosine distance against enrolled profiles)
+        2. Regex self-introduction detection (text context)
+        3. Mistral fusion (LLM-based resolution with candidate validation)
+        4. Transcript keyword overlap (existing text-based matching)
+
+        Returns: {assignee_name, confidence, source, method}
+        """
+        from app.services.speaker_profile_service import SpeakerProfileService
+        from app.services.speaker_name_detector import detect_self_introduction
+        from app.services.mistral_fusion_service import mistral_fusion_service
+        from app.services.speaker_embedding_service import speaker_embedding_service
+        from app.services.audio_segment_service import audio_segment_service
+
+        INVALID_ASSIGNEES = {"", "null", "n/a", "non défini", "none", "undefined", "tbd", "tba"}
+
+        # Build candidate list: participants + enrolled ONNX profiles
+        profile_service = SpeakerProfileService(self.db)
+        enrolled_profiles = await profile_service.get_profiles(client_id)
+        profile_names = [p.name for p in enrolled_profiles if p.name]
+        candidates = list(set(participant_names + profile_names))
+        logger.info(f"learn_from_feedback candidates: {candidates}")
+
+        signals = []
+
+        # SIGNAL 1: ONNX Audio Matching — extract embedding per speaker, match profiles
+        await speaker_embedding_service.initialize()
+        if speaker_embedding_service.is_available and transcription and transcription.segments:
+            # Group segments by speaker
+            speaker_groups: Dict[str, List[Dict]] = {}
+            for seg in transcription.segments:
+                spk = seg.get("speaker", "Speaker 0")
+                if spk not in speaker_groups:
+                    speaker_groups[spk] = []
+                speaker_groups[spk].append(seg)
+
+            # Download audio from S3
+            audio_path = await self._download_recording_audio(meeting_id)
+            if audio_path:
+                for speaker_label, segs in speaker_groups.items():
+                    try:
+                        segments_for_service = [
+                            {"speaker": "target", "start": s.get("start", 0), "end": s.get("end", 0)}
+                            for s in segs
+                        ]
+                        speaker_files = await audio_segment_service.extract_speaker_segments(
+                            audio_file_path=audio_path, segments=segments_for_service
+                        )
+                        target_audio = speaker_files.get("target")
+                        if target_audio and os.path.exists(target_audio):
+                            embedding = await speaker_embedding_service.extract_embedding(target_audio)
+                            if embedding is not None:
+                                name, distance, conf_level = await profile_service.match_speaker(
+                                    client_id=client_id, embedding=embedding
+                                )
+                                if name:
+                                    audio_score = {"high": 0.90, "medium": 0.60, "low": 0.30}.get(conf_level, 0.30)
+                                    signals.append({"source": "audio", "name": name, "score": audio_score})
+                                    logger.info(f"Audio signal for {speaker_label}: {name} (score={audio_score:.2f})")
+                            try:
+                                os.remove(target_audio)
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        logger.warning(f"Audio matching failed for {speaker_label}: {e}")
+                try:
+                    os.remove(audio_path)
+                except Exception:
+                    pass
+
+        # SIGNAL 2: Regex Self-Introduction Detection
+        if transcription and transcription.full_text:
+            text_context = transcription.full_text[:5000]  # Limit for performance
+            detected_name = detect_self_introduction(text_context, candidates)
+            if detected_name:
+                signals.append({"source": "text", "name": detected_name, "score": 0.85})
+                logger.info(f"Text signal (self-intro): {detected_name} (score=0.85)")
+
+        # SIGNAL 3: Mistral Fusion (if no high-confidence signal yet)
+        if not signals or all(s["score"] < 0.70 for s in signals):
+            # Build text context from transcription segments grouped by speaker
+            text_by_speaker = {}
+            if transcription and transcription.segments:
+                for seg in transcription.segments:
+                    spk = seg.get("speaker", "Speaker 0")
+                    text_by_speaker[spk] = text_by_speaker.get(spk, "") + " " + seg.get("text", "")
+
+            for speaker_label, text_context in text_by_speaker.items():
+                if not text_context.strip():
+                    continue
+                mistral_name, mistral_score, _ = await mistral_fusion_service.fuse_speaker_mapping(
+                    speaker_label=speaker_label,
+                    text_context=text_context.strip(),
+                    audio_matches=[],
+                    client_id=client_id,
+                    candidates=candidates,
+                )
+                if mistral_name:
+                    signals.append({"source": "llm", "name": mistral_name, "score": mistral_score})
+                    logger.info(f"LLM signal for {speaker_label}: {mistral_name} (score={mistral_score:.2f})")
+
+        # SIGNAL 4: Transcript Keyword Overlap (existing logic)
+        if transcription and transcription.segments and suggestion_title:
+            task_keywords = set((suggestion_title or "").lower().split() + (suggestion_description or "").lower().split())
+            task_keywords = {w for w in task_keywords if len(w) > 3}
+            best_speaker = None
+            best_score = 0
+            for seg in transcription.segments:
+                seg_text = seg.get("text", "").lower()
+                seg_words = set(seg_text.split())
+                overlap = len(task_keywords & seg_words)
+                if overlap > best_score:
+                    best_score = overlap
+                    best_speaker = seg.get("speaker")
+            if best_speaker and best_score >= 2:
+                resolved = best_speaker
+                if best_speaker.startswith("Speaker "):
+                    for m in speaker_mappings:
+                        if m["speaker_label"] == best_speaker and m.get("resolved_name"):
+                            resolved = m["resolved_name"]
+                            break
+                if resolved and not resolved.startswith("Speaker "):
+                    keyword_score = min(best_score / 10.0, 0.75)
+                    signals.append({"source": "keyword", "name": resolved, "score": keyword_score})
+                    logger.info(f"Keyword signal: {resolved} (score={keyword_score:.2f}, overlap={best_score})")
+
+        # AGGREGATE: weighted consensus (same as _identify_speakers)
+        resolved_name = None
+        confidence = 0.0
+        method = "no_match"
+
+        if signals:
+            name_scores = {}
+            name_sources = {}
+            total_signal_weight = sum(s["score"] for s in signals)
+
+            for sig in signals:
+                name = sig["name"]
+                name_scores[name] = name_scores.get(name, 0) + sig["score"]
+                name_sources[name] = name_sources.get(name, []) + [sig["source"]]
+
+            resolved_name = max(name_scores, key=name_scores.get)
+            raw_score = name_scores[resolved_name]
+            num_sources = len(name_sources[resolved_name])
+
+            confidence = raw_score / total_signal_weight if total_signal_weight > 0 else 0.0
+            if num_sources > 1:
+                confidence = min(confidence * (1.0 + 0.15 * (num_sources - 1)), 1.0)
+            other_score = total_signal_weight - raw_score
+            if other_score > 0:
+                conflict_ratio = other_score / raw_score
+                confidence *= max(1.0 - conflict_ratio * 0.5, 0.3)
+
+            method = "+".join(sorted(set(name_sources[resolved_name])))
+            logger.info(f"Consensus: {resolved_name} (confidence={confidence:.2f}, sources={method})")
+
+        # VALIDATION: name MUST be in candidates
+        if resolved_name and resolved_name not in candidates:
+            logger.warning(f"'{resolved_name}' not in candidates. Rejecting.")
+            resolved_name = None
+            confidence = 0.0
+            method = "no_match"
+
+        # FALLBACK: use suggested_assignee if valid and no consensus found
+        if not resolved_name and suggested_assignee and str(suggested_assignee).strip().lower() not in INVALID_ASSIGNEES:
+            resolved_name = str(suggested_assignee).strip()
+            confidence = 0.50
+            method = "suggested_assignee"
+
+        return {
+            "assignee_name": resolved_name,
+            "confidence": confidence,
+            "source": method,
+        }
+
+    async def _download_recording_audio(self, meeting_id: str) -> Optional[str]:
+        """Download recording audio from S3 for embedding extraction."""
+        try:
+            from app.core.config import settings as app_settings
+            result = await self.db.execute(
+                select(Recording).where(Recording.meeting_id == meeting_id).order_by(Recording.created_at.desc()).limit(1)
+            )
+            recording = result.scalar_one_or_none()
+            if not recording or not recording.file_path:
+                return None
+
+            loop = asyncio.get_event_loop()
+            s3_client = boto3.client(
+                "s3",
+                endpoint_url=app_settings.S3_ENDPOINT,
+                aws_access_key_id=app_settings.S3_ACCESS_KEY,
+                aws_secret_access_key=app_settings.S3_SECRET_KEY,
+            )
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                await loop.run_in_executor(
+                    None,
+                    lambda: s3_client.download_fileobj(app_settings.S3_BUCKET_NAME, recording.file_path, tmp)
+                )
+                return tmp.name
+        except Exception as e:
+            logger.warning(f"Failed to download recording audio: {e}")
+            return None
+
     async def learn_from_feedback(self, suggestion_id: str, client_id: str, action: str, user_id: Optional[str] = None) -> None:
         """Records feedback and creates a real Action if accepted."""
         from sqlalchemy.orm import selectinload
         from app.models.meeting import Meeting
+        from app.tasks.transcription_tasks import _save_pv_and_actions
+        from app.services.assignee_resolver import AssigneeResolver
+        from app.services.audit_service import AuditService
+        from app.models.transcription import Speaker, Transcription
         stmt = (
             select(ActionSuggestion)
             .options(selectinload(ActionSuggestion.meeting).selectinload(Meeting.participants))
@@ -366,12 +695,20 @@ Return ONLY a JSON array of objects with the following structure:
 
         if action == "accept":
             suggestion.status = "accepted"
-            # Create the actual action entry so it appears in the PV/PDF
+
+            if not suggestion.meeting_id:
+                logger.error(
+                    f"Suggestion {suggestion_id} has NULL meeting_id. "
+                    f"Cannot create Action. Committing status change only."
+                )
+                await self.db.commit()
+                return
+
             new_action_id = str(uuid.uuid4())
             new_action = Action(
                 id=new_action_id,
                 client_id=client_id,
-                meeting_id=suggestion.meeting_id,
+                meeting_id=str(suggestion.meeting_id),
                 title=suggestion.title,
                 description=suggestion.description,
                 status=ActionStatus.PENDING,
@@ -379,15 +716,167 @@ Return ONLY a JSON array of objects with the following structure:
             )
             self.db.add(new_action)
             
-            # Auto-assign only if the AI suggested a specific person
-            if suggestion.suggested_assignee and suggestion.suggested_assignee.lower() not in ["null", "n/a", "non défini"]:
+            # CRITICAL RULE: NULL/EMPTY ASSIGNEES ARE FORBIDDEN
+            # Every action MUST have an assignee. Resolution is MANDATORY.
+            INVALID_ASSIGNEES = {"", "null", "n/a", "non défini", "none", "undefined", "tbd", "tba"}
+            
+            # ALWAYS gather resolution data
+            participant_names = [p.name for p in suggestion.meeting.participants if p.name] if suggestion.meeting.participants else []
+            
+            # Get speaker mappings with resolved_name
+            speaker_stmt = select(Speaker).where(Speaker.meeting_id == suggestion.meeting_id)
+            speaker_result = await self.db.execute(speaker_stmt)
+            speakers = speaker_result.scalars().all()
+            speaker_mappings = [
+                {
+                    "speaker_label": s.name,
+                    "resolved_name": s.resolved_name or s.name,
+                    "confidence": s.mapping_confidence or 0.0,
+                    "method": s.mapping_method or "unknown",
+                    "user_id": s.user_id,
+                }
+                for s in speakers
+            ]
+            
+            # Get all client users for directory resolution
+            all_users_stmt = select(User).where(User.client_id == client_id, User.deleted_at.is_(None))
+            all_users_result = await self.db.execute(all_users_stmt)
+            all_users = all_users_result.scalars().all()
+            client_users = [
+                {"id": str(u.id), "full_name": u.full_name, "email": u.email}
+                for u in all_users if u.full_name or u.email
+            ]
+            
+            # Use AssigneeResolver for professional resolution
+            resolver = AssigneeResolver(
+                speaker_mappings=speaker_mappings,
+                participant_names=participant_names,
+                client_users=client_users,
+            )
+            
+            # Determine single speaker for fallback
+            resolved_speakers = {m["resolved_name"]: m for m in speaker_mappings if m.get("resolved_name")}
+            single_speaker = list(resolved_speakers.keys())[0] if len(resolved_speakers) == 1 else None
+            
+            # Load transcription for signal pipeline
+            trans_stmt = select(Transcription).where(
+                Transcription.meeting_id == suggestion.meeting_id,
+                Transcription.client_id == client_id,
+            )
+            trans_result = await self.db.execute(trans_stmt)
+            transcription = trans_result.scalar_one_or_none()
+
+            # FULL SIGNAL PIPELINE: ONNX + Mistral + Gladia + DB participants + keyword
+            try:
+                resolution_result = await self._resolve_assignee_with_full_signals(
+                    client_id=client_id,
+                    meeting_id=str(suggestion.meeting_id),
+                    suggestion_title=suggestion.title,
+                    suggestion_description=suggestion.description,
+                    suggested_assignee=suggestion.suggested_assignee,
+                    participant_names=participant_names,
+                    speaker_mappings=speaker_mappings,
+                    transcription=transcription,
+                )
+            except Exception as e:
+                logger.error(f"Signal resolution failed for suggestion {suggestion_id}: {e}")
+                resolution_result = {
+                    "assignee_name": suggestion.suggested_assignee,
+                    "confidence": 0.50,
+                    "source": "error_fallback",
+                }
+
+            assignee_name = resolution_result["assignee_name"]
+            resolution_source = resolution_result["source"]
+            resolution_confidence = resolution_result["confidence"]
+
+            logger.info(
+                f"learn_from_feedback signal resolution: '{assignee_name}' "
+                f"(confidence={resolution_confidence:.2f}, source={resolution_source})"
+            )
+
+            # FALLBACKS if full signal pipeline didn't resolve
+            if not assignee_name and single_speaker:
+                assignee_name = single_speaker
+                resolution_source = "single_speaker_fallback"
+
+            if not assignee_name and participant_names:
+                assignee_name = participant_names[0]
+                resolution_source = "first_participant_fallback"
+            
+            # FINAL SAFETY: If still no assignee, log critical error but still create external assignment
+            if not assignee_name:
+                logger.critical(
+                    f"[ASSIGNEE_CRITICAL] No assignee resolved for suggestion {suggestion_id} — "
+                    f"this should NEVER happen. Creating unassigned action."
+                )
+                # Still commit the action without assignment — but this is a bug
+                await self.db.commit()
+                return
+            
+            resolution = resolver.resolve(assignee_name, single_speaker=single_speaker)
+            
+            if resolution.user_id:
                 assignment = Assignment(
                     id=str(uuid.uuid4()),
                     action_id=new_action_id,
-                    external_name=suggestion.suggested_assignee.strip()
+                    user_id=resolution.user_id
                 )
-                self.db.add(assignment)
-                
+                logger.info(
+                    f"learn_from_feedback: resolved '{assignee_name}' to user_id '{resolution.user_id}' via {resolution.matched_via} (source: {resolution_source})"
+                )
+                # Audit log (ISO 27001)
+                await AuditService.log_action(
+                    db=self.db,
+                    client_id=client_id,
+                    action="ACTION_ASSIGNED",
+                    table_name="assignments",
+                    record_id=assignment.id,
+                    new_values={
+                        "action_id": new_action_id,
+                        "user_id": resolution.user_id,
+                        "assignee_name": assignee_name,
+                        "matched_via": resolution.matched_via,
+                        "confidence": resolution.confidence,
+                        "source": "learn_from_feedback",
+                        "resolution_source": resolution_source,
+                    },
+                    ip_address="internal",
+                    user_agent="frontend",
+                )
+            else:
+                # External assignment
+                assignment = Assignment(
+                    id=str(uuid.uuid4()),
+                    action_id=new_action_id,
+                    external_name=resolution.external_name or assignee_name,
+                    external_email=resolution.external_email,
+                )
+                logger.info(
+                    f"learn_from_feedback: external assignment for '{assignee_name}' via {resolution.matched_via} (source: {resolution_source})"
+                )
+                # Audit log (ISO 27001)
+                await AuditService.log_action(
+                    db=self.db,
+                    client_id=client_id,
+                    action="ACTION_ASSIGNED_EXTERNAL",
+                    table_name="assignments",
+                    record_id=assignment.id,
+                    new_values={
+                        "action_id": new_action_id,
+                        "external_name": resolution.external_name or assignee_name,
+                        "external_email": resolution.external_email,
+                        "matched_via": resolution.matched_via,
+                        "confidence": resolution.confidence,
+                        "is_ambiguous": resolution.is_ambiguous,
+                        "source": "learn_from_feedback",
+                        "resolution_source": resolution_source,
+                    },
+                    ip_address="internal",
+                    user_agent="frontend",
+                )
+            self.db.add(assignment)
+            
             logger.info(f"Suggestion {suggestion_id} accepted and converted to Action {new_action.id}")
         elif action == "reject":
             suggestion.status = "rejected"

@@ -76,7 +76,7 @@ def upgrade() -> None:
     sa.Column('title', sa.String(), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('location', sa.String(), nullable=True),
-    sa.Column('status', sa.Enum('PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', name='meetingstatus'), nullable=True),
+    sa.Column('status', sa.Enum('planned', 'in_progress', 'completed', 'cancelled', name='meetingstatus'), nullable=True),
     sa.Column('start_time', sa.DateTime(timezone=True), nullable=False),
     sa.Column('end_time', sa.DateTime(timezone=True), nullable=True),
     sa.Column('creator_id', sa.String(), nullable=True),

@@ -90,6 +90,144 @@ async def test_health_check(e2e_client_no_auth):
     ...
 ```
 
+## Local Test Execution Strategy (without conftest changes)
+
+Tests are categorized by external dependency. Each category requires different infrastructure.
+
+### Test Categories
+
+| Category | Files | Tests | DB Required | Celery Required | Command |
+|----------|-------|-------|-------------|-----------------|---------|
+| **1: Pure Mocks** | `test_action_service.py`, `test_security_migration.py`, `test_fallback_scenarios.py`, `test_diarization_matcher.py`, `test_diarization_service.py` | ~25 | ❌ SQLite | ❌ No | `pytest <files> -v` |
+| **2: SQLite-safe** | `test_meetings.py`, `test_pv.py`, `test_transcriptions.py`, `test_actions.py`, `test_recordings.py`, `test_reports_api.py`, `test_pdf_export_api.py`, `test_websockets_api.py` | ~12 | ❌ SQLite | ❌ No | `pytest <files> -v` |
+| **3: Celery-dependent** | `test_audit.py`, `test_auth.py` | 4 | ✅ PostgreSQL | ✅ Eager mode | `E2E_TEST=true pytest <files> -v` |
+| **4: Mixed fixtures** | `test_branding.py`, `test_pv_versioning.py`, `test_meeting_planner_extension.py` | ~5 | ✅ PostgreSQL | ⚠️ If register called | `E2E_TEST=true pytest <files> -v` |
+
+### Celery Eager Mode
+
+The codebase couples two concerns via `E2E_TEST`:
+
+| Env Var | conftest.py (DB) | celery_app.py (Eager) |
+|---------|------------------|----------------------|
+| `E2E_TEST=true` | PostgreSQL | ✅ `task_always_eager=True` |
+| `TEST_USE_PROD_DB=true` | PostgreSQL | ❌ |
+| `USE_POSTGRES_FOR_TESTS=true` | PostgreSQL | ❌ |
+
+**Only `E2E_TEST=true` activates Celery eager mode.** Tests calling `/api/v1/auth/register` (which triggers `send_invitation_email.delay()`) **must** use `E2E_TEST=true` — otherwise `.delay()` tries to connect to RabbitMQ and hangs.
+
+### Architecture Constraint
+
+```
+E2E_TEST=true
+    ├── conftest.py → Uses PostgreSQL (not SQLite)
+    ├── celery_app.py → task_always_eager=True (synchronous, no broker)
+    └── database.py → NullPool (prevents asyncpg enum OID caching)
+```
+
+There is **no way** to get Celery eager mode while keeping SQLite, without modifying `conftest.py` or `celery_app.py`.
+
+### Step-by-Step Execution
+
+**Step 1: Pure unit tests (no dependencies)**
+```bash
+cd backend
+venv_test/bin/python -m pytest \
+    tests/test_action_service.py \
+    tests/test_security_migration.py \
+    tests/test_fallback_scenarios.py \
+    tests/test_diarization_matcher.py \
+    tests/test_diarization_service.py \
+    -v
+```
+
+**Step 2: All unit tests with PostgreSQL + Celery eager**
+```bash
+cd backend
+E2E_TEST=true \
+DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5432/meeting_db" \
+REDIS_URL="redis://localhost:6379/0" \
+CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//" \
+venv_test/bin/python -m pytest tests/ --ignore=tests/e2e/ --ignore=tests/load/ -v --tb=short
+```
+
+**Step 3: E2E smoke tests**
+```bash
+cd backend
+E2E_TEST=true \
+E2E_BASE_URL="http://localhost:8000" \
+DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5432/meeting_db" \
+REDIS_URL="redis://localhost:6379/0" \
+CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//" \
+venv_test/bin/python -m pytest tests/e2e/test_smoke.py -v --tb=short
+```
+
+### Why test_audit.py Hangs Without E2E_TEST
+
+```
+test_audit.py → POST /api/v1/auth/register
+    → auth.py:277 → send_invitation_email.delay()
+        → celery_app.py:9 → broker=settings.CELERY_BROKER_URL
+            → rabbitmq:5672 (Docker hostname, not resolvable from host)
+                → Connection attempt BLOCKS → test hangs
+```
+
+With `E2E_TEST=true`:
+```
+send_invitation_email.delay()
+    → task_always_eager=True → executes synchronously in-process
+    → SMTP/n8n fail gracefully (logged as warnings)
+    → Registration returns 201 successfully
+```
+
+### Required Environment Variables
+
+```bash
+export E2E_TEST=true
+export DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5432/meeting_db"
+export REDIS_URL="redis://localhost:6379/0"
+export CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//"
+export SECRET_KEY="dev-secret-key-meeting-automation-2026"
+export ENCRYPTION_KEY="6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4="
+export TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4="
+```
+
+### Test Results (2026-06-04)
+
+| Metric | Value |
+|--------|-------|
+| **Total tests** | 74 |
+| **Passed** | 71 |
+| **Failed** | 0 |
+| **Skipped** | 1 |
+| **XFailed** (known vulns) | 2 |
+| **XPassed** | 1 |
+| **Pass rate** | 100% (excl. xfailed) |
+| **Runtime** | ~85s |
+
+### Security Fixes Applied
+
+| File | Fix | Category |
+|------|-----|----------|
+| `app/api/v1/reports.py` | Added `client_id` query param to automation endpoints | Tenant Isolation |
+| `app/api/v1/pv.py` | Added PV ownership check in `get_pv_version` | Tenant Isolation |
+| `app/api/v1/settings.py` | Upsert pattern for branding (prevents duplicate key) | Data Integrity |
+| `requirements.txt` | Added `numpy==1.26.4` (missing dependency) | Test Infrastructure |
+
+### Test Fixes Applied
+
+| File | Fix | Reason |
+|------|-----|--------|
+| `test_auth.py` | Handle duplicate user + set ACTIVE status | E2E DB has pre-existing user |
+| `test_branding.py` | Accept UUID id + handle 409 | Branding persists across runs |
+| `test_encryption_iso27001.py` | Use `Fernet.generate_key()` | Raw bytes invalid for Fernet |
+| `test_audit_logging.py` | Accept multiple audit action types | Middleware creates additional logs |
+| `test_n8n_communication.py` | Use `uuid.uuid4()` for IDs | Hardcoded IDs collide |
+| `test_login_logout_e2e.py` | Use `client`/`db_session` fixtures + `timestamp` column | Fixtures didn't exist; wrong column name |
+| `test_celery_task_tenant_isolation.py` | `await` on `db_session.get()` + `AsyncSessionLocal()` | Async/sync mismatch |
+| `test_automation_tenant_isolation.py` | Pass `client_id` query param | New tenant isolation requires it |
+
+---
+
 ## Running Tests Manually
 
 ### DEV (Local)
