@@ -111,15 +111,15 @@ async def create_recording_for_tenant(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Known vulnerability: celery task lacks client_id filter - tracked for fix")
 async def test_celery_task_no_client_id_filter_vulnerability(db_session: AsyncSession):
     """
-    VULNERABILITY CONFIRMATION: _process_recording_pipeline queries Recording
-    by ID only (line 109), WITHOUT filtering by client_id.
+    FIX VERIFIED (2026-06-05): _process_recording_pipeline now queries Recording
+    by ID AND client_id. This test invokes the pipeline for Tenant B's recording
+    with Tenant A's client_id. The pipeline should NOT find the recording (wrong
+    client_id), leaving status unchanged at "uploaded".
 
-    This test directly invokes the pipeline function for a recording belonging
-    to Tenant B, proving that the task does not enforce tenant isolation.
-    If the task had client_id validation, it would reject cross-tenant access.
+    Previously marked xfail — vulnerability existed before client_id was added
+    to the pipeline function signature (ISO 27001 Defense-in-Depth).
     """
     await setup_two_tenants(db_session)
     recording_b_id = await create_recording_for_tenant(
@@ -222,12 +222,14 @@ async def test_celery_task_no_client_id_filter_vulnerability(db_session: AsyncSe
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Known vulnerability: exception handler lacks client_id filter - tracked for fix")
 async def test_celery_task_exception_handler_no_client_id(db_session: AsyncSession):
     """
-    VULNERABILITY: Exception handler at line 166 also queries Recording
-    without client_id filter. A failed task can modify any tenant's
-    recording status to "failed".
+    FIX VERIFIED (2026-06-05): Exception handler now queries Recording with
+    client_id filter. A failed task with wrong client_id cannot modify another
+    tenant's recording status.
+
+    Previously marked xfail — vulnerability existed before client_id was added
+    to the exception handler query (ISO 27001 Defense-in-Depth).
     """
     await setup_two_tenants(db_session)
     recording_b_id = await create_recording_for_tenant(
@@ -302,16 +304,16 @@ async def test_api_initiate_transcription_enforces_client_id(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="Known vulnerability: direct task invocation bypasses API tenant isolation - tracked for fix")
 async def test_celery_task_direct_invocation_bypasses_api_protection(
     db_session: AsyncSession,
 ):
     """
-    PROOF OF CONCEPT: While the API blocks cross-tenant access,
-    directly invoking the Celery task bypasses this protection entirely.
+    FIX VERIFIED (2026-06-05): Direct Celery task invocation with wrong client_id
+    is now rejected. The pipeline queries Recording by both ID and client_id,
+    preventing cross-tenant access even when the task is invoked directly.
 
-    This simulates: compromised worker, queue manipulation, or internal
-    code path that calls process_recording.delay() without proper auth.
+    Previously marked xfail — vulnerability existed before client_id was added
+    to process_recording() and _process_recording_pipeline() (ISO 27001 Defense-in-Depth).
     """
     await setup_two_tenants(db_session)
     recording_b_id = await create_recording_for_tenant(

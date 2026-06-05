@@ -33,7 +33,7 @@ async def initiate_transcription(
 
     # Trigger the Celery task (which includes Diarization now)
     from app.tasks.transcription_tasks import process_recording
-    process_recording.delay(recording_id)
+    process_recording.delay(recording_id, str(current_user.client_id))
 
     # Mock returning a transcription ID immediately
     return {

@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, desc, or_
 from sqlalchemy.future import select
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.models.action import Action, Assignment, ActionSuggestion, SuggestionStatus, ActionStatus
 from app.models.pv import PV
@@ -446,7 +446,7 @@ Return ONLY a JSON array of objects with the following structure:
 
         # Set completed_at when status changes to COMPLETED (P1-9)
         if validated_status == ActionStatus.COMPLETED:
-            action.completed_at = datetime.utcnow()
+            action.completed_at = datetime.now(timezone.utc)
 
         await self.db.commit()
 
@@ -508,7 +508,7 @@ Return ONLY a JSON array of objects with the following structure:
         # Build candidate list: participants + enrolled ONNX profiles
         profile_service = SpeakerProfileService(self.db)
         enrolled_profiles = await profile_service.get_profiles(client_id)
-        profile_names = [p.name for p in enrolled_profiles if p.name]
+        profile_names = [p.resolved_name or p.name for p in enrolled_profiles if p.resolved_name or p.name]
         candidates = list(set(participant_names + profile_names))
         logger.info(f"learn_from_feedback candidates: {candidates}")
 
@@ -743,8 +743,11 @@ Return ONLY a JSON array of objects with the following structure:
             # ALWAYS gather resolution data
             participant_names = [p.name for p in suggestion.meeting.participants if p.name] if suggestion.meeting.participants else []
             
-            # Get speaker mappings with resolved_name
-            speaker_stmt = select(Speaker).where(Speaker.meeting_id == suggestion.meeting_id)
+            # Get speaker mappings with resolved_name (include global profiles with meeting_id=NULL for this client)
+            speaker_stmt = select(Speaker).where(
+                Speaker.client_id == client_id,
+                or_(Speaker.meeting_id == suggestion.meeting_id, Speaker.meeting_id.is_(None))
+            )
             speaker_result = await self.db.execute(speaker_stmt)
             speakers = speaker_result.scalars().all()
             speaker_mappings = [
@@ -957,7 +960,7 @@ Example format:
 
     async def get_due_actions(self) -> List[Action]:
         """Für tägliche Reminder (via Celery)"""
-        tomorrow = datetime.utcnow() + timedelta(days=1)
+        tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
         result = await self.db.execute(
             select(Action).where(
                 Action.due_date <= tomorrow, Action.status != "COMPLETED"

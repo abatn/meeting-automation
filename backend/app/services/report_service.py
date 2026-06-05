@@ -1,7 +1,7 @@
 import logging
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Any
 import redis.asyncio as redis
 from sqlalchemy import select, func, case
@@ -45,7 +45,7 @@ class ReportService:
         """Aggregiert Meetings nach Status (cached)"""
 
         async def compute():
-            date_filter = datetime.utcnow() - timedelta(
+            date_filter = datetime.now(timezone.utc) - timedelta(
                 days=30 if period == "month" else 365
             )
             query = (
@@ -78,7 +78,7 @@ class ReportService:
 
         async def compute():
             # overdue ist, wenn status = pending und due_date < NOW()
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             query = select(
                 func.sum(case((Action.status == "COMPLETED", 1), else_=0)).label(
                     "completed"
@@ -116,7 +116,7 @@ class ReportService:
         """Leistung pro Mitarbeiter (cached). Manager sieht nur sein Team, DG sieht alle."""
 
         async def compute():
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             from app.models.action import Assignment
             # Use distinct names from both assignments and users
             query = (
@@ -187,7 +187,7 @@ class ReportService:
         async def compute():
             # Vereinfachte Mock-Implementierung für den Graphen
             trend = []
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             for i in range(months - 1, -1, -1):
                 month_date = now - timedelta(days=30 * i)
                 trend.append(
@@ -206,7 +206,7 @@ class ReportService:
     async def get_kpi_trends(self, client_id: str) -> dict:
         """Calculates trends (current vs. previous month) for Meetings and Actions."""
         async def compute():
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             first_day_current = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             first_day_prev = (first_day_current - timedelta(days=1)).replace(day=1)
             last_day_prev = first_day_current - timedelta(seconds=1)
@@ -289,7 +289,7 @@ class ReportService:
             raise PermissionError(f"User {user_id} does not belong to client {client_id}")
 
         async def compute():
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             # Query: JOIN meetings with recordings, transcriptions, pvs
             # Filter: completed meetings in last 30 days where user attended
@@ -442,7 +442,7 @@ class ReportService:
         from app.models.meeting import Participant
         from sqlalchemy import or_
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         
         query = (
             select(Meeting)
@@ -541,7 +541,7 @@ class ReportService:
     async def get_upcoming_meetings(self, user_id: str, client_id: str, limit: int = 5) -> List[dict]:
         from app.models.meeting import Participant
         from sqlalchemy import or_
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         # Meetings where user is participant OR creator
         query = (
             select(Meeting)

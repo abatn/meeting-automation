@@ -111,16 +111,16 @@ def match_timestamps(words: List[Dict], segments: List[Dict]) -> List[Dict]:
 
     return result
 
-async def _process_recording_pipeline(recording_id: str) -> None:
+async def _process_recording_pipeline(recording_id: str, client_id: str) -> None:
     temp_path = None
     try:
         publish_status(recording_id, "uploaded", 5, "Initializing Map-Reduce Pipeline...")
 
         async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Recording).where(Recording.id == recording_id))
+            result = await db.execute(select(Recording).where(Recording.id == recording_id, Recording.client_id == client_id))
             recording = result.scalar_one_or_none()
             if not recording:
-                logger.warning(f"Recording {recording_id} not found, aborting.")
+                logger.warning(f"Recording {recording_id} not found for client {client_id}, aborting.")
                 return
 
             recording.status = "transcribing"
@@ -239,7 +239,7 @@ async def _process_recording_pipeline(recording_id: str) -> None:
         logger.error(f"Pipeline failed for recording {recording_id}: {str(e)}", exc_info=True)
         # Rollback: Set recording.status to "failed"
         async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Recording).where(Recording.id == recording_id))
+            result = await db.execute(select(Recording).where(Recording.id == recording_id, Recording.client_id == client_id))
             recording = result.scalar_one_or_none()
             if recording:
                 recording.status = "failed"
@@ -385,7 +385,7 @@ async def _identify_speakers(
     # Build candidate list: participants + enrolled ONNX profiles
     profile_service = SpeakerProfileService(db)
     enrolled_profiles = await profile_service.get_profiles(client_id)
-    profile_names = [p.name for p in enrolled_profiles if p.name]
+    profile_names = [p.resolved_name or p.name for p in enrolled_profiles if p.resolved_name or p.name]
     candidates = list(set(participant_names + profile_names))
     logger.info(f"Speaker ID candidates: {candidates}")
 
@@ -872,7 +872,7 @@ async def _notify_n8n_completion(recording_id, meeting_id):
     try:
         async with httpx.AsyncClient() as client:
             await client.post(settings.N8N_WEBHOOK_TRANSCRIPTION_COMPLETED, json={"event": "transcription.completed", "recording_id": recording_id, "meeting_id": meeting_id})
-    except: pass
+    except Exception: pass
 
 @celery_app.task(
     name="process_recording",
@@ -883,12 +883,12 @@ async def _notify_n8n_completion(recording_id, meeting_id):
     retry_jitter=True,
     max_retries=3,
 )
-def process_recording(self, recording_id: str) -> None:
+def process_recording(self, recording_id: str, client_id: str) -> None:
     loop = asyncio.get_event_loop()
     if not loop.is_running():
-        loop.run_until_complete(_process_recording_pipeline(recording_id))
+        loop.run_until_complete(_process_recording_pipeline(recording_id, client_id))
     else:
-        asyncio.ensure_future(_process_recording_pipeline(recording_id), loop=loop)
+        asyncio.ensure_future(_process_recording_pipeline(recording_id, client_id), loop=loop)
 
 
 # Expose DiarizationService for backward compatibility with tests

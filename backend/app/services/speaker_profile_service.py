@@ -161,7 +161,7 @@ class SpeakerProfileService:
 
             if cosine_distance < best_distance:
                 best_distance = cosine_distance
-                best_name = profile.name
+                best_name = profile.resolved_name or profile.name
 
         if best_distance < COSINE_DISTANCE_HIGH:
             confidence = "high"

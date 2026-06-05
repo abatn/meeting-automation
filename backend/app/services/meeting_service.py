@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import httpx
@@ -36,7 +36,7 @@ class MeetingService:
             end_time=meeting_in.end_time,
             status=meeting_in.status,
             creator_id=owner_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         self.db.add(db_meeting)
         await self.db.flush()
@@ -144,7 +144,7 @@ class MeetingService:
         result = await self.db.execute(
             select(Meeting)
             .where(Meeting.client_id == client_id)
-            .where(Meeting.start_time > datetime.utcnow())
+            .where(Meeting.start_time > datetime.now(timezone.utc))
             .order_by(Meeting.start_time)
         )
         return list(result.scalars().all())

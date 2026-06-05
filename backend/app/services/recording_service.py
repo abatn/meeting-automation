@@ -80,7 +80,7 @@ class RecordingService:
         # Trigger Celery Pipeline
         from app.tasks.transcription_tasks import process_recording
 
-        process_recording.delay(db_recording.id)
+        process_recording.delay(db_recording.id, str(db_recording.client_id))
 
         return db_recording
 
@@ -191,7 +191,7 @@ class RecordingService:
         # Trigger Celery Pipeline
         from app.tasks.transcription_tasks import process_recording
 
-        process_recording.delay(db_recording.id)
+        process_recording.delay(db_recording.id, str(db_recording.client_id))
 
         return db_recording
 

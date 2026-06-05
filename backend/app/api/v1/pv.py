@@ -3,7 +3,7 @@ import uuid
 import json
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -322,7 +322,7 @@ async def restore_pv_version(pv_id: str, version_id: str, db: AsyncSession = Dep
         restore_data = json.loads(version.snapshot_data)
         for key, value in restore_data.items():
             if hasattr(pv, key): setattr(pv, key, value)
-    except: raise HTTPException(status_code=500, detail="Invalid snapshot data")
+    except Exception: raise HTTPException(status_code=500, detail="Invalid snapshot data")
     await db.commit()
     await db.refresh(pv)
     return {"message": f"Successfully restored to version {version.version_number}"}
@@ -342,7 +342,7 @@ async def get_onlyoffice_config(pv_id: str, language: str = "fr", db: AsyncSessi
     callback_url = f"{settings.PUBLIC_BACKEND_URL}/api/v1/pv/{pv_id}/onlyoffice/callback"
     oo_lang = "ar-SA" if (language == "ar") else language
     config = {
-        "document": {"fileType": "docx", "key": f"{pv_id}_{int(datetime.utcnow().timestamp())}", "title": f"PV_{pv.title}.docx", "url": download_url, "permissions": {"edit": True, "download": True}},
+        "document": {"fileType": "docx", "key": f"{pv_id}_{int(datetime.now(timezone.utc).timestamp())}", "title": f"PV_{pv.title}.docx", "url": download_url, "permissions": {"edit": True, "download": True}},
         "editorConfig": {"callbackUrl": callback_url, "user": {"id": current_user.id, "name": current_user.full_name or current_user.email}, "lang": oo_lang, "customization": {"forcesave": True, "onlyOfficeUrl": settings.ONLYOFFICE_URL}}
     }
     config["token"] = jwt.encode(config, settings.ONLYOFFICE_SECRET, algorithm="HS256")
@@ -355,7 +355,7 @@ async def onlyoffice_download(pv_id: str, file_key: str) -> Any:
     try:
         response = s3.get_object(Bucket=settings.S3_BUCKET_NAME, Key=file_key)
         return StreamingResponse(response['Body'].iter_chunks(), media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    except: raise HTTPException(status_code=404, detail="File not found")
+    except Exception: raise HTTPException(status_code=404, detail="File not found")
 
 
 @router.post("/{pv_id}/onlyoffice/callback")
@@ -406,7 +406,7 @@ async def onlyoffice_callback(pv_id: str, data: dict, request: Request, backgrou
         try: 
             s3.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=pdf_key)
             logger.info(f"Old PDF deleted for PV {pv_id} to ensure fresh conversion")
-        except: 
+        except Exception:
             pass
         
         # 4. Versioning (ISO 27001)

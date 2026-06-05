@@ -99,3 +99,58 @@ tests/e2e/test_intelligent_speaker_assignment.py — 12/12 PASSED
 - **Confidence < 0.50** → Name wird nicht ersetzt (verhindert falsche Zuordnung)
 - **Unbekannte Speaker** → Bleiben als "Speaker N" erhalten
 - **Ambiguous matches** → External assignment mit `is_ambiguous=True`
+
+---
+
+## Fix 2026-06-05: Speaker Resolution — 3 weitere Bugs
+
+### Problem
+PV zeigte weiterhin `"speaker 0"` bei einer Action (4 von 4). `learn_from_feedback` erstellte External-Zuordnungen mit `"Speaker 0"` statt echte Namen.
+
+### Root Cause (3 Bugs)
+
+**Bug #1 — `match_speaker()` gab `profile.name` statt `profile.resolved_name` zurück**
+```python
+# speaker_profile_service.py:164
+best_name = profile.name           # → "Speaker 0" (Gladia-Label)
+# Fix:
+best_name = profile.resolved_name or profile.name  # → "Abdelkader Batnini"
+```
+
+**Bug #2 — `learn_from_feedback` fand das Profil nicht**
+```python
+# action_service.py:747
+# VORHER: Nur nach meeting_id gefiltert (Profil hatte meeting_id=NULL)
+speaker_stmt = select(Speaker).where(Speaker.meeting_id == suggestion.meeting_id)
+# Fix: client_id + meeting_id IS NULL Fallback
+speaker_stmt = select(Speaker).where(
+    Speaker.client_id == client_id,
+    or_(Speaker.meeting_id == suggestion.meeting_id, Speaker.meeting_id.is_(None))
+)
+```
+
+**Bug #3 — Kandidaten enthielten "Speaker 0"**
+```python
+# transcription_tasks.py:388 + action_service.py:511
+# VORHER:
+profile_names = [p.name for p in enrolled_profiles if p.name]
+# → ["Speaker 0"]
+# Fix:
+profile_names = [p.resolved_name or p.name for p in enrolled_profiles if p.resolved_name or p.name]
+# → ["Abdelkader Batnini"]
+```
+
+### Test-Ergebnisse
+```
+tests/e2e/test_intelligent_speaker_assignment.py — 16/16 PASSED
+tests/security/ — 20/20 PASSED
+tests/test_meetings.py — 2/2 PASSED
+```
+
+### Geänderte Dateien
+| Datei | Zeile | Änderung |
+|-------|-------|----------|
+| `app/services/speaker_profile_service.py` | 164 | `profile.resolved_name or profile.name` |
+| `app/services/action_service.py` | 747-749 | Query mit `client_id` + `meeting_id IS NULL` |
+| `app/tasks/transcription_tasks.py` | 388 | `p.resolved_name or p.name` |
+| `app/services/action_service.py` | 511 | `p.resolved_name or p.name` |

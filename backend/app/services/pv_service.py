@@ -5,7 +5,7 @@ import time
 from typing import Dict, Any, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.config import settings
 from app.models.pv import PV
@@ -333,7 +333,7 @@ The output MUST be a valid JSON object with the identical structure as the input
 
         pv.is_validated = True
         pv.validated_by_id = user_id
-        pv.validated_at = datetime.utcnow()
+        pv.validated_at = datetime.now(timezone.utc)
         pv.status = "published"
 
         await self.db.commit()

@@ -316,7 +316,7 @@ class TeamService:
         if db_user:
             from datetime import datetime
             db_user.status = UserStatus.DISABLED.value
-            db_user.deleted_at = datetime.utcnow()  # Soft-delete for ISO 27001 compliance
+            db_user.deleted_at = datetime.now(timezone.utc)  # Soft-delete for ISO 27001 compliance
             # Also cascade delete any tokens if pending
             token_stmt = delete(ActivationToken).where(ActivationToken.user_id == db_user.id)
             await self.db.execute(token_stmt)
