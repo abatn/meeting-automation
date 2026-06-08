@@ -353,7 +353,7 @@ class TestRealSaasPipeline:
         }
 
         response = await client.post(
-            "/api/v1/meetings",
+            "/api/v1/meetings/",
             json=meeting_data,
             follow_redirects=True,
         )

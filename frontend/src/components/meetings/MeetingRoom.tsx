@@ -54,7 +54,7 @@ import {
   SpeakerNotes as SpeakerNotesIcon,
   Assignment as AssignmentIcon,
 } from "@mui/icons-material";
-import { LiveKitRoom, ControlBar, useParticipants, useRoomInfo } from "@livekit/components-react";
+import { LiveKitRoom, ControlBar, RoomAudioRenderer, useParticipants, useRoomInfo } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
@@ -908,11 +908,7 @@ const handleStopRecording = async () => {
               <Stack direction="row" alignItems="center" spacing={0.75}>
                 <GroupIcon sx={{ fontSize: 15, color: COLOR.textMuted }} />
                 <Typography sx={{ fontSize: 14, fontWeight: 600 }}>
-                  {livekitToken ? (
-                    <LiveKitRoom token={livekitToken} serverUrl={livekitUrl} connect={false}>
-                      <ParticipantCount />
-                    </LiveKitRoom>
-                  ) : "—"}
+                  {livekitToken ? "●" : "—"}
                 </Typography>
               </Stack>
             </Tooltip>
@@ -937,22 +933,23 @@ const handleStopRecording = async () => {
                   {t("meeting_assistant.participants")}
                 </Typography>
               </Box>
-              {livekitToken ? (
-                <LiveKitRoom
-                  token={livekitToken}
-                  serverUrl={livekitUrl}
-                  connect={true}
-                  audio={true}
-                  video={false}
-                >
-                  <Box sx={{ px: 2, pb: 1, minHeight: 80 }}>
-                    <ParticipantsList />
-                  </Box>
-                  <Divider />
-                  <ControlBar
-                    controls={{ microphone: true, camera: false, screenShare: false, leave: true }}
-                  />
-                </LiveKitRoom>
+               {livekitToken ? (
+                 <LiveKitRoom
+                   token={livekitToken}
+                   serverUrl={livekitUrl}
+                   connect={true}
+                   audio={true}
+                   video={false}
+                 >
+                   <RoomAudioRenderer />
+                   <Box sx={{ px: 2, pb: 1, minHeight: 80 }}>
+                     <ParticipantsList />
+                   </Box>
+                   <Divider />
+                   <ControlBar
+                     controls={{ microphone: true, camera: false, screenShare: false, leave: true }}
+                   />
+                 </LiveKitRoom>
               ) : (
                 <Box sx={{ px: 2.5, pb: 2.5, display: "flex", alignItems: "center", gap: 1.5 }}>
                   <CircularProgress size={18} />

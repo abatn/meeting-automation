@@ -190,10 +190,15 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides[get_db] = override_get_db
 
     from jose import jwt
+    import uuid
+    from datetime import datetime, timedelta, timezone
     # Token payload matches the test user created in db_session
+    # Unique jti per test prevents blacklist collisions (ISO 27001 A.5.17)
     token_payload = {
         "sub": "test-user-id",
         "client_id": "test-client-id",
+        "jti": str(uuid.uuid4()),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=1),
     }
     token = jwt.encode(token_payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     headers = {"Authorization": f"Bearer {token}"}

@@ -81,7 +81,8 @@ async def get_livekit_token(
         participant_result = await db.execute(
             select(Participant).where(
                 Participant.meeting_id == meeting_id,
-                Participant.user_id == current_user.id
+                # Check by user_id OR by email (participants may not have user_id linked)
+                (Participant.user_id == current_user.id) | (Participant.email == current_user.email)
             )
         )
         is_participant = participant_result.scalar_one_or_none() is not None
