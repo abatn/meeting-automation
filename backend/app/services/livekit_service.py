@@ -44,15 +44,25 @@ class LiveKitService:
         await self.api.room.delete_room(req)
         logger.info(f"LiveKit room deleted: {meeting_id}")
 
-    async def generate_token(self, meeting_id: str, user_id: str, can_publish: bool = True) -> str:
+    async def generate_token(self, meeting_id: str, user_id: str, user_name: str = "", can_publish: bool = True) -> str:
+        """Generate a LiveKit token with unique participant identity.
+        
+        LiveKit Best Practice: Use unique identity to prevent duplicate participant issues.
+        Reference: https://github.com/livekit-examples/meet/blob/main/app/api/connection-details/route.ts
+        """
+        import secrets
+        # Unique identity prevents duplicate participant issues in the same room
+        identity = f"{user_id}_{secrets.token_hex(4)}"
         token = (
             AccessToken(api_key=settings.LIVEKIT_API_KEY, api_secret=settings.LIVEKIT_API_SECRET)
-            .with_identity(user_id)
+            .with_identity(identity)
+            .with_name(user_name or user_id)
             .with_grants(VideoGrants(
                 room_join=True,
                 room=meeting_id,
                 can_publish=can_publish,
                 can_subscribe=True,
+                can_publish_data=True,  # Required for chat and data channels
             ))
         )
         return token.to_jwt()

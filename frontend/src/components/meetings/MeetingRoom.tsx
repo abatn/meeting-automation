@@ -498,8 +498,9 @@ const MeetingRoom: React.FC = () => {
           status:       m.status || "",
         });
         setMeetingCreatorId(m.creator_id || "");
-        setLivekitToken(tokenRes.data.token);
-        setLivekitUrl(tokenRes.data.server_url);
+        // Support both old and new response formats (backward compatibility)
+        setLivekitToken(tokenRes.data.participantToken || tokenRes.data.token);
+        setLivekitUrl(tokenRes.data.serverUrl || tokenRes.data.server_url);
       } catch (err) {
         console.error("Failed to fetch meeting or token", err);
       }

@@ -59,18 +59,48 @@ async def get_livekit_token(
     meeting_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    """Generates a LiveKit token for the current user to join the meeting room."""
+    """Generates a LiveKit token for any authenticated meeting participant.
+    
+    LiveKit Best Practice: Any authenticated user can join a room with a valid token.
+    Security is maintained through multi-tenant client_id validation in deps.py.
+    Reference: https://github.com/livekit-examples/meet/blob/main/app/api/connection-details/route.ts
+    """
+    from app.models.meeting import Participant
+    
     async with AsyncSessionLocal() as db:
-        meeting = await db.get(Meeting, meeting_id)
+        # Verify meeting exists and belongs to this tenant
+        result = await db.execute(
+            select(Meeting).where(Meeting.id == meeting_id, Meeting.client_id == current_user.client_id)
+        )
+        meeting = result.scalar_one_or_none()
         if not meeting:
             raise HTTPException(status_code=404, detail="Meeting not found")
-        if meeting.creator_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Only meeting creator can generate LiveKit token")
+
+        # SECURITY: Verify user is creator OR a registered participant
+        is_creator = meeting.creator_id == current_user.id
+        participant_result = await db.execute(
+            select(Participant).where(
+                Participant.meeting_id == meeting_id,
+                Participant.user_id == current_user.id
+            )
+        )
+        is_participant = participant_result.scalar_one_or_none() is not None
+
+        if not is_creator and not is_participant:
+            raise HTTPException(status_code=403, detail="Not authorized to join this meeting")
 
     service = LiveKitService()
-    token = await service.generate_token(meeting_id, current_user.id)
+    user_name = current_user.full_name or current_user.email
+    token = await service.generate_token(meeting_id, current_user.id, user_name)
     server_url = settings.LIVEKIT_PUBLIC_URL or settings.LIVEKIT_URL
-    return {"token": token, "server_url": server_url}
+    
+    # LiveKit Meet ConnectionDetails pattern
+    return {
+        "serverUrl": server_url,
+        "roomName": meeting_id,
+        "participantName": user_name,
+        "participantToken": token,
+    }
 
 
 @router.post("/meetings/{meeting_id}/livekit/start-recording")
