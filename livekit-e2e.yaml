@@ -1,0 +1,21 @@
+port: 7880
+rtc:
+  # Port-Range erweitert: 7881-7890 (10 Ports) für parallele Egress-Connections
+  # node_ip wird dynamisch via docker-compose entrypoint gesetzt
+  port_range_start: 7881
+  port_range_end: 7890
+  use_external_ip: false
+keys:
+  meeting-api-key: meeting-api-secret-2026
+logging:
+  level: info
+redis:
+  address: redis-test:6379
+  password: redis_password
+  db: 0
+# Tier 1.5: Webhook-Config f\u00fcr Egress-Events (LiveKit-Syntax: urls-Liste)
+# Wichtig: Service-Name aus docker-compose.e2e.yml ist `backend`, nicht `backend-e2e`
+webhook:
+  api_key: meeting-api-key
+  urls:
+    - http://backend:8000/api/v1/livekit/webhooks

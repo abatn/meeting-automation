@@ -11,9 +11,9 @@ router = APIRouter()
 @router.get("/", response_model=List[TeamMember])
 async def list_team_members(
     db: AsyncSession = Depends(deps.get_db),
-    current_user: UserModel = Depends(deps.get_current_user),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG, UserRole.MANAGER])),
 ) -> Any:
-    """List all team members for the client."""
+    """List all team members for the client. DG and Manager only."""
     service = TeamService(db)
     return await service.get_team_members(current_user.client_id)
 
@@ -21,11 +21,9 @@ async def list_team_members(
 async def create_team_member(
     member_in: TeamMemberCreate,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: UserModel = Depends(deps.get_current_user),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG, UserRole.MANAGER])),
 ) -> Any:
-    """Create a new team member. Allowed for any authenticated user within their client context."""
-    # We remove the strict DG/MANAGER check here to allow the initial client user 
-    # (who might be a 'participant' by default) to manage their team.
+    """Create a new team member. DG and Manager only."""
     service = TeamService(db)
     try:
         return await service.create_team_member(current_user.client_id, member_in, current_user.id)
@@ -37,9 +35,9 @@ async def update_team_member(
     member_id: str,
     member_in: TeamMemberUpdate,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: UserModel = Depends(deps.get_current_user),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG, UserRole.MANAGER])),
 ) -> Any:
-    """Update a team member or user."""
+    """Update a team member or user. DG and Manager only."""
     service = TeamService(db)
     member = await service.update_team_member(current_user.client_id, member_id, member_in, current_user.id)
     if not member:
@@ -50,9 +48,9 @@ async def update_team_member(
 async def delete_team_member(
     member_id: str,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: UserModel = Depends(deps.get_current_user),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG, UserRole.MANAGER])),
 ) -> Any:
-    """Delete a team member."""
+    """Delete a team member. DG and Manager only."""
     service = TeamService(db)
     success = await service.delete_team_member(current_user.client_id, member_id, current_user.id)
     if not success:
@@ -63,8 +61,8 @@ async def delete_team_member(
 async def search_team(
     q: str,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: UserModel = Depends(deps.get_current_user),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG, UserRole.MANAGER])),
 ) -> Any:
-    """Search across users and team members for the planner."""
+    """Search across users and team members for the planner. DG and Manager only."""
     service = TeamService(db)
     return await service.search_members(current_user.client_id, q)

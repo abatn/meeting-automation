@@ -1,0 +1,28 @@
+log_level: debug
+api_key: meeting-api-key
+api_secret: meeting-api-secret-2026
+ws_url: ws://livekit-server:7880
+insecure: true
+
+redis:
+  address: redis:6379
+  password: redis_password
+  db: 0
+
+storage:
+  s3:
+    access_key: minio_user
+    secret: minio_password
+    endpoint: http://minio:9000
+    bucket: meeting-recordings
+    region: us-east-1
+
+health_port: 7000
+template_port: 7980
+prometheus_port: 7001
+
+cpu_cost:
+  room_composite_cpu_cost: 1.5
+  web_cpu_cost: 1.5
+  track_composite_cpu_cost: 1.0
+  track_cpu_cost: 0.5

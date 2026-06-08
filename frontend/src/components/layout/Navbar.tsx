@@ -129,7 +129,7 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
                 </Box>
                 <Divider sx={{ my: 1 }} />
                 
-                {!isBusinessAdmin && (
+                {["dg", "manager"].includes(user?.role ?? "") && (
                   <Box>
                     <MenuItem onClick={() => { navigate("/team"); setAnchorElProfile(null); }} sx={{ borderRadius: 1.5, py: 1, mb: 0.5 }}>
                       <ListItemIcon><PeopleIcon fontSize="small" sx={{ color: "#71717A" }} /></ListItemIcon>

@@ -34,6 +34,8 @@ class Recording(Base):
     access_policy: Mapped[str] = mapped_column(
         String, default="everyone"
     )  # everyone, organizer_only, specific_people
+    error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    egress_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

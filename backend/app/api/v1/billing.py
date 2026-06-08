@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import deps
-from app.models.user import User as UserModel
+from app.models.user import User as UserModel, UserRole
 from app.models.facture import Facture as FactureModel
 from app.schemas.billing import (
     Facture, 
@@ -21,10 +21,10 @@ async def create_checkout_session(
     *,
     db: AsyncSession = Depends(deps.get_db),
     session_in: CheckoutSessionCreate,
-    current_user: UserModel = Depends(deps.get_current_user),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG])),
 ) -> Any:
     """
-    Create a checkout session for a specific subscription plan.
+    Create a checkout session for a specific subscription plan. DG only.
     """
     if session_in.plan not in ["PRO", "ENTREPRISE"]:
         raise HTTPException(status_code=400, detail="Invalid plan selected")
@@ -42,10 +42,10 @@ async def create_checkout_session(
 @router.get("/invoices", response_model=List[Facture])
 async def list_my_invoices(
     db: AsyncSession = Depends(deps.get_db),
-    current_user: UserModel = Depends(deps.get_current_user),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG])),
 ) -> Any:
     """
-    Retrieve all invoices for the current tenant.
+    Retrieve all invoices for the current tenant. DG only.
     """
     service = BillingService(db)
     return await service.get_client_invoices(current_user.client_id)
@@ -55,10 +55,10 @@ async def list_my_invoices(
 async def get_my_usage(
     period: Optional[str] = None,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: UserModel = Depends(deps.get_current_user),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG])),
 ) -> Any:
     """
-    Retrieve transcription usage summary for the current tenant.
+    Retrieve transcription usage summary for the current tenant. DG only.
     """
     service = BillingService(db)
     return await service.get_usage_summary(current_user.client_id, period)
@@ -72,10 +72,10 @@ from app.core.config import settings
 async def download_invoice(
     invoice_id: str,
     db: AsyncSession = Depends(deps.get_db),
-    current_user: UserModel = Depends(deps.get_current_user),
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG])),
 ) -> Any:
     """
-    Download a specific invoice PDF from S3.
+    Download a specific invoice PDF from S3. DG only.
     """
     stmt = select(FactureModel).where(FactureModel.id == invoice_id)
     # Check ownership if not superuser

@@ -11,6 +11,9 @@ from app.api import deps
 from app.models.meeting import Meeting as MeetingModel
 from app.models.meeting import Participant as ParticipantModel
 from app.models.recording import Recording as RecordingModel
+from app.models.transcription import Transcription as TranscriptionModel
+from app.models.pv import PV as PVModel, Section as SectionModel
+from app.models.action import Action as ActionModel
 from app.models.user import User as UserModel
 from app.models.user import UserRole, UserStatus
 from app.schemas.meeting import Meeting, MeetingCreate, MeetingWithPV
@@ -219,6 +222,187 @@ async def get_recording_status(
         recording_duration=duration_seconds,
         recording_id=recording.id,
     )
+
+
+@router.get("/{meeting_id}/ai-insights")
+async def get_ai_insights(
+    meeting_id: str,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Returns pipeline results (transcription, PV sections, actions) for the meeting.
+    Used by the frontend MeetingRoom to drive the recording state machine
+    (idle -> recording -> processing -> completed/failed).
+
+    Returns:
+        - status: "idle" | "recording" | "processing" | "completed" | "failed"
+        - recording_id, file_size, duration, format
+        - transcription: {id, status, language, full_text, segments}
+        - pv: {id, status, title, language, sections: [{order, type, title, content}]}
+        - actions: [{id, title, description, priority, status, assigned_to}]
+        - insights: derived from PV sections for UI display
+
+    Tier 4.1 (UX): Provides real backend state so the UI doesn't stay stuck on
+    "Processing insights..." when the pipeline has actually completed.
+    """
+    # Verify meeting belongs to current client (multi-tenant isolation)
+    meeting_res = await db.execute(
+        select(MeetingModel).where(
+            MeetingModel.id == meeting_id,
+            MeetingModel.client_id == current_user.client_id,
+        )
+    )
+    meeting = meeting_res.scalar_one_or_none()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    # Latest recording (any status)
+    rec_res = await db.execute(
+        select(RecordingModel)
+        .where(
+            RecordingModel.meeting_id == meeting_id,
+            RecordingModel.client_id == current_user.client_id,
+        )
+        .order_by(RecordingModel.created_at.desc())
+        .limit(1)
+    )
+    recording = rec_res.scalar_one_or_none()
+
+    # Default response: no recording yet
+    if not recording:
+        return {
+            "status": "idle",
+            "recording_id": None,
+            "file_size": None,
+            "duration": None,
+            "format": None,
+            "transcription": None,
+            "pv": None,
+            "actions": [],
+            "insights": [],
+        }
+
+    # Map recording.status -> frontend status
+    # Backend states: "streaming" | "uploaded" | "transcribing" | "analyzing" | "completed" | "failed"
+    # Frontend states: "idle" | "recording" | "processing" | "completed" | "failed"
+    status_map = {
+        "streaming": "recording",
+        "uploaded": "processing",
+        "transcribing": "processing",
+        "analyzing": "processing",
+        "completed": "completed",
+        "failed": "failed",
+    }
+    frontend_status = status_map.get(recording.status, "processing")
+
+    # Transcription (may not exist yet)
+    trans_res = await db.execute(
+        select(TranscriptionModel).where(
+            TranscriptionModel.recording_id == recording.id,
+            TranscriptionModel.client_id == current_user.client_id,
+        )
+    )
+    transcription = trans_res.scalar_one_or_none()
+    transcription_payload = None
+    if transcription:
+        transcription_payload = {
+            "id": transcription.id,
+            "status": transcription.status,
+            "language": transcription.language or "auto",
+            "full_text": transcription.full_text,
+            "segments": transcription.segments or [],
+        }
+
+    # PV (may not exist yet)
+    pv_payload = None
+    pv_res = await db.execute(
+        select(PVModel).where(
+            PVModel.meeting_id == meeting_id,
+            PVModel.client_id == current_user.client_id,
+        )
+    )
+    pv = pv_res.scalar_one_or_none()
+    if pv:
+        sec_res = await db.execute(
+            select(SectionModel)
+            .where(SectionModel.pv_id == pv.id)
+            .order_by(SectionModel.order)
+        )
+        sections = sec_res.scalars().all()
+        pv_payload = {
+            "id": pv.id,
+            "status": pv.status,
+            "title": pv.title,
+            "language": pv.language,
+            "content_html": pv.content_html,
+            "sections": [
+                {
+                    "order": s.order,
+                    "type": s.type,
+                    "title": s.title,
+                    "content": s.content,
+                }
+                for s in sections
+            ],
+        }
+
+    # Actions
+    actions_payload = []
+    act_res = await db.execute(
+        select(ActionModel)
+        .where(
+            ActionModel.meeting_id == meeting_id,
+            ActionModel.client_id == current_user.client_id,
+        )
+        .options(selectinload(ActionModel.assignments).selectinload(__import__("app.models.action", fromlist=["Assignment"]).Assignment.user))
+    )
+    for a in act_res.scalars().all():
+        assigned_to = None
+        assigned_user_id = None
+        if a.assignments:
+            first = a.assignments[0]
+            assigned_user_id = first.user_id
+            if first.user:
+                assigned_to = first.user.full_name or first.user.email
+            else:
+                assigned_to = first.external_name or first.external_email
+        actions_payload.append({
+            "id": a.id,
+            "title": a.title,
+            "description": a.description,
+            "priority": a.priority,
+            "status": a.status.value if hasattr(a.status, "value") else str(a.status),
+            "due_date": a.due_date.isoformat() if a.due_date else None,
+            "assigned_to": assigned_to,
+            "assigned_user_id": assigned_user_id,
+        })
+
+    # Derive AI insights from PV sections (simple heuristic for UI display)
+    insights = []
+    if pv_payload and pv_payload.get("sections"):
+        for sec in pv_payload["sections"]:
+            if sec.get("type") in ("summary", "decision", "action") and sec.get("content"):
+                content_preview = (sec["content"] or "")[:160]
+                if len(sec["content"]) > 160:
+                    content_preview += "..."
+                insights.append({
+                    "topic": sec.get("title", "Insight"),
+                    "confidence": 0.85,
+                    "actions": [content_preview],
+                })
+
+    return {
+        "status": frontend_status,
+        "recording_id": recording.id,
+        "file_size": recording.file_size,
+        "duration": recording.duration,
+        "format": recording.format,
+        "transcription": transcription_payload,
+        "pv": pv_payload,
+        "actions": actions_payload,
+        "insights": insights,
+    }
 
 
 @router.patch("/{meeting_id}/cancel", response_model=Meeting)

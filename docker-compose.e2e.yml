@@ -37,7 +37,13 @@ services:
   rabbitmq-test:
     image: rabbitmq:3-management
     restart: unless-stopped
+    user: "0:0"
     hostname: rabbitmq-test
+    command: >
+      sh -c "
+        chown -R rabbitmq:rabbitmq /var/lib/rabbitmq &&
+        rabbitmq-server
+      "
     environment:
       RABBITMQ_DEFAULT_USER: rabbit_user
       RABBITMQ_DEFAULT_PASS: rabbit_password
@@ -141,6 +147,7 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     environment:
       - PYTHONPATH=/app
+      - APP_ROLE=backend
       - E2E_TEST=true
       - DB_HOST=postgres-test
       - DB_NAME=meeting_db_test
@@ -163,6 +170,10 @@ services:
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
       - INTERNAL_API_SECRET=test-internal-api-secret-key-2026
+      - LIVEKIT_URL=ws://livekit-server:7880
+      - LIVEKIT_API_KEY=meeting-api-key
+      - LIVEKIT_API_SECRET=meeting-api-secret-2026
+      - LIVEKIT_EGRESS_BUCKET=meeting-recordings
     ports:
       - "8001:8000"
     volumes:
@@ -179,8 +190,63 @@ services:
         condition: service_healthy
       onlyoffice-test:
         condition: service_healthy
+      livekit-server:
+        condition: service_healthy
     networks:
       - e2e-network
+
+  livekit-server:
+    image: livekit/livekit-server:latest
+    container_name: meeting-automation-livekit-server-e2e
+    restart: unless-stopped
+    # Dynamische IP-Erkennung via custom Entrypoint-Script
+    # Verhindert IPv6/IPv4-Mismatch in Pion (Egress)
+    entrypoint: /opt/livekit/entrypoint.sh
+    command: --config /etc/livekit.yaml
+    ports:
+      - "7880:7880"
+      - "7881-7890:7881-7890/udp"
+    volumes:
+      - ./livekit-e2e.yaml:/etc/livekit.yaml:ro
+      - ./livekit-entrypoint.sh:/opt/livekit/entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7880"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - e2e-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  livekit-egress:
+    image: livekit/egress:latest
+    container_name: meeting-automation-livekit-egress-e2e
+    restart: unless-stopped
+    environment:
+      - EGRESS_CONFIG_FILE=/etc/livekit-egress/config.yaml
+    volumes:
+      - ./livekit-egress-e2e.yaml:/etc/livekit-egress/config.yaml:ro
+    depends_on:
+      livekit-server:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - e2e-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
 networks:
   e2e-network:

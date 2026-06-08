@@ -96,7 +96,7 @@ class TestPhase1Fixes:
             creator_id=user_a.id,
             start_time=datetime.utcnow() - timedelta(days=5),
             end_time=datetime.utcnow() - timedelta(days=5, hours=-1),
-            status="COMPLETED",
+            status="completed",
         )
         db_session.add(meeting)
         await db_session.flush()

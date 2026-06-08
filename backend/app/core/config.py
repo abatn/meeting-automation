@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "amqp://rabbit_user:rabbit_password@rabbitmq:5672//"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
 
+    # LiveKit
+    LIVEKIT_URL: str = "ws://livekit-server:7880"
+    LIVEKIT_PUBLIC_URL: str = "ws://localhost:7880"
+    LIVEKIT_API_KEY: str = "meeting-api-key"
+    LIVEKIT_API_SECRET: str = "meeting-api-secret-2026"
+    LIVEKIT_EGRESS_BUCKET: str = "meeting-recordings"
+
     # OnlyOffice
     ONLYOFFICE_SECRET: str = "super_secret_jwt_key_onlyoffice_2026"
     ONLYOFFICE_URL: str = "http://localhost:8080"

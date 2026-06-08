@@ -5,11 +5,14 @@ Phase 4: Cosine Distance Matching against stored profiles
 import os
 import tempfile
 import wave
+import uuid
 
 import numpy as np
 import pytest
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.client import Client
 from app.services.audio_segment_service import AudioSegmentService
 from app.services.speaker_embedding_service import SpeakerEmbeddingService, SAMPLE_RATE
 from app.services.speaker_profile_service import SpeakerProfileService
@@ -70,6 +73,10 @@ async def test_phase8_18_enroll_and_match_same_speaker(db_session, test_audio_fi
     - Audio → Embedding → Enrollment works
     - Same audio matches the enrolled profile with high confidence
     """
+    import uuid
+    from datetime import datetime
+    from app.models.client import Client
+    
     embedding_service = SpeakerEmbeddingService()
     await embedding_service.initialize()
 
@@ -78,11 +85,22 @@ async def test_phase8_18_enroll_and_match_same_speaker(db_session, test_audio_fi
 
     profile_service = SpeakerProfileService(db_session)
 
+    # Create a test client
+    client = Client(
+        id=str(uuid.uuid4()),
+        company_name=f"Test Company {uuid.uuid4().hex[:6]}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
+        created_at=datetime.utcnow(),
+    )
+    db_session.add(client)
+    await db_session.flush()
+
     embedding = await embedding_service.extract_embedding(test_audio_file)
     assert embedding is not None, "Embedding should be extracted"
 
     speaker = await profile_service.create_profile(
-        client_id="test-client-id",
+        client_id=client.id,
         name="Ahmed",
         embedding=embedding,
         source="manual",
@@ -90,7 +108,7 @@ async def test_phase8_18_enroll_and_match_same_speaker(db_session, test_audio_fi
     await db_session.commit()
 
     name, distance, confidence = await profile_service.match_speaker(
-        client_id="test-client-id",
+        client_id=client.id,
         embedding=embedding,
     )
 
@@ -109,6 +127,10 @@ async def test_phase8_19_enroll_and_match_different_speaker(
     - Different audio produces different embedding
     - Distance is higher than same-speaker match
     """
+    import uuid
+    from datetime import datetime
+    from app.models.client import Client
+    
     embedding_service = SpeakerEmbeddingService()
     await embedding_service.initialize()
 
@@ -117,11 +139,22 @@ async def test_phase8_19_enroll_and_match_different_speaker(
 
     profile_service = SpeakerProfileService(db_session)
 
+    # Create a test client
+    client = Client(
+        id=str(uuid.uuid4()),
+        company_name=f"Test Company {uuid.uuid4().hex[:6]}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
+        created_at=datetime.utcnow(),
+    )
+    db_session.add(client)
+    await db_session.flush()
+
     embedding_ahmed = await embedding_service.extract_embedding(test_audio_file)
     assert embedding_ahmed is not None
 
     await profile_service.create_profile(
-        client_id="test-client-id",
+        client_id=client.id,
         name="Ahmed",
         embedding=embedding_ahmed,
         source="manual",
@@ -132,7 +165,7 @@ async def test_phase8_19_enroll_and_match_different_speaker(
     assert embedding_sarah is not None
 
     name, distance, confidence = await profile_service.match_speaker(
-        client_id="test-client-id",
+        client_id=client.id,
         embedding=embedding_sarah,
     )
 
@@ -148,6 +181,10 @@ async def test_phase8_20_multi_speaker_matching(db_session, test_audio_file, tes
     - Correct speaker is matched (closest embedding)
     - Multiple profiles don't interfere
     """
+    import uuid
+    from datetime import datetime
+    from app.models.client import Client
+    
     embedding_service = SpeakerEmbeddingService()
     await embedding_service.initialize()
 
@@ -156,17 +193,28 @@ async def test_phase8_20_multi_speaker_matching(db_session, test_audio_file, tes
 
     profile_service = SpeakerProfileService(db_session)
 
+    # Create a test client
+    client = Client(
+        id=str(uuid.uuid4()),
+        company_name=f"Test Company {uuid.uuid4().hex[:6]}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
+        created_at=datetime.utcnow(),
+    )
+    db_session.add(client)
+    await db_session.flush()
+
     embedding_ahmed = await embedding_service.extract_embedding(test_audio_file)
     embedding_sarah = await embedding_service.extract_embedding(test_audio_file_different)
 
     await profile_service.create_profile(
-        client_id="test-client-id",
+        client_id=client.id,
         name="Ahmed",
         embedding=embedding_ahmed,
         source="manual",
     )
     await profile_service.create_profile(
-        client_id="test-client-id",
+        client_id=client.id,
         name="Sarah",
         embedding=embedding_sarah,
         source="manual",
@@ -174,11 +222,11 @@ async def test_phase8_20_multi_speaker_matching(db_session, test_audio_file, tes
     await db_session.commit()
 
     name_ahmed, dist_ahmed, _ = await profile_service.match_speaker(
-        client_id="test-client-id",
+        client_id=client.id,
         embedding=embedding_ahmed,
     )
     name_sarah, dist_sarah, _ = await profile_service.match_speaker(
-        client_id="test-client-id",
+        client_id=client.id,
         embedding=embedding_sarah,
     )
 
@@ -196,6 +244,10 @@ async def test_phase8_21_no_profiles_returns_no_match(db_session, test_audio_fil
     - Empty profile list returns None name
     - Confidence is 'no_match'
     """
+    import uuid
+    from datetime import datetime
+    from app.models.client import Client
+    
     embedding_service = SpeakerEmbeddingService()
     await embedding_service.initialize()
 
@@ -204,11 +256,22 @@ async def test_phase8_21_no_profiles_returns_no_match(db_session, test_audio_fil
 
     profile_service = SpeakerProfileService(db_session)
 
+    # Create a test client
+    client = Client(
+        id=str(uuid.uuid4()),
+        company_name=f"Test Company {uuid.uuid4().hex[:6]}",
+        subscription_plan="GRATUIT",
+        subscription_status="ACTIVE",
+        created_at=datetime.utcnow(),
+    )
+    db_session.add(client)
+    await db_session.flush()
+
     embedding = await embedding_service.extract_embedding(test_audio_file)
     assert embedding is not None
 
     name, distance, confidence = await profile_service.match_speaker(
-        client_id="test-client-id",
+        client_id=client.id,
         embedding=embedding,
     )
 

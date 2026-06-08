@@ -49,7 +49,7 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
         echo "=== Running Alembic Migrations (ISO 27001 compliant) ==="
         export PYTHONPATH=/app
         cd /app
-        alembic upgrade head
+        alembic upgrade heads
         echo "=== Migrations complete ==="
     else
         echo "=== Skipping Alembic migrations (APP_ROLE=$APP_ROLE) ==="

@@ -50,6 +50,8 @@ function App() {
   const isBusinessAdmin = user?.role === "system_admin";
   const isTechAdmin = user?.role === "tech_admin";
   const isRegularUser = user && !isBusinessAdmin && !isTechAdmin;
+  const canAccessTeam = ["dg", "manager"].includes(user?.role ?? "");
+  const canAccessBilling = (user?.role ?? "") === "dg";
 
   // Define components for regular users
   const getRegularDashboard = () => {
@@ -115,8 +117,8 @@ function App() {
               <Route path="/editor/:pvId" element={<OnlyOfficePage />} />
               <Route path="/actions" element={<MainLayout><ActionTracker /></MainLayout>} />
               <Route path="/reports" element={<MainLayout><AnalyticalReports /></MainLayout>} />
-              <Route path="/team" element={<MainLayout><TeamManagement /></MainLayout>} />
-              <Route path="/billing" element={<MainLayout><BillingPanel /></MainLayout>} />
+              {canAccessTeam && <Route path="/team" element={<MainLayout><TeamManagement /></MainLayout>} />}
+              {canAccessBilling && <Route path="/billing" element={<MainLayout><BillingPanel /></MainLayout>} />}
               <Route path="/settings" element={<MainLayout><Box sx={{ p: 3 }}><MFASetup qrCodeUrl="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=ExampleSecret" secret="JBSWY3DPEHPK3PXP" /></Box></MainLayout>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -152,7 +152,7 @@ async def test_phase8_34_identify_speakers_embedding_unavailable(mock_db, mock_g
                 assert len(mappings) == 2
                 assert mappings[0]["speaker_label"] == "Speaker 0"
                 assert mappings[0]["resolved_name"] == "Ahmed"
-                assert mappings[0]["method"] == "text"
+                assert mappings[0]["method"] == "heuristic+text"
 
                 assert mappings[1]["speaker_label"] == "Speaker 1"
                 assert mappings[1]["resolved_name"] == "Sarah"

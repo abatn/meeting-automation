@@ -178,7 +178,6 @@ services:
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
       - INTERNAL_API_SECRET=super-secret-automation-key-2026
       - LIVEKIT_URL=ws://livekit-server:7880
-      - LIVEKIT_PUBLIC_URL=ws://localhost:7880
       - LIVEKIT_API_KEY=meeting-api-key
       - LIVEKIT_API_SECRET=meeting-api-secret-2026
       - LIVEKIT_EGRESS_BUCKET=meeting-recordings
@@ -294,17 +293,12 @@ services:
   livekit-server:
     image: livekit/livekit-server:latest
     restart: unless-stopped
-    # Dynamische IP-Erkennung via custom Entrypoint-Script
-    # Verhindert IPv6/IPv4-Mismatch in Pion (Egress)
-    # Eigenes Script liegt unter /opt/livekit/ (überschreibt NICHT Original-Entrypoint)
-    entrypoint: /opt/livekit/entrypoint.sh
     command: --config /etc/livekit.yaml
     ports:
       - "7880:7880"
-      - "7881-7890:7881-7890/udp"
+      - "7881:7881"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
-      - ./livekit-entrypoint.sh:/opt/livekit/entrypoint.sh:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:7880"]
       interval: 15s

@@ -1,0 +1,270 @@
+# LiveKit Integration — Minimaler Plan
+
+**Erstellt:** 2026-06-05 | **Ziel:** Echtzeit-Audio für alle Teilnehmer + Recording → Pipeline
+
+---
+
+## Architektur
+
+```
+Browser ←──→ LiveKit SFU ←──→ Browser
+              │
+              └── Egress → S3 → Celery Pipeline (unverändert!)
+```
+
+**Was bleibt:** TranscriptionTasks, Gladia, Speaker ID, PV, Actions, TranscriptionViewer, PVValidator
+**Was sich ändert:** AudioRecorder + MediaRecorder → LiveKit SDK
+
+---
+
+## Dateien (5 gesamt)
+
+### NEU (3 Dateien)
+
+| Datei | Zeilen | Inhalt |
+|-------|--------|--------|
+| `docker-compose.yml` (Änderung) | +15 | LiveKit Server Container |
+| `backend/app/services/livekit_service.py` | ~80 | Room/Token/Egress API |
+| `backend/app/api/v1/livekit.py` | ~40 | Token-Endpoint + Webhook |
+
+### GEÄNDERT (3 Dateien)
+
+| Datei | Zeilen | Inhalt |
+|-------|--------|--------|
+| `backend/app/services/meeting_service.py` | +3 | `create_meeting()` → LiveKit Room |
+| `frontend/src/components/meetings/MeetingRoom.tsx` | ~30 | `<LiveKitRoom>` statt `AudioRecorder` |
+| `backend/app/services/recording_service.py` | ~20 | Egress → S3 statt MediaRecorder |
+
+### ENTFERNT (2 Dateien)
+
+| Datei | Grund |
+|-------|-------|
+| `frontend/src/hooks/useAudioRecorder.ts` | LiveKit übernimmt |
+| `frontend/src/components/meetings/AudioRecorder.tsx` | LiveKit ControlBar |
+
+---
+
+## Phase 1: Docker (15 Minuten)
+
+```yaml
+# docker-compose.yml — NEU
+livekit-server:
+  image: livekit/livekit-server:latest
+  restart: unless-stopped
+  ports:
+    - "7880:7880"      # HTTP/WS Signalisierung
+    - "7881:7881/udp"  # RTC/UDP Medien
+  volumes:
+    - ./livekit.yaml:/etc/livekit.yaml
+  command: --config /etc/livekit.yaml
+```
+
+```yaml
+# livekit.yaml — NEU
+port: 7880
+rtc:
+  port_range_start: 7881
+  port_range_end: 7881
+  use_external_ip: false  # Docker intern
+keys:
+  meeting-api-key: meeting-api-secret-2026
+logging:
+  level: info
+```
+
+**Kein coturn nötig** (Docker intern = kein NAT)
+
+---
+
+## Phase 2: Backend (1 Tag)
+
+### livekit_service.py (~80 Zeilen)
+
+```python
+from livekit.api import LiveKitAPI, AccessToken, VideoGrants
+
+class LiveKitService:
+    def __init__(self):
+        self.api = LiveKitAPI(
+            url=settings.LIVEKIT_URL,
+            api_key=settings.LIVEKIT_API_KEY,
+            api_secret=settings.LIVEKIT_API_SECRET,
+        )
+
+    async def create_room(self, meeting_id: str):
+        """Room bei Meeting-Erstellung"""
+        await self.api.room.create_room(
+            name=meeting_id,
+            empty_timeout=300,
+            max_participants=50,
+        )
+
+    async def generate_token(self, meeting_id: str, user_id: str) -> str:
+        """JWT für Frontend"""
+        token = AccessToken(
+            api_key=settings.LIVEKIT_API_KEY,
+            api_secret=settings.LIVEKIT_API_SECRET,
+        )
+        token.identity = user_id
+        token.add_grant(VideoGrants(
+            room_join=True,
+            room=meeting_id,
+            can_publish=True,
+            can_subscribe=True,
+        ))
+        return token.to_jwt()
+
+    async def start_egress(self, meeting_id: str, file_key: str) -> str:
+        """Recording → MinIO/S3"""
+        from livekit.protocol.egress import EncodedFileOutput
+        from livekit.api import S3Upload
+
+        output = EncodedFileOutput(
+            filepath=f"{file_key}.ogg",
+            s3=S3Upload(
+                access_key=settings.S3_ACCESS_KEY,
+                secret=settings.S3_SECRET_KEY,
+                bucket=settings.S3_BUCKET,
+                endpoint=settings.S3_ENDPOINT,
+            ),
+        )
+        info = await self.api.egress.start_room_composite_egress(
+            room_name=meeting_id, file=output,
+        )
+        return info.egress_id
+```
+
+### api/v1/livekit.py (~40 Zeilen)
+
+```python
+router = APIRouter()
+
+@router.post("/meetings/{meeting_id}/livekit/token")
+async def get_livekit_token(meeting_id: str, user=Depends(get_current_user)):
+    service = LiveKitService()
+    token = await service.generate_token(meeting_id, user.id)
+    return {"token": token, "server_url": settings.LIVEKIT_URL}
+
+@router.post("/livekit/webhooks")
+async def livekit_webhook(request: Request):
+    """Egress completed → Celery Pipeline starten"""
+    data = await request.json()
+    if data.get("event") == "egress.completed":
+        meeting_id = data["room_name"]
+        file_key = data["file_location"]
+        # Recording erstellen + Pipeline triggern
+        process_recording.delay(recording_id, file_key)
+    return {"ok": True}
+```
+
+### meeting_service.py (+3 Zeilen)
+
+```python
+async def create_meeting(self, ...):
+    # Bestehende Logik...
+    # NEU: LiveKit Room erstellen
+    livekit = LiveKitService()
+    await livekit.create_room(meeting.id)
+```
+
+---
+
+## Phase 3: Frontend (1-2 Tage)
+
+### Dependencies
+
+```bash
+npm install @livekit/components-react livekit-client
+```
+
+### MeetingRoom.tsx (~30 Zeilen geändert)
+
+```tsx
+import { LiveKitRoom, VideoConference, ControlBar } from '@livekit/components-react';
+import '@livekit/components-styles';
+
+function MeetingRoom({ meetingId }) {
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.post(`/meetings/${meetingId}/livekit/token`)
+      .then(res => setToken(res.data.token));
+  }, [meetingId]);
+
+  if (!token) return <Loading />;
+
+  return (
+    <LiveKitRoom token={token} serverUrl="ws://localhost:7880" connect={true}>
+      <VideoConference />
+      <ControlBar />
+    </LiveKitRoom>
+  );
+}
+```
+
+**Das war's.** `<VideoConference />` rendert automatisch:
+- Audio für alle Teilnehmer
+- Speaker Detection
+- Teilnehmerliste
+- Mic/Cam Toggle
+- Screen Share Button
+
+---
+
+## Recording Pipeline (unverändert!)
+
+```
+LiveKit Egress → OGG nach MinIO/S3
+                    ↓
+        Celery: process_recording.delay()
+                    ↓
+        Gladia V2 Transkription
+                    ↓
+        Speaker Identification (ONNX)
+                    ↓
+        PV Generierung (Mistral)
+                    ↓
+        Action Assignment
+                    ↓
+        Frontend: TranscriptionViewer + PVValidator
+```
+
+**Keine Änderung** an `transcription_tasks.py`, `gladia_service.py`, `pv_service.py`, `action_service.py`.
+
+---
+
+## Env Variablen (.env)
+
+```
+LIVEKIT_URL=ws://livekit-server:7880
+LIVEKIT_API_KEY=meeting-api-key
+LIVEKIT_API_SECRET=meeting-api-secret-2026
+```
+
+---
+
+## Zeitplan
+
+| Phase | Beschreibung | Zeit |
+|-------|-------------|------|
+| 1 | Docker (livekit-server + yaml) | 15 Min |
+| 2 | Backend (service + api + meeting_service) | 1 Tag |
+| 3 | Frontend (MeetingRoom + Dependencies) | 1-2 Tag |
+| **Total** | | **2-3 Tage** |
+
+---
+
+## Rollback
+
+1. `LIVEKIT_URL` aus .env entfernen
+2. `MeetingRoom.tsx` auf alte Version
+3. `AudioRecorder.tsx` reaktivieren
+4. LiveKit Container stoppen
+
+---
+
+## Kosten
+
+- **LiveKit Server:** Apache 2.0 (kostenlos)
+- **Ressourcen:** ~100MB RAM
+- **Bandbreite:** ~50-100 Kbps pro Audio-Stream

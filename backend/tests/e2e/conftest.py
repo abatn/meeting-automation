@@ -329,7 +329,7 @@ async def e2e_recording(
 
     # Directly trigger the pipeline (bypass Celery) to ensure it runs in same async context
     from app.tasks.transcription_tasks import _process_recording_pipeline
-    await _process_recording_pipeline(recording["id"])
+    await _process_recording_pipeline(recording["id"], e2e_meeting["client_id"])
 
     return recording
 

@@ -69,6 +69,14 @@ class MeetingService:
         # n8n Webhook triggern
         await self._trigger_n8n_meeting_created(db_meeting)
 
+        # LiveKit Room erstellen (non-blocking, Fehler werden geloggt)
+        try:
+            from app.services.livekit_service import LiveKitService
+            livekit = LiveKitService()
+            await livekit.create_room(db_meeting.id)
+        except Exception as e:
+            logger.warning(f"LiveKit room creation failed (non-fatal): {e}")
+
         return db_meeting
 
     async def get_meeting(self, meeting_id: str, client_id: str) -> Optional[Meeting]:
@@ -134,6 +142,14 @@ class MeetingService:
         db_meeting = await self.get_meeting(meeting_id, client_id)
         if not db_meeting:
             return False
+
+        # LiveKit Room löschen (non-blocking)
+        try:
+            from app.services.livekit_service import LiveKitService
+            livekit = LiveKitService()
+            await livekit.delete_room(meeting_id)
+        except Exception as e:
+            logger.warning(f"LiveKit room deletion failed (non-fatal): {e}")
 
         await self.db.delete(db_meeting)
         await self.db.commit()
