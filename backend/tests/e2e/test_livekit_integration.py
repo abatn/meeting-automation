@@ -17,9 +17,12 @@ async def test_livekit_token_endpoint(e2e_client: AsyncClient, e2e_meeting: dict
     assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
 
     data = resp.json()
-    assert "token" in data, "Response must contain 'token'"
-    assert isinstance(data["token"], str) and len(data["token"]) > 20, "Token must be a valid JWT"
-    assert "server_url" in data, "Response must contain 'server_url'"
+    # LiveKit Meet ConnectionDetails pattern
+    assert "participantToken" in data, "Response must contain 'participantToken'"
+    assert isinstance(data["participantToken"], str) and len(data["participantToken"]) > 20, "Token must be a valid JWT"
+    assert "serverUrl" in data, "Response must contain 'serverUrl'"
+    assert "roomName" in data, "Response must contain 'roomName'"
+    assert "participantName" in data, "Response must contain 'participantName'"
 
 
 @pytest.mark.asyncio
@@ -107,13 +110,16 @@ async def test_livekit_meeting_creates_room(e2e_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_livekit_token_response_structure(e2e_client: AsyncClient, e2e_meeting: dict):
-    """Verify token response has expected structure."""
+    """Verify token response has expected structure (LiveKit Meet ConnectionDetails pattern)."""
     meeting_id = e2e_meeting["id"]
     resp = await e2e_client.post(f"/api/v1/meetings/{meeting_id}/livekit/token")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["token"].startswith("eyJ"), "Token should be a JWT (starts with eyJ)"
-    assert data["server_url"].startswith("ws://") or data["server_url"].startswith("wss://")
+    # LiveKit Meet ConnectionDetails pattern
+    assert data["participantToken"].startswith("eyJ"), "Token should be a JWT (starts with eyJ)"
+    assert data["serverUrl"].startswith("ws://") or data["serverUrl"].startswith("wss://")
+    assert data["roomName"] == meeting_id, "roomName must match meeting_id"
+    assert isinstance(data["participantName"], str) and len(data["participantName"]) > 0
 
 
 @pytest.mark.asyncio
