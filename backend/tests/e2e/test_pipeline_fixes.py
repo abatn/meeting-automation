@@ -198,7 +198,8 @@ class TestSingleSpeakerContextAware:
 class TestSentinelSemaphore:
     """Test that Sentinel uses semaphore for controlled parallelism."""
 
-    def test_semaphore_allows_concurrent(self):
+    @pytest.mark.asyncio
+    async def test_semaphore_allows_concurrent(self):
         """Semaphore should allow concurrent execution."""
         import asyncio
         semaphore = asyncio.Semaphore(2)
@@ -209,9 +210,7 @@ class TestSentinelSemaphore:
                 return True
 
         # Should allow 2 concurrent
-        results = asyncio.get_event_loop().run_until_complete(
-            asyncio.gather(test_concurrent(), test_concurrent())
-        )
+        results = await asyncio.gather(test_concurrent(), test_concurrent())
         assert all(results)
 
 
