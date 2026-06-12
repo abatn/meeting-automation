@@ -175,6 +175,43 @@ class SpeakerProfileService:
 
         return best_name, best_distance, confidence
 
+    def match_speaker_from_list(
+        self,
+        profiles: List[Speaker],
+        embedding: np.ndarray,
+    ) -> Tuple[Optional[str], float, str]:
+        """
+        Match an embedding against pre-loaded profiles (no DB query).
+        Use this when profiles are already loaded to avoid N+1 queries.
+        """
+        if not profiles:
+            return None, 1.0, "no_match"
+
+        best_name = None
+        best_distance = 1.0
+
+        for profile in profiles:
+            stored = np.array(profile.embedding, dtype=np.float32).flatten()
+            if stored.shape[0] != EMBEDDING_DIM:
+                continue
+            cosine_distance = float(np.clip(1.0 - np.dot(embedding, stored), 0.0, 1.0))
+
+            if cosine_distance < best_distance:
+                best_distance = cosine_distance
+                best_name = profile.resolved_name or profile.name
+
+        if best_distance < COSINE_DISTANCE_HIGH:
+            confidence = "high"
+        elif best_distance < COSINE_DISTANCE_MEDIUM:
+            confidence = "medium"
+        elif best_distance < COSINE_DISTANCE_LOW:
+            confidence = "low"
+        else:
+            confidence = "no_match"
+            best_name = None
+
+        return best_name, best_distance, confidence
+
     async def delete_profile(self, client_id: str, speaker_id: str) -> bool:
         """Delete a speaker profile."""
         result = await self.db.execute(

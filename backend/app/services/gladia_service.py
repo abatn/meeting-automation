@@ -73,9 +73,22 @@ class GladiaService:
                 logger.info(f"Step 2/3: Transcription started. Polling URL: {result_url}")
 
                 # --- STEP 3: Poll for results ---
+                MAX_POLL_SECONDS = 300
+                MAX_POLL_ITERATIONS = 100
+                poll_start = time.time()
+                iteration = 0
+                
                 while True:
+                    iteration += 1
+                    elapsed = time.time() - poll_start
+                    
+                    if elapsed > MAX_POLL_SECONDS:
+                        raise Exception(f"Gladia timeout: {elapsed:.0f}s exceeded {MAX_POLL_SECONDS}s limit")
+                    if iteration > MAX_POLL_ITERATIONS:
+                        raise Exception(f"Gladia timeout: {iteration} iterations exceeded limit")
+                    
                     await asyncio.sleep(5)
-                    logger.info("Step 3/3: Polling for results...")
+                    logger.info(f"Step 3/3: Polling for results (iteration {iteration}, elapsed {elapsed:.1f}s)...")
                     
                     poll_response = await client.get(result_url, headers=headers, timeout=60.0)
                     poll_response.raise_for_status()
@@ -84,7 +97,7 @@ class GladiaService:
                     status = data.get("status")
                     
                     if status == "done":
-                        logger.info("Step 3/3: Transcription complete!")
+                        logger.info(f"Step 3/3: Transcription complete! ({elapsed:.1f}s total)")
                         success = True
                         return self._format_result(data)
                     elif status == "error":

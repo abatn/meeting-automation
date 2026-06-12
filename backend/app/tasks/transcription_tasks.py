@@ -71,8 +71,23 @@ def _run_async(coro):
             future = pool.submit(_run_in_thread)
             return future.result(timeout=120)
 
+_redis_pool = None
+
 def get_redis_client() -> redis.Redis:
-    return redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+    global _redis_pool
+    if _redis_pool is None:
+        _redis_pool = redis.ConnectionPool.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+            max_connections=10,
+        )
+    return redis.Redis(connection_pool=_redis_pool)
+
+def cleanup_redis_pool():
+    global _redis_pool
+    if _redis_pool:
+        _redis_pool.disconnect()
+        _redis_pool = None
 
 def publish_status(recording_id: str, status: str, progress: int, message: str = "") -> None:
     try:
@@ -301,6 +316,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 os.remove(temp_path)
             except Exception as e:
                 logger.warning(f"Failed to delete temp file {temp_path}: {e}")
+        cleanup_redis_pool()
 
 async def _match_speaker_to_participant(
     speaker_label: str,
@@ -420,6 +436,7 @@ async def _identify_speakers(
     # Build candidate list: participants + enrolled ONNX profiles
     profile_service = SpeakerProfileService(db)
     enrolled_profiles = await profile_service.get_profiles(client_id)
+    profiles_with_embeddings = [p for p in enrolled_profiles if p.embedding is not None]
     profile_names = [p.resolved_name or p.name for p in enrolled_profiles if p.resolved_name or p.name]
     candidates = list(set(participant_names + profile_names))
     logger.info(f"Speaker ID candidates: {candidates}")
@@ -462,9 +479,9 @@ async def _identify_speakers(
 
             # SIGNAL 1: ONNX Audio Matching
             audio_matches = []
-            if embedding is not None:
-                name, distance, conf_level = await profile_service.match_speaker(
-                    client_id=client_id,
+            if embedding is not None and profiles_with_embeddings:
+                name, distance, conf_level = profile_service.match_speaker_from_list(
+                    profiles=profiles_with_embeddings,
                     embedding=embedding,
                 )
                 if name:
