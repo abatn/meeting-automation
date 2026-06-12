@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.database import AsyncSessionLocal
 from app.models.pv import PV, Section
 from app.models.recording import Recording
 from app.models.transcription import Transcription
@@ -95,6 +96,7 @@ async def test_tier21_22_23_pipeline_completes(
     e2e_client: AsyncClient,
     e2e_meeting: dict,
     db_session: AsyncSession,
+    sample_audio_bytes,
     mock_gladia,
     mock_mistral_pv,
     mock_sentinel,
@@ -113,25 +115,41 @@ async def test_tier21_22_23_pipeline_completes(
 
     meeting_id = e2e_meeting["id"]
 
-    # 2-second 16kHz mono WAV (real audio, ~64KB)
-    sample_rate = 16000
-    duration_secs = 2
-    buf = io.BytesIO()
-    with wave.open(buf, "wb") as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(sample_rate)
-        for i in range(sample_rate * duration_secs):
-            v = int(0.1 * 32767 * (i % 100) / 100)
-            w.writeframes(struct.pack("<h", v))
-    audio_bytes = buf.getvalue()
-    expected_file_size = len(audio_bytes)
-
-    files = {"file": ("tier2_test.wav", audio_bytes, "audio/wav")}
-    resp = await e2e_client.post(f"/api/v1/recordings/upload/{meeting_id}", files=files)
-    assert resp.status_code in (200, 201), f"Upload failed: {resp.text}"
-    recording = resp.json()
-    recording_id = recording["id"]
+    # Upload file directly to S3 (bypass Celery task)
+    import boto3
+    from app.core.config import settings
+    from app.models.recording import Recording
+    
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=settings.S3_ENDPOINT,
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY,
+    )
+    
+    file_key = f"{e2e_meeting['client_id']}/recordings/{meeting_id}/{uuid.uuid4()}_test.wav"
+    s3_client.put_object(
+        Bucket=settings.S3_BUCKET_NAME,
+        Key=file_key,
+        Body=sample_audio_bytes,
+        ContentType="audio/wav"
+    )
+    
+    # Create recording in DB
+    recording_id = str(uuid.uuid4())
+    async with AsyncSessionLocal() as db:
+        recording = Recording(
+            id=recording_id,
+            client_id=e2e_meeting["client_id"],
+            meeting_id=meeting_id,
+            file_path=file_key,
+            status="uploaded",
+            format="audio/wav"
+        )
+        db.add(recording)
+        await db.commit()
+    
+    expected_file_size = len(sample_audio_bytes)
 
     from app.tasks.transcription_tasks import _process_recording_pipeline
     rec_for_client = await db_session.execute(

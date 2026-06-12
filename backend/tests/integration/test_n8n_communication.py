@@ -38,7 +38,7 @@ async def test_n8n_callback_processing(client: AsyncClient, db_session: AsyncSes
         "language": "fr"
     }
 
-    headers = {"X-Internal-API-Key": "super-secret-automation-key-2026"}
+    headers = {"X-Internal-API-Key": "test-internal-api-secret-key-2026"}
     response = await client.post("/api/v1/webhooks/n8n/transcription", json=payload, headers=headers)
     assert response.status_code == 200
 
@@ -76,7 +76,7 @@ async def test_n8n_callback_idempotency(client: AsyncClient, db_session: AsyncSe
         "request_id": f"unique-req-{uuid.uuid4()}"
     }
 
-    headers = {"X-Internal-API-Key": "super-secret-automation-key-2026"}
+    headers = {"X-Internal-API-Key": "test-internal-api-secret-key-2026"}
     response1 = await client.post("/api/v1/webhooks/n8n/transcription", json=payload, headers=headers)
     assert response1.status_code == 200
 

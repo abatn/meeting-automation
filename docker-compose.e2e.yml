@@ -164,8 +164,8 @@ services:
       - ONLYOFFICE_URL=http://onlyoffice-test:80
       - N8N_WEBHOOK_URL=http://n8n-test:5678/webhook
       - SECRET_KEY=test-secret-key-for-e2e-only
-      - MISTRAL_API_KEY=test-key
-      - GLADIA_API_KEY=test-key
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - GLADIA_API_KEY=${GLADIA_API_KEY}
       - DEBUG=true
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=

@@ -919,19 +919,32 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr", speaker_ma
         single_speaker = list(resolved_speakers.keys())[0]
         logger.info(f"Single speaker detected: '{single_speaker}' — will be default assignee")
 
-    # Save PV
+    # Save PV — check if one already exists for this meeting
     summary = pv_data.get("summary", "")
     decisions_list = pv_data.get("decisions", [])
     actions_list = pv_data.get("actions", [])
     html = f"<h3>Résumé</h3><p>{summary}</p><h3>Décisions</h3><ul>" + "".join([f"<li>{d}</li>" for d in decisions_list]) + "</ul>"
 
-    pv_id = str(uuid.uuid4())
-    await db.execute(insert(PV).values(
-        id=pv_id, client_id=str(recording.client_id), meeting_id=str(recording.meeting_id),
-        title=pv_data.get("title", "Meeting PV"),
-        tags=pv_data.get("tags"),
-        content_html=html, language=language, status="draft", is_validated=False
-    ))
+    existing_pv_result = await db.execute(
+        select(PV).where(PV.meeting_id == str(recording.meeting_id), PV.client_id == str(recording.client_id))
+    )
+    existing_pv = existing_pv_result.scalar_one_or_none()
+    
+    if existing_pv:
+        pv_id = existing_pv.id
+        existing_pv.title = pv_data.get("title", "Meeting PV")
+        existing_pv.tags = pv_data.get("tags")
+        existing_pv.content_html = html
+        existing_pv.language = language
+        logger.info(f"Updated existing PV {pv_id} for meeting {recording.meeting_id}")
+    else:
+        pv_id = str(uuid.uuid4())
+        await db.execute(insert(PV).values(
+            id=pv_id, client_id=str(recording.client_id), meeting_id=str(recording.meeting_id),
+            title=pv_data.get("title", "Meeting PV"),
+            tags=pv_data.get("tags"),
+            content_html=html, language=language, status="draft", is_validated=False
+        ))
 
     # Tier 2.2: Persist Mistral structured response into pv_sections
     # Order: 0=summary, 1=decisions, 2=actions

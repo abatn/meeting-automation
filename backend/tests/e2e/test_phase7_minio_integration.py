@@ -42,7 +42,7 @@ class TestPhase7MinIOIntegration:
     """Phase 7: MinIO/S3 Multi-Tenant Integration Tests"""
 
     @pytest.mark.asyncio
-    async def test_upload_recording_creates_client_id_prefix(self, db_session: AsyncSession, authenticated_user_a):
+    async def test_upload_recording_creates_client_id_prefix(self, db_session: AsyncSession, authenticated_user_a, mock_gladia, mock_mistral_pv, mock_sentinel, mock_n8n_transcription):
         """
         Test P1-6: Recording upload creates file_key with client_id prefix
         
@@ -366,7 +366,7 @@ class TestPhase7MinIOIntegration:
         print(f"   ONLYOFFICE_BACKEND_URL: {settings.ONLYOFFICE_BACKEND_URL}")
 
     @pytest.mark.asyncio
-    async def test_recording_file_key_format_validation(self, db_session: AsyncSession, authenticated_user_a):
+    async def test_recording_file_key_format_validation(self, db_session: AsyncSession, authenticated_user_a, mock_gladia, mock_mistral_pv, mock_sentinel, mock_n8n_transcription):
         """
         Test: Recording file_key follows required format with client_id prefix
         

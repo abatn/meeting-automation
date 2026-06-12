@@ -28,6 +28,7 @@ from sqlalchemy import select
 
 from app.models.transcription import Transcription
 from app.models.pv import PV
+from app.core.database import AsyncSessionLocal
 from app.core.config import settings
 
 
@@ -168,10 +169,38 @@ async def e2e_client(
 
 @pytest.fixture
 def sample_audio_bytes() -> bytes:
-    """Returns a minimal audio file content for recording uploads."""
-    # 1 second of silence as WAV (simple header + data)
-    # For E2E tests, content doesn't matter because Gladia is mocked.
-    return b"FAKE_AUDIO_DATA_FOR_E2E_TESTING"
+    """Returns a valid minimal WAV file (1 second of silence) for recording uploads."""
+    import struct
+    import io
+    
+    # Create a valid WAV file: 1 second of silence at 16kHz, 16-bit mono
+    sample_rate = 16000
+    duration = 1  # seconds
+    num_samples = sample_rate * duration
+    
+    # WAV header
+    data_size = num_samples * 2  # 16-bit = 2 bytes per sample
+    header = struct.pack(
+        '<4sI4s4sIHHIIHH4sI',
+        b'RIFF',
+        36 + data_size,
+        b'WAVE',
+        b'fmt ',
+        16,  # chunk size
+        1,   # PCM format
+        1,   # mono
+        sample_rate,
+        sample_rate * 2,  # byte rate
+        2,   # block align
+        16,  # bits per sample
+        b'data',
+        data_size,
+    )
+    
+    # Silence = zeros
+    silence = b'\x00' * data_size
+    
+    return header + silence
 
 
 @pytest.fixture
@@ -322,16 +351,48 @@ async def e2e_recording(
     Returns the recording dictionary.
     """
     meeting_id = e2e_meeting["id"]
-    files = {"file": ("test_recording.wav", sample_audio_bytes, "audio/wav")}
-    resp = await e2e_client.post(f"/api/v1/recordings/upload/{meeting_id}", files=files)
-    resp.raise_for_status()
-    recording = resp.json()
-
+    
+    # Upload file directly to S3 (bypass Celery task)
+    import boto3
+    from app.core.config import settings
+    
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=settings.S3_ENDPOINT,
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY,
+    )
+    
+    file_key = f"{e2e_meeting['client_id']}/recordings/{meeting_id}/{uuid.uuid4()}_test.wav"
+    s3_client.put_object(
+        Bucket=settings.S3_BUCKET_NAME,
+        Key=file_key,
+        Body=sample_audio_bytes,
+        ContentType="audio/wav"
+    )
+    
+    # Create recording in DB
+    from app.models.recording import Recording
+    from sqlalchemy import select
+    
+    recording_id = str(uuid.uuid4())
+    async with AsyncSessionLocal() as db:
+        recording = Recording(
+            id=recording_id,
+            client_id=e2e_meeting["client_id"],
+            meeting_id=meeting_id,
+            file_path=file_key,
+            status="uploaded",
+            format="audio/wav"
+        )
+        db.add(recording)
+        await db.commit()
+    
     # Directly trigger the pipeline (bypass Celery) to ensure it runs in same async context
     from app.tasks.transcription_tasks import _process_recording_pipeline
-    await _process_recording_pipeline(recording["id"], e2e_meeting["client_id"])
+    await _process_recording_pipeline(recording_id, e2e_meeting["client_id"])
 
-    return recording
+    return {"id": recording_id, "meeting_id": meeting_id, "file_path": file_key, "status": "uploaded"}
 
 
 @pytest_asyncio.fixture
@@ -361,9 +422,10 @@ async def e2e_transcription(
 
     while time.time() - start_time < timeout:
         result = await db_session.execute(
-            select(Transcription).where(Transcription.recording_id == recording_id)
+            select(Transcription).where(Transcription.recording_id == recording_id).order_by(Transcription.created_at.desc())
         )
-        transcription = result.scalar_one_or_none()
+        transcriptions = result.scalars().all()
+        transcription = transcriptions[0] if transcriptions else None
         if transcription:
             # Transcription exists; pipeline likely completed.
             # Optionally also check PV existence.
@@ -401,11 +463,14 @@ async def e2e_pv(
     meeting_id = e2e_transcription["meeting_id"]
     db_session.expire_all()  # ensure fresh read after pipeline commit
     result = await db_session.execute(
-        select(PV).where(PV.meeting_id == meeting_id)
+        select(PV).where(PV.meeting_id == meeting_id).order_by(PV.created_at.desc())
     )
-    pv = result.scalar_one_or_none()
-    if pv is None:
+    pvs = result.scalars().all()
+    if not pvs:
         raise ValueError(f"No PV found for meeting {meeting_id}")
+    
+    # Use the most recent PV
+    pv = pvs[0]
 
     return {
         "id": pv.id,

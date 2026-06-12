@@ -84,6 +84,7 @@ async def test_full_recording_transcription_pipeline(
 async def test_recording_upload_success(
     e2e_client,
     e2e_meeting: dict,
+    sample_audio_bytes,
     mock_gladia,
     mock_mistral_pv,
     mock_n8n_transcription
@@ -92,8 +93,7 @@ async def test_recording_upload_success(
     E2E: Uploading a recording returns success and triggers background processing.
     """
     meeting_id = e2e_meeting["id"]
-    audio_bytes = b"TEST_AUDIO_CONTENT"
-    files = {"file": ("upload_test.wav", audio_bytes, "audio/wav")}
+    files = {"file": ("upload_test.wav", sample_audio_bytes, "audio/wav")}
     resp = await e2e_client.post(f"/api/v1/recordings/upload/{meeting_id}", files=files)
     assert resp.status_code in [200, 201, 202]
     recording = resp.json()
