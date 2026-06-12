@@ -29,20 +29,9 @@ def process_feedback_resolution(
     Background task to process feedback resolution.
     Runs heavy operations (S3 download, ONNX inference, Mistral API) asynchronously.
     """
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    if loop.is_running():
-        asyncio.ensure_future(
-            _process_feedback_async(suggestion_id, client_id, action, user_id)
-        )
-    else:
-        loop.run_until_complete(
-            _process_feedback_async(suggestion_id, client_id, action, user_id)
-        )
+    asyncio.run(
+        _process_feedback_async(suggestion_id, client_id, action, user_id)
+    )
 
     return {
         "suggestion_id": suggestion_id,

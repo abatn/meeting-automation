@@ -1069,11 +1069,7 @@ async def _notify_n8n_completion(recording_id, meeting_id):
     max_retries=3,
 )
 def process_recording(self, recording_id: str, client_id: str) -> None:
-    loop = asyncio.get_event_loop()
-    if not loop.is_running():
-        loop.run_until_complete(_process_recording_pipeline(recording_id, client_id))
-    else:
-        asyncio.ensure_future(_process_recording_pipeline(recording_id, client_id), loop=loop)
+    asyncio.run(_process_recording_pipeline(recording_id, client_id))
 
 
 # Expose DiarizationService for backward compatibility with tests

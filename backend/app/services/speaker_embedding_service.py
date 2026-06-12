@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import struct
@@ -30,6 +31,7 @@ class SpeakerEmbeddingService:
 
     _instance: Optional["SpeakerEmbeddingService"] = None
     _initialized: bool = False
+    _instance_lock = asyncio.Lock()
 
     def __init__(self):
         self._session = None
@@ -38,10 +40,11 @@ class SpeakerEmbeddingService:
 
     @classmethod
     async def get_instance(cls) -> "SpeakerEmbeddingService":
-        if cls._instance is None:
-            cls._instance = cls()
-            await cls._instance.initialize()
-        return cls._instance
+        async with cls._instance_lock:
+            if cls._instance is None:
+                cls._instance = cls()
+                await cls._instance.initialize()
+            return cls._instance
 
     async def initialize(self) -> bool:
         """Load ONNX model and fbank filters. Returns True if successful."""
@@ -161,6 +164,8 @@ class SpeakerEmbeddingService:
         Returns:
             192-dim numpy array or None if extraction fails
         """
+        if not self._initialized:
+            await self.initialize()
         if not self._available:
             logger.warning("SpeakerEmbeddingService not available — returning None")
             return None
@@ -214,6 +219,8 @@ class SpeakerEmbeddingService:
         Returns:
             192-dim numpy array or None
         """
+        if not self._initialized:
+            await self.initialize()
         if not self._available:
             return None
 

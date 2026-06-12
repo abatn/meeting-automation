@@ -31,16 +31,7 @@ async def _send_reminder_via_n8n(payload: dict):
 @celery_app.task(name="send_reminder_via_n8n")
 def send_reminder_via_n8n(payload: dict):
     """Celery task wrapper for the async n8n call"""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    if not loop.is_running():
-        loop.run_until_complete(_send_reminder_via_n8n(payload))
-    else:
-        asyncio.ensure_future(_send_reminder_via_n8n(payload), loop=loop)
+    asyncio.run(_send_reminder_via_n8n(payload))
 
 
 async def _daily_reminder_task():
@@ -78,16 +69,7 @@ async def _daily_reminder_task():
 @celery_app.task(name="daily_reminder_task")
 def daily_reminder_task():
     """Celery task wrapper for the async cron job"""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    if not loop.is_running():
-        loop.run_until_complete(_daily_reminder_task())
-    else:
-        asyncio.ensure_future(_daily_reminder_task(), loop=loop)
+    asyncio.run(_daily_reminder_task())
 
 
 def _send_via_smtp(email: str, subject: str, html_body: str) -> bool:
@@ -191,13 +173,4 @@ async def _send_invitation_email(client_id: str, email: str, full_name: str, com
 @celery_app.task(name="send_invitation_email", bind=True, max_retries=3)
 def send_invitation_email(self, client_id: str, email: str, full_name: str, company_name: str, activation_link: str):
     """Celery task to send invitation email (Multi-Tenant compliant with client_id)"""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    if not loop.is_running():
-        loop.run_until_complete(_send_invitation_email(client_id, email, full_name, company_name, activation_link))
-    else:
-        asyncio.ensure_future(_send_invitation_email(client_id, email, full_name, company_name, activation_link), loop=loop)
+    asyncio.run(_send_invitation_email(client_id, email, full_name, company_name, activation_link))
