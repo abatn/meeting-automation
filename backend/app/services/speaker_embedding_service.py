@@ -173,13 +173,18 @@ class SpeakerEmbeddingService:
         try:
             import librosa
 
-            audio, sr = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
+            loop = asyncio.get_running_loop()
+            audio, sr = await loop.run_in_executor(
+                None, lambda: librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
+            )
 
             if len(audio) < SAMPLE_RATE:
                 logger.warning(f"Audio too short for embedding: {len(audio)} samples (< {SAMPLE_RATE})")
                 return None
 
-            features = self._extract_fbank_features(audio)
+            features = await loop.run_in_executor(
+                None, self._extract_fbank_features, audio
+            )
 
             input_names = [inp.name for inp in self._session.get_inputs()]
             features_expanded = features[np.newaxis, ...].astype(np.float32)
@@ -190,7 +195,9 @@ class SpeakerEmbeddingService:
                 if name not in input_feed:
                     logger.warning(f"Unexpected input name: {name}")
 
-            result = self._session.run(None, input_feed)
+            result = await loop.run_in_executor(
+                None, lambda: self._session.run(None, input_feed)
+            )
             embedding = result[0].squeeze()
 
             if embedding.shape[0] != EMBEDDING_DIM:

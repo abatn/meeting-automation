@@ -217,7 +217,7 @@ services:
       bash -c "
       echo 'Waiting 10s for RabbitMQ...' &&
       sleep 10 &&
-      celery -A app.tasks.celery_app worker --loglevel=info
+      celery -A app.tasks.celery_app worker --loglevel=info --queues=transcription,email,maintenance --concurrency=2
       "
     env_file: .env
     environment:
