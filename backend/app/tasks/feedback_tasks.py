@@ -3,11 +3,40 @@ Celery tasks for feedback processing (learn_from_feedback endpoint).
 Runs heavy operations (S3 download, ONNX, Mistral) in background.
 """
 import asyncio
+import concurrent.futures
 import logging
 from app.tasks.celery_app import celery_app
 from app.core.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
+
+
+def _run_async(coro):
+    """Run async coroutine from sync context."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    
+    if loop is None:
+        asyncio.run(coro)
+    else:
+        import concurrent.futures
+        
+        async def _wrapper():
+            return await coro
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            def _run_in_thread():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(_wrapper())
+                finally:
+                    new_loop.close()
+            
+            future = pool.submit(_run_in_thread)
+            return future.result(timeout=60)
 
 
 @celery_app.task(
@@ -29,7 +58,7 @@ def process_feedback_resolution(
     Background task to process feedback resolution.
     Runs heavy operations (S3 download, ONNX inference, Mistral API) asynchronously.
     """
-    asyncio.run(
+    _run_async(
         _process_feedback_async(suggestion_id, client_id, action, user_id)
     )
 

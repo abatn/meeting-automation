@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import json
 import logging
 import os
@@ -38,6 +39,37 @@ from difflib import SequenceMatcher
 from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
+
+
+def _run_async(coro):
+    """Run async coroutine from sync context, handling both cases:
+    - No event loop running (normal Celery worker): use asyncio.run()
+    - Event loop already running (eager mode in tests): use thread pool with new loop
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    
+    if loop is None:
+        asyncio.run(coro)
+    else:
+        import concurrent.futures
+        
+        async def _wrapper():
+            return await coro
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            def _run_in_thread():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(_wrapper())
+                finally:
+                    new_loop.close()
+            
+            future = pool.submit(_run_in_thread)
+            return future.result(timeout=120)
 
 def get_redis_client() -> redis.Redis:
     return redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -1069,7 +1101,7 @@ async def _notify_n8n_completion(recording_id, meeting_id):
     max_retries=3,
 )
 def process_recording(self, recording_id: str, client_id: str) -> None:
-    asyncio.run(_process_recording_pipeline(recording_id, client_id))
+    _run_async(_process_recording_pipeline(recording_id, client_id))
 
 
 # Expose DiarizationService for backward compatibility with tests

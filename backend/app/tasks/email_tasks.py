@@ -15,6 +15,40 @@ from app.services.audit_service import AuditService
 logger = logging.getLogger(__name__)
 
 
+def _run_async(coro):
+    """Run async coroutine from sync context, handling both cases:
+    - No event loop running (normal Celery worker): use asyncio.run()
+    - Event loop already running (eager mode in tests): use run_until_complete()
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    
+    if loop is None:
+        asyncio.run(coro)
+    else:
+        # Eager mode: event loop is running, use run_until_complete
+        # This is the case when Celery runs in eager mode within FastAPI
+        import concurrent.futures
+        
+        async def _wrapper():
+            return await coro
+        
+        # Create a new event loop in a thread to avoid blocking the main loop
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            def _run_in_thread():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    return new_loop.run_until_complete(_wrapper())
+                finally:
+                    new_loop.close()
+            
+            future = pool.submit(_run_in_thread)
+            return future.result(timeout=60)
+
+
 async def _send_reminder_via_n8n(payload: dict):
     """Ruft n8n-Webhook auf"""
     try:
@@ -31,7 +65,7 @@ async def _send_reminder_via_n8n(payload: dict):
 @celery_app.task(name="send_reminder_via_n8n")
 def send_reminder_via_n8n(payload: dict):
     """Celery task wrapper for the async n8n call"""
-    asyncio.run(_send_reminder_via_n8n(payload))
+    _run_async(_send_reminder_via_n8n(payload))
 
 
 async def _daily_reminder_task():
@@ -69,7 +103,7 @@ async def _daily_reminder_task():
 @celery_app.task(name="daily_reminder_task")
 def daily_reminder_task():
     """Celery task wrapper for the async cron job"""
-    asyncio.run(_daily_reminder_task())
+    _run_async(_daily_reminder_task())
 
 
 def _send_via_smtp(email: str, subject: str, html_body: str) -> bool:
@@ -173,4 +207,4 @@ async def _send_invitation_email(client_id: str, email: str, full_name: str, com
 @celery_app.task(name="send_invitation_email", bind=True, max_retries=3)
 def send_invitation_email(self, client_id: str, email: str, full_name: str, company_name: str, activation_link: str):
     """Celery task to send invitation email (Multi-Tenant compliant with client_id)"""
-    asyncio.run(_send_invitation_email(client_id, email, full_name, company_name, activation_link))
+    _run_async(_send_invitation_email(client_id, email, full_name, company_name, activation_link))
