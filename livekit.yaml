@@ -1,12 +1,17 @@
 port: 7880
 rtc:
-  # Port-Range erweitert: 7881-7890 (10 Ports) für parallele Egress-Connections
-  # node_ip wird dynamisch via docker-compose entrypoint gesetzt
+  # TEST-ONLY: ngrok-Media-Test über ICE/TCP-Fallback.
+  # Vor Produktion entfernen und LiveKit wieder normal über UDP/Firewall betreiben.
+  tcp_port: 7881
+  # TEST-ONLY: LiveKit meldet LIVEKIT_NODE_IP/ngrok-Host an Clients.
+  # Vor Produktion entfernen.
+  use_external_ip: true
+  # TEST-ONLY: UDP-Range bleibt für lokale Teilnehmer aktiv; ngrok-Teilnehmer nutzen tcp_port als Fallback.
+  # Vor Produktion entfernen, wenn UDP nicht benötigt wird.
   port_range_start: 7881
   port_range_end: 7890
-  use_external_ip: false
 keys:
-  meeting-api-key: meeting-api-secret-2026
+  __LIVEKIT_API_KEY__: __LIVEKIT_API_SECRET__
 logging:
   level: info
 redis:
@@ -18,6 +23,6 @@ redis:
 # Syntax (offizielle config-sample.yaml): `urls` (Liste), `api_key`. Kein `events`-Feld.
 # LiveKit sendet standardm\u00e4ssig alle Webhook-Events (room/participant/track/egress/ingress).
 webhook:
-  api_key: meeting-api-key
+  api_key: __LIVEKIT_API_KEY__
   urls:
     - http://backend:8000/api/v1/livekit/webhooks

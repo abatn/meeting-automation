@@ -15,17 +15,16 @@ import {
   Tooltip,
   Skeleton,
   IconButton,
-  Divider,
   Badge,
   Menu,
   MenuItem,
   ListItemIcon,
   ListItemText,
+  useTheme,
 } from "@mui/material";
 import {
   AutoFixHigh as SuggestionIcon,
   MicOff as MicOffIcon,
-  RecordVoiceOver as RecordVoiceOverIcon,
   AccessTime as AccessTimeIcon,
   Group as GroupIcon,
   SmartToy as SmartToyIcon,
@@ -45,7 +44,6 @@ import {
   MoreVert as MoreIcon,
   Mic as MicIcon,
   VideocamOff as CameraOffIcon,
-  CheckCircleOutline as ProcessingIcon,
   Edit as EditIcon,
   PictureAsPdf as PdfIcon,
   Description as WordIcon,
@@ -54,30 +52,35 @@ import {
   SpeakerNotes as SpeakerNotesIcon,
   Assignment as AssignmentIcon,
 } from "@mui/icons-material";
-import { LiveKitRoom, ControlBar, RoomAudioRenderer, useParticipants, useRoomInfo } from "@livekit/components-react";
+import { Theme } from "@mui/material/styles";
+import { LiveKitRoom, RoomAudioRenderer, useParticipants, useRoomInfo, useConnectionState } from "@livekit/components-react";
 import "@livekit/components-styles";
+import { ConnectionState, ConnectionQuality, RoomEvent } from "livekit-client";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
-import api from "../../services/api";
+import { meetingsApi } from "../../services/meetings";
 import { RootState } from "../../store";
+import { animations } from "../../styles/animations";
+import { speakerColor, speakerInitial, formatDuration } from "../../utils/speakerUtils";
 
-// ─── Design Tokens ───────────────────────────────────────────────────────────
-const COLOR = {
-  primary:   "#3B82F6",
-  success:   "#22C55E",
-  warning:   "#FBBF24",
-  error:     "#EF4444",
-  purple:    "#8B5CF6",
-  bg:        "#F8FAFC",
-  card:      "#FFFFFF",
-  border:    "rgba(0,0,0,0.08)",
-  textMuted: "rgba(0,0,0,0.45)",
-};
+// ─── Design Tokens (theme-derived) ─────────────────────────────────────────
+const PURPLE = "#8B5CF6";
 
-const SPEAKER_COLORS = [
-  COLOR.primary, COLOR.purple, COLOR.success, COLOR.warning,
-  "#EC4899", "#14B8A6", "#F97316", "#6366F1",
-];
+function buildColor(theme: Theme) {
+  return {
+    primary:   theme.palette.primary.main,
+    success:   theme.palette.success.main,
+    warning:   theme.palette.warning.main,
+    error:     theme.palette.error.main,
+    purple:    PURPLE,
+    bg:        theme.palette.background.default,
+    card:      theme.palette.background.paper,
+    border:    theme.palette.divider,
+    textMuted: theme.palette.text.secondary,
+  };
+}
+
+type ColorTokens = ReturnType<typeof buildColor>;
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 interface MeetingInfo {
@@ -119,26 +122,7 @@ interface AIInsight {
   actions: string[];
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-function speakerColor(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return SPEAKER_COLORS[Math.abs(hash) % SPEAKER_COLORS.length];
-}
-
-function speakerInitial(name: string): string {
-  return (name || "?").charAt(0).toUpperCase();
-}
-
-function priorityColor(priority?: string): string {
+function priorityColor(priority: string | undefined, COLOR: ColorTokens): string {
   if (priority === "high")   return COLOR.error;
   if (priority === "medium") return COLOR.warning;
   return COLOR.success;
@@ -147,6 +131,8 @@ function priorityColor(priority?: string): string {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ParticipantsList() {
+  const theme = useTheme();
+  const COLOR = buildColor(theme);
   const participants = useParticipants();
   const { t } = useTranslation();
   if (participants.length === 0) {
@@ -187,165 +173,71 @@ function ParticipantsList() {
                 position: "absolute", bottom: -2, right: -2,
                 width: 12, height: 12, borderRadius: "50%",
                 bgcolor: COLOR.success, border: "2px solid #fff",
-                animation: "pulse 1s infinite",
+                animation: "pulse-opacity 1s infinite",
               }} />
             )}
           </Box>
-          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-            <Typography sx={{
-              fontSize: 13, fontWeight: p.isSpeaking ? 600 : 500,
-              color: p.isSpeaking ? COLOR.success : "text.primary",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-            }}>
-              {p.name || p.identity}
-            </Typography>
-            {p.isSpeaking && (
-              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25 }}>
-                {[0, 1, 2].map((i) => (
-                  <Box
-                    key={i}
-                    sx={{
-                      width: 3, height: 8, borderRadius: 1.5,
-                      bgcolor: COLOR.success,
-                      animation: `wave 0.8s ease-in-out ${i * 0.15}s infinite`,
-                    }}
-                  />
-                ))}
-                <Typography sx={{ fontSize: 10, color: COLOR.success, fontWeight: 500 }}>
-                  {t("meeting_assistant.participant_speaking")}
-                </Typography>
-              </Stack>
-            )}
-          </Box>
-          {p.isSpeaking && (
-            <VolumeIcon sx={{ fontSize: 16, color: COLOR.success, flexShrink: 0 }} />
-          )}
+           <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+             <Typography sx={{
+               fontSize: 13, fontWeight: p.isSpeaking ? 600 : 500,
+               color: p.isSpeaking ? COLOR.success : "text.primary",
+               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+             }}>
+               {p.name || p.identity}
+             </Typography>
+             {p.isSpeaking && (
+               <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.25 }}>
+                 {[0, 1, 2].map((i) => (
+                   <Box
+                     key={i}
+                     sx={{
+                       width: 3, height: 8, borderRadius: 1.5,
+                       bgcolor: COLOR.success,
+                       animation: `wave 0.8s ease-in-out ${i * 0.15}s infinite`,
+                     }}
+                   />
+                 ))}
+                 <Typography sx={{ fontSize: 10, color: COLOR.success, fontWeight: 500 }}>
+                   {t("meeting_assistant.participant_speaking")}
+                 </Typography>
+               </Stack>
+             )}
+           </Box>
+           <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0 }}>
+             {p.isMicrophoneEnabled ? (
+               <Tooltip title={t("meeting_assistant.mic_on", "Mic On")}>
+                 <MicIcon sx={{ fontSize: 14, color: COLOR.success }} />
+               </Tooltip>
+             ) : (
+               <Tooltip title={t("meeting_assistant.mic_muted", "Mic Muted")}>
+                 <MicOffIcon sx={{ fontSize: 14, color: COLOR.textMuted }} />
+               </Tooltip>
+             )}
+             {p.isSpeaking && (
+               <VolumeIcon sx={{ fontSize: 16, color: COLOR.success }} />
+             )}
+           </Stack>
         </Box>
       ))}
     </Stack>
   );
 }
 
-function ParticipantCount() {
-  const participants = useParticipants();
-  return <>{participants.length}</>;
+function LiveKitConnectionBridge({ onStateChange }: { onStateChange: (state: ConnectionState) => void }) {
+  const connectionState = useConnectionState();
+
+  useEffect(() => {
+    onStateChange(connectionState);
+  }, [connectionState, onStateChange]);
+
+  return null;
 }
 
-function SpeakingStatsPanel({
-  stats, isRecording,
-}: { stats: SpeakingStats[]; isRecording: boolean }) {
-  const { t } = useTranslation();
-
-  if (!isRecording) {
-    return (
-      <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: `1px solid ${COLOR.border}` }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-          <VolumeIcon sx={{ fontSize: 16, color: COLOR.textMuted }} />
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: "text.primary", textTransform: "uppercase", letterSpacing: 0.5 }}>
-            {t("meeting_assistant.speaking_time")}
-          </Typography>
-        </Stack>
-        <Stack alignItems="center" spacing={1.5} sx={{ py: 2, color: COLOR.textMuted }}>
-          <MicOffIcon sx={{ fontSize: 32, color: alpha("#000", 0.1) }} />
-          <Typography sx={{ fontSize: 12, textAlign: "center" }}>{t("meeting_assistant.start_recording_for_stats")}</Typography>
-        </Stack>
-      </Paper>
-    );
-  }
-
-  if (stats.length === 0) {
-    return (
-      <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: `1px solid ${COLOR.border}` }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-          <VolumeIcon sx={{ fontSize: 16, color: COLOR.textMuted }} />
-          <Typography sx={{ fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            {t("meeting_assistant.speaking_time")}
-          </Typography>
-        </Stack>
-        <Stack spacing={1.5}>
-          {[1, 2].map((i) => (
-            <Box key={i}>
-              <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                <Skeleton width={80} height={14} />
-                <Skeleton width={28} height={14} />
-              </Stack>
-              <Skeleton variant="rectangular" height={6} sx={{ borderRadius: 3 }} />
-            </Box>
-          ))}
-        </Stack>
-        <Stack alignItems="center" spacing={1} sx={{ mt: 2 }}>
-          {[0, 1, 2].map((i) => (
-            <Box
-              key={i}
-              sx={{
-                width: 4, height: 16, borderRadius: 2,
-                bgcolor: COLOR.primary,
-                animation: `wave 1.2s ease-in-out ${i * 0.2}s infinite`,
-              }}
-            />
-          ))}
-          <Typography sx={{ fontSize: 11, color: COLOR.textMuted, textAlign: "center" }}>
-            {t("meeting_assistant.analyzing_audio")}
-          </Typography>
-        </Stack>
-      </Paper>
-    );
-  }
-
-  return (
-    <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: `1px solid ${COLOR.border}` }}>
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
-        <VolumeIcon sx={{ fontSize: 16, color: COLOR.primary }} />
-        <Typography sx={{ fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-          {t("meeting_assistant.speaking_time")}
-        </Typography>
-      </Stack>
-      <Stack spacing={2}>
-        {stats.map((stat, idx) => (
-          <Box key={stat.participantId}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
-              <Stack direction="row" alignItems="center" spacing={1}>
-                <Avatar sx={{
-                  width: 24, height: 24, fontSize: 10, fontWeight: 600,
-                  bgcolor: SPEAKER_COLORS[idx % SPEAKER_COLORS.length],
-                }}>
-                  {speakerInitial(stat.name)}
-                </Avatar>
-                <Typography sx={{ fontSize: 13, fontWeight: 500 }}>{stat.name}</Typography>
-              </Stack>
-              <Chip
-                label={`${stat.percentage}%`}
-                size="small"
-                sx={{
-                  height: 20, fontSize: 10, fontWeight: 700,
-                  bgcolor: alpha(SPEAKER_COLORS[idx % SPEAKER_COLORS.length], 0.1),
-                  color: SPEAKER_COLORS[idx % SPEAKER_COLORS.length],
-                }}
-              />
-            </Stack>
-            <LinearProgress
-              variant="determinate"
-              value={stat.percentage}
-              sx={{
-                height: 6, borderRadius: 3,
-                bgcolor: alpha(SPEAKER_COLORS[idx % SPEAKER_COLORS.length], 0.1),
-                "& .MuiLinearProgress-bar": {
-                  bgcolor: SPEAKER_COLORS[idx % SPEAKER_COLORS.length], borderRadius: 3,
-                },
-              }}
-            />
-            <Typography sx={{ fontSize: 11, color: COLOR.textMuted, mt: 0.5, fontFamily: "monospace" }}>
-              {formatDuration(stat.duration)}
-            </Typography>
-          </Box>
-        ))}
-      </Stack>
-    </Paper>
-  );
-}
 
 // ─── Pipeline Progress Indicator ─────────────────────────────────────────────
 function PipelineProgressIndicator({ status }: { status: string }) {
+  const theme = useTheme();
+  const COLOR = buildColor(theme);
   const stages = [
     { key: "recording", label: "Recording", icon: <RecordIcon sx={{ fontSize: 14 }} /> },
     { key: "transcribing", label: "Transcription", icon: <TextSnippetIcon sx={{ fontSize: 14 }} /> },
@@ -442,6 +334,8 @@ function PipelineProgressIndicator({ status }: { status: string }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const MeetingRoom: React.FC = () => {
+  const theme = useTheme();
+  const COLOR = buildColor(theme);
   const { id } = useParams<{ id: string }>();
   const { t, i18n } = useTranslation();
   const currentUser = useSelector((state: RootState) => state.auth.user);
@@ -453,6 +347,9 @@ const MeetingRoom: React.FC = () => {
   // LiveKit
   const [livekitToken, setLivekitToken] = useState<string | null>(null);
   const [livekitUrl, setLivekitUrl]     = useState<string>("");
+  const [livekitConnectionState, setLivekitConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
+  const [livekitConnected, setLivekitConnected]             = useState(false);
+  const [livekitError, setLivekitError] = useState<string | null>(null);
 
   // Recording
   const [isRecording, setIsRecording]             = useState(false);
@@ -478,17 +375,27 @@ const MeetingRoom: React.FC = () => {
   const transcriptionEndRef = useRef<HTMLDivElement>(null);
   const pollingRef          = useRef<NodeJS.Timeout | null>(null);
 
+  const handleLiveKitConnectionState = useCallback((state: ConnectionState) => {
+    const connected = state === ConnectionState.Connected;
+
+    setLivekitConnectionState(state);
+    setLivekitConnected(connected);
+
+    if (connected) {
+      setLivekitError(null);
+    }
+  }, []);
+
   // ── Fetch meeting info + token on mount ──────────────────────────────────
   useEffect(() => {
     if (!id || !currentUser) return;
 
     const fetchAll = async () => {
       try {
-        const [meetingRes, tokenRes] = await Promise.all([
-          api.get(`/meetings/${id}`),
-          api.post(`/meetings/${id}/livekit/token`),
+        const [m, tokenRes] = await Promise.all([
+          meetingsApi.getMeeting(id),
+          meetingsApi.getLivekitToken(id),
         ]);
-        const m = meetingRes.data;
         setMeetingInfo({
           id:           m.id,
           title:        m.title || `Meeting #${m.id?.slice(0, 8)}`,
@@ -499,8 +406,21 @@ const MeetingRoom: React.FC = () => {
         });
         setMeetingCreatorId(m.creator_id || "");
         // Support both old and new response formats (backward compatibility)
-        setLivekitToken(tokenRes.data.participantToken || tokenRes.data.token);
-        setLivekitUrl(tokenRes.data.serverUrl || tokenRes.data.server_url);
+        const nextLivekitToken = tokenRes.participantToken || tokenRes.token;
+        const nextLivekitUrl = tokenRes.serverUrl || tokenRes.server_url;
+        console.info("[LiveKit] Token response", {
+          serverUrl: nextLivekitUrl,
+          hasToken: Boolean(nextLivekitToken),
+          tokenPrefix: nextLivekitToken?.slice(0, 12),
+        });
+        setLivekitToken(nextLivekitToken);
+        // TEST-ONLY: Handle both ws:// and wss:// URLs (remove for production)
+        // Production: Backend will return correctly formatted URLs
+        setLivekitUrl(
+          nextLivekitUrl.startsWith('ws://') || nextLivekitUrl.startsWith('wss://')
+            ? nextLivekitUrl
+            : `ws://${nextLivekitUrl}`
+        );
       } catch (err) {
         console.error("Failed to fetch meeting or token", err);
       }
@@ -509,15 +429,24 @@ const MeetingRoom: React.FC = () => {
     fetchAll();
   }, [id, currentUser]);
 
+  useEffect(() => {
+    const connected = livekitConnectionState === ConnectionState.Connected;
+    setLivekitConnected(connected);
+
+    if (connected) {
+      setLivekitError(null);
+    }
+  }, [livekitConnectionState]);
+
   // ── Fetch suggestions on mount + every 30s ───────────────────────────────
   useEffect(() => {
     if (!id || !currentUser) return;
     const fetchSuggestions = async () => {
       try {
         const lang = i18n.language.split("-")[0] || "fr";
-        const res  = await api.get(`/actions/suggestions/${id}?lang=${lang}`);
-        if (res.data) {
-          setSuggestions(res.data.filter((s: ActionSuggestion) => s.status.toLowerCase() === "suggested"));
+        const data = await meetingsApi.getSuggestions(id, lang);
+        if (data) {
+          setSuggestions(data.filter((s: ActionSuggestion) => s.status.toLowerCase() === "suggested"));
         }
       } catch { /* no suggestions yet */ }
     };
@@ -534,8 +463,7 @@ const MeetingRoom: React.FC = () => {
     if (!id || !currentUser) return;
     const syncFromBackend = async () => {
       try {
-        const res = await api.get(`/meetings/${id}/ai-insights`);
-        const data = res.data;
+        const data = await meetingsApi.getAiInsights(id);
         if (!data || data.status === "idle") return;
 
         // Set the state machine to the real backend status
@@ -595,9 +523,9 @@ const MeetingRoom: React.FC = () => {
   const pollTranscriptionData = useCallback(async () => {
     if (!id) return;
     try {
-      const res = await api.get(`/transcriptions/meeting/${id}`);
-      if (res.data?.segments?.length > 0) {
-        const segs: TranscriptionSegment[] = res.data.segments.map((s: any) => ({
+      const data = await meetingsApi.getTranscription(id);
+      if (data?.segments?.length > 0) {
+        const segs: TranscriptionSegment[] = data.segments.map((s: any) => ({
           speaker:   s.speaker || t("meeting_assistant.unknown_speaker"),
           text:      s.text    || "",
           start:     s.start,
@@ -633,8 +561,7 @@ const MeetingRoom: React.FC = () => {
     if (!id) return;
     setInsightsLoading(true);
     try {
-      const res = await api.get(`/meetings/${id}/ai-insights`);
-      const data = res.data;
+      const data = await meetingsApi.getAiInsights(id);
 
       // Update recording status from backend (single source of truth)
       if (data?.status) {
@@ -677,9 +604,9 @@ const MeetingRoom: React.FC = () => {
         setPvId(data.pv.id);
       } else if (data?.status === "completed" && !pvId) {
         // Try to fetch PV ID separately if not in insights response
-        api.get(`/pvs/meeting/${id}`)
-          .then((pvRes) => {
-            if (pvRes.data?.id) setPvId(pvRes.data.id);
+        meetingsApi.getPvByMeeting(id)
+          .then((pvData) => {
+            if (pvData?.id) setPvId(pvData.id);
           })
           .catch(() => { /* no PV yet */ });
       }
@@ -717,12 +644,13 @@ const MeetingRoom: React.FC = () => {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleStartRecording = async () => {
+    if (!id) return;
     try {
       setIsRecording(true);
       setRecordingStatus("recording");
-      const res = await api.post(`/meetings/${id}/livekit/start-recording`);
-      setRecordingId(res.data.recording_id || null);
-      setEgressId(res.data.egress_id || null);
+      const res = await meetingsApi.startRecording(id);
+      setRecordingId(res.recording_id || null);
+      setEgressId(res.egress_id || null);
       setRecordingDuration(0);
     } catch (err) {
       console.error("Failed to start recording", err);
@@ -732,10 +660,11 @@ const MeetingRoom: React.FC = () => {
   };
 
 const handleStopRecording = async () => {
+  if (!id) return;
   try {
     setRecordingStatus("processing");
     setIsRecording(false);
-    await api.post(`/meetings/${id}/livekit/stop-recording`);
+    await meetingsApi.stopRecording(id);
     setEgressId(null);
     // Continue processing - polling will continue naturally from processing state
     // No need to set to "stopped" and restart polling after timeout
@@ -760,7 +689,7 @@ const handleStopRecording = async () => {
 
   const handleSuggestionFeedback = async (suggestionId: string, action: "accept" | "reject") => {
     try {
-      await api.post("/actions/suggestions/learn", { suggestion_id: suggestionId, action });
+      await meetingsApi.learnSuggestion({ suggestion_id: suggestionId, action });
       setSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
     } catch (err) {
       console.error(`Failed to ${action} suggestion`, err);
@@ -787,10 +716,8 @@ const handleStopRecording = async () => {
     if (!pvId) return;
     try {
       const lang = i18n.language.split("-")[0] || "fr";
-      const res = await api.get(`/pv/${pvId}/pdf?language=${lang}`, {
-        responseType: "blob",
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const blob = await meetingsApi.getPvPdf(pvId, lang);
+      const url = window.URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `PV_${meetingInfo?.title || "meeting"}_${lang}.pdf`);
@@ -808,10 +735,8 @@ const handleStopRecording = async () => {
     if (!pvId) return;
     try {
       const lang = i18n.language.split("-")[0] || "fr";
-      const res = await api.get(`/pv/${pvId}/docx?language=${lang}`, {
-        responseType: "blob",
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+      const blob = await meetingsApi.getPvDocx(pvId, lang);
+      const url = window.URL.createObjectURL(new Blob([blob], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `PV_${meetingInfo?.title || "meeting"}_${lang}.docx`);
@@ -844,7 +769,7 @@ const handleStopRecording = async () => {
             <Box sx={{
               width: 10, height: 10, borderRadius: "50%",
               bgcolor: isRecording ? COLOR.error : COLOR.success,
-              animation: "pulse 2s infinite",
+              animation: "pulse-opacity 2s infinite",
               boxShadow: `0 0 0 3px ${alpha(isRecording ? COLOR.error : COLOR.success, 0.2)}`,
             }} />
 
@@ -896,7 +821,7 @@ const handleStopRecording = async () => {
             {isRecording && (
               <Tooltip title={t("meeting_assistant.recording_duration")}>
                 <Stack direction="row" alignItems="center" spacing={0.75}>
-                  <RecordIcon sx={{ fontSize: 15, color: COLOR.error, animation: "pulse 1.5s infinite" }} />
+                  <RecordIcon sx={{ fontSize: 15, color: COLOR.error, animation: "pulse-opacity 1.5s infinite" }} />
                   <Typography sx={{ fontSize: 14, fontWeight: 600, fontFamily: "monospace", color: COLOR.error }}>
                     {formatDuration(recordingDuration)}
                   </Typography>
@@ -927,29 +852,48 @@ const handleStopRecording = async () => {
           <Stack spacing={2.5}>
 
             {/* LiveKit Audio */}
-            <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${COLOR.border}`, overflow: "hidden" }}>
+<Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${COLOR.border}`, overflow: "hidden" }}>
               <Box sx={{ px: 2.5, pt: 2.5, pb: 1 }}>
                 <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLOR.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>
                   {t("meeting_assistant.participants")}
                 </Typography>
               </Box>
-               {livekitToken ? (
-                 <LiveKitRoom
-                   token={livekitToken}
-                   serverUrl={livekitUrl}
-                   connect={true}
-                   audio={true}
-                   video={false}
-                 >
-                   <RoomAudioRenderer />
-                   <Box sx={{ px: 2, pb: 1, minHeight: 80 }}>
-                     <ParticipantsList />
-                   </Box>
-                   <Divider />
-                   <ControlBar
-                     controls={{ microphone: true, camera: false, screenShare: false, leave: true }}
-                   />
-                 </LiveKitRoom>
+              {livekitToken ? (
+                  <LiveKitRoom
+                    token={livekitToken}
+                    serverUrl={livekitUrl}
+                    connect={true}
+                    audio={true}
+                    video={false}
+                    connectOptions={{
+                      peerConnectionTimeout: 30000,
+                      maxRetries: 3,
+                    }}
+                    onConnected={() => {
+                      setLivekitError(null);
+                    }}
+onError={(error) => {
+                       console.error("[LiveKit] Connection error:", error, "serverUrl:", livekitUrl);
+                       if (recordingStatus === "idle") {
+                         setLivekitError(error.message || String(error));
+                       }
+                     }}
+                    onMediaDeviceFailure={(failure, kind) => {
+                      console.error("[LiveKit] Media device failure:", failure, kind);
+                      if (recordingStatus === "idle") {
+                        setLivekitError(`Media device failure: ${failure} (${kind})`);
+                      }
+                    }}
+                    onDisconnected={() => {
+                      setLivekitConnected(false);
+                    }}
+                   >
+                     <LiveKitConnectionBridge onStateChange={handleLiveKitConnectionState} />
+                     <RoomAudioRenderer />
+                     <Box sx={{ px: 2, pb: 1, minHeight: 80 }}>
+                       <ParticipantsList />
+                     </Box>
+</LiveKitRoom>
               ) : (
                 <Box sx={{ px: 2.5, pb: 2.5, display: "flex", alignItems: "center", gap: 1.5 }}>
                   <CircularProgress size={18} />
@@ -958,6 +902,16 @@ const handleStopRecording = async () => {
                   </Typography>
                 </Box>
               )}
+              {livekitError && (
+                 <Box sx={{ px: 2.5, py: 2, bgcolor: alpha(COLOR.error, 0.08), borderTop: `1px solid ${alpha(COLOR.error, 0.2)}` }}>
+                   <Typography sx={{ fontSize: 12, fontWeight: 600, color: COLOR.error, mb: 0.5 }}>
+                     LiveKit Connection Error
+                   </Typography>
+                   <Typography sx={{ fontSize: 11, color: COLOR.error, fontFamily: "monospace", wordBreak: "break-all" }}>
+                     {livekitError}
+</Typography>
+                  </Box>
+                )}
             </Paper>
 
             {/* ── TEAMS-LIKE RECORDING CONTROLS ── */}
@@ -978,11 +932,11 @@ const handleStopRecording = async () => {
 
               {/* IDLE — Non-creator waiting */}
               {recordingStatus === "idle" && meetingCreatorId !== currentUser?.id && (
-                <Stack alignItems="center" spacing={1} sx={{ py: 1, color: COLOR.textMuted }}>
-                  <RecordIcon sx={{ fontSize: 28, color: alpha("#000", 0.1) }} />
-                  <Typography sx={{ fontSize: 12, textAlign: "center" }}>
-                    Waiting for host to start recording...
-                  </Typography>
+                 <Stack alignItems="center" spacing={1} sx={{ py: 1, color: COLOR.textMuted }}>
+                   <RecordIcon sx={{ fontSize: 28, color: alpha("#000", 0.1) }} />
+                   <Typography sx={{ fontSize: 12, textAlign: "center" }}>
+                     {t("meeting_assistant.waiting_for_host")}
+                   </Typography>
                 </Stack>
               )}
 
@@ -995,7 +949,7 @@ const handleStopRecording = async () => {
                     bgcolor: alpha(COLOR.error, 0.06),
                     border: `1px solid ${alpha(COLOR.error, 0.15)}`,
                   }}>
-                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: COLOR.error, animation: "pulse 1s infinite", flexShrink: 0 }} />
+                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: COLOR.error, animation: "pulse-opacity 1s infinite", flexShrink: 0 }} />
                     <Box sx={{ flexGrow: 1 }}>
                       <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLOR.error }}>
                         {t("meeting_assistant.recording_in_progress")}
@@ -1009,20 +963,20 @@ const handleStopRecording = async () => {
                   {/* Teams-like Stop + Pause buttons */}
                   {meetingCreatorId === currentUser?.id && (
                     <Stack direction="row" spacing={1}>
-                      <Button
-                        variant="outlined" fullWidth onClick={handlePauseRecording}
-                        startIcon={<PauseIcon />}
-                        sx={{ borderRadius: 2, textTransform: "none", fontSize: 13, fontWeight: 600, py: 1, borderColor: COLOR.warning, color: COLOR.warning, "&:hover": { bgcolor: alpha(COLOR.warning, 0.06), borderColor: COLOR.warning } }}
-                      >
-                        Pause
-                      </Button>
-                      <Button
-                        variant="contained" fullWidth disableElevation onClick={handleStopRecording}
-                        startIcon={<StopIcon />}
-                        sx={{ bgcolor: "#1F2937", color: "#FFF", borderRadius: 2, textTransform: "none", fontSize: 13, fontWeight: 600, py: 1, "&:hover": { bgcolor: "#111827" } }}
-                      >
-                        Stop
-                      </Button>
+                       <Button
+                         variant="outlined" fullWidth onClick={handlePauseRecording}
+                         startIcon={<PauseIcon />}
+                         sx={{ borderRadius: 2, textTransform: "none", fontSize: 13, fontWeight: 600, py: 1, borderColor: COLOR.warning, color: COLOR.warning, "&:hover": { bgcolor: alpha(COLOR.warning, 0.06), borderColor: COLOR.warning } }}
+                       >
+                         {t("meeting_assistant.pause_recording")}
+                       </Button>
+                       <Button
+                         variant="contained" fullWidth disableElevation onClick={handleStopRecording}
+                         startIcon={<StopIcon />}
+                         sx={{ bgcolor: "#1F2937", color: "#FFF", borderRadius: 2, textTransform: "none", fontSize: 13, fontWeight: 600, py: 1, "&:hover": { bgcolor: "#111827" } }}
+                       >
+                         {t("meeting_assistant.stop_recording")}
+                       </Button>
                     </Stack>
                   )}
                 </Stack>
@@ -1037,24 +991,24 @@ const handleStopRecording = async () => {
                     border: `1px solid ${alpha(COLOR.warning, 0.2)}`,
                   }}>
                     <PauseIcon sx={{ fontSize: 18, color: COLOR.warning }} />
-                    <Box sx={{ flexGrow: 1 }}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLOR.warning }}>
-                        Recording Paused
-                      </Typography>
-                      <Typography sx={{ fontSize: 12, color: COLOR.textMuted, fontFamily: "monospace" }}>
-                        {formatDuration(recordingDuration)}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  {meetingCreatorId === currentUser?.id && (
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        variant="contained" fullWidth disableElevation onClick={handleResumeRecording}
-                        startIcon={<ResumeIcon />}
-                        sx={{ bgcolor: COLOR.success, color: "#FFF", borderRadius: 2, textTransform: "none", fontSize: 13, fontWeight: 600, py: 1, "&:hover": { bgcolor: "#16A34A" } }}
-                      >
-                        Resume
-                      </Button>
+                     <Box sx={{ flexGrow: 1 }}>
+                       <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLOR.warning }}>
+                         {t("meeting_assistant.recording_paused")}
+                       </Typography>
+                       <Typography sx={{ fontSize: 12, color: COLOR.textMuted, fontFamily: "monospace" }}>
+                         {formatDuration(recordingDuration)}
+                       </Typography>
+                     </Box>
+                   </Stack>
+                   {meetingCreatorId === currentUser?.id && (
+                     <Stack direction="row" spacing={1}>
+                       <Button
+                         variant="contained" fullWidth disableElevation onClick={handleResumeRecording}
+                         startIcon={<ResumeIcon />}
+                         sx={{ bgcolor: COLOR.success, color: "#FFF", borderRadius: 2, textTransform: "none", fontSize: 13, fontWeight: 600, py: 1, "&:hover": { bgcolor: "#16A34A" } }}
+                       >
+                         {t("meeting_assistant.resume_recording")}
+                       </Button>
                       <Button
                         variant="outlined" fullWidth onClick={handleStopRecording}
                         startIcon={<StopIcon />}
@@ -1103,9 +1057,9 @@ const handleStopRecording = async () => {
 
               {/* FAILED — pipeline errored */}
               {recordingStatus === "failed" && (
-                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5, borderRadius: 2, bgcolor: alpha("#d32f2f", 0.05), border: `1px solid ${alpha("#d32f2f", 0.2)}` }}>
+                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5, borderRadius: 2, bgcolor: alpha(COLOR.error, 0.05), border: `1px solid ${alpha(COLOR.error, 0.2)}` }}>
                   <Box sx={{ flexGrow: 1 }}>
-                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#d32f2f" }}>
+                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLOR.error }}>
                       Recording failed
                     </Typography>
                     <Typography sx={{ fontSize: 11, color: COLOR.textMuted }}>
@@ -1127,14 +1081,12 @@ const handleStopRecording = async () => {
                       AI processing started...
                     </Typography>
                   </Box>
-                </Stack>
-              )}
-            </Paper>
+                 </Stack>
+               )}
+             </Paper>
 
-            {/* Speaking Stats */}
-            <SpeakingStatsPanel stats={speakingStats} isRecording={isRecording} />
-          </Stack>
-        </Grid>
+           </Stack>
+         </Grid>
 
         {/* ── MIDDLE COLUMN: Live Transcription ───────────────────────────── */}
         <Grid item xs={12} lg={6}>
@@ -1548,8 +1500,8 @@ const handleStopRecording = async () => {
                             size="small"
                             label={s.priority}
                             sx={{
-                              bgcolor: alpha(priorityColor(s.priority), 0.1),
-                              color: priorityColor(s.priority),
+                              bgcolor: alpha(priorityColor(s.priority, COLOR), 0.1),
+                              color: priorityColor(s.priority, COLOR),
                               fontSize: 9, fontWeight: 700, height: 18,
                               textTransform: "uppercase",
                               flexShrink: 0,
@@ -1689,41 +1641,41 @@ const handleStopRecording = async () => {
               </Box>
             </Tooltip>
 
-            {/* Recording toggle button */}
-            {meetingCreatorId === currentUser?.id && (
-              <>
-                {recordingStatus === "idle" && (
-                  <Tooltip title="Start Recording">
-                    <Box onClick={handleStartRecording} sx={{
-                      width: 44, height: 44, borderRadius: "50%",
-                      bgcolor: alpha(COLOR.error, 0.2), display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", border: `2px solid ${alpha(COLOR.error, 0.5)}`,
-                      "&:hover": { bgcolor: alpha(COLOR.error, 0.35) },
-                    }}>
-                      <RecordIcon sx={{ fontSize: 20, color: COLOR.error }} />
-                    </Box>
-                  </Tooltip>
-                )}
-                {recordingStatus === "recording" && (
-                  <Tooltip title="Stop Recording">
-                    <Box onClick={handleStopRecording} sx={{
-                      width: 44, height: 44, borderRadius: "50%",
-                      bgcolor: COLOR.error, display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", animation: "pulse 2s infinite",
-                      "&:hover": { bgcolor: "#DC2626" },
-                    }}>
-                      <StopIcon sx={{ fontSize: 20, color: "#fff" }} />
-                    </Box>
-                  </Tooltip>
-                )}
-                {recordingStatus === "paused" && (
-                  <Tooltip title="Resume Recording">
-                    <Box onClick={handleResumeRecording} sx={{
-                      width: 44, height: 44, borderRadius: "50%",
-                      bgcolor: COLOR.success, display: "flex", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer",
-                      "&:hover": { bgcolor: "#16A34A" },
-                    }}>
+             {/* Recording toggle button */}
+             {meetingCreatorId === currentUser?.id && (
+               <>
+                 {recordingStatus === "idle" && (
+                   <Tooltip title={t("meeting_assistant.start_recording")}>
+                     <Box onClick={handleStartRecording} sx={{
+                       width: 44, height: 44, borderRadius: "50%",
+                       bgcolor: alpha(COLOR.error, 0.2), display: "flex", alignItems: "center", justifyContent: "center",
+                       cursor: "pointer", border: `2px solid ${alpha(COLOR.error, 0.5)}`,
+                       "&:hover": { bgcolor: alpha(COLOR.error, 0.35) },
+                     }}>
+                       <RecordIcon sx={{ fontSize: 20, color: COLOR.error }} />
+                     </Box>
+                   </Tooltip>
+                 )}
+                 {recordingStatus === "recording" && (
+                   <Tooltip title={t("meeting_assistant.stop_recording")}>
+                     <Box onClick={handleStopRecording} sx={{
+                       width: 44, height: 44, borderRadius: "50%",
+                       bgcolor: COLOR.error, display: "flex", alignItems: "center", justifyContent: "center",
+                       cursor: "pointer", animation: "pulse-opacity 2s infinite",
+                       "&:hover": { bgcolor: "#DC2626" },
+                     }}>
+                       <StopIcon sx={{ fontSize: 20, color: "#fff" }} />
+                     </Box>
+                   </Tooltip>
+                 )}
+                 {recordingStatus === "paused" && (
+                   <Tooltip title={t("meeting_assistant.resume_recording")}>
+                     <Box onClick={handleResumeRecording} sx={{
+                       width: 44, height: 44, borderRadius: "50%",
+                       bgcolor: COLOR.success, display: "flex", alignItems: "center", justifyContent: "center",
+                       cursor: "pointer",
+                       "&:hover": { bgcolor: "#16A34A" },
+                     }}>
                       <ResumeIcon sx={{ fontSize: 20, color: "#fff" }} />
                     </Box>
                   </Tooltip>
@@ -1770,18 +1722,8 @@ const handleStopRecording = async () => {
         </Stack>
       </Paper>
 
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes pulse {
-          0%   { opacity: 1; transform: scale(1); }
-          50%  { opacity: 0.5; transform: scale(1.1); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        @keyframes wave {
-          0%, 100% { transform: scaleY(0.4); }
-          50%       { transform: scaleY(1.2); }
-        }
-      `}</style>
+      {/* CSS Animations — imported from shared styles/animations.ts */}
+      <style>{animations}</style>
     </Box>
   );
 };

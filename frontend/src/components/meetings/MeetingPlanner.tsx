@@ -41,6 +41,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import "dayjs/locale/ar-tn";
 import "dayjs/locale/fr";
+import { animations } from "../../styles/animations";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -296,7 +297,7 @@ const MeetingPlanner: React.FC = () => {
                                    sx={{ 
                                      borderRadius: '8px', fontWeight: 800, textTransform: 'none',
                                      bgcolor: (isSoon || isLate) ? 'success.main' : 'primary.main',
-                                     color: '#fff', animation: isSoon ? 'pulse 2s infinite' : 'none',
+                                     color: '#fff', animation: isSoon ? 'pulse-ripple 2s infinite' : 'none',
                                      '&:hover': { bgcolor: (isSoon || isLate) ? 'success.dark' : 'primary.dark' }
                                    }}
                                  >
@@ -311,7 +312,7 @@ const MeetingPlanner: React.FC = () => {
                                        sx={{ 
                                          borderRadius: '8px', fontWeight: 800, textTransform: 'none',
                                          bgcolor: 'success.main',
-                                         color: '#fff', animation: 'pulse 2s infinite',
+                                         color: '#fff', animation: 'pulse-ripple 2s infinite',
                                          '&:hover': { bgcolor: 'success.dark' }
                                        }}
                                      >
@@ -355,7 +356,7 @@ const MeetingPlanner: React.FC = () => {
           </Grid>
         </Grid>
       </Box>
-      <style>{`@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }`}</style>
+      <style>{animations}</style>
     </LocalizationProvider>
   );
 };

@@ -21,6 +21,7 @@ import { fetchManagerDashboardData } from "../../store/dashboardSlice";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
+import { animations } from "../../styles/animations";
 
 // Material UI Icons
 import EventIcon from "@mui/icons-material/Event";
@@ -237,7 +238,7 @@ const DashboardManager: React.FC = () => {
                                 sx={{ 
                                   borderRadius: 1.5, textTransform: "none", fontSize: 12, fontWeight: 600,
                                   bgcolor: (isSoon || isLate) ? "success.main" : "primary.main",
-                                  animation: isSoon ? 'pulse 2s infinite' : 'none',
+                                  animation: isSoon ? 'pulse-ripple 2s infinite' : 'none',
                                   "&:hover": { bgcolor: (isSoon || isLate) ? "success.dark" : "primary.dark" }
                                 }}
                               >
@@ -309,7 +310,7 @@ const DashboardManager: React.FC = () => {
         </Grid>
 
       </Grid>
-      <style>{`@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }`}</style>
+      <style>{animations}</style>
     </Box>
   );
 };

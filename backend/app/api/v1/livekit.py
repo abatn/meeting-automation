@@ -20,10 +20,8 @@ from app.services.audit_service import AuditService
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 
-_LIVEKIT_API_KEY = "meeting-api-key"
-_LIVEKIT_API_SECRET = "meeting-api-secret-2026"
 _webhook_receiver = WebhookReceiver(
-    TokenVerifier(api_key=_LIVEKIT_API_KEY, api_secret=_LIVEKIT_API_SECRET)
+    TokenVerifier(api_key=settings.LIVEKIT_API_KEY, api_secret=settings.LIVEKIT_API_SECRET)
 )
 
 _DEDUP_TTL_SECONDS = 86_400  # 24h — LiveKit retries webhooks up to ~1h, 24h is safe headroom
@@ -57,8 +55,14 @@ def _claim_webhook_event(egress_id: str, event_name: str) -> bool:
 @router.post("/meetings/{meeting_id}/livekit/token")
 async def get_livekit_token(
     meeting_id: str,
+    request: Request,  # Required for ngrok detection
     current_user: User = Depends(get_current_user),
 ):
+    """Generates a LiveKit token for any authenticated meeting participant.
+    
+    TEST-ONLY: Auto-detects ngrok clients and returns appropriate LiveKit URL.
+    Remove LIVEKIT_NGROK_URL from .env for production deployment.
+    """
     """Generates a LiveKit token for any authenticated meeting participant.
     
     LiveKit Best Practice: Any authenticated user can join a room with a valid token.
@@ -93,7 +97,22 @@ async def get_livekit_token(
     service = LiveKitService()
     user_name = current_user.full_name or current_user.email
     token = await service.generate_token(meeting_id, current_user.id, user_name)
-    server_url = settings.LIVEKIT_PUBLIC_URL or settings.LIVEKIT_URL
+    # TEST-ONLY: Auto-detect ngrok clients and return appropriate LiveKit URL
+    request_host = request.headers.get("host", "")
+    if settings.LIVEKIT_NGROK_URL and "ngrok" in request_host:
+        server_url = settings.LIVEKIT_NGROK_URL
+    else:
+        server_url = settings.LIVEKIT_PUBLIC_URL or settings.LIVEKIT_URL
+    # TEST-ONLY LOGGING - REMOVE FOR PRODUCTION
+    logger.info(
+        f"[LiveKit Token] ngrok_detection={bool(settings.LIVEKIT_NGROK_URL and 'ngrok' in request_host)} "
+        f"request_host={request_host} server_url={server_url}"
+    )
+    if not server_url or not settings.LIVEKIT_API_KEY or not settings.LIVEKIT_API_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail="LiveKit configuration is incomplete. Check LIVEKIT_URL, LIVEKIT_PUBLIC_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET.",
+        )
     
     # LiveKit Meet ConnectionDetails pattern
     return {
@@ -111,11 +130,17 @@ async def start_livekit_recording(
 ):
     """Starts LiveKit Egress recording for the meeting. Creator/admin only."""
     async with AsyncSessionLocal() as db:
-        meeting = await db.get(Meeting, meeting_id)
+        result = await db.execute(
+            select(Meeting).where(
+                Meeting.id == meeting_id,
+                Meeting.client_id == current_user.client_id,
+            )
+        )
+        meeting = result.scalar_one_or_none()
         if not meeting:
             raise HTTPException(status_code=404, detail="Meeting not found")
         if meeting.creator_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Only meeting creator can start recording")
+            raise HTTPException(status_code=403, detail="Only meeting creator can start recording.")
 
     service = LiveKitService()
     file_key = f"{current_user.client_id}/recordings/{meeting_id}/{uuid.uuid4()}_livekit.ogg"
@@ -262,7 +287,11 @@ async def livekit_webhook(request: Request):
     body_bytes = await request.body()
     body_str = body_bytes.decode("utf-8") if body_bytes else ""
 
-    logger.info(f"LiveKit webhook DEBUG: auth_header={auth_header[:50]}... body={body_str[:200]}")
+    logger.info(
+        "LiveKit webhook received: auth_header_present=%s body_prefix=%s",
+        bool(auth_header),
+        body_str[:200],
+    )
 
     event_name = ""
     meeting_id = ""
@@ -303,7 +332,18 @@ async def livekit_webhook(request: Request):
         error_message = (err.get("error", {}) or {}).get("message", "") if isinstance(err.get("error"), dict) else str(err.get("error", ""))
         logger.info(f"LiveKit webhook (manual/Bearer): event={event_name}")
     else:
-        raise HTTPException(status_code=403, detail="Invalid webhook auth")
+         raise HTTPException(status_code=403, detail="Invalid webhook auth")
+
+    # Handle participant connection aborted events (non-fatal, logging only)
+    if event_name == "participant_connection_aborted" and meeting_id:
+        logger.warning(
+            "LiveKit participant connection aborted: meeting_id=%s "
+            "Participant is attempting to reconnect. This is normal for network instability.",
+            meeting_id,
+        )
+        # No recording status change, no audit log, no DB operation
+        # ICE failures and reconnects are expected in WebRTC
+        return {"ok": True, "event": event_name, "handled": "log_only"}
 
     if event_name == "egress_ended" and meeting_id and egress_id:
         if not _claim_webhook_event(egress_id, event_name):
@@ -312,23 +352,33 @@ async def livekit_webhook(request: Request):
                 f"egress_id={egress_id} (already processed)"
             )
             return {"ok": True, "event": event_name, "deduplicated": True}
+
         if _egress_status_is_failure(egress_status):
             logger.warning(
                 f"egress_ended with failure status for meeting={meeting_id} "
                 f"egress_id={egress_id}: {error_message or 'aborted'}"
             )
-            await _mark_recording_failed(meeting_id, egress_id, error_message or "Egress aborted (no publisher)")
+            await _mark_recording_failed(
+                meeting_id=meeting_id,
+                egress_id=egress_id,
+                error_message=error_message or "Egress aborted (no publisher)",
+            )
         else:
             from app.tasks.transcription_tasks import process_recording
 
             async with AsyncSessionLocal() as db:
-                result = await db.execute(
-                    select(Recording).where(
-                        Recording.meeting_id == meeting_id,
-                        Recording.status == "streaming",
-                    ).order_by(Recording.created_at.desc()).limit(1)
+                meeting_client_id = await _get_meeting_client_id(db, meeting_id)
+                if not meeting_client_id:
+                    logger.warning(
+                        f"LiveKit webhook ignored: meeting_id={meeting_id} not found"
+                    )
+                    return {"ok": True, "event": event_name}
+
+                recording = await _get_active_recording_for_meeting(
+                    db,
+                    meeting_id=meeting_id,
+                    client_id=meeting_client_id,
                 )
-                recording = result.scalar_one_or_none()
                 if recording:
                     recording.egress_id = egress_id
                     if file_location:
@@ -355,9 +405,35 @@ async def livekit_webhook(request: Request):
                 f"egress_id={egress_id} (already processed)"
             )
             return {"ok": True, "event": event_name, "deduplicated": True}
-        await _mark_recording_failed(meeting_id, egress_id, error_message or "Egress failed (no message)")
+        await _mark_recording_failed(
+            meeting_id=meeting_id,
+            egress_id=egress_id,
+            error_message=error_message or "Egress failed (no message)",
+        )
 
     return {"ok": True, "event": event_name}
+
+
+async def _get_meeting_client_id(db, meeting_id: str) -> str | None:
+    result = await db.execute(
+        select(Meeting.client_id).where(Meeting.id == meeting_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def _get_active_recording_for_meeting(db, meeting_id: str, client_id: str) -> Recording | None:
+    result = await db.execute(
+        select(Recording)
+        .join(Meeting, Meeting.id == Recording.meeting_id)
+        .where(
+            Recording.meeting_id == meeting_id,
+            Meeting.client_id == client_id,
+            Recording.status == "streaming",
+        )
+        .order_by(Recording.created_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
 
 
 def _egress_status_is_failure(status) -> bool:
@@ -374,13 +450,18 @@ def _egress_status_is_failure(status) -> bool:
 async def _mark_recording_failed(meeting_id: str, egress_id: str, error_message: str) -> None:
     """Set the active recording for ``meeting_id`` to status='failed' and audit it."""
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(Recording).where(
-                Recording.meeting_id == meeting_id,
-                Recording.status == "streaming",
-            ).order_by(Recording.created_at.desc()).limit(1)
+        meeting_client_id = await _get_meeting_client_id(db, meeting_id)
+        if not meeting_client_id:
+            logger.warning(
+                f"LiveKit Egress FAILED webhook ignored: meeting_id={meeting_id} not found"
+            )
+            return
+
+        recording = await _get_active_recording_for_meeting(
+            db,
+            meeting_id=meeting_id,
+            client_id=meeting_client_id,
         )
-        recording = result.scalar_one_or_none()
         if recording:
             recording.status = "failed"
             recording.egress_id = egress_id

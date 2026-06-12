@@ -1,7 +1,4 @@
 log_level: debug
-api_key: meeting-api-key
-api_secret: meeting-api-secret-2026
-ws_url: ws://livekit-server:7880
 insecure: true
 
 redis:

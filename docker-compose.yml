@@ -177,10 +177,12 @@ services:
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
       - INTERNAL_API_SECRET=super-secret-automation-key-2026
-      - LIVEKIT_URL=ws://livekit-server:7880
-      - LIVEKIT_PUBLIC_URL=ws://localhost:7880
-      - LIVEKIT_API_KEY=meeting-api-key
-      - LIVEKIT_API_SECRET=meeting-api-secret-2026
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - LIVEKIT_PUBLIC_URL=${LIVEKIT_PUBLIC_URL}
+      # TEST-ONLY: ngrok-Signal-URL für Teilnehmer über ngrok. Für Produktion entfernen.
+      - LIVEKIT_NGROK_URL=${LIVEKIT_NGROK_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
       - LIVEKIT_EGRESS_BUCKET=meeting-recordings
     ports:
       - "8000:8000"
@@ -294,6 +296,11 @@ services:
   livekit-server:
     image: livekit/livekit-server:latest
     restart: unless-stopped
+    environment:
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      # TEST-ONLY: ngrok-Host aus .env für LiveKit-Media-TCP-Test. Vor Produktion entfernen.
+      - LIVEKIT_NODE_IP=${LIVEKIT_NODE_IP:-}
     # Dynamische IP-Erkennung via custom Entrypoint-Script
     # Verhindert IPv6/IPv4-Mismatch in Pion (Egress)
     # Eigenes Script liegt unter /opt/livekit/ (überschreibt NICHT Original-Entrypoint)
@@ -301,6 +308,7 @@ services:
     command: --config /etc/livekit.yaml
     ports:
       - "7880:7880"
+      - "7881:7881/tcp"
       - "7881-7890:7881-7890/udp"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
@@ -321,6 +329,9 @@ services:
     restart: unless-stopped
     environment:
       - EGRESS_CONFIG_FILE=/etc/livekit-egress/config.yaml
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - LIVEKIT_WS_URL=${LIVEKIT_URL}
     volumes:
       - ./livekit-egress.yaml:/etc/livekit-egress/config.yaml:ro
     depends_on:

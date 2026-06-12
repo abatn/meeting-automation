@@ -79,10 +79,11 @@ class Settings(BaseSettings):
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/2"
 
     # LiveKit
-    LIVEKIT_URL: str = "ws://livekit-server:7880"
-    LIVEKIT_PUBLIC_URL: str = "ws://localhost:7880"
-    LIVEKIT_API_KEY: str = "meeting-api-key"
-    LIVEKIT_API_SECRET: str = "meeting-api-secret-2026"
+    LIVEKIT_URL: str = ""
+    LIVEKIT_PUBLIC_URL: str = ""
+    LIVEKIT_NGROK_URL: str = ""  # TEST-ONLY: Remove for production
+    LIVEKIT_API_KEY: str = ""
+    LIVEKIT_API_SECRET: str = ""
     LIVEKIT_EGRESS_BUCKET: str = "meeting-recordings"
 
     # OnlyOffice

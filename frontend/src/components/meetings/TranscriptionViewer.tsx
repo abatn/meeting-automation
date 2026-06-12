@@ -19,27 +19,11 @@ import {
 } from "@mui/icons-material";
 import { useTranslation } from "react-i18next";
 import { meetingsApi } from "../../services/meetings";
+import { speakerColor } from "../../utils/speakerUtils";
 
 interface TranscriptionViewerProps {
   meetingId: string;
 }
-
-const COLORS = [
-  "#1976d2",
-  "#388e3c",
-  "#d32f2f",
-  "#f57c00",
-  "#7b1fa2",
-  "#00796b",
-];
-
-const getSpeakerColor = (speaker: string) => {
-  let hash = 0;
-  for (let i = 0; i < speaker.length; i++) {
-    hash = speaker.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return COLORS[Math.abs(hash) % COLORS.length];
-};
 
 const formatTimestamp = (seconds: number) => {
   const m = Math.floor(seconds / 60)
@@ -192,14 +176,14 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({
             const originalSpeaker = segment.speaker || t('meeting_assistant.unknown_speaker');
             const displaySpeaker =
               speakerMapping[originalSpeaker] || originalSpeaker;
-            const speakerColor = getSpeakerColor(originalSpeaker);
+            const speakerColorValue = speakerColor(originalSpeaker);
             const isEditing = editingSpeaker === originalSpeaker;
 
             return (
               <Box key={index} mb={3} display="flex" gap={2}>
                 <Avatar
                   sx={{
-                    bgcolor: speakerColor,
+                    bgcolor: speakerColorValue,
                     width: 40,
                     height: 40,
                     fontSize: "1rem",
@@ -233,7 +217,7 @@ const TranscriptionViewer: React.FC<TranscriptionViewerProps> = ({
                       <Typography
                         variant="subtitle2"
                         sx={{
-                          color: speakerColor,
+                          color: speakerColorValue,
                           fontWeight: "bold",
                           cursor: "pointer",
                         }}
