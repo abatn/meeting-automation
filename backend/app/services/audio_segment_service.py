@@ -40,30 +40,28 @@ class AudioSegmentService:
         speaker_segments = self._group_by_speaker(segments)
         result = {}
 
-        for speaker_label, segs in speaker_segments.items():
+        async def extract_single(speaker_label: str, segs: List[Dict]) -> tuple:
             total_duration = sum(s["end"] - s["start"] for s in segs)
-
             if total_duration < MIN_AUDIO_DURATION:
-                logger.warning(
-                    f"Speaker {speaker_label} has only {total_duration:.1f}s audio "
-                    f"(min {MIN_AUDIO_DURATION}s) — skipping"
-                )
-                continue
-
+                return speaker_label, None
             if len(segs) == 1:
-                segment_path = await self._extract_single_segment(
-                    audio_file_path, segs[0]
-                )
+                segment_path = await self._extract_single_segment(audio_file_path, segs[0])
             else:
-                segment_path = await self._concatenate_segments(
-                    audio_file_path, segs
-                )
+                segment_path = await self._concatenate_segments(audio_file_path, segs)
+            return speaker_label, segment_path
 
-            if segment_path and os.path.exists(segment_path):
-                result[speaker_label] = segment_path
-                logger.info(
-                    f"Extracted {speaker_label}: {total_duration:.1f}s total audio"
-                )
+        tasks = [extract_single(label, segs) for label, segs in speaker_segments.items()]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for res in results:
+            if isinstance(res, Exception):
+                logger.error(f"Speaker extraction failed: {res}")
+                continue
+            label, path = res
+            if path and os.path.exists(path):
+                result[label] = path
+                total_duration = sum(s["end"] - s["start"] for s in speaker_segments[label])
+                logger.info(f"Extracted {label}: {total_duration:.1f}s total audio")
 
         return result
 
@@ -123,61 +121,60 @@ class AudioSegmentService:
         self, audio_file_path: str, segments: List[Dict]
     ) -> Optional[str]:
         """Extract and concatenate multiple segments for a speaker."""
+        import shutil
         tmp_dir = tempfile.mkdtemp()
         part_files = []
 
-        for i, seg in enumerate(segments):
-            duration = seg["end"] - seg["start"]
-            if duration < 0.5:
-                continue
-
-            part_path = os.path.join(tmp_dir, f"part_{i}.wav")
-            cmd = [
-                "ffmpeg", "-y", "-i", audio_file_path,
-                "-ss", str(seg["start"]),
-                "-t", str(duration),
-                "-ar", "16000",
-                "-ac", "1",
-                "-acodec", "pcm_s16le",
-                part_path,
-            ]
-
-            try:
+        try:
+            async def extract_part(i: int, seg: Dict) -> Optional[str]:
+                duration = seg["end"] - seg["start"]
+                if duration < 0.5:
+                    return None
+                part_path = os.path.join(tmp_dir, f"part_{i}.wav")
+                cmd = [
+                    "ffmpeg", "-y", "-i", audio_file_path,
+                    "-ss", str(seg["start"]),
+                    "-t", str(duration),
+                    "-ar", "16000",
+                    "-ac", "1",
+                    "-acodec", "pcm_s16le",
+                    part_path,
+                ]
                 proc = await asyncio.create_subprocess_exec(
                     *cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
                 await proc.communicate()
-
                 if proc.returncode == 0 and os.path.exists(part_path):
-                    part_files.append(part_path)
+                    return part_path
+                return None
 
-            except Exception as e:
-                logger.error(f"Failed to extract segment {i}: {e}")
+            tasks = [extract_part(i, seg) for i, seg in enumerate(segments)]
+            results = await asyncio.gather(*tasks)
+            part_files = [r for r in results if r is not None]
 
-        if not part_files:
-            return None
+            if not part_files:
+                return None
 
-        if len(part_files) == 1:
-            return part_files[0]
+            if len(part_files) == 1:
+                return part_files[0]
 
-        concat_file = os.path.join(tmp_dir, "concat_list.txt")
-        with open(concat_file, "w") as f:
-            for pf in part_files:
-                f.write(f"file '{pf}'\n")
+            concat_file = os.path.join(tmp_dir, "concat_list.txt")
+            with open(concat_file, "w") as f:
+                for pf in part_files:
+                    f.write(f"file '{pf}'\n")
 
-        output_path = os.path.join(tmp_dir, "speaker_combined.wav")
-        cmd = [
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-            "-i", concat_file,
-            "-ar", "16000",
-            "-ac", "1",
-            "-acodec", "pcm_s16le",
-            output_path,
-        ]
+            output_path = os.path.join(tmp_dir, "speaker_combined.wav")
+            cmd = [
+                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                "-i", concat_file,
+                "-ar", "16000",
+                "-ac", "1",
+                "-acodec", "pcm_s16le",
+                output_path,
+            ]
 
-        try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -186,17 +183,15 @@ class AudioSegmentService:
             await proc.communicate()
 
             if proc.returncode == 0 and os.path.exists(output_path):
-                for pf in part_files:
-                    if os.path.exists(pf):
-                        os.remove(pf)
-                if os.path.exists(concat_file):
-                    os.remove(concat_file)
                 return output_path
 
             return None
 
         except Exception as e:
             logger.error(f"Failed to concatenate segments: {e}")
+            return None
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
             return None
 
     async def extract_embeddings(
