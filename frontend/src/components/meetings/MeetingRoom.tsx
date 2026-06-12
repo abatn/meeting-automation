@@ -57,9 +57,21 @@ import { LiveKitRoom, RoomAudioRenderer, useParticipants, useRoomInfo, useConnec
 import "@livekit/components-styles";
 import { ConnectionState, ConnectionQuality, RoomEvent } from "livekit-client";
 import { useTranslation } from "react-i18next";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { meetingsApi } from "../../services/meetings";
-import { RootState } from "../../store";
+import { RootState, AppDispatch } from "../../store";
+import {
+  setStatus,
+  setRecordingId,
+  setEgressId,
+  setDuration,
+  setTranscription,
+  setSpeakingStats,
+  setAiInsights,
+  setSuggestions,
+  setPvId,
+  resetRecording,
+} from "../../store/recordingSlice";
 import { animations } from "../../styles/animations";
 import { speakerColor, speakerInitial, formatDuration } from "../../utils/speakerUtils";
 
@@ -338,7 +350,23 @@ const MeetingRoom: React.FC = () => {
   const COLOR = buildColor(theme);
   const { id } = useParams<{ id: string }>();
   const { t, i18n } = useTranslation();
+  const dispatch = useDispatch<AppDispatch>();
   const currentUser = useSelector((state: RootState) => state.auth.user);
+
+  // Recording state from Redux
+  const recordingState = useSelector((state: RootState) => state.recording);
+  const {
+    status: recordingStatus,
+    isRecording,
+    duration: recordingDuration,
+    recordingId,
+    egressId,
+    transcription: liveTranscription,
+    speakingStats,
+    aiInsights,
+    suggestions,
+    pvId,
+  } = recordingState;
 
   // Meeting info
   const [meetingInfo, setMeetingInfo] = useState<MeetingInfo | null>(null);
@@ -351,24 +379,12 @@ const MeetingRoom: React.FC = () => {
   const [livekitConnected, setLivekitConnected]             = useState(false);
   const [livekitError, setLivekitError] = useState<string | null>(null);
 
-  // Recording
-  const [isRecording, setIsRecording]             = useState(false);
-  const [recordingStatus, setRecordingStatus]     = useState<"idle" | "recording" | "paused" | "processing" | "stopped" | "completed" | "failed">("idle");
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const [recordingId, setRecordingId]             = useState<string | null>(null);
-  const [egressId, setEgressId]                   = useState<string | null>(null);
-
   // Timers
   const [meetingDuration, setMeetingDuration] = useState(0);
   const [startTime]                           = useState<Date>(new Date());
 
-  // Real data from APIs — NO MOCKS
-  const [speakingStats, setSpeakingStats]       = useState<SpeakingStats[]>([]);
-  const [liveTranscription, setLiveTranscription] = useState<TranscriptionSegment[]>([]);
-  const [aiInsights, setAiInsights]             = useState<AIInsight[]>([]);
-  const [suggestions, setSuggestions]           = useState<ActionSuggestion[]>([]);
+  // Local UI state
   const [insightsLoading, setInsightsLoading]   = useState(false);
-  const [pvId, setPvId]                         = useState<string | null>(null);
   const [editMenuAnchor, setEditMenuAnchor]     = useState<null | HTMLElement>(null);
 
   // Refs
@@ -468,25 +484,25 @@ const MeetingRoom: React.FC = () => {
 
         // Set the state machine to the real backend status
         if (data.status) {
-          setRecordingStatus(data.status);
+          dispatch(setStatus(data.status));
         }
         if (data.recording_id) {
-          setRecordingId(data.recording_id);
+          dispatch(setRecordingId(data.recording_id));
         }
 
         // Populate transcription
         if (data.transcription?.segments?.length > 0) {
-          setLiveTranscription(data.transcription.segments);
+          dispatch(setTranscription(data.transcription.segments));
         }
 
         // Populate insights
         if (data.insights?.length > 0) {
-          setAiInsights(data.insights);
+          dispatch(setAiInsights(data.insights));
         }
 
         // Populate actions as suggestions
         if (data.actions?.length > 0) {
-          setSuggestions(
+          dispatch(setSuggestions(
             data.actions.map((a: any) => ({
               id: a.id,
               title: a.title,
@@ -495,7 +511,7 @@ const MeetingRoom: React.FC = () => {
               priority: a.priority || "medium",
               status: "suggested" as const,
             }))
-          );
+          ));
         }
       } catch { /* no recording yet — that's fine */ }
     };
@@ -514,10 +530,10 @@ const MeetingRoom: React.FC = () => {
   useEffect(() => {
     let iv: NodeJS.Timeout;
     if (isRecording) {
-      iv = setInterval(() => setRecordingDuration((d) => d + 1), 1000);
+      iv = setInterval(() => dispatch(setDuration(recordingDuration + 1)), 1000);
     }
     return () => clearInterval(iv);
-  }, [isRecording]);
+  }, [isRecording, recordingDuration, dispatch]);
 
   // ── Poll transcription + speaking stats when recording ───────────────────
   const pollTranscriptionData = useCallback(async () => {
@@ -534,7 +550,7 @@ const MeetingRoom: React.FC = () => {
             ? new Date(s.start * 1000).toISOString().substr(11, 8)
             : "",
         }));
-        setLiveTranscription(segs);
+        dispatch(setTranscription(segs));
 
         // Derive speaking stats from segments
         const durationMap: Record<string, number> = {};
@@ -549,10 +565,10 @@ const MeetingRoom: React.FC = () => {
           duration:    Math.round(dur),
           percentage:  Math.round((dur / total) * 100),
         }));
-        setSpeakingStats(stats);
+        dispatch(setSpeakingStats(stats));
       }
     } catch { /* transcription not ready yet */ }
-  }, [id, t]);
+  }, [id, t, dispatch]);
 
   // ── Poll AI insights after recording ends ─────────────────────────────────
   // Tier 4.1: Pull real backend status (recording.status, transcription, PV, actions)
@@ -566,26 +582,25 @@ const MeetingRoom: React.FC = () => {
       // Update recording status from backend (single source of truth)
       if (data?.status) {
         const next = data.status as "idle" | "recording" | "processing" | "completed" | "failed";
-        setRecordingStatus((prev) => {
-          // Don't downgrade from a terminal state
-          if ((prev === "completed" || prev === "failed") && next !== prev) return prev;
-          return next;
-        });
+        // Don't downgrade from a terminal state
+        if (!(recordingStatus === "completed" || recordingStatus === "failed") || next === recordingStatus) {
+          dispatch(setStatus(next));
+        }
       }
 
       // Populate transcription if backend has it
       if (data?.transcription) {
-        setLiveTranscription(data.transcription.segments || []);
+        dispatch(setTranscription(data.transcription.segments || []));
       }
 
       // Populate PV-derived insights
       if (data?.insights?.length > 0) {
-        setAiInsights(data.insights);
+        dispatch(setAiInsights(data.insights));
       }
 
       // Populate actions (suggestions)
       if (data?.actions?.length > 0) {
-        setSuggestions(
+        dispatch(setSuggestions(
           data.actions.map((a: any) => ({
             id: a.id,
             title: a.title,
@@ -594,26 +609,25 @@ const MeetingRoom: React.FC = () => {
             priority: a.priority || "medium",
             status: "suggested" as const,
           }))
-        );
+        ));
       }
 
       // Extract PV ID for edit functionality
       if (data?.pv_id) {
-        setPvId(data.pv_id);
+        dispatch(setPvId(data.pv_id));
       } else if (data?.pv?.id) {
-        setPvId(data.pv.id);
+        dispatch(setPvId(data.pv.id));
       } else if (data?.status === "completed" && !pvId) {
         // Try to fetch PV ID separately if not in insights response
         meetingsApi.getPvByMeeting(id)
           .then((pvData) => {
-            if (pvData?.id) setPvId(pvData.id);
+            if (pvData?.id) dispatch(setPvId(pvData.id));
           })
           .catch(() => { /* no PV yet */ });
       }
 
       // Stop polling on terminal states
       if (data?.status === "completed" || data?.status === "failed") {
-        setIsRecording(false);
         if (pollingRef.current) {
           clearInterval(pollingRef.current);
           pollingRef.current = null;
@@ -646,51 +660,41 @@ const MeetingRoom: React.FC = () => {
   const handleStartRecording = async () => {
     if (!id) return;
     try {
-      setIsRecording(true);
-      setRecordingStatus("recording");
+      dispatch(setStatus("recording"));
       const res = await meetingsApi.startRecording(id);
-      setRecordingId(res.recording_id || null);
-      setEgressId(res.egress_id || null);
-      setRecordingDuration(0);
+      dispatch(setRecordingId(res.recording_id || null));
+      dispatch(setEgressId(res.egress_id || null));
+      dispatch(setDuration(0));
     } catch (err) {
       console.error("Failed to start recording", err);
-      setIsRecording(false);
-      setRecordingStatus("idle");
+      dispatch(setStatus("idle"));
     }
   };
 
 const handleStopRecording = async () => {
   if (!id) return;
   try {
-    setRecordingStatus("processing");
-    setIsRecording(false);
+    dispatch(setStatus("processing"));
     await meetingsApi.stopRecording(id);
-    setEgressId(null);
-    // Continue processing - polling will continue naturally from processing state
-    // No need to set to "stopped" and restart polling after timeout
+    dispatch(setEgressId(null));
   } catch (err) {
     console.error("Failed to stop recording", err);
-    setRecordingStatus("recording");
-    setIsRecording(true);
+    dispatch(setStatus("recording"));
   }
 };
 
   const handlePauseRecording = () => {
-    // LiveKit Egress has no native pause — we toggle local timer only
-    // The recording continues on server but user sees "paused" state locally
-    setRecordingStatus("paused");
-    setIsRecording(false);
+    dispatch(setStatus("paused"));
   };
 
   const handleResumeRecording = () => {
-    setRecordingStatus("recording");
-    setIsRecording(true);
+    dispatch(setStatus("recording"));
   };
 
   const handleSuggestionFeedback = async (suggestionId: string, action: "accept" | "reject") => {
     try {
       await meetingsApi.learnSuggestion({ suggestion_id: suggestionId, action });
-      setSuggestions((prev) => prev.filter((s) => s.id !== suggestionId));
+      dispatch(setSuggestions(suggestions.filter((s) => s.id !== suggestionId)));
     } catch (err) {
       console.error(`Failed to ${action} suggestion`, err);
     }
@@ -1069,8 +1073,8 @@ onError={(error) => {
                 </Stack>
               )}
 
-              {/* STOPPED — Done */}
-              {recordingStatus === "stopped" && (
+              {/* COMPLETED — Done */}
+              {recordingStatus === "completed" && (
                 <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5, borderRadius: 2, bgcolor: alpha(COLOR.success, 0.05), border: `1px solid ${alpha(COLOR.success, 0.2)}` }}>
                   <CheckIcon sx={{ fontSize: 18, color: COLOR.success }} />
                   <Box>
