@@ -564,20 +564,6 @@ const MeetingRoom: React.FC = () => {
         if (data.insights?.length > 0) {
           setAiInsights(data.insights);
         }
-
-        // Populate actions as suggestions
-        if (data.actions?.length > 0) {
-          setSuggestions(
-            data.actions.map((a: any) => ({
-              id: a.id,
-              title: a.title,
-              description: a.description || "",
-              suggested_assignee: a.assigned_to || null,
-              priority: a.priority || "medium",
-              status: "suggested" as const,
-            }))
-          );
-        }
       } catch { /* no recording yet — that's fine */ }
     };
     syncFromBackend();
@@ -662,20 +648,6 @@ const MeetingRoom: React.FC = () => {
       // Populate PV-derived insights
       if (data?.insights?.length > 0) {
         setAiInsights(data.insights);
-      }
-
-      // Populate actions (suggestions)
-      if (data?.actions?.length > 0) {
-        setSuggestions(
-          data.actions.map((a: any) => ({
-            id: a.id,
-            title: a.title,
-            description: a.description || "",
-            suggested_assignee: a.assigned_to || null,
-            priority: a.priority || "medium",
-            status: "suggested" as const,
-          }))
-        );
       }
 
       // Extract PV ID for edit functionality
