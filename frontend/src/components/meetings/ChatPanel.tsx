@@ -14,7 +14,6 @@ import {
   Send as SendIcon,
   Close as CloseIcon,
 } from "@mui/icons-material";
-import { Chat as LiveKitChat, useChat } from "@livekit/components-react";
 
 interface ChatMessage {
   id: string;
@@ -27,43 +26,37 @@ interface ChatMessage {
 interface ChatPanelProps {
   isOpen: boolean;
   onClose?: () => void;
+  onSendMessage?: (message: string) => void;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({
+  isOpen,
+  onClose,
+  onSendMessage,
+}) => {
   const theme = useTheme();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { send, chatMessages } = useChat();
 
-  // Sync LiveKit chat messages with local state
-  useEffect(() => {
-    if (chatMessages) {
-      const mappedMessages: ChatMessage[] = chatMessages.map((msg) => ({
-        id: msg.id || String(Date.now()),
-        sender: msg.from?.name || "Unknown",
-        message: msg.message,
-        timestamp: msg.timestamp ? new Date(msg.timestamp) : new Date(),
-        isOwn: msg.from?.identity === "local",
-      }));
-      setMessages(mappedMessages);
-    }
-  }, [chatMessages]);
-
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!message.trim()) return;
     
-    try {
-      await send(message);
-      setMessage("");
-    } catch (error) {
-      console.error("Failed to send message:", error);
-    }
+    const newMessage: ChatMessage = {
+      id: String(Date.now()),
+      sender: "You",
+      message: message.trim(),
+      timestamp: new Date(),
+      isOwn: true,
+    };
+    
+    setMessages((prev) => [...prev, newMessage]);
+    onSendMessage?.(message.trim());
+    setMessage("");
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -87,7 +80,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         overflow: "hidden",
       }}
     >
-      {/* Header */}
       <Stack
         direction="row"
         alignItems="center"
@@ -106,7 +98,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         </IconButton>
       </Stack>
 
-      {/* Messages */}
       <Box
         sx={{
           flexGrow: 1,
@@ -200,7 +191,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
         <div ref={messagesEndRef} />
       </Box>
 
-      {/* Input */}
       <Box
         sx={{
           p: 1.5,
