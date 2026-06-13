@@ -145,9 +145,45 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
     ]
     ```
 
-## 3. Recordings (`/api/v1/recordings`)
+## 3. LiveKit (`/api/v1/meetings/{meeting_id}/livekit`)
 
-### 3.1. Upload Recording
+### 3.1. Generate LiveKit Token
+- **Endpoint**: `/api/v1/meetings/{meeting_id}/livekit/token`
+- **Method**: `POST`
+- **Description**: Generates LiveKit access token for meeting room.
+- **Response (200 OK)**:
+    ```json
+    {
+        "token": "eyJhbGciOiJIUzI1NiIs...",
+        "server_url": "ws://localhost:7880"
+    }
+    ```
+
+### 3.2. Start Recording
+- **Endpoint**: `/api/v1/meetings/{meeting_id}/livekit/start-recording`
+- **Method**: `POST`
+- **Description**: Starts LiveKit Egress recording.
+- **Response (200 OK)**:
+    ```json
+    {
+        "recording_id": "uuid",
+        "egress_id": "EG_xxx"
+    }
+    ```
+
+### 3.3. Stop Recording
+- **Endpoint**: `/api/v1/meetings/{meeting_id}/livekit/stop-recording`
+- **Method**: `POST`
+- **Description**: Stops active Egress recording.
+
+### 3.4. Recording Status
+- **Endpoint**: `/api/v1/meetings/{meeting_id}/livekit/recording-status`
+- **Method**: `GET`
+- **Description**: Returns current recording status (idle/recording/processing/completed/failed).
+
+## 4. Recordings (`/api/v1/recordings`)
+
+### 4.1. Upload Recording
 - **Endpoint**: `/api/v1/recordings/upload/{meeting_id}`
 - **Method**: `POST`
 - **Description**: Uploads an audio/video recording file for a specific meeting.
@@ -164,7 +200,7 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
     }
     ```
 
-### 3.2. Get Recording by ID
+### 4.2. Get Recording by ID
 - **Endpoint**: `/api/v1/recordings/{recording_id}`
 - **Method**: `GET`
 - **Description**: Retrieves details of a specific recording.
@@ -210,7 +246,32 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
     }
     ```
 
-## 5. Procès-Verbaux (PV) (`/api/v1/pv`)
+## 5. AI Insights (`/api/v1/meetings/{meeting_id}/ai-insights`)
+
+### 5.1. Get AI Insights
+- **Endpoint**: `/api/v1/meetings/{meeting_id}/ai-insights`
+- **Method**: `GET`
+- **Description**: Returns AI-generated insights including transcription, PV, and actions for a meeting.
+- **Response (200 OK)**:
+    ```json
+    {
+        "status": "completed",
+        "transcription": {
+            "segments": [
+                {"speaker": "Abdelkader Batnini", "text": "...", "start": 0.0, "end": 2.5}
+            ]
+        },
+        "insights": [
+            {"topic": "Meeting Summary", "confidence": 0.85, "actions": ["..."]}
+        ],
+        "actions": [
+            {"id": "uuid", "title": "Action item", "status": "pending"}
+        ],
+        "pv_id": "uuid"
+    }
+    ```
+
+## 6. Procès-Verbaux (PV) (`/api/v1/pv`)
 ...
 ### 6.4. List Actions
 ...
