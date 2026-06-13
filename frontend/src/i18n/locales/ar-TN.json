@@ -544,8 +544,15 @@
      "recording_continues_on_server": "التسجيل مستمر على الخادم",
      "mic_on": "الميكروفون مفعل",
      "mic_muted": "الميكروفون معطل",
-     "participants_audio_status": "حالة الصوت"
-   },
+     "participants_audio_status": "حالة الصوت",
+     "connection_connected": "متصل",
+     "connection_connecting": "جارٍ الاتصال...",
+     "connection_disconnected": "غير متصل",
+     "mic_mute": "كتم الميكروفون",
+     "mic_unmute": "تشغيل الميكروفون",
+     "leave_meeting": "مغادرة الاجتماع",
+     "leave": "مغادرة"
+    },
   "archive": {
     "subtitle": "تصفح وابحث في سجل اجتماعات شركتك.",
     "date_from": "من",

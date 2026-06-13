@@ -546,8 +546,15 @@
      "recording_continues_on_server": "L'enregistrement continue sur le serveur",
      "mic_on": "Micro Activé",
      "mic_muted": "Micro Désactivé",
-     "participants_audio_status": "Statut Audio"
-   },
+     "participants_audio_status": "Statut Audio",
+     "connection_connected": "Connecté",
+     "connection_connecting": "Connexion en cours...",
+     "connection_disconnected": "Déconnecté",
+     "mic_mute": "Couper le micro",
+     "mic_unmute": "Activer le micro",
+     "leave_meeting": "Quitter la réunion",
+     "leave": "Quitter"
+    },
   "archive": {
     "subtitle": "Parcourez et recherchez dans l'historique des réunions de votre entreprise.",
     "date_from": "Du",

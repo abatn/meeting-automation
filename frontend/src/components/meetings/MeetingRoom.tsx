@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Grid,
@@ -21,6 +21,10 @@ import {
   ListItemIcon,
   ListItemText,
   useTheme,
+  FormControl,
+  InputLabel,
+  Select,
+  SelectChangeEvent,
 } from "@mui/material";
 import {
   AutoFixHigh as SuggestionIcon,
@@ -53,7 +57,7 @@ import {
   Assignment as AssignmentIcon,
 } from "@mui/icons-material";
 import { Theme } from "@mui/material/styles";
-import { LiveKitRoom, RoomAudioRenderer, useParticipants, useRoomInfo, useConnectionState } from "@livekit/components-react";
+import { LiveKitRoom, RoomAudioRenderer, useParticipants, useRoomInfo, useConnectionState, useLocalParticipant, useDisconnectButton } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { ConnectionState, ConnectionQuality, RoomEvent } from "livekit-client";
 import { useTranslation } from "react-i18next";
@@ -134,6 +138,7 @@ function ParticipantsList() {
   const theme = useTheme();
   const COLOR = buildColor(theme);
   const participants = useParticipants();
+  const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
   const { t } = useTranslation();
   if (participants.length === 0) {
     return (
@@ -204,14 +209,33 @@ function ParticipantsList() {
              )}
            </Box>
            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0 }}>
-             {p.isMicrophoneEnabled ? (
-               <Tooltip title={t("meeting_assistant.mic_on", "Mic On")}>
-                 <MicIcon sx={{ fontSize: 14, color: COLOR.success }} />
+             {p.isLocal ? (
+               <Tooltip title={isMicrophoneEnabled ? t("meeting_assistant.mic_mute") : t("meeting_assistant.mic_unmute")}>
+                 <IconButton
+                   size="small"
+                   aria-label={isMicrophoneEnabled ? t("meeting_assistant.mic_mute") : t("meeting_assistant.mic_unmute")}
+                   onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+                   sx={{
+                     p: 0.25,
+                     color: isMicrophoneEnabled ? COLOR.success : COLOR.error,
+                     "&:focus-visible": { outline: `2px solid ${COLOR.primary}`, outlineOffset: 2 },
+                   }}
+                 >
+                   {isMicrophoneEnabled
+                     ? <MicIcon sx={{ fontSize: 14 }} />
+                     : <MicOffIcon sx={{ fontSize: 14 }} />}
+                 </IconButton>
                </Tooltip>
              ) : (
-               <Tooltip title={t("meeting_assistant.mic_muted", "Mic Muted")}>
-                 <MicOffIcon sx={{ fontSize: 14, color: COLOR.textMuted }} />
-               </Tooltip>
+               p.isMicrophoneEnabled ? (
+                 <Tooltip title={t("meeting_assistant.mic_on", "Mic On")}>
+                   <MicIcon sx={{ fontSize: 14, color: COLOR.success }} />
+                 </Tooltip>
+               ) : (
+                 <Tooltip title={t("meeting_assistant.mic_muted", "Mic Muted")}>
+                   <MicOffIcon sx={{ fontSize: 14, color: COLOR.textMuted }} />
+                 </Tooltip>
+               )
              )}
              {p.isSpeaking && (
                <VolumeIcon sx={{ fontSize: 16, color: COLOR.success }} />
@@ -230,6 +254,29 @@ function LiveKitConnectionBridge({ onStateChange }: { onStateChange: (state: Con
     onStateChange(connectionState);
   }, [connectionState, onStateChange]);
 
+  return null;
+}
+
+function LiveKitDisconnectBridge({ onReady }: { onReady: (fn: () => void) => void }) {
+  const { buttonProps } = useDisconnectButton({});
+  useEffect(() => {
+    onReady(buttonProps.onClick);
+  }, [buttonProps.onClick, onReady]);
+  return null;
+}
+
+function MicToggleBridge({
+  onMicState,
+}: {
+  onMicState: (enabled: boolean, toggle: () => void) => void;
+}) {
+  const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
+  const toggle = useCallback(() => {
+    localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
+  }, [localParticipant, isMicrophoneEnabled]);
+  useEffect(() => {
+    onMicState(isMicrophoneEnabled, toggle);
+  }, [isMicrophoneEnabled, toggle, onMicState]);
   return null;
 }
 
@@ -337,6 +384,7 @@ const MeetingRoom: React.FC = () => {
   const theme = useTheme();
   const COLOR = buildColor(theme);
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const currentUser = useSelector((state: RootState) => state.auth.user);
 
@@ -370,6 +418,20 @@ const MeetingRoom: React.FC = () => {
   const [insightsLoading, setInsightsLoading]   = useState(false);
   const [pvId, setPvId]                         = useState<string | null>(null);
   const [editMenuAnchor, setEditMenuAnchor]     = useState<null | HTMLElement>(null);
+  const [exportLanguage, setExportLanguage]     = useState<string>(i18n.language.split("-")[0] || "fr");
+
+  // Mic state (propagated from inside LiveKitRoom via MicToggleBridge)
+  const [micEnabled, setMicEnabled] = useState(true);
+  const micToggleRef = useRef<(() => void) | null>(null);
+
+  const handleMicState = useCallback((enabled: boolean, toggle: () => void) => {
+    setMicEnabled(enabled);
+    micToggleRef.current = toggle;
+  }, []);
+
+  const handleMicToggle = useCallback(() => {
+    if (micToggleRef.current) micToggleRef.current();
+  }, []);
 
   // Refs
   const transcriptionEndRef = useRef<HTMLDivElement>(null);
@@ -385,6 +447,25 @@ const MeetingRoom: React.FC = () => {
       setLivekitError(null);
     }
   }, []);
+
+  // ── State Reset bei Meeting-Wechsel ─────────────────────────────────────
+  useEffect(() => {
+    setRecordingStatus("idle");
+    setRecordingId(null);
+    setEgressId(null);
+    setIsRecording(false);
+    setRecordingDuration(0);
+    setMeetingDuration(0);
+    setLiveTranscription([]);
+    setAiInsights([]);
+    setSuggestions([]);
+    setPvId(null);
+    setLivekitToken(null);
+    setLivekitError(null);
+    setLivekitConnected(false);
+    setLivekitConnectionState(ConnectionState.Disconnected);
+    setMeetingInfo(null);
+  }, [id]);
 
   // ── Fetch meeting info + token on mount ──────────────────────────────────
   useEffect(() => {
@@ -687,6 +768,33 @@ const handleStopRecording = async () => {
     setIsRecording(true);
   };
 
+  // ── Leave Handler ────────────────────────────────────────────────────────
+  const leaveButtonRef = useRef<(() => void) | null>(null);
+
+  const handleDisconnectReady = useCallback((fn: () => void) => {
+    leaveButtonRef.current = fn;
+  }, []);
+
+  const handleLeave = async () => {
+    try {
+      // 1. Stop recording if active
+      if (recordingStatus === "recording" || recordingStatus === "paused") {
+        try {
+          await handleStopRecording();
+        } catch {
+          // best-effort — still proceed with leave
+        }
+      }
+    } finally {
+      // 2. Disconnect LiveKit (via ref callback set by LeaveButton inner component)
+      if (leaveButtonRef.current) {
+        leaveButtonRef.current();
+      }
+      // 3. Navigate to meetings list
+      navigate("/meetings");
+    }
+  };
+
   const handleSuggestionFeedback = async (suggestionId: string, action: "accept" | "reject") => {
     try {
       await meetingsApi.learnSuggestion({ suggestion_id: suggestionId, action });
@@ -707,7 +815,7 @@ const handleStopRecording = async () => {
 
   const handleEditOnline = () => {
     if (pvId) {
-      window.open(`/editor/${pvId}?lang=${i18n.language.split("-")[0] || "fr"}`, "_blank");
+      window.open(`/editor/${pvId}?lang=${exportLanguage}`, "_blank");
     }
     handleEditMenuClose();
   };
@@ -715,12 +823,11 @@ const handleStopRecording = async () => {
   const handleEditPdf = async () => {
     if (!pvId) return;
     try {
-      const lang = i18n.language.split("-")[0] || "fr";
-      const blob = await meetingsApi.getPvPdf(pvId, lang);
+      const blob = await meetingsApi.getPvPdf(pvId, exportLanguage);
       const url = window.URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `PV_${meetingInfo?.title || "meeting"}_${lang}.pdf`);
+      link.setAttribute("download", `PV_${meetingInfo?.title || "meeting"}_${exportLanguage}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -734,18 +841,17 @@ const handleStopRecording = async () => {
   const handleEditWord = async () => {
     if (!pvId) return;
     try {
-      const lang = i18n.language.split("-")[0] || "fr";
-      const blob = await meetingsApi.getPvDocx(pvId, lang);
-      const url = window.URL.createObjectURL(new Blob([blob], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+      const blob = await meetingsApi.getPvDocx(pvId, exportLanguage);
+      const url = window.URL.createObjectURL(new Blob([blob]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `PV_${meetingInfo?.title || "meeting"}_${lang}.docx`);
+      link.setAttribute("download", `PV_${meetingInfo?.title || "meeting"}_${exportLanguage}.docx`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Failed to export DOCX:", err);
+      console.error("Failed to export Word:", err);
     }
     handleEditMenuClose();
   };
@@ -889,6 +995,8 @@ onError={(error) => {
                     }}
                    >
                      <LiveKitConnectionBridge onStateChange={handleLiveKitConnectionState} />
+                     <LiveKitDisconnectBridge onReady={handleDisconnectReady} />
+                     <MicToggleBridge onMicState={handleMicState} />
                      <RoomAudioRenderer />
                      <Box sx={{ px: 2, pb: 1, minHeight: 80 }}>
                        <ParticipantsList />
@@ -1262,75 +1370,87 @@ onError={(error) => {
           <Stack spacing={2.5}>
 
             {/* ── EDIT PV BUTTON GROUP ─────────────────────────────────────── */}
-            {recordingStatus === "completed" && pvId && (
-              <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: `1px solid ${COLOR.border}`, background: `linear-gradient(135deg, ${alpha(COLOR.success, 0.04)} 0%, ${alpha(COLOR.primary, 0.04)} 100%)` }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLOR.success, display: "flex", alignItems: "center", gap: 0.75 }}>
-                    <CheckIcon sx={{ fontSize: 16 }} />
-                    {t("meeting_assistant.pipeline_complete")}
-                  </Typography>
-                </Stack>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  disableElevation
-                  onClick={handleEditMenuOpen}
-                  startIcon={<EditIcon sx={{ fontSize: 16 }} />}
-                  sx={{
-                    bgcolor: COLOR.primary,
-                    color: "#FFF",
-                    borderRadius: 2,
-                    textTransform: "none",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    py: 1,
-                    "&:hover": { bgcolor: "#2563EB" },
-                  }}
+            <Paper elevation={0} sx={{ p: 2, borderRadius: 3, border: `1px solid ${COLOR.border}`, background: `linear-gradient(135deg, ${alpha(COLOR.success, 0.04)} 0%, ${alpha(COLOR.primary, 0.04)} 100%)` }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLOR.success, display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <CheckIcon sx={{ fontSize: 16 }} />
+                  {t("meeting_assistant.pipeline_complete")}
+                </Typography>
+              </Stack>
+              <FormControl size="small" fullWidth sx={{ mb: 1.5 }}>
+                <InputLabel sx={{ fontSize: 13 }}>{t("common.language") || "Language"}</InputLabel>
+                <Select
+                  value={exportLanguage}
+                  label={t("common.language") || "Language"}
+                  onChange={(e: SelectChangeEvent) => setExportLanguage(e.target.value as string)}
+                  sx={{ borderRadius: 2, fontSize: 13 }}
                 >
-                  {t("meeting_assistant.edit_pv")}
-                </Button>
-                <Menu
-                  anchorEl={editMenuAnchor}
-                  open={Boolean(editMenuAnchor)}
-                  onClose={handleEditMenuClose}
-                  PaperProps={{ sx: { borderRadius: 2, minWidth: 200 } }}
-                >
-                  <MenuItem onClick={handleEditOnline}>
-                    <ListItemIcon>
-                      <EditIcon sx={{ fontSize: 18, color: COLOR.primary }} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={t("pv.edit_online", "Edit Online")}
-                      secondary={t("meeting_assistant.edit_online_desc", "Open in OnlyOffice editor")}
-                      primaryTypographyProps={{ fontSize: 13, fontWeight: 600 }}
-                      secondaryTypographyProps={{ fontSize: 11 }}
-                    />
-                  </MenuItem>
-                  <MenuItem onClick={handleEditPdf}>
-                    <ListItemIcon>
-                      <PdfIcon sx={{ fontSize: 18, color: COLOR.error }} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={t("meeting_assistant.export_pdf", "Export PDF")}
-                      secondary={t("meeting_assistant.export_pdf_desc", "Download as PDF document")}
-                      primaryTypographyProps={{ fontSize: 13, fontWeight: 600 }}
-                      secondaryTypographyProps={{ fontSize: 11 }}
-                    />
-                  </MenuItem>
-                  <MenuItem onClick={handleEditWord}>
-                    <ListItemIcon>
-                      <WordIcon sx={{ fontSize: 18, color: "#2B579A" }} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={t("meeting_assistant.export_word", "Export Word")}
-                      secondary={t("meeting_assistant.export_word_desc", "Download as DOCX file")}
-                      primaryTypographyProps={{ fontSize: 13, fontWeight: 600 }}
-                      secondaryTypographyProps={{ fontSize: 11 }}
-                    />
-                  </MenuItem>
-                </Menu>
-              </Paper>
-            )}
+                  <MenuItem value="ar">العربية</MenuItem>
+                  <MenuItem value="fr">Français</MenuItem>
+                  <MenuItem value="en">English</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="contained"
+                fullWidth
+                disableElevation
+                disabled={!(recordingStatus === "completed" && pvId)}
+                onClick={handleEditMenuOpen}
+                startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+                sx={{
+                  bgcolor: COLOR.primary,
+                  color: "#FFF",
+                  borderRadius: 2,
+                  textTransform: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  py: 1,
+                  "&:hover": { bgcolor: "#2563EB" },
+                }}
+              >
+                {t("meeting_assistant.edit_pv")}
+              </Button>
+              <Menu
+                anchorEl={editMenuAnchor}
+                open={Boolean(editMenuAnchor)}
+                onClose={handleEditMenuClose}
+                PaperProps={{ sx: { borderRadius: 2, minWidth: 200 } }}
+              >
+                <MenuItem onClick={handleEditOnline}>
+                  <ListItemIcon>
+                    <EditIcon sx={{ fontSize: 18, color: COLOR.primary }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={t("pv.edit_online", "Edit Online")}
+                    secondary={t("meeting_assistant.edit_online_desc", "Open in OnlyOffice editor")}
+                    primaryTypographyProps={{ fontSize: 13, fontWeight: 600 }}
+                    secondaryTypographyProps={{ fontSize: 11 }}
+                  />
+                </MenuItem>
+                <MenuItem onClick={handleEditPdf}>
+                  <ListItemIcon>
+                    <PdfIcon sx={{ fontSize: 18, color: COLOR.error }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={t("meeting_assistant.export_pdf", "Export PDF")}
+                    secondary={t("meeting_assistant.export_pdf_desc", "Download as PDF document")}
+                    primaryTypographyProps={{ fontSize: 13, fontWeight: 600 }}
+                    secondaryTypographyProps={{ fontSize: 11 }}
+                  />
+                </MenuItem>
+                <MenuItem onClick={handleEditWord}>
+                  <ListItemIcon>
+                    <WordIcon sx={{ fontSize: 18, color: "#2B579A" }} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={t("meeting_assistant.export_word", "Export Word")}
+                    secondary={t("meeting_assistant.export_word_desc", "Download as DOCX file")}
+                    primaryTypographyProps={{ fontSize: 13, fontWeight: 600 }}
+                    secondaryTypographyProps={{ fontSize: 11 }}
+                  />
+                </MenuItem>
+              </Menu>
+            </Paper>
 
             {/* AI Insights */}
             <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: `1px solid ${COLOR.border}` }}>
@@ -1573,7 +1693,7 @@ onError={(error) => {
         </Grid>
       </Grid>
 
-      {/* ── TEAMS-LIKE BOTTOM CONTROL BAR ──────────────────────────────────── */}
+      {/* ── BOTTOM CONTROL BAR ─────────────────────────────────────────────── */}
       <Paper
         elevation={0}
         sx={{
@@ -1582,142 +1702,85 @@ onError={(error) => {
           background: `linear-gradient(135deg, #1F2937 0%, #111827 100%)`,
         }}
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
 
-          {/* Left: Meeting info */}
-          <Stack direction="row" alignItems="center" spacing={2}>
-            <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
-              {formatDuration(meetingDuration)}
-            </Typography>
-            {isRecording && (
-              <Chip
-                label={`REC ${formatDuration(recordingDuration)}`}
-                size="small"
-                icon={<RecordIcon sx={{ fontSize: "12px !important", color: `${COLOR.error} !important` }} />}
-                sx={{ bgcolor: alpha(COLOR.error, 0.2), color: COLOR.error, fontWeight: 700, fontSize: 11, height: 24 }}
-              />
-            )}
-            {recordingStatus === "paused" && (
-              <Chip
-                label="PAUSED"
-                size="small"
-                sx={{ bgcolor: alpha(COLOR.warning, 0.2), color: COLOR.warning, fontWeight: 700, fontSize: 11, height: 24 }}
-              />
-            )}
-          </Stack>
-
-          {/* Center: Teams-like control buttons */}
+          {/* Left: Connection status */}
           <Stack direction="row" alignItems="center" spacing={1}>
-            {/* Mic toggle — LiveKit handles this via ControlBar but we add visual */}
-            <Tooltip title="Microphone (use audio controls above)">
+            <Box
+              role="status"
+              aria-live="polite"
+              aria-label={`Connection: ${livekitConnectionState}`}
+              sx={{ display: "flex", alignItems: "center", gap: 1 }}
+            >
               <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha("#fff", 0.1), display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "default",
-                "&:hover": { bgcolor: alpha("#fff", 0.15) },
+                width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                bgcolor:
+                  livekitConnectionState === ConnectionState.Connected ? COLOR.success :
+                  livekitConnectionState === ConnectionState.Reconnecting ? COLOR.warning :
+                  COLOR.error,
+                animation:
+                  livekitConnectionState === ConnectionState.Reconnecting
+                    ? "pulse-opacity 1s infinite"
+                    : "none",
+              }} />
+              <Typography sx={{
+                fontSize: 12, fontWeight: 500,
+                color:
+                  livekitConnectionState === ConnectionState.Connected ? "rgba(255,255,255,0.85)" :
+                  livekitConnectionState === ConnectionState.Reconnecting ? COLOR.warning :
+                  COLOR.error,
               }}>
-                <MicIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
-
-            {/* Camera Off (audio-only) */}
-            <Tooltip title="Camera off (audio-only meeting)">
-              <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha(COLOR.error, 0.3), display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <CameraOffIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
-
-            {/* Screen Share placeholder */}
-            <Tooltip title="Screen share (coming soon)">
-              <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha("#fff", 0.1), display: "flex", alignItems: "center", justifyContent: "center",
-                opacity: 0.5, cursor: "not-allowed",
-              }}>
-                <ScreenShareIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
-
-             {/* Recording toggle button */}
-             {meetingCreatorId === currentUser?.id && (
-               <>
-                 {recordingStatus === "idle" && (
-                   <Tooltip title={t("meeting_assistant.start_recording")}>
-                     <Box onClick={handleStartRecording} sx={{
-                       width: 44, height: 44, borderRadius: "50%",
-                       bgcolor: alpha(COLOR.error, 0.2), display: "flex", alignItems: "center", justifyContent: "center",
-                       cursor: "pointer", border: `2px solid ${alpha(COLOR.error, 0.5)}`,
-                       "&:hover": { bgcolor: alpha(COLOR.error, 0.35) },
-                     }}>
-                       <RecordIcon sx={{ fontSize: 20, color: COLOR.error }} />
-                     </Box>
-                   </Tooltip>
-                 )}
-                 {recordingStatus === "recording" && (
-                   <Tooltip title={t("meeting_assistant.stop_recording")}>
-                     <Box onClick={handleStopRecording} sx={{
-                       width: 44, height: 44, borderRadius: "50%",
-                       bgcolor: COLOR.error, display: "flex", alignItems: "center", justifyContent: "center",
-                       cursor: "pointer", animation: "pulse-opacity 2s infinite",
-                       "&:hover": { bgcolor: "#DC2626" },
-                     }}>
-                       <StopIcon sx={{ fontSize: 20, color: "#fff" }} />
-                     </Box>
-                   </Tooltip>
-                 )}
-                 {recordingStatus === "paused" && (
-                   <Tooltip title={t("meeting_assistant.resume_recording")}>
-                     <Box onClick={handleResumeRecording} sx={{
-                       width: 44, height: 44, borderRadius: "50%",
-                       bgcolor: COLOR.success, display: "flex", alignItems: "center", justifyContent: "center",
-                       cursor: "pointer",
-                       "&:hover": { bgcolor: "#16A34A" },
-                     }}>
-                      <ResumeIcon sx={{ fontSize: 20, color: "#fff" }} />
-                    </Box>
-                  </Tooltip>
-                )}
-              </>
-            )}
-
-            {/* Reactions placeholder */}
-            <Tooltip title="Reactions (coming soon)">
-              <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha("#fff", 0.1), display: "flex", alignItems: "center", justifyContent: "center",
-                opacity: 0.5, cursor: "not-allowed",
-              }}>
-                <ReactIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
-
-            {/* More options */}
-            <Tooltip title="More options (coming soon)">
-              <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha("#fff", 0.1), display: "flex", alignItems: "center", justifyContent: "center",
-                opacity: 0.5, cursor: "not-allowed",
-              }}>
-                <MoreIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
+                {livekitConnectionState === ConnectionState.Connected && t("meeting_assistant.connection_connected")}
+                {livekitConnectionState === ConnectionState.Connecting && t("meeting_assistant.connection_connecting")}
+                {livekitConnectionState === ConnectionState.Reconnecting && t("meeting_assistant.connection_reconnecting")}
+                {livekitConnectionState === ConnectionState.Disconnected && t("meeting_assistant.connection_disconnected")}
+              </Typography>
+            </Box>
           </Stack>
 
-          {/* Right: Leave meeting */}
+          {/* Center: Mic toggle (only when connected) */}
+          <Stack direction="row" alignItems="center" spacing={1}>
+            {livekitConnected && (
+              <Tooltip title={micEnabled ? t("meeting_assistant.mic_mute") : t("meeting_assistant.mic_unmute")}>
+                <IconButton
+                  tabIndex={0}
+                  aria-label={micEnabled ? t("meeting_assistant.mic_mute") : t("meeting_assistant.mic_unmute")}
+                  onClick={handleMicToggle}
+                  sx={{
+                    width: 44, height: 44, borderRadius: "50%",
+                    bgcolor: micEnabled ? alpha("#fff", 0.1) : alpha(COLOR.error, 0.3),
+                    color: "#fff",
+                    "&:hover": {
+                      bgcolor: micEnabled ? alpha("#fff", 0.2) : alpha(COLOR.error, 0.5),
+                    },
+                    "&:focus-visible": { outline: "2px solid #fff", outlineOffset: 2 },
+                  }}
+                >
+                  {micEnabled
+                    ? <MicIcon sx={{ fontSize: 20 }} />
+                    : <MicOffIcon sx={{ fontSize: 20 }} />}
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
+
+          {/* Right: Leave */}
           <Button
-            variant="contained" disableElevation
+            variant="contained"
+            disableElevation
+            tabIndex={0}
+            aria-label={t("meeting_assistant.leave_meeting")}
+            onClick={handleLeave}
             startIcon={<LeaveIcon />}
             sx={{
               bgcolor: COLOR.error, color: "#FFF",
               borderRadius: 2, textTransform: "none",
               fontSize: 13, fontWeight: 600, px: 2.5,
               "&:hover": { bgcolor: "#DC2626" },
+              "&:focus-visible": { outline: `2px solid #fff`, outlineOffset: 2 },
             }}
           >
-            Leave
+            {t("meeting_assistant.leave")}
           </Button>
         </Stack>
       </Paper>
