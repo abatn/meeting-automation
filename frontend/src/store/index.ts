@@ -3,8 +3,7 @@ import authReducer from "./authSlice";
 import meetingsReducer from "./meetingsSlice";
 import actionsReducer from "./actionsSlice";
 import reportReducer from "./reportSlice";
-import dashboardReducer from "./dashboardSlice";
-import recordingReducer from "./recordingSlice";
+import dashboardReducer from "./dashboardSlice"; // Neu hinzugefügt
 
 export const store = configureStore({
   reducer: {
@@ -12,8 +11,7 @@ export const store = configureStore({
     meetings: meetingsReducer,
     actions: actionsReducer,
     reports: reportReducer,
-    dashboard: dashboardReducer,
-    recording: recordingReducer,
+    dashboard: dashboardReducer, // Neu hinzugefügt
   },
 });
 

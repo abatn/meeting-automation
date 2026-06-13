@@ -42,34 +42,12 @@ logger = logging.getLogger(__name__)
 
 
 def _run_async(coro):
-    """Run async coroutine from sync context, handling both cases:
-    - No event loop running (normal Celery worker): use asyncio.run()
-    - Event loop already running (eager mode in tests): use thread pool with new loop
-    """
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-    
-    if loop is None:
-        asyncio.run(coro)
+    """Run async coroutine from sync context (Celery worker)."""
+    loop = asyncio.get_event_loop()
+    if not loop.is_running():
+        loop.run_until_complete(coro)
     else:
-        import concurrent.futures
-        
-        async def _wrapper():
-            return await coro
-        
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            def _run_in_thread():
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    return new_loop.run_until_complete(_wrapper())
-                finally:
-                    new_loop.close()
-            
-            future = pool.submit(_run_in_thread)
-            return future.result(timeout=120)
+        asyncio.ensure_future(coro)
 
 _redis_pool = None
 

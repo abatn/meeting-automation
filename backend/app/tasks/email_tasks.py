@@ -16,37 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 def _run_async(coro):
-    """Run async coroutine from sync context, handling both cases:
-    - No event loop running (normal Celery worker): use asyncio.run()
-    - Event loop already running (eager mode in tests): use run_until_complete()
-    """
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-    
-    if loop is None:
-        asyncio.run(coro)
+    """Run async coroutine from sync context (Celery worker)."""
+    loop = asyncio.get_event_loop()
+    if not loop.is_running():
+        loop.run_until_complete(coro)
     else:
-        # Eager mode: event loop is running, use run_until_complete
-        # This is the case when Celery runs in eager mode within FastAPI
-        import concurrent.futures
-        
-        async def _wrapper():
-            return await coro
-        
-        # Create a new event loop in a thread to avoid blocking the main loop
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            def _run_in_thread():
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    return new_loop.run_until_complete(_wrapper())
-                finally:
-                    new_loop.close()
-            
-            future = pool.submit(_run_in_thread)
-            return future.result(timeout=60)
+        asyncio.ensure_future(coro)
 
 
 async def _send_reminder_via_n8n(payload: dict):
