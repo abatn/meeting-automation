@@ -74,6 +74,11 @@ import {
 } from "../../store/recordingSlice";
 import { animations } from "../../styles/animations";
 import { speakerColor, speakerInitial, formatDuration } from "../../utils/speakerUtils";
+import { ControlBar } from "./ControlBar";
+import { ReactionsBar } from "./ReactionsBar";
+import { ChatPanel } from "./ChatPanel";
+import { ParticipantGrid } from "./ParticipantGrid";
+import { ConnectionIndicator } from "./ConnectionIndicator";
 
 // ─── Design Tokens (theme-derived) ─────────────────────────────────────────
 const PURPLE = "#8B5CF6";
@@ -382,6 +387,11 @@ const MeetingRoom: React.FC = () => {
   // Timers
   const [meetingDuration, setMeetingDuration] = useState(0);
   const [startTime]                           = useState<Date>(new Date());
+
+  // UI panels
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isReactionsOpen, setIsReactionsOpen] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   // Local UI state
   const [insightsLoading, setInsightsLoading]   = useState(false);
@@ -851,16 +861,17 @@ const handleStopRecording = async () => {
       {/* ── 3-COLUMN LAYOUT ─────────────────────────────────────────────────── */}
       <Grid container spacing={2.5}>
 
-        {/* ── LEFT COLUMN: Audio + Recording + Speaking Stats ─────────────── */}
+        {/* ── LEFT COLUMN: Participants + Recording + Controls ──────────── */}
         <Grid item xs={12} lg={3}>
           <Stack spacing={2.5}>
 
-            {/* LiveKit Audio */}
+            {/* LiveKit Room with Participants Grid */}
 <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${COLOR.border}`, overflow: "hidden" }}>
-              <Box sx={{ px: 2.5, pt: 2.5, pb: 1 }}>
+              <Box sx={{ px: 2.5, pt: 2.5, pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLOR.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>
                   {t("meeting_assistant.participants")}
                 </Typography>
+                {livekitConnected && <ConnectionIndicator />}
               </Box>
               {livekitToken ? (
                   <LiveKitRoom
@@ -876,7 +887,7 @@ const handleStopRecording = async () => {
                     onConnected={() => {
                       setLivekitError(null);
                     }}
-onError={(error) => {
+                    onError={(error) => {
                        console.error("[LiveKit] Connection error:", error, "serverUrl:", livekitUrl);
                        if (recordingStatus === "idle") {
                          setLivekitError(error.message || String(error));
@@ -895,7 +906,7 @@ onError={(error) => {
                      <LiveKitConnectionBridge onStateChange={handleLiveKitConnectionState} />
                      <RoomAudioRenderer />
                      <Box sx={{ px: 2, pb: 1, minHeight: 80 }}>
-                       <ParticipantsList />
+                       <ParticipantGrid maxParticipants={6} />
                      </Box>
 </LiveKitRoom>
               ) : (
@@ -1573,6 +1584,18 @@ onError={(error) => {
                 </Stack>
               )}
             </Paper>
+
+            {/* Chat Panel */}
+            <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+
+            {/* Reactions Panel */}
+            <ReactionsBar
+              isOpen={isReactionsOpen}
+              onReaction={(emoji) => {
+                console.log("Reaction:", emoji);
+                // TODO: Send reaction via LiveKit DataChannel
+              }}
+            />
           </Stack>
         </Grid>
       </Grid>
@@ -1610,119 +1633,59 @@ onError={(error) => {
             )}
           </Stack>
 
-          {/* Center: Teams-like control buttons */}
-          <Stack direction="row" alignItems="center" spacing={1}>
-            {/* Mic toggle — LiveKit handles this via ControlBar but we add visual */}
-            <Tooltip title="Microphone (use audio controls above)">
-              <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha("#fff", 0.1), display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "default",
-                "&:hover": { bgcolor: alpha("#fff", 0.15) },
-              }}>
-                <MicIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
+          {/* Center: LiveKit ControlBar */}
+          {livekitConnected && (
+            <ControlBar
+              onLeave={() => { /* handle leave */ }}
+              onToggleChat={() => setIsChatOpen(!isChatOpen)}
+              onToggleReactions={() => setIsReactionsOpen(!isReactionsOpen)}
+              onToggleScreenShare={() => setIsScreenSharing(!isScreenSharing)}
+              isChatOpen={isChatOpen}
+              isReactionsOpen={isReactionsOpen}
+            />
+          )}
 
-            {/* Camera Off (audio-only) */}
-            <Tooltip title="Camera off (audio-only meeting)">
-              <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha(COLOR.error, 0.3), display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <CameraOffIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
-
-            {/* Screen Share placeholder */}
-            <Tooltip title="Screen share (coming soon)">
-              <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha("#fff", 0.1), display: "flex", alignItems: "center", justifyContent: "center",
-                opacity: 0.5, cursor: "not-allowed",
-              }}>
-                <ScreenShareIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
-
-             {/* Recording toggle button */}
-             {meetingCreatorId === currentUser?.id && (
-               <>
-                 {recordingStatus === "idle" && (
-                   <Tooltip title={t("meeting_assistant.start_recording")}>
-                     <Box onClick={handleStartRecording} sx={{
-                       width: 44, height: 44, borderRadius: "50%",
-                       bgcolor: alpha(COLOR.error, 0.2), display: "flex", alignItems: "center", justifyContent: "center",
-                       cursor: "pointer", border: `2px solid ${alpha(COLOR.error, 0.5)}`,
-                       "&:hover": { bgcolor: alpha(COLOR.error, 0.35) },
-                     }}>
-                       <RecordIcon sx={{ fontSize: 20, color: COLOR.error }} />
-                     </Box>
-                   </Tooltip>
-                 )}
-                 {recordingStatus === "recording" && (
-                   <Tooltip title={t("meeting_assistant.stop_recording")}>
-                     <Box onClick={handleStopRecording} sx={{
-                       width: 44, height: 44, borderRadius: "50%",
-                       bgcolor: COLOR.error, display: "flex", alignItems: "center", justifyContent: "center",
-                       cursor: "pointer", animation: "pulse-opacity 2s infinite",
-                       "&:hover": { bgcolor: "#DC2626" },
-                     }}>
-                       <StopIcon sx={{ fontSize: 20, color: "#fff" }} />
-                     </Box>
-                   </Tooltip>
-                 )}
-                 {recordingStatus === "paused" && (
-                   <Tooltip title={t("meeting_assistant.resume_recording")}>
-                     <Box onClick={handleResumeRecording} sx={{
-                       width: 44, height: 44, borderRadius: "50%",
-                       bgcolor: COLOR.success, display: "flex", alignItems: "center", justifyContent: "center",
-                       cursor: "pointer",
-                       "&:hover": { bgcolor: "#16A34A" },
-                     }}>
-                      <ResumeIcon sx={{ fontSize: 20, color: "#fff" }} />
-                    </Box>
-                  </Tooltip>
-                )}
-              </>
-            )}
-
-            {/* Reactions placeholder */}
-            <Tooltip title="Reactions (coming soon)">
-              <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha("#fff", 0.1), display: "flex", alignItems: "center", justifyContent: "center",
-                opacity: 0.5, cursor: "not-allowed",
-              }}>
-                <ReactIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
-
-            {/* More options */}
-            <Tooltip title="More options (coming soon)">
-              <Box sx={{
-                width: 44, height: 44, borderRadius: "50%",
-                bgcolor: alpha("#fff", 0.1), display: "flex", alignItems: "center", justifyContent: "center",
-                opacity: 0.5, cursor: "not-allowed",
-              }}>
-                <MoreIcon sx={{ fontSize: 20, color: "#fff" }} />
-              </Box>
-            </Tooltip>
-          </Stack>
-
-          {/* Right: Leave meeting */}
-          <Button
-            variant="contained" disableElevation
-            startIcon={<LeaveIcon />}
-            sx={{
-              bgcolor: COLOR.error, color: "#FFF",
-              borderRadius: 2, textTransform: "none",
-              fontSize: 13, fontWeight: 600, px: 2.5,
-              "&:hover": { bgcolor: "#DC2626" },
-            }}
-          >
-            Leave
-          </Button>
+          {/* Right: Recording buttons (only for creator) */}
+          {meetingCreatorId === currentUser?.id && (
+            <Stack direction="row" alignItems="center" spacing={1}>
+              {recordingStatus === "idle" && (
+                <Tooltip title={t("meeting_assistant.start_recording")}>
+                  <Box onClick={handleStartRecording} sx={{
+                    width: 44, height: 44, borderRadius: "50%",
+                    bgcolor: alpha(COLOR.error, 0.2), display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer", border: `2px solid ${alpha(COLOR.error, 0.5)}`,
+                    "&:hover": { bgcolor: alpha(COLOR.error, 0.35) },
+                  }}>
+                    <RecordIcon sx={{ fontSize: 20, color: COLOR.error }} />
+                  </Box>
+                </Tooltip>
+              )}
+              {recordingStatus === "recording" && (
+                <Tooltip title={t("meeting_assistant.stop_recording")}>
+                  <Box onClick={handleStopRecording} sx={{
+                    width: 44, height: 44, borderRadius: "50%",
+                    bgcolor: COLOR.error, display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer", animation: "pulse-opacity 2s infinite",
+                    "&:hover": { bgcolor: "#DC2626" },
+                  }}>
+                    <StopIcon sx={{ fontSize: 20, color: "#fff" }} />
+                  </Box>
+                </Tooltip>
+              )}
+              {recordingStatus === "paused" && (
+                <Tooltip title={t("meeting_assistant.resume_recording")}>
+                  <Box onClick={handleResumeRecording} sx={{
+                    width: 44, height: 44, borderRadius: "50%",
+                    bgcolor: COLOR.success, display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer",
+                    "&:hover": { bgcolor: "#16A34A" },
+                  }}>
+                    <ResumeIcon sx={{ fontSize: 20, color: "#fff" }} />
+                  </Box>
+                </Tooltip>
+              )}
+            </Stack>
+          )}
         </Stack>
       </Paper>
 
