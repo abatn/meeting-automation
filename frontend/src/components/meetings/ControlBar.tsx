@@ -1,13 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Box,
   Stack,
   IconButton,
   Tooltip,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
   Divider,
   alpha,
   useTheme,
@@ -22,22 +18,20 @@ import {
   Chat as ChatIcon,
   EmojiEmotions as EmojiIcon,
   CallEnd as LeaveIcon,
-  Settings as SettingsIcon,
-  MoreVert as MoreIcon,
 } from "@mui/icons-material";
-import {
-  useTrackToggle,
-  useRoomContext,
-} from "@livekit/components-react";
-import { Track, ConnectionState } from "livekit-client";
 
 interface ControlBarProps {
   onLeave?: () => void;
   onToggleChat?: () => void;
   onToggleReactions?: () => void;
   onToggleScreenShare?: () => void;
+  onToggleMic?: () => void;
+  onToggleCamera?: () => void;
   isChatOpen?: boolean;
   isReactionsOpen?: boolean;
+  isMicEnabled?: boolean;
+  isCameraEnabled?: boolean;
+  isScreenSharing?: boolean;
 }
 
 export const ControlBar: React.FC<ControlBarProps> = ({
@@ -45,22 +39,15 @@ export const ControlBar: React.FC<ControlBarProps> = ({
   onToggleChat,
   onToggleReactions,
   onToggleScreenShare,
+  onToggleMic,
+  onToggleCamera,
   isChatOpen = false,
   isReactionsOpen = false,
+  isMicEnabled = true,
+  isCameraEnabled = false,
+  isScreenSharing = false,
 }) => {
   const theme = useTheme();
-  const room = useRoomContext();
-  const [settingsAnchor, setSettingsAnchor] = useState<null | HTMLElement>(null);
-
-  // Track toggles
-  const micToggle = useTrackToggle({ source: Track.Source.Microphone });
-  const cameraToggle = useTrackToggle({ source: Track.Source.Camera });
-  const screenShareToggle = useTrackToggle({ source: Track.Source.ScreenShare });
-
-  const handleLeave = () => {
-    room?.disconnect();
-    onLeave?.();
-  };
 
   const buttonStyle = {
     width: 48,
@@ -105,35 +92,32 @@ export const ControlBar: React.FC<ControlBarProps> = ({
       }}
     >
       {/* Microphone Toggle */}
-      <Tooltip title={micToggle.enabled ? "Mute Microphone" : "Unmute Microphone"}>
+      <Tooltip title={isMicEnabled ? "Mute Microphone" : "Unmute Microphone"}>
         <IconButton
-          onClick={() => micToggle.toggle()}
-          sx={micToggle.enabled ? activeButtonStyle : inactiveButtonStyle}
+          onClick={onToggleMic}
+          sx={isMicEnabled ? activeButtonStyle : inactiveButtonStyle}
         >
-          {micToggle.enabled ? <MicIcon /> : <MicOffIcon />}
+          {isMicEnabled ? <MicIcon /> : <MicOffIcon />}
         </IconButton>
       </Tooltip>
 
       {/* Camera Toggle */}
-      <Tooltip title={cameraToggle.enabled ? "Turn Off Camera" : "Turn On Camera"}>
+      <Tooltip title={isCameraEnabled ? "Turn Off Camera" : "Turn On Camera"}>
         <IconButton
-          onClick={() => cameraToggle.toggle()}
-          sx={cameraToggle.enabled ? activeButtonStyle : inactiveButtonStyle}
+          onClick={onToggleCamera}
+          sx={isCameraEnabled ? activeButtonStyle : inactiveButtonStyle}
         >
-          {cameraToggle.enabled ? <VideocamIcon /> : <VideocamOffIcon />}
+          {isCameraEnabled ? <VideocamIcon /> : <VideocamOffIcon />}
         </IconButton>
       </Tooltip>
 
       {/* Screen Share Toggle */}
-      <Tooltip title={screenShareToggle.enabled ? "Stop Screen Share" : "Share Screen"}>
+      <Tooltip title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}>
         <IconButton
-          onClick={() => {
-            screenShareToggle.toggle();
-            onToggleScreenShare?.();
-          }}
-          sx={screenShareToggle.enabled ? activeButtonStyle : inactiveButtonStyle}
+          onClick={onToggleScreenShare}
+          sx={isScreenSharing ? activeButtonStyle : inactiveButtonStyle}
         >
-          {screenShareToggle.enabled ? <StopScreenShareIcon /> : <ScreenShareIcon />}
+          {isScreenSharing ? <StopScreenShareIcon /> : <ScreenShareIcon />}
         </IconButton>
       </Tooltip>
 
@@ -163,7 +147,7 @@ export const ControlBar: React.FC<ControlBarProps> = ({
 
       {/* Leave Button */}
       <Tooltip title="Leave Meeting">
-        <IconButton onClick={handleLeave} sx={dangerButtonStyle}>
+        <IconButton onClick={onLeave} sx={dangerButtonStyle}>
           <LeaveIcon />
         </IconButton>
       </Tooltip>

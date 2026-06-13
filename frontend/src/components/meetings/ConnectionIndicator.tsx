@@ -1,8 +1,5 @@
 import React from "react";
 import {
-  Box,
-  Stack,
-  Typography,
   Chip,
   alpha,
   useTheme,
@@ -13,31 +10,33 @@ import {
   SignalCellular4Bar as ExcellentIcon,
   SignalCellular0Bar as DisconnectedIcon,
 } from "@mui/icons-material";
-import { useConnectionQualityIndicator } from "@livekit/components-react";
-import { ConnectionQuality } from "livekit-client";
 
-export const ConnectionIndicator: React.FC = () => {
+interface ConnectionIndicatorProps {
+  quality?: "excellent" | "good" | "poor" | "disconnected";
+}
+
+export const ConnectionIndicator: React.FC<ConnectionIndicatorProps> = ({
+  quality = "disconnected",
+}) => {
   const theme = useTheme();
-  const qualityIndicator = useConnectionQualityIndicator();
-  const quality = qualityIndicator.quality;
 
   const getQualityConfig = () => {
     switch (quality) {
-      case ConnectionQuality.Excellent:
+      case "excellent":
         return {
           icon: <ExcellentIcon sx={{ fontSize: 16 }} />,
           label: "Excellent",
           color: theme.palette.success.main,
           bgcolor: alpha(theme.palette.success.main, 0.1),
         };
-      case ConnectionQuality.Good:
+      case "good":
         return {
           icon: <GoodIcon sx={{ fontSize: 16 }} />,
           label: "Good",
           color: theme.palette.warning.main,
           bgcolor: alpha(theme.palette.warning.main, 0.1),
         };
-      case ConnectionQuality.Poor:
+      case "poor":
         return {
           icon: <PoorIcon sx={{ fontSize: 16 }} />,
           label: "Poor",

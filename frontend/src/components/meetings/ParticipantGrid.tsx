@@ -11,20 +11,24 @@ import {
   Mic as MicIcon,
   MicOff as MicOffIcon,
 } from "@mui/icons-material";
-import {
-  useParticipants,
-} from "@livekit/components-react";
-import { Participant, Track, ConnectionState } from "livekit-client";
+
+interface Participant {
+  name?: string;
+  identity?: string;
+  isSpeaking?: boolean;
+  isMuted?: boolean;
+}
 
 interface ParticipantGridProps {
+  participants?: Participant[];
   maxParticipants?: number;
 }
 
 export const ParticipantGrid: React.FC<ParticipantGridProps> = ({
+  participants = [],
   maxParticipants = 6,
 }) => {
   const theme = useTheme();
-  const participants = useParticipants();
   const displayParticipants = participants.slice(0, maxParticipants);
 
   if (displayParticipants.length === 0) {
@@ -48,8 +52,8 @@ export const ParticipantGrid: React.FC<ParticipantGridProps> = ({
 
   return (
     <Grid container spacing={1.5}>
-      {displayParticipants.map((participant) => (
-        <Grid item xs={12} sm={6} md={4} key={participant.identity}>
+      {displayParticipants.map((participant, idx) => (
+        <Grid item xs={12} sm={6} md={4} key={participant.identity || idx}>
           <ParticipantCard participant={participant} />
         </Grid>
       ))}
@@ -64,7 +68,7 @@ interface ParticipantCardProps {
 const ParticipantCard: React.FC<ParticipantCardProps> = ({ participant }) => {
   const theme = useTheme();
   const isSpeaking = participant.isSpeaking;
-  const isMuted = participant.getTrackPublication(Track.Source.Microphone)?.isMuted;
+  const isMuted = participant.isMuted;
 
   return (
     <Box
@@ -80,7 +84,7 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({ participant }) => {
         bgcolor: alpha(theme.palette.text.primary, 0.03),
       }}
     >
-      {/* Participant Video/Audio indicator */}
+      {/* Participant Avatar */}
       <Box
         sx={{
           width: "100%",
@@ -88,14 +92,14 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({ participant }) => {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          bgcolor: alpha(theme.palette.primary.main, 0.05),
+          bgcolor: alpha(theme.palette.primary.main, 0.1),
         }}
       >
         <Avatar
           sx={{
-            width: 80,
-            height: 80,
-            fontSize: 32,
+            width: 64,
+            height: 64,
+            fontSize: 24,
             bgcolor: theme.palette.primary.main,
             color: "#FFF",
           }}
@@ -105,34 +109,6 @@ const ParticipantCard: React.FC<ParticipantCardProps> = ({ participant }) => {
             "?"}
         </Avatar>
       </Box>
-
-      {/* Fallback: Show avatar if no video */}
-      {!participant.getTrackPublication(Track.Source.Camera) && (
-        <Box
-          sx={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            bgcolor: alpha(theme.palette.primary.main, 0.1),
-          }}
-        >
-          <Avatar
-            sx={{
-              width: 64,
-              height: 64,
-              fontSize: 24,
-              bgcolor: theme.palette.primary.main,
-              color: "#FFF",
-            }}
-          >
-            {participant.name?.charAt(0).toUpperCase() ||
-              participant.identity?.charAt(0).toUpperCase() ||
-              "?"}
-          </Avatar>
-        </Box>
-      )}
 
       {/* Name Label */}
       <Box
