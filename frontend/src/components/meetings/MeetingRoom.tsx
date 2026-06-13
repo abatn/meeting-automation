@@ -74,11 +74,6 @@ import {
 } from "../../store/recordingSlice";
 import { animations } from "../../styles/animations";
 import { speakerColor, speakerInitial, formatDuration } from "../../utils/speakerUtils";
-import { ControlBar } from "./ControlBar";
-import { ReactionsBar } from "./ReactionsBar";
-import { ChatPanel } from "./ChatPanel";
-import { ParticipantGrid } from "./ParticipantGrid";
-import { ConnectionIndicator } from "./ConnectionIndicator";
 
 // ─── Design Tokens (theme-derived) ─────────────────────────────────────────
 const PURPLE = "#8B5CF6";
@@ -387,11 +382,6 @@ const MeetingRoom: React.FC = () => {
   // Timers
   const [meetingDuration, setMeetingDuration] = useState(0);
   const [startTime]                           = useState<Date>(new Date());
-
-  // UI panels
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isReactionsOpen, setIsReactionsOpen] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   // Local UI state
   const [insightsLoading, setInsightsLoading]   = useState(false);
@@ -867,11 +857,10 @@ const handleStopRecording = async () => {
 
             {/* LiveKit Room with Participants Grid */}
 <Paper elevation={0} sx={{ borderRadius: 3, border: `1px solid ${COLOR.border}`, overflow: "hidden" }}>
-              <Box sx={{ px: 2.5, pt: 2.5, pb: 1, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <Box sx={{ px: 2.5, pt: 2.5, pb: 1 }}>
                 <Typography sx={{ fontSize: 13, fontWeight: 600, color: COLOR.textMuted, textTransform: "uppercase", letterSpacing: 0.5 }}>
                   {t("meeting_assistant.participants")}
                 </Typography>
-                {livekitConnected && <ConnectionIndicator />}
               </Box>
               {livekitToken ? (
                   <LiveKitRoom
@@ -906,7 +895,7 @@ const handleStopRecording = async () => {
                      <LiveKitConnectionBridge onStateChange={handleLiveKitConnectionState} />
                      <RoomAudioRenderer />
                      <Box sx={{ px: 2, pb: 1, minHeight: 80 }}>
-                       <ParticipantGrid maxParticipants={6} />
+                       <ParticipantsList />
                      </Box>
 </LiveKitRoom>
               ) : (
@@ -1585,107 +1574,43 @@ const handleStopRecording = async () => {
               )}
             </Paper>
 
-            {/* Chat Panel */}
-            <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
-
-            {/* Reactions Panel */}
-            <ReactionsBar
-              isOpen={isReactionsOpen}
-              onReaction={(emoji) => {
-                console.log("Reaction:", emoji);
-                // TODO: Send reaction via LiveKit DataChannel
-              }}
-            />
           </Stack>
         </Grid>
       </Grid>
 
-      {/* ── TEAMS-LIKE BOTTOM CONTROL BAR ──────────────────────────────────── */}
+      {/* ── BOTTOM STATUS BAR ──────────────────────────────────────────────── */}
       <Paper
         elevation={0}
         sx={{
-          mt: 3, p: 2, borderRadius: 3,
+          mt: 3, p: 1.5, borderRadius: 3,
           border: `1px solid ${COLOR.border}`,
           background: `linear-gradient(135deg, #1F2937 0%, #111827 100%)`,
         }}
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
-
-          {/* Left: Meeting info */}
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
           <Stack direction="row" alignItems="center" spacing={2}>
-            <Typography sx={{ fontSize: 13, color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
+            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.6)", fontFamily: "monospace" }}>
               {formatDuration(meetingDuration)}
             </Typography>
             {isRecording && (
               <Chip
                 label={`REC ${formatDuration(recordingDuration)}`}
                 size="small"
-                icon={<RecordIcon sx={{ fontSize: "12px !important", color: `${COLOR.error} !important` }} />}
-                sx={{ bgcolor: alpha(COLOR.error, 0.2), color: COLOR.error, fontWeight: 700, fontSize: 11, height: 24 }}
+                icon={<RecordIcon sx={{ fontSize: "10px !important", color: `${COLOR.error} !important` }} />}
+                sx={{ bgcolor: alpha(COLOR.error, 0.2), color: COLOR.error, fontWeight: 700, fontSize: 10, height: 20 }}
               />
             )}
             {recordingStatus === "paused" && (
-              <Chip
-                label="PAUSED"
-                size="small"
-                sx={{ bgcolor: alpha(COLOR.warning, 0.2), color: COLOR.warning, fontWeight: 700, fontSize: 11, height: 24 }}
+              <Chip label="PAUSED" size="small"
+                sx={{ bgcolor: alpha(COLOR.warning, 0.2), color: COLOR.warning, fontWeight: 700, fontSize: 10, height: 20 }}
               />
             )}
           </Stack>
-
-          {/* Center: LiveKit ControlBar */}
-          {livekitConnected && (
-            <ControlBar
-              onLeave={() => { /* handle leave */ }}
-              onToggleChat={() => setIsChatOpen(!isChatOpen)}
-              onToggleReactions={() => setIsReactionsOpen(!isReactionsOpen)}
-              onToggleScreenShare={() => setIsScreenSharing(!isScreenSharing)}
-              isChatOpen={isChatOpen}
-              isReactionsOpen={isReactionsOpen}
-            />
-          )}
-
-          {/* Right: Recording buttons (only for creator) */}
-          {meetingCreatorId === currentUser?.id && (
-            <Stack direction="row" alignItems="center" spacing={1}>
-              {recordingStatus === "idle" && (
-                <Tooltip title={t("meeting_assistant.start_recording")}>
-                  <Box onClick={handleStartRecording} sx={{
-                    width: 44, height: 44, borderRadius: "50%",
-                    bgcolor: alpha(COLOR.error, 0.2), display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: "pointer", border: `2px solid ${alpha(COLOR.error, 0.5)}`,
-                    "&:hover": { bgcolor: alpha(COLOR.error, 0.35) },
-                  }}>
-                    <RecordIcon sx={{ fontSize: 20, color: COLOR.error }} />
-                  </Box>
-                </Tooltip>
-              )}
-              {recordingStatus === "recording" && (
-                <Tooltip title={t("meeting_assistant.stop_recording")}>
-                  <Box onClick={handleStopRecording} sx={{
-                    width: 44, height: 44, borderRadius: "50%",
-                    bgcolor: COLOR.error, display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: "pointer", animation: "pulse-opacity 2s infinite",
-                    "&:hover": { bgcolor: "#DC2626" },
-                  }}>
-                    <StopIcon sx={{ fontSize: 20, color: "#fff" }} />
-                  </Box>
-                </Tooltip>
-              )}
-              {recordingStatus === "paused" && (
-                <Tooltip title={t("meeting_assistant.resume_recording")}>
-                  <Box onClick={handleResumeRecording} sx={{
-                    width: 44, height: 44, borderRadius: "50%",
-                    bgcolor: COLOR.success, display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: "pointer",
-                    "&:hover": { bgcolor: "#16A34A" },
-                  }}>
-                    <ResumeIcon sx={{ fontSize: 20, color: "#fff" }} />
-                  </Box>
-                </Tooltip>
-              )}
-            </Stack>
-          )}
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+              {livekitConnected ? "● Connected" : "○ Disconnected"}
+            </Typography>
+          </Stack>
         </Stack>
       </Paper>
 
