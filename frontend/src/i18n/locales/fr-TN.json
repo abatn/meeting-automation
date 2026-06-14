@@ -2,6 +2,7 @@
   "common": {
     "appName": "Automatisation de Réunions",
     "toggleLanguage": "Changer de langue",
+    "language": "Langue",
     "export": "Exporter le Rapport",
     "save": "Enregistrer",
     "cancel": "Annuler",

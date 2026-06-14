@@ -2,6 +2,7 @@
   "common": {
     "appName": "أتمتة الاجتماعات",
     "toggleLanguage": "تغيير اللغة",
+    "language": "اللغة",
     "export": "تصدير التقرير",
     "save": "حفظ",
     "cancel": "إلغاء",

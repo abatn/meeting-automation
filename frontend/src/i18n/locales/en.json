@@ -2,6 +2,7 @@
   "common": {
     "appName": "Meeting Automation",
     "toggleLanguage": "Toggle Language",
+    "language": "Language",
     "export": "Export Report",
     "save": "Save",
     "cancel": "Cancel",

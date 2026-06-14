@@ -36,6 +36,7 @@ import {
   FiberManualRecord as RecordIcon,
   Person as PersonIcon,
   CheckCircle as CheckIcon,
+  CheckCircleOutline as ApproveIcon,
   RadioButtonChecked as LiveIcon,
   VolumeUp as VolumeIcon,
   Stop as StopIcon,
@@ -417,6 +418,8 @@ const MeetingRoom: React.FC = () => {
   const [suggestions, setSuggestions]           = useState<ActionSuggestion[]>([]);
   const [insightsLoading, setInsightsLoading]   = useState(false);
   const [pvId, setPvId]                         = useState<string | null>(null);
+  const [isValidated, setIsValidated]           = useState(false);
+  const [isApproving, setIsApproving]           = useState(false);
   const [editMenuAnchor, setEditMenuAnchor]     = useState<null | HTMLElement>(null);
   const [exportLanguage, setExportLanguage]     = useState<string>(i18n.language.split("-")[0] || "fr");
 
@@ -460,6 +463,8 @@ const MeetingRoom: React.FC = () => {
     setAiInsights([]);
     setSuggestions([]);
     setPvId(null);
+    setIsValidated(false);
+    setIsApproving(false);
     setLivekitToken(null);
     setLivekitError(null);
     setLivekitConnected(false);
@@ -664,6 +669,11 @@ const MeetingRoom: React.FC = () => {
           .catch(() => { /* no PV yet */ });
       }
 
+      // Sync validated state from backend
+      if (data?.pv?.is_validated || data?.pv?.status === "published") {
+        setIsValidated(true);
+      }
+
       // Stop polling on terminal states
       if (data?.status === "completed" || data?.status === "failed") {
         setIsRecording(false);
@@ -826,6 +836,21 @@ const handleStopRecording = async () => {
       console.error("Failed to export Word:", err);
     }
     handleEditMenuClose();
+  };
+
+  const handleValidatePv = async () => {
+    if (!pvId || isValidated || isApproving) return;
+    setIsApproving(true);
+    try {
+      await meetingsApi.validatePv(pvId);
+      setIsValidated(true);
+      alert(t("pv.approved_success") || "Protocol successfully validated! Action items have been assigned.");
+    } catch (err) {
+      console.error("Failed to approve PV", err);
+      alert(t("pv.approved_error") || "Error validating the protocol.");
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1422,6 +1447,35 @@ onError={(error) => {
                   />
                 </MenuItem>
               </Menu>
+              <Button
+                variant="contained"
+                fullWidth
+                disableElevation
+                disabled={!(recordingStatus === "completed" && pvId) || isValidated || isApproving}
+                onClick={handleValidatePv}
+                startIcon={
+                  isApproving ? <CircularProgress size={16} color="inherit" /> :
+                  isValidated  ? <CheckIcon /> :
+                                 <ApproveIcon />
+                }
+                sx={{
+                  mt: 1.5,
+                  bgcolor: isValidated ? "#10B981" : "#3B82F6",
+                  color: "#FFF",
+                  borderRadius: 2,
+                  textTransform: "none",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  py: 1,
+                  "&:hover": { bgcolor: isValidated ? "#059669" : "#2563EB" },
+                  "&.Mui-disabled": {
+                    bgcolor: isValidated ? alpha("#10B981", 0.6) : undefined,
+                    color: isValidated ? "#FFF" : undefined,
+                  },
+                }}
+              >
+                {isValidated ? (t("pv.validated") || "Validated") : (t("pv.approve") || "Approve & Sign")}
+              </Button>
             </Paper>
 
             {/* AI Insights */}

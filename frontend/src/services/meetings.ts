@@ -118,6 +118,11 @@ export const meetingsApi = {
     return response.data;
   },
 
+  validatePv: async (pvId: string) => {
+    const response = await api.post(`/pv/${pvId}/validate`);
+    return response.data;
+  },
+
   getPvByMeeting: async (meetingId: string) => {
     const response = await api.get(`/pvs/meeting/${meetingId}`);
     return response.data;
