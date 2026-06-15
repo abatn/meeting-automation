@@ -148,6 +148,11 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 logger.warning(f"Recording {recording_id} not found for client {client_id}, aborting.")
                 return
 
+            # Guard: Skip if recording is already completed (prevents duplicate actions)
+            if recording.status == "completed":
+                logger.info(f"Recording {recording_id} already completed, skipping pipeline")
+                return
+
             recording.status = "transcribing"
             await db.commit()
 
@@ -200,7 +205,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             name_map = {
                 m["speaker_label"]: m["resolved_name"]
                 for m in speaker_mappings
-                if m.get("resolved_name") and m.get("confidence", 0) >= 0.50
+                if m.get("resolved_name") and m.get("confidence", 0.5) >= 0.50
             }
             display_text = gladia_result.get("full_text", "")
             display_segments = [seg.copy() for seg in gladia_result.get("segments", [])]
@@ -529,10 +534,17 @@ async def _identify_speakers(
                     confidence = min(confidence * (1.0 + 0.15 * (num_sources - 1)), 1.0)
 
                 # Penalty for conflicting signals (other names with significant scores)
+                # But only if audio doesn't clearly dominate (audio is most reliable)
                 other_score = total_signal_weight - raw_score
-                if other_score > 0:
+                audio_signals = [s for s in signals if s["source"] == "audio" and s["name"] == resolved_name]
+                audio_dominates = audio_signals and audio_signals[0]["score"] > 0.80
+
+                if other_score > 0 and not audio_dominates:
                     conflict_ratio = other_score / raw_score
                     confidence *= max(1.0 - conflict_ratio * 0.5, 0.3)  # Minimum 0.3
+                elif other_score > 0 and audio_dominates:
+                    # Audio dominates: reduce penalty significantly
+                    confidence = max(confidence, 0.70)
 
                 method = "+".join(sorted(set(name_sources[resolved_name])))
                 logger.info(
@@ -987,6 +999,14 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr", speaker_ma
         logger.info(f"Tier 2.2: Persisted {len(pv_sections_to_insert)} PV sections for PV {pv_id}")
 
     # Create actions and resolve assignees
+    # Idempotency: Load existing actions to prevent duplicates
+    existing_actions_result = await db.execute(
+        select(Action).where(Action.meeting_id == str(recording.meeting_id))
+    )
+    existing_action_titles = {
+        a.title.lower().strip() for a in existing_actions_result.scalars().all()
+    }
+
     created_actions = []
     for act in pv_data.get("actions", []):
         due_date = None
@@ -996,6 +1016,13 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr", speaker_ma
             except (ValueError, TypeError):
                 pass
         description = act.get("description", "")
+        title = (description[:200] if description else "Action").lower().strip()
+
+        # Skip if identical action already exists for this meeting
+        if title in existing_action_titles:
+            logger.info(f"Skipping duplicate action: '{title[:50]}...' for meeting {recording.meeting_id}")
+            continue
+
         action = Action(
             id=str(uuid.uuid4()),
             client_id=str(recording.client_id),
@@ -1007,6 +1034,7 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr", speaker_ma
             priority=act.get("priority", "medium"),
         )
         db.add(action)
+        existing_action_titles.add(title)
         created_actions.append((action, act.get("assignee")))
 
     await db.flush()

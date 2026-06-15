@@ -123,7 +123,7 @@ class AudioSegmentService:
         """Extract and concatenate multiple segments for a speaker."""
         import shutil
         tmp_dir = tempfile.mkdtemp()
-        part_files = []
+        result_path = None
 
         try:
             async def extract_part(i: int, seg: Dict) -> Optional[str]:
@@ -155,44 +155,44 @@ class AudioSegmentService:
             part_files = [r for r in results if r is not None]
 
             if not part_files:
-                return None
+                result_path = None
+            elif len(part_files) == 1:
+                result_path = part_files[0]
+            else:
+                concat_file = os.path.join(tmp_dir, "concat_list.txt")
+                with open(concat_file, "w") as f:
+                    for pf in part_files:
+                        f.write(f"file '{pf}'\n")
 
-            if len(part_files) == 1:
-                return part_files[0]
+                final_tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+                final_tmp.close()
+                final_output = final_tmp.name
 
-            concat_file = os.path.join(tmp_dir, "concat_list.txt")
-            with open(concat_file, "w") as f:
-                for pf in part_files:
-                    f.write(f"file '{pf}'\n")
+                cmd = [
+                    "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                    "-i", concat_file,
+                    "-ar", "16000",
+                    "-ac", "1",
+                    "-acodec", "pcm_s16le",
+                    final_output,
+                ]
 
-            output_path = os.path.join(tmp_dir, "speaker_combined.wav")
-            cmd = [
-                "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-                "-i", concat_file,
-                "-ar", "16000",
-                "-ac", "1",
-                "-acodec", "pcm_s16le",
-                output_path,
-            ]
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await proc.communicate()
 
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            await proc.communicate()
-
-            if proc.returncode == 0 and os.path.exists(output_path):
-                return output_path
-
-            return None
+                result_path = final_output if (proc.returncode == 0 and os.path.exists(final_output)) else None
 
         except Exception as e:
             logger.error(f"Failed to concatenate segments: {e}")
-            return None
+            result_path = None
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)
-            return None
+
+        return result_path
 
     async def extract_embeddings(
         self,

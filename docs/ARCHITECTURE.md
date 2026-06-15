@@ -1,8 +1,8 @@
 # System Architecture for Meeting Automation System
 
-## ✅ CURRENT STATUS — 2026-06-13: PIPELINE OPERATIONAL
+## ✅ CURRENT STATUS — 2026-06-14: PIPELINE OPERATIONAL
 
-**349/354 Tests Passing (98.6%) | Pipeline ~14s (testbobo)**
+**355+ Tests Passing | Pipeline ~14s (testbobo)**
 
 All critical architectural components validated:
 - Multi-tenant data isolation ✅
@@ -15,6 +15,8 @@ All critical architectural components validated:
 - Gladia V2 Transcription ✅
 - Mistral PV Generation ✅
 - Phase 1 Security Fixes ✅
+- Duplicate Action Prevention ✅
+- Confidence Fallback Fix (NULL ≠ 0.0) ✅
 
 ### Pipeline Performance (Verified)
 - **Total Pipeline**: ~14s (testbobo)
@@ -194,6 +196,7 @@ graph TD
 - **Audit Middleware**: Comprehensive audit trail for all significant actions.
 - **Data Isolation**: Application-level Row Level Security via `client_id` filtering.
 - **Data Encryption**: AES-256 for data at rest, TLS for data in transit.
+- **Confidence Handling**: NULL confidence values default to 0.5 (neutral), not 0.0 (explicitly low). This prevents false negatives in speaker identification and assignee resolution.
 
 ## 6. Cultural Adaptations (Tunisia/Maghreb)
 

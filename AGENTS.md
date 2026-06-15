@@ -55,7 +55,7 @@ Tests are categorized by external dependency — not all "unit tests" run with S
 
 ### LiveKit Pipeline (Critical Timing)
 - **Recording → PV pipeline**: Target ≤90s end-to-end for Arabic transcriptions
-- **Current**: ~3m 10s - 3m 40s total (validated in docs/LIVEKIT_ROUTE_PIPELINE_2026-06-07.md)
+- **Current**: ~14s (testbobo), ~3m 10s (complex meetings)
 - **Main bottleneck**: Gladia polling (fixed 5s intervals → ~110s idle wait)
 - **PV generation**: Dual-context approach (Sentinel summary + Display Transcript with real names)
 - **Temperature 0.1** for deterministic Mistral output (not default 0.7)
@@ -63,6 +63,7 @@ Tests are categorized by external dependency — not all "unit tests" run with S
 - **Webhook flow**: LiveKit egress → MinIO upload → Celery async task → Gladia → Mistral → DB
 - **Room auto-close**: 5min empty timeout — frontend must join room before recording
 - **Webhook dedup**: Redis SETNX (24h TTL, fail-open) prevents duplicate processing
+- **Duplicate action prevention**: Guard in `_process_recording_pipeline` (skip if `recording.status == "completed"`) + idempotency check in `_save_pv_and_actions` (skip if action title exists for meeting)
 - **Key files**:
   - `backend/app/tasks/transcription_tasks.py` (lines 870-949: PV sections)
   - `backend/app/services/pv_service.py` (Mistral API, 60s timeout, Temperature 0.1)
@@ -76,6 +77,7 @@ Tests are categorized by external dependency — not all "unit tests" run with S
 - **Display Transcript** sent to Mistral: `"Abdelkader Batnini: ..."` not `"Speaker 0: ..."`
 - **Assignee Resolution**: 6-step (speaker mappings → participants → phonetic → fuzzy → single speaker → external)
 - **Confidence scoring**: 0.30 (external) to 0.95 (exact match)
+- **Confidence fallback**: Use 0.5 for NULL (unknown), NOT 0.0. `None` ≠ `0.0`. NULL means "never measured", 0.0 means "explicitly low confidence"
 - **Auto-enrollment**: ONNX 192-dim embeddings stored for future matching
 
 ## Quick Commands
@@ -303,6 +305,14 @@ Extract with: `docker logs celery-worker | grep TIMING`
 ### 10. test_audit.py or test_auth.py Hangs Without E2E_TEST
 - Symptom: Tests hang indefinitely
 - Fix: These tests call `/api/v1/auth/register` which triggers `send_invitation_email.delay()`. Without `E2E_TEST=true`, Celery tries to connect to RabbitMQ (unreachable from host). Use `E2E_TEST=true` to enable eager mode.
+
+### 11. Duplicate Actions from Multiple Recording Runs
+- Symptom: 3 recording runs create 3x identical actions for the same meeting
+- Fix: Guard in `_process_recording_pipeline` (skip if `recording.status == "completed"`) + idempotency check in `_save_pv_and_actions` (skip if action title exists for meeting)
+
+### 12. Confidence NULL vs 0.0 Confusion
+- Symptom: `mapping_confidence or 0.0` treats NULL (unknown) same as 0.0 (explicitly low)
+- Fix: Use `s.mapping_confidence if s.mapping_confidence is not None else 0.5` — NULL means "never measured", 0.0 means "explicitly rejected"
 
 ## Development Workflow
 

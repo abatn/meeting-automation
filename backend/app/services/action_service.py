@@ -754,7 +754,7 @@ Return ONLY a JSON array of objects with the following structure:
                 {
                     "speaker_label": s.name,
                     "resolved_name": s.resolved_name or s.name,
-                    "confidence": s.mapping_confidence or 0.0,
+                    "confidence": s.mapping_confidence if s.mapping_confidence is not None else 0.5,
                     "method": s.mapping_method or "unknown",
                     "user_id": s.user_id,
                 }

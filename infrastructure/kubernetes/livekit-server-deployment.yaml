@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livekit-server
+  namespace: meeting-automation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: livekit-server
+  template:
+    metadata:
+      labels:
+        app: livekit-server
+    spec:
+      containers:
+      - name: livekit-server
+        image: livekit/livekit-server:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 7880
+          name: signaling
+        - containerPort: 7881
+          name: tcp-fallback
+          protocol: TCP
+        - containerPort: 7881
+          name: udp-media
+          protocol: UDP
+          startPort: 7881
+          endPort: 7890
+        env:
+        - name: LIVEKIT_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: livekit-secrets
+              key: LIVEKIT_API_KEY
+        - name: LIVEKIT_API_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: livekit-secrets
+              key: LIVEKIT_API_SECRET
+        - name: LIVEKIT_NODE_IP
+          value: ""
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 7880
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 7880
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: livekit-config
+          mountPath: /etc/livekit.yaml
+          subPath: livekit.yaml
+        - name: livekit-config
+          mountPath: /opt/livekit/entrypoint.sh
+          subPath: livekit-entrypoint.sh
+      volumes:
+      - name: livekit-config
+        configMap:
+          name: livekit-config
+          defaultMode: 0755

@@ -18,9 +18,6 @@ def _run_async(coro):
         loop.run_until_complete(coro)
     else:
         asyncio.ensure_future(coro)
-            
-            future = pool.submit(_run_in_thread)
-            return future.result(timeout=60)
 
 
 @celery_app.task(

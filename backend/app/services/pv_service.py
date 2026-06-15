@@ -1,6 +1,7 @@
 import httpx
 import logging
 import json
+import asyncio
 import time
 from typing import Dict, Any, Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,9 @@ from app.models.pv import PV
 from app.core.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
+
+# Concurrency limiter: max 2 parallel Mistral API calls
+_mistral_semaphore = asyncio.Semaphore(2)
 
 REQUIRED_PV_KEYS = {"title", "summary", "decisions", "actions"}
 
@@ -137,6 +141,9 @@ class PVService:
 
             system_content = f"""You are a professional secretary creating a 'Procès-Verbal' (PV) from meeting transcriptions.
 
+MEETING DATE: {datetime.now().strftime('%Y-%m-%d')} (TODAY)
+CRITICAL: All deadlines MUST be in the FUTURE (after {datetime.now().strftime('%Y-%m-%d')}). If someone says "next week", the deadline is approximately 7 days from today. If someone says "in two weeks", it is approximately 14 days from today. NEVER generate dates in the past.
+
 CONTEXT PROVIDED:
 1. MEETING SUMMARY (for overview):
 {sentinel_summary}
@@ -172,7 +179,7 @@ The JSON keys MUST remain exactly as follows:
       "priority": "high/medium/low",
       "priority_reason": "Short justification",
       "assignee": "EXACT name from the closed list above",
-      "deadline": "YYYY-MM-DD or null (Only return null if NO timeframe or date is mentioned. The current year is {current_year}.)"
+      "deadline": "YYYY-MM-DD or null (Only return null if NO timeframe or date is mentioned. Current date: {datetime.now().strftime('%Y-%m-%d')}. ALL deadlines MUST be in the FUTURE. 'Next week' ≈ 7 days from now. 'In two weeks' ≈ 14 days from now.)"
     }}
   ]
 }}
@@ -197,15 +204,32 @@ Use the summary for the PV overview, and the full transcript to determine who is
                 "temperature": 0.1,
             }
 
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.mistral.ai/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=60.0,
-                )
-                response.raise_for_status()
-                result = response.json()
+            async with _mistral_semaphore:
+                async with httpx.AsyncClient() as client:
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            response = await client.post(
+                                "https://api.mistral.ai/v1/chat/completions",
+                                headers=headers,
+                                json=payload,
+                                timeout=60.0,
+                            )
+                            if response.status_code == 429:
+                                retry_after = int(response.headers.get("Retry-After", 2 ** attempt))
+                                logger.warning(f"Mistral 429 rate limited, retrying in {retry_after}s (attempt {attempt + 1}/{max_retries})")
+                                await asyncio.sleep(retry_after)
+                                continue
+                            response.raise_for_status()
+                            result = response.json()
+                            break
+                        except httpx.HTTPStatusError as e:
+                            if e.response.status_code == 429 and attempt < max_retries - 1:
+                                retry_after = int(e.response.headers.get("Retry-After", 2 ** attempt))
+                                logger.warning(f"Mistral 429, retry in {retry_after}s")
+                                await asyncio.sleep(retry_after)
+                                continue
+                            raise
                 content_str = result["choices"][0]["message"]["content"]
                 
                 # AUDIT LOGGING: Capture Mistral response for assignee audit
@@ -293,15 +317,32 @@ The output MUST be a valid JSON object with the identical structure as the input
                 "response_format": {"type": "json_object"},
             }
 
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    "https://api.mistral.ai/v1/chat/completions",
-                    headers=headers,
-                    json=payload,
-                    timeout=30.0,
-                )
-                response.raise_for_status()
-                result = response.json()
+            async with _mistral_semaphore:
+                async with httpx.AsyncClient() as client:
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            response = await client.post(
+                                "https://api.mistral.ai/v1/chat/completions",
+                                headers=headers,
+                                json=payload,
+                                timeout=30.0,
+                            )
+                            if response.status_code == 429:
+                                retry_after = int(response.headers.get("Retry-After", 2 ** attempt))
+                                logger.warning(f"Mistral 429 rate limited, retrying in {retry_after}s (attempt {attempt + 1}/{max_retries})")
+                                await asyncio.sleep(retry_after)
+                                continue
+                            response.raise_for_status()
+                            result = response.json()
+                            break
+                        except httpx.HTTPStatusError as e:
+                            if e.response.status_code == 429 and attempt < max_retries - 1:
+                                retry_after = int(e.response.headers.get("Retry-After", 2 ** attempt))
+                                logger.warning(f"Mistral 429, retry in {retry_after}s")
+                                await asyncio.sleep(retry_after)
+                                continue
+                            raise
                 content_str = result["choices"][0]["message"]["content"]
                 
                 try:

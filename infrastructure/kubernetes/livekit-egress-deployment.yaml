@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livekit-egress
+  namespace: meeting-automation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: livekit-egress
+  template:
+    metadata:
+      labels:
+        app: livekit-egress
+    spec:
+      containers:
+      - name: livekit-egress
+        image: livekit/egress:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 7000
+          name: health
+        env:
+        - name: EGRESS_CONFIG_FILE
+          value: /etc/livekit-egress/config.yaml
+        - name: LIVEKIT_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: livekit-secrets
+              key: LIVEKIT_API_KEY
+        - name: LIVEKIT_API_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: livekit-secrets
+              key: LIVEKIT_API_SECRET
+        - name: LIVEKIT_WS_URL
+          value: "ws://livekit-server:7880"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 7000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 7000
+          initialDelaySeconds: 15
+          periodSeconds: 30
+          timeoutSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: livekit-config
+          mountPath: /etc/livekit-egress/config.yaml
+          subPath: livekit-egress.yaml
+      volumes:
+      - name: livekit-config
+        configMap:
+          name: livekit-config

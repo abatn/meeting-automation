@@ -185,7 +185,7 @@ class AssigneeResolver:
         # Exact match
         if name_lower in self._resolved_speakers:
             mapping = self._resolved_speakers[name_lower]
-            speaker_conf = mapping.get("confidence", 0.0)
+            speaker_conf = mapping.get("confidence", 0.5)
             user_id = mapping.get("user_id")
 
             # If mapping has user_id, return immediately
