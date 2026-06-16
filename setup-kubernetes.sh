@@ -350,6 +350,17 @@ kubectl apply -f infrastructure/kubernetes/traefik-middlewares.yaml 2>/dev/null 
 kubectl apply -f infrastructure/kubernetes/traefik-ingressroute.yaml 2>/dev/null || true
 
 # ============================================================
+# 8.5. Deploy LiveKit (Server + Egress)
+# ============================================================
+echo -e "${YELLOW}Deploying LiveKit...${NC}"
+kubectl apply -f infrastructure/kubernetes/livekit-configmap.yaml 2>/dev/null || true
+kubectl apply -f infrastructure/kubernetes/livekit-secrets.yaml 2>/dev/null || true
+kubectl apply -f infrastructure/kubernetes/livekit-server-deployment.yaml 2>/dev/null || true
+kubectl apply -f infrastructure/kubernetes/livekit-server-service.yaml 2>/dev/null || true
+kubectl apply -f infrastructure/kubernetes/livekit-egress-deployment.yaml 2>/dev/null || true
+kubectl apply -f infrastructure/kubernetes/livekit-egress-service.yaml 2>/dev/null || true
+
+# ============================================================
 # 9. Load Docker images into containerd
 # ============================================================
 echo -e "${YELLOW}Loading Docker images into cluster...${NC}"
@@ -362,9 +373,15 @@ echo -e "Loading meeting-automation-backend:latest into ${CLUSTER_NODE}..."
 echo -e "${YELLOW}Note: Backend image is large (~4.35GB). This may take 5-10 minutes...${NC}"
 docker save meeting-automation-backend:latest | docker exec -i "$CLUSTER_NODE" ctr -n k8s.io images import - 2>/dev/null || echo -e "${YELLOW}Warning: Backend image load failed (may already exist).${NC}"
 
+echo -e "Loading livekit/livekit-server:latest into ${CLUSTER_NODE}..."
+docker save livekit/livekit-server:latest 2>/dev/null | docker exec -i "$CLUSTER_NODE" ctr -n k8s.io images import - 2>/dev/null || echo -e "${YELLOW}Warning: LiveKit server image load failed (may already exist).${NC}"
+
+echo -e "Loading livekit/egress:latest into ${CLUSTER_NODE}..."
+docker save livekit/egress:latest 2>/dev/null | docker exec -i "$CLUSTER_NODE" ctr -n k8s.io images import - 2>/dev/null || echo -e "${YELLOW}Warning: LiveKit egress image load failed (may already exist).${NC}"
+
 # Restart all deployments to pick up loaded images
 echo -e "${YELLOW}Restarting all deployments to use loaded images...${NC}"
-kubectl rollout restart deployment/backend deployment/frontend deployment/celery-worker deployment/celery-beat deployment/n8n -n meeting-automation 2>/dev/null || true
+kubectl rollout restart deployment/backend deployment/frontend deployment/celery-worker deployment/celery-beat deployment/n8n deployment/livekit-server deployment/livekit-egress -n meeting-automation 2>/dev/null || true
 
 # ============================================================
 # 10. Wait for all pods to be ready
@@ -375,6 +392,8 @@ wait_for_pods "app=frontend" 120 || true
 wait_for_pods "app=n8n" 120 || true
 wait_for_pods "app=celery-worker" 60 || true
 wait_for_pods "app=celery-beat" 60 || true
+wait_for_pods "app=livekit-server" 60 || true
+wait_for_pods "app=livekit-egress" 60 || true
 
 # ============================================================
 # 11. Database Migrations & Initial Setup
@@ -420,6 +439,7 @@ echo -e "Frontend: ${BLUE}kubectl port-forward deployment/frontend 3000:80 --add
 echo -e "Backend:  ${BLUE}kubectl port-forward deployment/backend 8000:8000 --address 0.0.0.0 -n meeting-automation${NC}"
 echo -e "OnlyOffice:  ${BLUE}kubectl port-forward deployment/onlyoffice 8080:80 --address 0.0.0.0 -n meeting-automation${NC}"
 echo -e "n8n:      ${BLUE}kubectl port-forward deployment/n8n 5678:5678 --address 0.0.0.0 -n meeting-automation${NC}"
+echo -e "LiveKit:  ${BLUE}kubectl port-forward deployment/livekit-server 7880:7880 --address 0.0.0.0 -n meeting-automation${NC}"
 echo -e ""
 echo -e "${YELLOW}Then open:${NC}"
 echo -e "Frontend: http://localhost:3000"

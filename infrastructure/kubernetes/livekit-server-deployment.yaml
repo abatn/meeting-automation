@@ -17,17 +17,14 @@ spec:
       - name: livekit-server
         image: livekit/livekit-server:latest
         imagePullPolicy: IfNotPresent
+        command: ["/livekit-server"]
+        args: ["--config", "/etc/livekit.yaml"]
         ports:
         - containerPort: 7880
           name: signaling
         - containerPort: 7881
           name: tcp-fallback
           protocol: TCP
-        - containerPort: 7881
-          name: udp-media
-          protocol: UDP
-          startPort: 7881
-          endPort: 7890
         env:
         - name: LIVEKIT_API_KEY
           valueFrom:
@@ -39,8 +36,6 @@ spec:
             secretKeyRef:
               name: livekit-secrets
               key: LIVEKIT_API_SECRET
-        - name: LIVEKIT_NODE_IP
-          value: ""
         readinessProbe:
           httpGet:
             path: /
@@ -66,11 +61,7 @@ spec:
         - name: livekit-config
           mountPath: /etc/livekit.yaml
           subPath: livekit.yaml
-        - name: livekit-config
-          mountPath: /opt/livekit/entrypoint.sh
-          subPath: livekit-entrypoint.sh
       volumes:
       - name: livekit-config
         configMap:
           name: livekit-config
-          defaultMode: 0755
