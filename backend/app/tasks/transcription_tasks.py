@@ -175,6 +175,15 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             # Tier 2.3: Populate file_size and duration from S3 HEAD + audio probe
             await _populate_recording_metadata(db, recording, str(recording.file_path), temp_path)
 
+            # Duration-Validierung: Prüfe auf mögliche Packet-Verlust (LiveKit Egress)
+            # Erwartete Mindestdauer = 10s für sinnvolle Aufnahmen
+            # Weniger = Warnsignal für Packet-Dropping wegen oldPacketThreshold=2s
+            if recording.duration and recording.duration < 10.0:
+                logger.warning(
+                    f"TIMING: recording_short_duration duration={recording.duration:.2f}s "
+                    f"(possible packet dropping due to LiveKit oldPacketThreshold=2s)"
+                )
+
             # 1. GLADIA PHASE (Diarization)
             publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
             gladia_result = await gladia_service.transcribe_and_diarize(temp_path)
@@ -436,6 +445,9 @@ async def _identify_speakers(
     # Limit concurrency to avoid overloading system resources
     speaker_list = list(speaker_groups.items())
     
+    # Initialize enrollment service BEFORE the closure (so it's accessible inside)
+    enrollment_service = AutoEnrollmentService(db)
+    
     # Create tasks for parallel processing
     async def process_single_speaker(speaker_index: int, speaker_label: str, speaker_segments: List[Dict]) -> Dict[str, Any]:
         try:
@@ -629,7 +641,6 @@ async def _identify_speakers(
             }
 
     # Process speakers with limited concurrency (max 3 at a time to avoid resource exhaustion)
-    enrollment_service = AutoEnrollmentService(db)
     
     # Process in batches of 3 to balance parallelism with resource constraints
     batch_size = 3

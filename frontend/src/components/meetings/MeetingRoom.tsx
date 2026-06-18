@@ -29,6 +29,7 @@ import {
 import {
   AutoFixHigh as SuggestionIcon,
   MicOff as MicOffIcon,
+  Mic as MicIcon,
   AccessTime as AccessTimeIcon,
   Group as GroupIcon,
   SmartToy as SmartToyIcon,
@@ -43,16 +44,9 @@ import {
   Pause as PauseIcon,
   PlayArrow as ResumeIcon,
   CallEnd as LeaveIcon,
-  Chat as ChatIcon,
-  ScreenShare as ScreenShareIcon,
-  EmojiEmotions as ReactIcon,
-  MoreVert as MoreIcon,
-  Mic as MicIcon,
-  VideocamOff as CameraOffIcon,
   Edit as EditIcon,
   PictureAsPdf as PdfIcon,
   Description as WordIcon,
-  Refresh as RefreshIcon,
   Timeline as TimelineIcon,
   SpeakerNotes as SpeakerNotesIcon,
   Assignment as AssignmentIcon,
@@ -398,9 +392,12 @@ const MeetingRoom: React.FC = () => {
   const [livekitUrl, setLivekitUrl]     = useState<string>("");
   const [livekitConnectionState, setLivekitConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [livekitConnected, setLivekitConnected]             = useState(false);
-  const [livekitError, setLivekitError] = useState<string | null>(null);
+const [livekitError, setLivekitError] = useState<string | null>(null);
 
-  // Recording
+   // Room stabilization (for clean Egress recording start)
+   const [roomConnectionReady, setRoomConnectionReady] = useState(false);
+
+   // Recording
   const [isRecording, setIsRecording]             = useState(false);
   const [recordingStatus, setRecordingStatus]     = useState<"idle" | "recording" | "paused" | "processing" | "stopped" | "completed" | "failed">("idle");
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -711,6 +708,13 @@ const MeetingRoom: React.FC = () => {
     try {
       setIsRecording(true);
       setRecordingStatus("recording");
+      
+      // Wait for LiveKit room to stabilize before starting Egress recording
+      // This prevents packet dropping caused by LiveKit's oldPacketThreshold (2s)
+      if (livekitConnectionState !== ConnectionState.Connected) {
+        console.info("[Recording] Waiting for LiveKit room to stabilize before starting recording...");
+      }
+      
       const res = await meetingsApi.startRecording(id);
       setRecordingId(res.recording_id || null);
       setEgressId(res.egress_id || null);
@@ -972,9 +976,10 @@ const handleStopRecording = async () => {
                       peerConnectionTimeout: 30000,
                       maxRetries: 3,
                     }}
-                    onConnected={() => {
-                      setLivekitError(null);
-                    }}
+onConnected={() => {
+                       setLivekitError(null);
+                       setRoomConnectionReady(true);
+                     }}
 onError={(error) => {
                        console.error("[LiveKit] Connection error:", error, "serverUrl:", livekitUrl);
                        if (recordingStatus === "idle") {
@@ -1025,15 +1030,16 @@ onError={(error) => {
                 {t("meeting_assistant.recording")}
               </Typography>
 
-              {/* IDLE — Show Start button (only for creator) */}
-              {recordingStatus === "idle" && meetingCreatorId === currentUser?.id && (
-                <Button variant="contained" fullWidth disableElevation onClick={handleStartRecording}
-                  startIcon={<RecordIcon />}
-                  sx={{ bgcolor: COLOR.error, color: "#FFF", borderRadius: 2, textTransform: "none", fontSize: 14, fontWeight: 600, py: 1.25, "&:hover": { bgcolor: "#DC2626" } }}
-                >
-                  {t("meeting_assistant.start_recording")}
-                </Button>
-              )}
+{/* IDLE — Show Start button (only for creator) */}
+               {recordingStatus === "idle" && meetingCreatorId === currentUser?.id && (
+                 <Button variant="contained" fullWidth disableElevation onClick={handleStartRecording}
+                   disabled={!roomConnectionReady}
+                   startIcon={<RecordIcon />}
+                   sx={{ bgcolor: COLOR.error, color: "#FFF", borderRadius: 2, textTransform: "none", fontSize: 14, fontWeight: 600, py: 1.25, "&:hover": { bgcolor: "#DC2626" } }}
+                 >
+                   {roomConnectionReady ? t("meeting_assistant.start_recording") : t("meeting_assistant.waiting_connection")}
+                 </Button>
+               )}
 
               {/* IDLE — Non-creator waiting */}
               {recordingStatus === "idle" && meetingCreatorId !== currentUser?.id && (
