@@ -211,7 +211,13 @@
     "team_tasks": "Tâches d'équipe",
     "team_tasks_placeholder": "La liste des tâches d'équipe apparaîtra ici.",
     "recurring_patterns": "Modèles de Tâches Récurrentes",
-    "ai_suggestion_stats": "Analyses des Suggestions IA"
+    "ai_suggestion_stats": "Analyses des Suggestions IA",
+    "stat_pending": "en attente",
+    "stat_total": "Total",
+    "stat_accepted": "Acceptées",
+    "stat_rejected": "Rejetées",
+    "ended": "Terminée",
+    "attendees": "participants"
   },
   "meetings": {
     "planner_title": "Planificateur de Réunions",

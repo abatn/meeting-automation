@@ -261,6 +261,15 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             )
 
             recording.status = "completed"
+
+            # Update meeting status to COMPLETED
+            meeting_result = await db.execute(
+                select(Meeting).where(Meeting.id == recording.meeting_id)
+            )
+            meeting = meeting_result.scalar_one_or_none()
+            if meeting:
+                meeting.status = "completed"
+
             await db.commit()
 
             await AuditService.log_action(

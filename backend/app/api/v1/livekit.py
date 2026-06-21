@@ -97,17 +97,17 @@ async def get_livekit_token(
     service = LiveKitService()
     user_name = current_user.full_name or current_user.email
     token = await service.generate_token(meeting_id, current_user.id, user_name)
-    # TEST-ONLY: Auto-detect ngrok clients and return appropriate LiveKit URL
+    # Use an explicit public URL when configured; otherwise derive the
+    # LiveKit WebSocket URL from the incoming Host header. This avoids
+    # hard-coded IPs and keeps localhost and external deployments consistent.
     request_host = request.headers.get("host", "")
     if settings.LIVEKIT_NGROK_URL and "ngrok" in request_host:
         server_url = settings.LIVEKIT_NGROK_URL
+    elif settings.LIVEKIT_PUBLIC_URL:
+        server_url = settings.LIVEKIT_PUBLIC_URL
     else:
-        server_url = settings.LIVEKIT_PUBLIC_URL or settings.LIVEKIT_URL
-    # TEST-ONLY LOGGING - REMOVE FOR PRODUCTION
-    logger.info(
-        f"[LiveKit Token] ngrok_detection={bool(settings.LIVEKIT_NGROK_URL and 'ngrok' in request_host)} "
-        f"request_host={request_host} server_url={server_url}"
-    )
+        hostname = request_host.split(":")[0]
+        server_url = f"ws://{hostname}:7880" if hostname else settings.LIVEKIT_URL
     if not server_url or not settings.LIVEKIT_API_KEY or not settings.LIVEKIT_API_SECRET:
         raise HTTPException(
             status_code=503,

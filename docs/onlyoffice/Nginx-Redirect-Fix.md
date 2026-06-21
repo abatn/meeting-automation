@@ -1,146 +1,176 @@
 # OnlyOffice Nginx Redirect Problem & Solution
 
-**Datum:** 2026-04-06  
-**Betroffene Version:** OnlyOffice Document Server 7.1.1, 9.0.4 (ARM64)  
+**Datum:** 2026-04-06 (aktualisiert: 2026-06-21)  
+**Betroffene Version:** OnlyOffice Document Server 7.1.1, 9.0.4, 9.3.1  
 **Umgebung:** Docker Compose, externe VM (158.180.18.110)
 
 ---
 
-## 🎯 Problem
+## Problem
 
-**Symptom:** Beim Klick auf "Edit Online" öffnet sich der OnlyOffice Editor, aber die Seite bleibt **leer/weiß**. Keine Fehlermeldung im Browser.
-
-**Beobachtungen:**
-
-- Backend liefert OnlyOffice Config korrekt mit `onlyOfficeUrl: "http://158.180.18.110:8081"`
-- Frontend lädt OnlyOffice JS von der richtigen URL
-- OnlyOffice Container läuft und Port 8081 ist offen
-- **Nginx redirectet auf `http://localhost/...`** statt auf die öffentliche IP
-
-```
-GET http://158.180.18.110:8081/web-apps/apps/documenteditor/
-→ HTTP/1.1 302 Moved Temporarily
-Location: http://localhost/9.0.4-76390656162cbc6053022373c417acc4/web-apps/apps/documenteditor/
-```
-
-Der Browser folgt dem Redirect zu `http://localhost/...` → kann `localhost` nicht auflösen (meint sich selbst, nicht den OnlyOffice Container) → leere Seite.
+Beim Klick auf "Edit PV" öffnet sich der OnlyOffice Editor nicht — weiße Seite oder "An Error occurred while opening the file".
 
 ---
 
-## 🔍 Root Cause
+## Root Cause (Drei Bugs)
 
-OnlyOffice Document Server verwendet **NGINX** als reverse proxy. NGINX generiert Redirect-URLs basierend auf:
+### Bug 1: `$host` stript Port — api.js lädt nie
 
-1. Dem `Host`-Header aus der eingehenden Anfrage, **ODER**
-2. Dem `server_name` aus der NGINX-Konfiguration, **ODER**
-3. Dem System-Hostnamen des Containers (via `$hostname`)
+`/api/` Block in nginx.conf verwendete `proxy_set_header Host $host;`.
 
-Wenn in `docker-compose.yml` **kein `hostname:`** gesetzt ist, setzt Docker den Container-Namen (zufällige ID wie `ad5bac701297`) als Hostname. NGINX interpretiert das als `localhost` oder Container-internen Namen → Redirects gehen an die interne Adresse.
+- `$host` → `158.180.18.110` (Port weg!)
+- `$http_host` → `158.180.18.110:3000` (mit Port)
 
-**In der Entwicklung** funktionierte es, weil:
-- `ONLYOFFICE_URL="http://localhost:8080"` im Backend konfiguriert war
-- Frontend lud Editor von `localhost` → Browser sah Redirect auf `localhost` als korrekt an (loopback)
+Backend empfängt `Host: 158.180.18.110` → baut `onlyOfficeUrl = "http://158.180.18.110"` → Frontend lädt api.js von Port 80 → nichts da → **weiße Seite**.
 
-**In der Produktion** (public IP) versagt:
-- `ONLYOFFICE_URL="http://158.180.18.110:8081"`
-- Browser lädt Editor von public IP
-- OnlyOffice redirectet auf `localhost` → Browser versucht `localhost` (127.0.0.1) zu erreichen, nicht den OnlyOffice Server → **Connection refused** oder leere Seite
+### Bug 2: Regex匹配 fehlgeschlagen
+
+Die ursprüngliche Regex:
+```nginx
+location ~ ^/[0-9]+\.[0-9]+\.[0-9]+[.\-]/ {
+```
+
+Erwartete: `/9.3.1-/` (Zeichenklasse `[.\-]` + `/`)
+Tatsächlich: `/9.3.1-15f561f.../` (nach `-` kommt Hash, kein `/`)
+
+→ Regex matched nie → `location /` fängt alles ab → SPA Index.html statt Proxy.
+
+### Bug 3: `/cache/` Pfad nicht geproxied — "Error opening file"
+
+NurOffice Editor lädt `Editor.bin` über `/cache/files/data/...`. Dieser Pfad wurde von `location /` als SPA Index ausgeliefert (397 Bytes) statt zu OnlyOffice geproxied.
 
 ---
 
-## ✅ Lösung
-
-### Methode 1: Hostname setzen (empfohlen)
-
-Füge zum `onlyoffice` Service in `docker-compose.yml` hinzu:
-
-```yaml
-onlyoffice:
-  image: onlyoffice/documentserver:9.0.4  # oder latest-arm64
-  restart: unless-stopped
-  hostname: "${HOST_IP:-localhost}"  # ← DIESE ZEILE HINZUFÜGEN
-  environment:
-    - JWT_ENABLED=true
-    - JWT_SECRET=${ONLYOFFICE_SECRET:-super_secret_jwt_key_onlyoffice_2026}
-    - JWT_HEADER=Authorization
-    - ALLOW_PRIVATE_IP_ADDRESS=true
-  ports:
-    - "8081:80"
-  volumes:
-    - onlyoffice_data:/var/www/onlyoffice/Data
-```
-
-**Wichtig:** `HOST_IP` muss in `.env` definiert sein:
-```bash
-HOST_IP=158.180.18.110
-```
-
-Dadurch erhalten alle Container den Hostnamen `158.180.18.110`. NGINX verwendet diesen für Redirects → Browser folgt Redirect zur public IP → funktioniert.
-
-### Methode 2: Custom NGINX Config (alternativ)
-
-Falls `hostname` nicht gesetzt werden kann/kann, erstelle `onlyoffice/nginx-config/custom.conf`:
+## Lösung — nginx.conf
 
 ```nginx
-server {
-    listen 80 default_server;
-    server_name _;
-    server_name_in_redirect off;
-    port_in_redirect off;
+# 1. $http_host in ALLEN Proxy-Blöcken (Port beibehalten)
+proxy_set_header Host $http_host;
+
+# 2. Regex angepasst (kein trailing / nach Zeichenklasse)
+location ~ ^/[0-9]+\.[0-9]+\.[0-9]+[-.] { ... }
+
+# 3. /cache/ Proxy für OnlyOffice Editor.bin
+location /cache/ {
+    proxy_pass http://onlyoffice:80;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_read_timeout 600s;
 }
 ```
 
-Mount in `docker-compose.yml`:
-```yaml
-volumes:
-  - onlyoffice_data:/var/www/onlyoffice/Data
-  - ./onlyoffice/nginx-config/custom.conf:/etc/nginx/conf.d/custom.conf
-```
+### Architektur
 
-`server_name_in_redirect off;` bewirkt, dass NGINX den `Host`-Header aus der Client-Anfrage für Redirects verwendet (statt `server_name`).
+```
+Browser → Port 3000 (nginx) → Port 80 (OnlyOffice intern)
+         ├─ /web-apps/...           → proxy zu OnlyOffice (api.js, CSS, JS)
+         ├─ /cache/...              → proxy zu OnlyOffice (Editor.bin)
+         ├─ /9.3.1-.../web-apps/... → proxy zu OnlyOffice (versionierter Redirect)
+         ├─ /healthcheck            → proxy zu OnlyOffice
+         ├─ /api/...                → proxy zu Backend
+         └─ alle anderen            → SPA (React)
+```
 
 ---
 
-## 🧪 Test nach Fix
+## Alle Änderungen
+
+| Datei | Was geändert |
+|-------|-------------|
+| `frontend/nginx.conf` | `$host` → `$http_host` in `/api/` und `/websockets/` |
+| `frontend/nginx.conf` | `X-Forwarded-Host $http_host` in OnlyOffice Proxy-Blöcken |
+| `frontend/nginx.conf` | Regex `[.\-]/` → `[-.]` |
+| `frontend/nginx.conf` | Neue `location /cache/` für Editor.bin |
+| `backend/app/api/v1/livekit.py` | LiveKit URL dynamisch aus Host-Header |
+| `backend/app/api/v1/pv.py` | onlyOfficeUrl dynamisch aus Host-Header |
+
+---
+
+## Testen nach Fix
 
 ```bash
-# 1. Container neu starten
-docker compose up -d onlyoffice
+# 1. Frontend neu bauen
+docker compose build --no-cache frontend
+docker compose up -d frontend
 
-# 2. Hostname prüfen
-docker exec meeting-automation-onlyoffice-1 hostname
-# → sollte 158.180.18.110 ausgeben (nichtContainer-ID)
+# 2. api.js Proxy testen
+curl -sI http://HOST:3000/web-apps/apps/api/documents/api.js
+# → 200 OK, Content-Type: application/javascript
 
-# 3. Redirect testen
-curl -I "http://158.180.18.110:8081/web-apps/apps/documenteditor/"
-# Erwartet: HTTP/1.1 200 OK (kein 302 oder Location: http://localhost)
+# 3. Redirect testen (Port muss in URL stehen)
+curl -sI http://HOST:3000/web-apps/apps/documenteditor/
+# → 302 mit Location: http://HOST:3000/9.3.1-.../web-apps/...
 
-# 4. api.js prüfen
-curl -I "http://158.180.18.110:8081/web-apps/apps/api/documents/api.js"
-# Erwartet: HTTP/1.1 200 OK
+# 4. /cache/ Proxy testen
+curl -sI http://HOST:3000/cache/files/data/test/Editor.bin/Editor.bin
+# → 403 (von OnlyOffice, nicht SPA Index.html)
+
+# 5. OnlyOffice Logs prüfen
+docker logs meeting-automation-onlyoffice-1 | tail -5
+# → host: "158.180.18.110" (nicht "onlyoffice")
 ```
 
 ---
 
-## 📋 Verwandte Issues
+## HTTPS in Produktion
 
-- NurOffice Leere Seite (Edit Online)
-- Nginx redirectet auf `localhost` oder Container-Hostname
-- Browser kann keine Verbindung zu OnlyOffice herstellen
+**Voraussetzung:** Ein TLS-Terminator (nginx, Traefik, Cloud Load Balancer) vor unserem nginx.
+
+### Was geändert werden muss
+
+1. **`X-Forwarded-Proto` Header** — TLS-Terminator setzt `https`, muss weitergeleitet werden:
+   ```nginx
+   map $http_x_forwarded_proto $forwarded_proto {
+       default $scheme;
+       https   https;
+   }
+   proxy_set_header X-Forwarded-Proto $forwarded_proto;
+   ```
+   Ohne dieses Mapping → OnlyOffice Redirect-URLs nutzen `http://` → **Mixed Content**.
+
+2. **Cookie Secure Flag** — JWT Cookies müssen `Secure` und `SameSite=None` haben bei HTTPS.
+
+3. **WebSocket** — `wss://` statt `ws://` (wird vom Frontend automatisch erkannt bei HTTPS).
+
+4. **CORS** — `CORS_ORIGINS` muss `https://domain.de` statt `http://IP:3000` enthalten.
+
+### Vorgehen
+
+```bash
+# 1. TLS-Terminator konfigurieren (z.B. nginx auf Port 443)
+# 2. nginx.conf anpassen (map-Block + $forwarded_proto)
+# 3. Frontend neu bauen
+# 4. OnlyOffice Editor mit HTTPS testen
+```
+
+### Bekannte Fallstricke
+
+- OnlyOffice generiert Redirect-URLs basierend auf `X-Forwarded-Host` — muss Port 443 enthalten (nicht 3000)
+- `X-Forwarded-Proto: https` muss an Backend UND OnlyOffice weitergeleitet werden
+- LiveKit muss ebenfalls auf WSS umgestellt werden (`wss://domain.de` statt `ws://IP:7880`)
 
 ---
 
-## 🔐 Security & ISO 27001 Hinweise
+## Verwandte Issues
+
+- OnlyOffice Leere Seite (api.js lädt nicht)
+- "An Error occurred while opening the file" (/cache/ nicht geproxied)
+- Nginx redirectet auf falschen Port
+- Regex matching für versionierte Pfade
+
+---
+
+## Security & ISO 27001
 
 - Der Fix ändert **keine** Sicherheitseinstellungen (JWT, Token)
-- Nur die Hostname-Konfiguration wird angepasst
-- Keine Einführung von neuen Schwachstellen
+- Nur Hostname- und Header-Konfiguration wird angepasst
+- `X-Forwarded-Host` und `X-Forwarded-Proto` sind Standard-Header für Reverse Proxies
 - Kompatibel mit ISO 27001
 
 ---
 
-## 📚 References
+## References
 
 - OnlyOffice Docs: https://helpcenter.onlyoffice.com/installation/docs-community-install-docker.aspx
-- Docker Compose `hostname`: https://docs.docker.com/compose/compose-file/compose-file-v3/#hostname
-- Nginx `server_name_in_redirect`: http://nginx.org/en/docs/http/ngx_http_core_module.html#server_name_in_redirect
+- Nginx `$host` vs `$http_host`: http://nginx.org/en/docs/http/ngx_http_core_module.html#var_host
+- Nginx `proxy_set_header`: http://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_set_header

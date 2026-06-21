@@ -41,6 +41,25 @@ class ReportService:
 
         return data
 
+    async def invalidate_cache(self, client_id: str) -> None:
+        """Invalidates all dashboard cache keys for a client"""
+        try:
+            # Scan for all keys matching dashboard cache patterns for this client
+            patterns = [
+                f"reports_meetings_{client_id}_*",
+                f"reports_actions_{client_id}_*",
+                f"reports_team_prod_{client_id}_*",
+                f"reports_trends_{client_id}",
+            ]
+            for pattern in patterns:
+                keys = []
+                async for key in self.redis_client.scan_iter(match=pattern):
+                    keys.append(key)
+                if keys:
+                    await self.redis_client.delete(*keys)
+        except Exception as e:
+            logger.warning(f"Redis cache invalidation error: {e}")
+
     async def get_meeting_stats(self, client_id: str, period: str = "month") -> dict:
         """Aggregiert Meetings nach Status (cached)"""
 

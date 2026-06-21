@@ -361,7 +361,41 @@ Triggers: Email notifications, Slack alerts, etc.
 - [ ] Webhook signature verification (HMAC)
 - [ ] Retry mechanism mit exponential backoff
 - [ ] Webhook history table für Debugging
-- [ ] Real-time meeting status updates via WebSocket
+- [x] Real-time meeting status updates via Pipeline (FIX 21.06.2026)
+
+---
+
+## 🔧 FIX: Meeting-Status-Transition in Pipeline (21.06.2026)
+
+### Problem
+Status-Übergang `in_progress → completed` wurde nur in der Theorie beschrieben, aber nie im Code implementiert:
+- `transcription_tasks.py:263` setzte nur `recording.status = "completed"`, aber nie `meeting.status`
+- Alle Meetings blieben ewig auf `"planned"` (DB-verifiziert: 9 Meetings, alle `"planned"`)
+
+### Lösung
+In `transcription_tasks.py` nach `recording.status = "completed"`:
+```python
+meeting_result = await db.execute(
+    select(Meeting).where(Meeting.id == recording.meeting_id)
+)
+meeting = meeting_result.scalar_one_or_none()
+if meeting:
+    meeting.status = "completed"
+```
+
+### Status-Übergänge (jetzt vollständig)
+```
+planned          → in_progress     (Meeting startet — via API)
+in_progress      → completed       (Recording-Pipeline — NEU)
+Any Status       → cancelled       (Meeting wird abgesagt — via API)
+```
+
+### Dateien geändert
+- `backend/app/tasks/transcription_tasks.py:263` — meeting.status = "completed"
+
+### Verifikation
+- ✅ 12/12 Tests bestanden
+- ✅ Backend Container healthy
 
 ---
 

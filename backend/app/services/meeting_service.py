@@ -131,6 +131,11 @@ class MeetingService:
         await self.db.commit()
         await self.db.refresh(db_meeting, attribute_names=["participants"])
 
+        # Invalidate dashboard cache for this client
+        from app.services.report_service import ReportService
+        report_service = ReportService(self.db)
+        await report_service.invalidate_cache(client_id)
+
         # Notify n8n about status change if relevant
         if "status" in update_data:
             await self._trigger_n8n_meeting_status_change(db_meeting, previous_status)

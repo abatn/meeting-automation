@@ -209,7 +209,9 @@
     "stat_pending": "قيد الانتظار",
     "stat_total": "الإجمالي",
     "stat_accepted": "مقبول",
-    "stat_rejected": "مرفوض"
+    "stat_rejected": "مرفوض",
+    "ended": "انتهى",
+    "attendees": "الحضور"
   },
   "meetings": {
     "planner_title": "مخطط الاجتماعات",

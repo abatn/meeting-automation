@@ -115,3 +115,86 @@ Um die Benutzererfahrung zu optimieren und die Datensicherheit (ISO 27001) zu er
 
 ## 📊 ERGEBNIS
 Die Applikation wirkt nun wie aus einem Guss. Durch die Beseitigung der funktionalen Defizite ("Müll-Arbeit") in den Dashboards, die strikte RBAC-Filterung im Action Tracker und die Stabilisierung der Zeit-Logik im Meeting Planner ist das System nun bereit für den produktiven Einsatz in verschiedenen Hierarchieebenen. Die technische Performance der Pipeline wurde via Log-Analyse bestätigt.
+
+---
+
+## 🔧 FIX: Dashboard Data Freshness (21.06.2026)
+
+### Problem
+Dashboard zeigte veraltete Daten nach Action-Status-Änderungen und Recording-Abschluss:
+1. **Meeting-Status blieb permanent auf `"planned"`** — Die Recording-Pipeline (`transcription_tasks.py`) setzte nur `recording.status = "completed"`, aber nie `meeting.status`. Alle 9 Meetings blieben ewig `"planned"`.
+2. **Redis-Cache nicht invalidiert** — `ReportService` cached Dashboard-Daten mit 30-60 Min TTL. `update_action_status()` und `update_meeting()` commiteten Änderungen in die DB, invalidierten aber nie den Redis-Cache.
+
+### Root Cause
+- `transcription_tasks.py:263` — Nur `recording.status` wird gesetzt, `meeting.status` wird nie aktualisiert
+- `action_service.py:451` — Kein `redis.delete()` nach DB-Commit
+- `meeting_service.py:131` — Kein `redis.delete()` nach DB-Commit
+- Doku (`PROTOCOL_PART_42`, `PROTOCOL_PHASE_3`) beschrieb Status-Übergänge als implementiert, aber Code fehlte
+
+### Lösung
+
+**1. Meeting-Status-Transition in Recording-Pipeline** (`transcription_tasks.py:263`):
+```python
+recording.status = "completed"
+
+# NEU: Meeting-Status auf "completed" setzen
+meeting_result = await db.execute(
+    select(Meeting).where(Meeting.id == recording.meeting_id)
+)
+meeting = meeting_result.scalar_one_or_none()
+if meeting:
+    meeting.status = "completed"
+
+await db.commit()
+```
+
+**2. Redis-Cache-Invalidierung** (`report_service.py:44`):
+```python
+async def invalidate_cache(self, client_id: str) -> None:
+    """Invalidates all dashboard cache keys for a client"""
+    patterns = [
+        f"reports_meetings_{client_id}_*",
+        f"reports_actions_{client_id}_*",
+        f"reports_team_prod_{client_id}_*",
+        f"reports_trends_{client_id}",
+    ]
+    for pattern in patterns:
+        keys = []
+        async for key in self.redis_client.scan_iter(match=pattern):
+            keys.append(key)
+        if keys:
+            await self.redis_client.delete(*keys)
+```
+
+**3. Aufruf in Action-Service** (`action_service.py:454`):
+```python
+await self.db.commit()
+
+# NEU: Dashboard-Cache invalidieren
+from app.services.report_service import ReportService
+report_service = ReportService(self.db)
+await report_service.invalidate_cache(action.client_id)
+```
+
+**4. Aufruf in Meeting-Service** (`meeting_service.py:134`):
+```python
+await self.db.commit()
+
+# NEU: Dashboard-Cache invalidieren
+from app.services.report_service import ReportService
+report_service = ReportService(self.db)
+await report_service.invalidate_cache(client_id)
+```
+
+### Dateien geändert
+```
+backend/app/tasks/transcription_tasks.py   — meeting.status = "completed" nach Pipeline
+backend/app/services/report_service.py     — invalidate_cache() Methode
+backend/app/services/action_service.py     — Cache-Invalidierung nach update_action_status()
+backend/app/services/meeting_service.py    — Cache-Invalidierung nach update_meeting()
+```
+
+### Verifikation
+- ✅ 12/12 Tests bestanden (test_meetings, test_actions, test_reports_api, test_pv, test_transcriptions, test_websockets, test_pdf_export)
+- ✅ Backend Container healthy nach Restart
+- ✅ Imports validiert: `ReportService.invalidate_cache` existiert

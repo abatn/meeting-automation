@@ -450,6 +450,11 @@ Return ONLY a JSON array of objects with the following structure:
 
         await self.db.commit()
 
+        # Invalidate dashboard cache for this client
+        from app.services.report_service import ReportService
+        report_service = ReportService(self.db)
+        await report_service.invalidate_cache(action.client_id)
+
         # Reload action with fresh DB state and eager-loaded relationships
         from sqlalchemy.orm import selectinload
         result = await self.db.execute(

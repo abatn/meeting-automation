@@ -329,7 +329,7 @@ async def restore_pv_version(pv_id: str, version_id: str, db: AsyncSession = Dep
 
 
 @router.get("/{pv_id}/onlyoffice/config")
-async def get_onlyoffice_config(pv_id: str, language: str = "fr", db: AsyncSession = Depends(deps.get_db), current_user: UserModel = Depends(deps.get_current_user)) -> Any:
+async def get_onlyoffice_config(pv_id: str, language: str = "fr", request: Request = None, db: AsyncSession = Depends(deps.get_db), current_user: UserModel = Depends(deps.get_current_user)) -> Any:
     stmt = select(PVModel).where(PVModel.id == pv_id, PVModel.client_id == current_user.client_id)
     pv = (await db.execute(stmt)).scalars().first()
     if not pv: raise HTTPException(status_code=404, detail="PV not found")
@@ -338,12 +338,16 @@ async def get_onlyoffice_config(pv_id: str, language: str = "fr", db: AsyncSessi
     file_key = f"tmp_edits/{pv_id}/{os.path.basename(local_path)}"
     s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
     with open(local_path, "rb") as f: s3.upload_fileobj(f, settings.S3_BUCKET_NAME, file_key)
-    download_url = f"{settings.PUBLIC_BACKEND_URL}/api/v1/pv/{pv_id}/onlyoffice/download?file_key={file_key}"
-    callback_url = f"{settings.PUBLIC_BACKEND_URL}/api/v1/pv/{pv_id}/onlyoffice/callback"
+    # Dynamische URLs aus Host-Header (funktioniert für localhost UND externe IP)
+    host = request.headers.get("host", "localhost:3000") if request else "localhost:3000"
+    scheme = request.headers.get("x-forwarded-proto", "http") if request else "http"
+    public_base = f"{scheme}://{host}"
+    download_url = f"{public_base}/api/v1/pv/{pv_id}/onlyoffice/download?file_key={file_key}"
+    callback_url = f"{public_base}/api/v1/pv/{pv_id}/onlyoffice/callback"
     oo_lang = "ar-SA" if (language == "ar") else language
     config = {
         "document": {"fileType": "docx", "key": f"{pv_id}_{int(datetime.now(timezone.utc).timestamp())}", "title": f"PV_{pv.title}.docx", "url": download_url, "permissions": {"edit": True, "download": True}},
-        "editorConfig": {"callbackUrl": callback_url, "user": {"id": current_user.id, "name": current_user.full_name or current_user.email}, "lang": oo_lang, "customization": {"forcesave": True, "onlyOfficeUrl": settings.ONLYOFFICE_URL}}
+        "editorConfig": {"callbackUrl": callback_url, "user": {"id": current_user.id, "name": current_user.full_name or current_user.email}, "lang": oo_lang, "customization": {"forcesave": True, "onlyOfficeUrl": f"{scheme}://{host}"}}
     }
     config["token"] = jwt.encode(config, settings.ONLYOFFICE_SECRET, algorithm="HS256")
     return config

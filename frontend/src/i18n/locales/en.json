@@ -215,7 +215,9 @@
     "stat_pending": "pending",
     "stat_total": "Total",
     "stat_accepted": "Accepted",
-    "stat_rejected": "Rejected"
+    "stat_rejected": "Rejected",
+    "ended": "Ended",
+    "attendees": "attendees"
   },
   "meetings": {
     "planner_title": "Meeting Planner",

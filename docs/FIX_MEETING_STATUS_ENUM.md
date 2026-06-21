@@ -94,3 +94,23 @@ UPDATE meetings SET status = 'cancelled' WHERE status = 'CANCELLED';
 
 ## Date
 2026-06-02
+
+---
+
+## 🔧 FIX: Pipeline Status-Transition (21.06.2026)
+
+### Problem
+Meeting-Status wurde im Recording-Pipeline nie von `"planned"` auf `"completed"` aktualisiert. `recording.status` wurde gesetzt, aber `meeting.status` blieb permanent auf `"planned"`.
+
+### Lösung
+`transcription_tasks.py:263` — Nach `recording.status = "completed"` wird jetzt auch `meeting.status = "completed"` gesetzt.
+
+### Datei geändert
+- `backend/app/tasks/transcription_tasks.py` (6 Zeilen)
+
+### Zusammenfassung aller Fixes
+| Fix | Datei | Problem |
+|-----|-------|---------|
+| Enum lowercase | `meeting.py` | SQLAlchemy speicherte Uppercase |
+| Frontend case-insensitive | `MeetingPlanner.tsx`, `DashboardManager.tsx` | Vergleiche waren case-sensitive |
+| **Pipeline transition** | `transcription_tasks.py` | **meeting.status wurde nie auf completed gesetzt** |

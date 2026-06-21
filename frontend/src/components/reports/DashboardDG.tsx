@@ -135,7 +135,7 @@ const DashboardDG: React.FC = () => {
     },
     {
       title: t("dashboard.completion_rate"),
-      value: dashboardData?.action_stats?.completed || "0",
+      value: dashboardData?.meeting_stats?.completed || "0",
       icon: <CheckCircle color="success" />,
       trend: dashboardData?.kpi_trends?.completion_rate 
         ? `${dashboardData.kpi_trends.completion_rate.direction === 'up' ? '+' : '-'}${dashboardData.kpi_trends.completion_rate.percent}% ${t("dashboard.vs_last_month")}`
@@ -370,13 +370,13 @@ const DashboardDG: React.FC = () => {
         <Grid item xs={12}>
           <Paper sx={glassStyle}>
             <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", display: 'flex', alignItems: 'center' }}>
-              <EventIcon sx={{ marginInlineEnd: 1 }} /> {t("dashboard.recent_meetings")}
+              <EventIcon sx={{ marginInlineEnd: 1 }} /> {t("meetings.recent_meetings")}
             </Typography>
             <Divider sx={{ mb: 2 }} />
             
             {dashboardData?.recent_completed_meetings?.length === 0 ? (
               <Typography variant="body2" color="textSecondary" sx={{ py: 2 }}>
-                {t("dashboard.no_recent_meetings")}
+                {t("meetings.no_recent_meetings")}
               </Typography>
             ) : (
               <List>
