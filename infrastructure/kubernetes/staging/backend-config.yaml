@@ -12,6 +12,12 @@ data:
   REFRESH_TOKEN_EXPIRE_DAYS: "7"
   S3_ENDPOINT: "http://minio-staging:9000"
   S3_BUCKET_NAME: "meeting-recordings-staging"
+  LIVEKIT_URL: "ws://livekit-server-staging:7880"
+  LIVEKIT_PUBLIC_URL: "wss://staging.meeting-automate.tn"
+  LIVEKIT_EGRESS_BUCKET: "meeting-recordings-staging"
+  LIVEKIT_EGRESS_S3_ENDPOINT: "http://minio-staging:9000"
+  # IMPORTANT: After deployment, update to MinIO ClusterIP for hostNetwork Egress:
+  # kubectl patch configmap backend-config -n meeting-automation-staging --type merge -p '{"data":{"LIVEKIT_EGRESS_S3_ENDPOINT":"http://<MINIO_CLUSTER_IP>:9000"}}'
   SMTP_HOST: "smtp.sendgrid.net"
   SMTP_PORT: "587"
   SMTP_USER: "apikey"
@@ -27,5 +33,4 @@ data:
   N8N_WEBHOOK_TRANSCRIPTION_COMPLETED: "http://n8n-staging:5678/webhook/transcription-completed"
   PUBLIC_BACKEND_URL: "https://staging.meeting-automate.tn"
   FRONTEND_URL: "https://staging.meeting-automate.tn"
-  # CORS: Allow staging frontend and test origins
   CORS_ORIGINS: '["https://staging.meeting-automate.tn","http://localhost:3000"]'

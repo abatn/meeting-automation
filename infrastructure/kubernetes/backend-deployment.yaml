@@ -63,3 +63,5 @@ spec:
         env:
         - name: PYTHONPATH
           value: "/app"
+        - name: DB_HOST
+          value: "postgres"

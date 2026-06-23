@@ -3,7 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: default-deny-all
-  namespace: meeting-automation
+  namespace: meeting-automation-staging
 spec:
   podSelector: {}
   policyTypes:
@@ -14,11 +14,11 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: postgres-policy
-  namespace: meeting-automation
+  namespace: meeting-automation-staging
 spec:
   podSelector:
     matchLabels:
-      app: postgres
+      app: postgres-staging
   ingress:
   - from:
     - podSelector:
@@ -26,10 +26,10 @@ spec:
           app: backend
     - podSelector:
         matchLabels:
-          app: n8n
+          app: n8n-staging
     - podSelector:
         matchLabels:
-          app: celery-worker
+          app: celery-worker-staging
     ports:
     - protocol: TCP
       port: 5432
@@ -39,11 +39,11 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: redis-policy
-  namespace: meeting-automation
+  namespace: meeting-automation-staging
 spec:
   podSelector:
     matchLabels:
-      app: redis
+      app: redis-staging
   ingress:
   - from:
     - podSelector:
@@ -51,10 +51,10 @@ spec:
           app: backend
     - podSelector:
         matchLabels:
-          app: celery-worker
+          app: celery-worker-staging
     - podSelector:
         matchLabels:
-          app: celery-beat
+          app: celery-beat-staging
     ports:
     - protocol: TCP
       port: 6379
@@ -64,11 +64,11 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: rabbitmq-policy
-  namespace: meeting-automation
+  namespace: meeting-automation-staging
 spec:
   podSelector:
     matchLabels:
-      app: rabbitmq
+      app: rabbitmq-staging
   ingress:
   - from:
     - podSelector:
@@ -76,10 +76,10 @@ spec:
           app: backend
     - podSelector:
         matchLabels:
-          app: celery-worker
+          app: celery-worker-staging
     - podSelector:
         matchLabels:
-          app: celery-beat
+          app: celery-beat-staging
     ports:
     - protocol: TCP
       port: 5672
@@ -91,11 +91,11 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: minio-policy
-  namespace: meeting-automation
+  namespace: meeting-automation-staging
 spec:
   podSelector:
     matchLabels:
-      app: minio
+      app: minio-staging
   ingress:
   - from:
     - podSelector:
@@ -103,7 +103,7 @@ spec:
           app: backend
     - podSelector:
         matchLabels:
-          app: celery-worker
+          app: celery-worker-staging
     - podSelector:
         matchLabels:
           app: frontend
@@ -118,7 +118,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: backend-policy
-  namespace: meeting-automation
+  namespace: meeting-automation-staging
 spec:
   podSelector:
     matchLabels:
@@ -132,29 +132,12 @@ spec:
     - protocol: TCP
       port: 8000
 ---
-# Backend NodePort: Allow external access via NodePort (k3s)
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: backend-nodeport-policy
-  namespace: meeting-automation
-spec:
-  podSelector:
-    matchLabels:
-      app: backend
-  policyTypes:
-  - Ingress
-  ingress:
-  - ports:
-    - port: 8000
-      protocol: TCP
----
 # Frontend: Allow from everywhere (via Ingress/LoadBalancer)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: frontend-policy
-  namespace: meeting-automation
+  namespace: meeting-automation-staging
 spec:
   podSelector:
     matchLabels:
@@ -172,11 +155,11 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: onlyoffice-policy
-  namespace: meeting-automation
+  namespace: meeting-automation-staging
 spec:
   podSelector:
     matchLabels:
-      app: onlyoffice
+      app: onlyoffice-staging
   ingress:
   - from:
     - podSelector:
@@ -192,7 +175,7 @@ spec:
   - to:
     - podSelector:
         matchLabels:
-          app: rabbitmq
+          app: rabbitmq-staging
     ports:
     - protocol: TCP
       port: 5672
@@ -202,11 +185,11 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: n8n-policy
-  namespace: meeting-automation
+  namespace: meeting-automation-staging
 spec:
   podSelector:
     matchLabels:
-      app: n8n
+      app: n8n-staging
   ingress:
   - from:
     - podSelector:
@@ -215,3 +198,62 @@ spec:
     ports:
     - protocol: TCP
       port: 5678
+---
+# LiveKit: Allow egress to Redis and Backend (webhooks)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: livekit-policy
+  namespace: meeting-automation-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: livekit-server-staging
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis-staging
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: backend
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# LiveKit Egress: Allow egress to Redis, MinIO, and LiveKit
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: livekit-egress-policy
+  namespace: meeting-automation-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: livekit-egress-staging
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis-staging
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: minio-staging
+    ports:
+    - protocol: TCP
+      port: 9000
+  - to:
+    - podSelector:
+        matchLabels:
+          app: livekit-server-staging
+    ports:
+    - protocol: TCP
+      port: 7880

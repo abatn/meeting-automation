@@ -1,3 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-staging-data
+  namespace: meeting-automation-staging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -34,7 +47,7 @@ spec:
         - secretRef:
             name: postgres-secrets
         volumeMounts:
-        - name: postgres-staging-storage
+        - name: postgres-data
           mountPath: /var/lib/postgresql/data
         resources:
           requests:
@@ -43,11 +56,15 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
-      volumes:
-      - name: postgres-staging-storage
-        hostPath:
-          path: /data/postgres
-          type: DirectoryOrCreate
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: 10Gi
 ---
 apiVersion: v1
 kind: Service

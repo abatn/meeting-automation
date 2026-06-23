@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livekit-egress-staging
+  namespace: meeting-automation-staging
+  labels:
+    app: livekit-egress-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: livekit-egress-staging
+  template:
+    metadata:
+      labels:
+        app: livekit-egress-staging
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: egress
+        image: livekit/egress:latest
+        env:
+        - name: EGRESS_CONFIG_FILE
+          value: /etc/livekit-egress/config.yaml
+        - name: LIVEKIT_API_KEY
+          value: "meeting-api-key"
+        - name: LIVEKIT_API_SECRET
+          value: "meeting-api-secret-2026"
+        - name: LIVEKIT_WS_URL
+          value: "ws://localhost:7880"
+        ports:
+        - containerPort: 7000
+          name: health
+          hostPort: 7000
+        volumeMounts:
+        - name: egress-config
+          mountPath: /etc/livekit-egress
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 7000
+          initialDelaySeconds: 15
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 7000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      volumes:
+      - name: egress-config
+        configMap:
+          name: livekit-egress-config-staging

@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: livekit-egress-config-staging
+  namespace: meeting-automation-staging
+data:
+  config.yaml: |
+    log_level: debug
+    insecure: true
+    redis:
+      address: redis-staging.meeting-automation-staging.svc.cluster.local:6379
+      password: redis_password
+      db: 0
+    s3:
+      access_key: minio_user
+      secret: minio_password
+      endpoint: http://minio-staging:9000
+      bucket: meeting-recordings-staging
+      region: us-east-1
+      force_path_style: true
+    health_port: 7000
+    template_port: 7980
+    prometheus_port: 7001
+    cpu_cost:
+      room_composite_cpu_cost: 1.5
+      web_cpu_cost: 1.5
+      track_composite_cpu_cost: 1.0
+      track_cpu_cost: 0.5

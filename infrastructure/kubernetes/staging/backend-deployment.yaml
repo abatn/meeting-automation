@@ -76,6 +76,10 @@ spec:
         env:
         - name: DEBUG
           value: "true"
+        - name: DB_HOST
+          value: "postgres-staging"
+        - name: APP_ROLE
+          value: "backend"
 ---
 apiVersion: v1
 kind: Service

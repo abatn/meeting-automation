@@ -1,3 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-staging-data
+  namespace: meeting-automation-staging
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -27,7 +40,7 @@ spec:
         - secretRef:
             name: minio-secrets
         volumeMounts:
-        - name: minio-staging-storage
+        - name: minio-data
           mountPath: /data
         resources:
           requests:
@@ -36,11 +49,27 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "500m"
-      volumes:
-      - name: minio-staging-storage
-        hostPath:
-          path: /data/minio
-          type: DirectoryOrCreate
+        livenessProbe:
+          httpGet:
+            path: /minio/health/live
+            port: 9000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /minio/health/ready
+            port: 9000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+  volumeClaimTemplates:
+  - metadata:
+      name: minio-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: 10Gi
 ---
 apiVersion: v1
 kind: Service

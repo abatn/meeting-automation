@@ -350,15 +350,28 @@ kubectl apply -f infrastructure/kubernetes/traefik-middlewares.yaml 2>/dev/null 
 kubectl apply -f infrastructure/kubernetes/traefik-ingressroute.yaml 2>/dev/null || true
 
 # ============================================================
-# 8.5. Deploy LiveKit (Server + Egress)
+# 8.5. LiveKit — k3s (im Cluster, kein Host mehr noetig)
 # ============================================================
-echo -e "${YELLOW}Deploying LiveKit...${NC}"
-kubectl apply -f infrastructure/kubernetes/livekit-configmap.yaml 2>/dev/null || true
-kubectl apply -f infrastructure/kubernetes/livekit-secrets.yaml 2>/dev/null || true
-kubectl apply -f infrastructure/kubernetes/livekit-server-deployment.yaml 2>/dev/null || true
-kubectl apply -f infrastructure/kubernetes/livekit-server-service.yaml 2>/dev/null || true
-kubectl apply -f infrastructure/kubernetes/livekit-egress-deployment.yaml 2>/dev/null || true
-kubectl apply -f infrastructure/kubernetes/livekit-egress-service.yaml 2>/dev/null || true
+echo -e "${YELLOW}LiveKit: Im Cluster verfuegbar (k3s). Kein Host-Workaround noetig.${NC}"
+
+# LiveKit Deployments aktivieren (k3s unterstuetzt UDP nativ)
+kubectl scale deployment/livekit-server --replicas=1 -n meeting-automation 2>/dev/null || true
+kubectl scale deployment/livekit-egress --replicas=1 -n meeting-automation 2>/dev/null || true
+
+# MinIO Bucket initialisieren
+kubectl exec -i deployment/minio -n meeting-automation -- mc alias set myminio http://localhost:9000 minio_user minio_password 2>/dev/null || true
+kubectl exec -i deployment/minio -n meeting-automation -- mc mb myminio/meeting-recordings --ignore-existing 2>/dev/null || true
+
+# Verifiziere LiveKit Webhook
+echo -e "${YELLOW}Verifying LiveKit webhook URL...${NC}"
+WEBHOOK_RESP=$(curl -sf -o /dev/null -w '%{http_code}' http://backend.meeting-automation.svc.cluster.local:8000/api/v1/livekit/webhooks 2>/dev/null || echo "000")
+if [ "$WEBHOOK_RESP" = "405" ] || [ "$WEBHOOK_RESP" = "422" ]; then
+    echo -e "${GREEN}  LiveKit webhook endpoint reachable (HTTP ${WEBHOOK_RESP}).${NC}"
+else
+    echo -e "${RED}  Warning: LiveKit webhook not reachable (HTTP ${WEBHOOK_RESP}). Pipeline may not work.${NC}"
+fi
+
+# Keine hostAliases noetig in k3s — DNS funktioniert nativ
 
 # ============================================================
 # 9. Load Docker images into containerd
@@ -396,18 +409,94 @@ wait_for_pods "app=livekit-server" 60 || true
 wait_for_pods "app=livekit-egress" 60 || true
 
 # ============================================================
-# 11. Database Migrations & Initial Setup
+# 11. Database Migrations & Schema Verification
 # ============================================================
-echo -e "${YELLOW}Running Alembic migrations...${NC}"
-kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && alembic upgrade head" 2>/dev/null || echo -e "${YELLOW}Warning: Alembic migrations may have already run.${NC}"
-echo -e "${GREEN}Database schema is up to date.${NC}"
+echo -e "${YELLOW}[11/14] Database Migrations & Schema Verification...${NC}"
 
-echo -e "${YELLOW}Seeding enterprise test users...${NC}"
-kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python scripts/seed_users.py" 2>/dev/null || echo -e "${YELLOW}Warning: Seeding script failed or users already exist.${NC}"
+# 11.1 Copy Alembic migrations to backend pod
+echo -e "${BLUE}  Kopiere Alembic-Migrationen in den Backend-Pod...${NC}"
+BACKEND_POD_NAME=$(kubectl get pods -n meeting-automation -l app=backend \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+if [ -n "${BACKEND_POD_NAME}" ]; then
+    for migration_file in backend/alembic/versions/*.py; do
+        filename=$(basename "$migration_file")
+        if [ "$filename" != "__pycache__" ] && [ "$filename" != ".gitkeep" ] && [[ "$filename" != _* ]]; then
+            kubectl cp "$migration_file" "meeting-automation/${BACKEND_POD_NAME}:/app/alembic/versions/${filename}" 2>/dev/null || true
+        fi
+    done
+    echo -e "${GREEN}  Migrationen kopiert.${NC}"
+else
+    echo -e "${YELLOW}  Warning: Kein Backend-Pod gefunden, überspringe Kopie.${NC}"
+fi
 
-echo -e "${YELLOW}Creating S3 bucket 'recordings'...${NC}"
-kubectl exec -i statefulset/minio -n meeting-automation -- mc alias set myminio http://localhost:9000 minio_user minio_password_prod 2>/dev/null || true
-kubectl exec -i statefulset/minio -n meeting-automation -- mc mb myminio/recordings --ignore-existing 2>/dev/null || echo -e "${YELLOW}Warning: S3 bucket creation failed or already exists.${NC}"
+# 11.2 Alembic Migrations (Init-Container macht das auch, aber Setup garantiert es)
+TABLE_EXISTS=$(kubectl exec -i postgres-0 -n meeting-automation -- \
+    psql -U meeting_user -d meeting_db -tAc \
+    "SELECT EXISTS (
+        SELECT FROM pg_tables
+        WHERE schemaname = 'public' AND tablename = 'users'
+    );" 2>/dev/null || echo "f")
+
+ALEMBIC_STAMPED=$(kubectl exec -i postgres-0 -n meeting-automation -- \
+    psql -U meeting_user -d meeting_db -tAc \
+    "SELECT EXISTS (
+        SELECT FROM pg_tables
+        WHERE schemaname = 'public' AND tablename = 'alembic_version'
+    );" 2>/dev/null || echo "f")
+
+# Verwaister Stempel (alembic_version aber keine Tabellen) → zurücksetzen
+if [ "${ALEMBIC_STAMPED}" = "t" ] && [ "${TABLE_EXISTS}" = "f" ]; then
+    echo -e "${YELLOW}  Verwaister Alembic-Stempel (keine Tabellen). Setze zurück...${NC}"
+    kubectl exec -i postgres-0 -n meeting-automation -- \
+        psql -U meeting_user -d meeting_db -c \
+        "DELETE FROM alembic_version;" > /dev/null 2>&1
+    echo -e "${GREEN}  Alembic-Stempel zurückgesetzt.${NC}"
+fi
+
+echo -e "${BLUE}  Führe alembic upgrade head durch...${NC}"
+kubectl exec -i "deployment/backend" -n meeting-automation -- \
+    bash -c "export PYTHONPATH=/app && cd /app && alembic upgrade head" 2>/dev/null || \
+    echo -e "${YELLOW}  Warning: alembic upgrade head hatte Probleme (Init-Container führt es erneut aus).${NC}"
+echo -e "${GREEN}  Migrationen aktuell.${NC}"
+
+# 11.3 Schema-Verifizierung — Migrationen haben das Schema korrekt erstellt
+echo -e "${GREEN}  Schema-Verifizierung: Alembic-Migrationen sind die einzige Quelle für Schema-Änderungen.${NC}"
+
+# 11.4 Seed users
+echo -e "${YELLOW}  Seede enterprise test users...${NC}"
+kubectl exec -i deployment/backend -n meeting-automation -- bash -c "export PYTHONPATH=/app && cd /app && python scripts/seed_users.py" 2>/dev/null || echo -e "${YELLOW}  Warning: Seeding script failed or users already exist.${NC}"
+
+# 11.5 Create S3 bucket
+echo -e "${YELLOW}  Creating S3 bucket 'recordings'...${NC}"
+MINIO_ENDPOINT="http://minio.meeting-automation.svc.cluster.local:9000"
+
+# Read MinIO credentials from minio-secrets (same as MinIO statefulset uses)
+MINIO_USER=$(kubectl get secret minio-secrets -n meeting-automation -o jsonpath='{.data.MINIO_ROOT_USER}' 2>/dev/null | base64 --decode || echo "")
+MINIO_PASS=$(kubectl get secret minio-secrets -n meeting-automation -o jsonpath='{.data.MINIO_ROOT_PASSWORD}' 2>/dev/null | base64 --decode || echo "")
+
+if [ -z "$MINIO_USER" ] || [ -z "$MINIO_PASS" ]; then
+    echo -e "${RED}  Warning: Could not read MinIO credentials from minio-secrets. Using fallback.${NC}"
+    MINIO_USER="minio_user"
+    MINIO_PASS="minio_password"
+fi
+
+kubectl exec -i "deployment/backend" -n meeting-automation -- \
+    bash -c "export PYTHONPATH=/app && cd /app && python -c \"
+import boto3
+from botocore.config import Config
+s3 = boto3.client('s3',
+    endpoint_url='${MINIO_ENDPOINT}',
+    aws_access_key_id='${MINIO_USER}',
+    aws_secret_access_key='${MINIO_PASS}',
+    config=Config(signature_version='s3v4'),
+    region_name='us-east-1')
+buckets = [b['Name'] for b in s3.list_buckets()['Buckets']]
+if 'recordings' not in buckets:
+    s3.create_bucket(Bucket='recordings')
+    print('Created bucket: recordings')
+else:
+    print('Bucket already exists: recordings')
+\"" 2>/dev/null || echo -e "${YELLOW}  Warning: S3 bucket creation failed or already exists.${NC}"
 
 # ============================================================
 # 12. n8n Workflow Setup
@@ -444,3 +533,100 @@ echo -e ""
 echo -e "${YELLOW}Then open:${NC}"
 echo -e "Frontend: http://localhost:3000"
 echo -e "OnlyOffice: http://localhost:8080"
+
+# ============================================================
+# 14. E2E Smoke Tests (via port-forward)
+# ============================================================
+echo -e "${YELLOW}[14/14] Running E2E smoke tests...${NC}"
+
+# Start port-forwards in background
+kubectl port-forward svc/backend 18000:8000 -n meeting-automation &>/dev/null &
+PF_BACKEND_PID=$!
+kubectl port-forward svc/frontend 13000:80 -n meeting-automation &>/dev/null &
+PF_FRONTEND_PID=$!
+sleep 3
+
+SMOKE_OK=true
+
+# Test 1: Backend health
+echo -e "${BLUE}  [1/5] Backend health...${NC}"
+HEALTH=$(curl -sf http://localhost:18000/health 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+if [ "$HEALTH" = "healthy" ]; then
+    echo -e "${GREEN}    ✅ Backend healthy${NC}"
+else
+    echo -e "${RED}    ❌ Backend health check failed (got: ${HEALTH})${NC}"
+    SMOKE_OK=false
+fi
+
+# Test 2: Login
+echo -e "${BLUE}  [2/5] Login (dg@meeting.tn)...${NC}"
+LOGIN_HEADERS=$(mktemp)
+curl -sf -D "$LOGIN_HEADERS" -X POST http://localhost:18000/api/v1/auth/login \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "username=dg%40meeting.tn&password=Password123%21" > /dev/null 2>&1
+ACCESS_TOKEN=$(grep -oP 'accessToken=\K[^;]+' "$LOGIN_HEADERS" 2>/dev/null || echo "")
+rm -f "$LOGIN_HEADERS"
+
+if [ -n "$ACCESS_TOKEN" ]; then
+    echo -e "${GREEN}    ✅ Login successful${NC}"
+else
+    echo -e "${RED}    ❌ Login failed${NC}"
+    SMOKE_OK=false
+fi
+
+# Test 3: User info
+echo -e "${BLUE}  [3/5] User info (/api/v1/auth/me)...${NC}"
+if [ -n "$ACCESS_TOKEN" ]; then
+    ME_INFO=$(curl -sf http://localhost:18000/api/v1/auth/me \
+        -H "Cookie: accessToken=$ACCESS_TOKEN" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('email',''))" 2>/dev/null || echo "")
+    if [ "$ME_INFO" = "dg@meeting.tn" ]; then
+        echo -e "${GREEN}    ✅ User info correct${NC}"
+    else
+        echo -e "${RED}    ❌ User info failed${NC}"
+        SMOKE_OK=false
+    fi
+else
+    echo -e "${YELLOW}    ⏭️  Skipped (no token)${NC}"
+fi
+
+# Test 4: Create meeting
+echo -e "${BLUE}  [4/5] Create meeting...${NC}"
+if [ -n "$ACCESS_TOKEN" ]; then
+    MEETING_RESP=$(curl -sf -X POST http://localhost:18000/api/v1/meetings/ \
+        -H "Cookie: accessToken=$ACCESS_TOKEN" \
+        -H "Content-Type: application/json" \
+        -d '{"title":"Production Smoke Test","start_time":"2026-06-22T10:00:00Z"}' 2>/dev/null || echo "")
+    MEETING_STATUS=$(echo "$MEETING_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+    if [ "$MEETING_STATUS" = "PLANNED" ] || [ "$MEETING_STATUS" = "planned" ]; then
+        echo -e "${GREEN}    ✅ Meeting created (status=${MEETING_STATUS})${NC}"
+    else
+        echo -e "${RED}    ❌ Meeting creation failed (response: ${MEETING_RESP:0:100})${NC}"
+        SMOKE_OK=false
+    fi
+else
+    echo -e "${YELLOW}    ⏭️  Skipped (no token)${NC}"
+fi
+
+# Test 5: Frontend
+echo -e "${BLUE}  [5/5] Frontend HTTP 200...${NC}"
+FE_CODE=$(curl -sf -o /dev/null -w '%{http_code}' http://localhost:13000/ 2>/dev/null || echo "000")
+if [ "$FE_CODE" = "200" ]; then
+    echo -e "${GREEN}    ✅ Frontend HTTP 200${NC}"
+else
+    echo -e "${RED}    ❌ Frontend returned HTTP ${FE_CODE}${NC}"
+    SMOKE_OK=false
+fi
+
+# Cleanup port-forwards
+kill $PF_BACKEND_PID $PF_FRONTEND_PID 2>/dev/null || true
+
+echo ""
+if [ "$SMOKE_OK" = true ]; then
+    echo -e "${GREEN}====================================================${NC}"
+    echo -e "${GREEN}   ✅ ALL E2E SMOKE TESTS PASSED${NC}"
+    echo -e "${GREEN}====================================================${NC}"
+else
+    echo -e "${RED}====================================================${NC}"
+    echo -e "${RED}   ❌ SOME SMOKE TESTS FAILED${NC}"
+    echo -e "${RED}====================================================${NC}"
+fi

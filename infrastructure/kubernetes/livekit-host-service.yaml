@@ -1,0 +1,48 @@
+# LiveKit Host Service for Kubernetes
+# Maps DNS name "livekit-host" to the host machine's Docker gateway IP
+# IP is detected dynamically by setup scripts (docker network inspect kind)
+# Application uses: ws://livekit-host.local:7880 (via hostAliases in deployment)
+apiVersion: v1
+kind: Service
+metadata:
+  name: livekit-host
+  namespace: meeting-automation-staging
+  labels:
+    app: livekit-host
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 7880
+      targetPort: 7880
+      protocol: TCP
+    - name: tcp-ice
+      port: 7881
+      targetPort: 7881
+      protocol: TCP
+    - name: turn
+      port: 3478
+      targetPort: 3478
+      protocol: UDP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: livekit-host
+  namespace: meeting-automation-staging
+subsets:
+  - addresses:
+      # IP is injected by setup script via hostAliases in backend deployment
+      # This Endpoints object is a fallback for direct DNS resolution
+      - ip: 172.18.0.1  # Docker gateway - auto-detected by setup-kubernetes-staging.sh
+    ports:
+      - name: http
+        port: 7880
+        protocol: TCP
+      - name: tcp-ice
+        port: 7881
+        protocol: TCP
+      - name: turn
+        port: 3478
+        protocol: UDP

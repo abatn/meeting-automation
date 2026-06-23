@@ -27,6 +27,16 @@ spec:
           limits:
             memory: "2Gi"
             cpu: "1"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - celery -A app.tasks.celery_app inspect ping --timeout=5
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
         env:
         - name: PYTHONPATH
           value: "/app"

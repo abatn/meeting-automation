@@ -8,7 +8,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 echo -e "${BLUE}====================================================${NC}"
-echo -e "${BLUE}   Meeting Automation - System Initialization       ${NC}"
+echo -e "${BLUE}   Meeting Automation - Local Development Setup     ${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
 # 0. Check for docker-compose command
@@ -36,31 +36,9 @@ until $DOCKER_COMPOSE exec -T postgres pg_isready -U meeting_user -d meeting_db 
 done
 echo -e "${GREEN}PostgreSQL is ready!${NC}"
 
-# 3. Run Database Migrations (Alembic) - Universelle Logik
+# 3. Run Database Migrations
 echo -e "${YELLOW}Checking database migration status...${NC}"
-
-# Prüfe, ob die Alembic-Kontrolltabelle existiert
-ALEMBIC_EXISTS=$($DOCKER_COMPOSE exec -T postgres psql -U meeting_user -d meeting_db -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'alembic_version');" 2>/dev/null)
-
-if [ "$ALEMBIC_EXISTS" = "t" ]; then
-    # Fall 1: Kontrolltabelle existiert → normales Upgrade
-    echo -e "${GREEN}Alembic control table found. Running migrations...${NC}"
-    $DOCKER_COMPOSE exec -T backend alembic upgrade head
-else
-    # Fall 2: Keine Kontrolltabelle → prüfe, ob andere Tabellen existieren
-    USERS_EXISTS=$($DOCKER_COMPOSE exec -T postgres psql -U meeting_user -d meeting_db -tAc "SELECT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'users');" 2>/dev/null)
-    
-    if [ "$USERS_EXISTS" = "t" ]; then
-        # Fall 2a: Tabellen existieren, aber keine Kontrolltabelle → Stampen UND dann Upgraden
-        echo -e "${YELLOW}Database tables found but no alembic_version. Stamping and upgrading...${NC}"
-        $DOCKER_COMPOSE exec -T backend alembic stamp head
-        $DOCKER_COMPOSE exec -T backend alembic upgrade head
-    else
-        # Fall 2b: Frische, leere Datenbank → Normales Upgrade
-        echo -e "${YELLOW}Fresh database. Running migrations...${NC}"
-        $DOCKER_COMPOSE exec -T backend alembic upgrade head
-    fi
-fi
+$DOCKER_COMPOSE exec -T backend alembic upgrade head
 echo -e "${GREEN}Database schema is up to date.${NC}"
 
 # 4. Seed Test Users
@@ -69,14 +47,37 @@ $DOCKER_COMPOSE exec -T backend python scripts/seed_users.py
 echo -e "${GREEN}Users seeded successfully.${NC}"
 
 # 5. Initialize MinIO / S3 Buckets
-echo -e "${YELLOW}Waiting for MinIO API...${NC}"
-sleep 5
-echo -e "${YELLOW}Creating S3 bucket 'recordings'...${NC}"
+echo -e "${YELLOW}Creating S3 buckets...${NC}"
 $DOCKER_COMPOSE exec -T minio mc alias set myminio http://localhost:9000 minio_user minio_password
 $DOCKER_COMPOSE exec -T minio mc mb myminio/recordings --ignore-existing
+$DOCKER_COMPOSE exec -T minio mc mb myminio/meeting-recordings-staging --ignore-existing
 echo -e "${GREEN}S3 infrastructure ready.${NC}"
 
-# 6. n8n Workflow Setup (Manual import only - CLI breaks webhooks)
+# 6. LiveKit on Host (UDP direct access)
+echo -e "${YELLOW}Ensuring LiveKit runs on host (UDP direct access)...${NC}"
+if curl -sf http://localhost:7880 > /dev/null 2>&1; then
+    echo -e "${GREEN}LiveKit already running on host (port 7880).${NC}"
+else
+    echo -e "${YELLOW}Starting LiveKit on host via Docker Compose...${NC}"
+    $DOCKER_COMPOSE up -d livekit-server livekit-redis
+    sleep 5
+    if curl -sf http://localhost:7880 > /dev/null 2>&1; then
+        echo -e "${GREEN}LiveKit started successfully on host.${NC}"
+    else
+        echo -e "${RED}Warning: LiveKit may not be running. Check with: docker logs livekit-server${NC}"
+    fi
+fi
+
+# 6.1 Verify LiveKit webhook reaches backend
+echo -e "${YELLOW}Verifying LiveKit webhook URL...${NC}"
+WEBHOOK_RESP=$(curl -sf -o /dev/null -w '%{http_code}' http://172.18.0.1:8000/api/v1/livekit/webhooks 2>/dev/null || echo "000")
+if [ "$WEBHOOK_RESP" = "405" ] || [ "$WEBHOOK_RESP" = "422" ]; then
+    echo -e "${GREEN}LiveKit webhook endpoint reachable (HTTP ${WEBHOOK_RESP} = OK for GET on POST-only endpoint).${NC}"
+else
+    echo -e "${RED}Warning: LiveKit webhook endpoint not reachable on port 8000 (HTTP ${WEBHOOK_RESP}). Pipeline may not work.${NC}"
+fi
+
+# 7. n8n Workflow Setup
 echo -e "${YELLOW}==================================================${NC}"
 echo -e "${RED}IMPORTANT: n8n Workflow Manual Setup Required!${NC}"
 echo -e "${YELLOW}==================================================${NC}"
@@ -91,5 +92,10 @@ echo -e ""
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${GREEN}   SETUP COMPLETED SUCCESSFULLY!                   ${NC}"
 echo -e "${BLUE}====================================================${NC}"
-echo -e "You can now login at http://localhost:3000"
-echo -e "Don't forget to activate n8n workflows at http://localhost:5678"
+echo -e "Frontend:    http://localhost:3000"
+echo -e "Backend:     http://localhost:8000"
+echo -e "LiveKit:     ws://localhost:7880 (host networking)"
+echo -e "n8n:         http://localhost:5678"
+echo -e "OnlyOffice:  http://localhost:8081"
+echo -e ""
+echo -e "Login: dg@meeting.tn / Password123!"

@@ -32,8 +32,8 @@ data:
       db: 0
     storage:
       s3:
-        access_key: minio_user
-        secret: minio_password
+        access_key: __MINIO_USER__
+        secret: __MINIO_PASS__
         endpoint: http://minio:9000
         bucket: meeting-recordings
         region: us-east-1

@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: onlyoffice-policy
+  namespace: meeting-automation-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: onlyoffice-staging
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - port: 80
+      protocol: TCP

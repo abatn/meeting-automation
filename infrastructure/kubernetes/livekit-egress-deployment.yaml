@@ -35,6 +35,16 @@ spec:
               key: LIVEKIT_API_SECRET
         - name: LIVEKIT_WS_URL
           value: "ws://livekit-server:7880"
+        - name: S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secrets
+              key: MINIO_ROOT_USER
+        - name: S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secrets
+              key: MINIO_ROOT_PASSWORD
         readinessProbe:
           httpGet:
             path: /health
