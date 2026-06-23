@@ -22,7 +22,7 @@ from app.models.pv import PV, Section
 from app.models.recording import Recording
 from app.models.transcription import Transcription
 from app.models.user import User
-from app.models.meeting import Meeting
+from app.models.meeting import Meeting, MeetingStatus
 from sqlalchemy.orm import selectinload
 from app.services.gladia_service import gladia_service
 from app.services.pv_service import PVService
@@ -268,7 +268,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             )
             meeting = meeting_result.scalar_one_or_none()
             if meeting:
-                meeting.status = "completed"
+                meeting.status = MeetingStatus.COMPLETED
 
             await db.commit()
 

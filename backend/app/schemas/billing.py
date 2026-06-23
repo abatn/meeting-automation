@@ -54,3 +54,16 @@ class CheckoutSessionCreate(BaseModel):
 class CheckoutSessionResponse(BaseModel):
     checkout_url: str
     session_id: str
+
+
+class PlanSwitchRequest(BaseModel):
+    plan: str  # "PRO" or "ENTREPRISE"
+    proration: str = "create_prorations"  # "create_prorations", "none", "always_invoice"
+
+
+class CancelSubscriptionRequest(BaseModel):
+    at_period_end: bool = True  # True = cancel at period end, False = cancel immediately
+
+
+class PortalSessionRequest(BaseModel):
+    return_url: str

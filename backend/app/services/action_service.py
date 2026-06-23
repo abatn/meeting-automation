@@ -719,7 +719,7 @@ Return ONLY a JSON array of objects with the following structure:
             return
 
         if action == "accept":
-            suggestion.status = "accepted"
+            suggestion.status = SuggestionStatus.ACCEPTED
 
             if not suggestion.meeting_id:
                 logger.error(
@@ -907,7 +907,7 @@ Return ONLY a JSON array of objects with the following structure:
             
             logger.info(f"Suggestion {suggestion_id} accepted and converted to Action {new_action.id}")
         elif action == "reject":
-            suggestion.status = "rejected"
+            suggestion.status = SuggestionStatus.REJECTED
         
         await self.db.commit()
 

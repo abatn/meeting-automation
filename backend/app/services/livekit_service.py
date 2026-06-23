@@ -73,7 +73,8 @@ class LiveKitService:
         file_output.s3.access_key = settings.S3_ACCESS_KEY
         file_output.s3.secret = settings.S3_SECRET_KEY
         file_output.s3.bucket = settings.LIVEKIT_EGRESS_BUCKET
-        file_output.s3.endpoint = settings.S3_ENDPOINT
+        if settings.LIVEKIT_EGRESS_S3_ENDPOINT:
+            file_output.s3.endpoint = settings.LIVEKIT_EGRESS_S3_ENDPOINT
         file_output.s3.region = "us-east-1"
         # Force path-style URLs so MinIO can resolve host without DNS subdomain
         # routing (avoids `meeting-recordings.minio:9000` lookup failure).

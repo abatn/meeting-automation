@@ -7,10 +7,13 @@ from app.api import deps
 from app.models.user import User as UserModel, UserRole
 from app.models.facture import Facture as FactureModel
 from app.schemas.billing import (
-    Facture, 
-    UsageMinute, 
-    CheckoutSessionCreate, 
-    CheckoutSessionResponse
+    Facture,
+    UsageMinute,
+    CheckoutSessionCreate,
+    CheckoutSessionResponse,
+    PlanSwitchRequest,
+    CancelSubscriptionRequest,
+    PortalSessionRequest
 )
 from app.services.billing_service import BillingService
 
@@ -34,7 +37,8 @@ async def create_checkout_session(
         client_id=current_user.client_id,
         plan_name=session_in.plan,
         success_url=session_in.success_url,
-        cancel_url=session_in.cancel_url
+        cancel_url=session_in.cancel_url,
+        customer_email=current_user.email
     )
     return result
 
@@ -139,3 +143,91 @@ async def admin_list_client_invoices(
         
     service = BillingService(db)
     return await service.get_client_invoices(client_id)
+
+
+@router.post("/switch-plan")
+async def switch_plan(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    request: PlanSwitchRequest,
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG])),
+) -> Any:
+    """
+    Switch subscription plan (upgrade/downgrade). DG only.
+    """
+    service = BillingService(db)
+    try:
+        result = await service.switch_plan(
+            client_id=current_user.client_id,
+            new_plan=request.plan,
+            proration=request.proration
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/cancel")
+async def cancel_subscription(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    request: CancelSubscriptionRequest,
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG])),
+) -> Any:
+    """
+    Cancel subscription. DG only.
+    """
+    service = BillingService(db)
+    try:
+        result = await service.cancel_subscription(
+            client_id=current_user.client_id,
+            at_period_end=request.at_period_end
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/portal")
+async def create_portal_session(
+    *,
+    db: AsyncSession = Depends(deps.get_db),
+    request: PortalSessionRequest,
+    current_user: UserModel = Depends(deps.check_permissions([UserRole.DG])),
+) -> Any:
+    """
+    Create Stripe Customer Portal session for self-service. DG only.
+    """
+    service = BillingService(db)
+    try:
+        result = await service.create_billing_portal_session(
+            client_id=current_user.client_id,
+            return_url=request.return_url
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/usage-status")
+async def get_usage_status(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Get detailed usage status with alert levels. Any authenticated user.
+    """
+    service = BillingService(db)
+    return await service.get_usage_status(current_user.client_id)
+
+
+@router.get("/check-usage")
+async def check_usage_limit(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Check if client can create new meetings (hard limit check). Any authenticated user.
+    """
+    service = BillingService(db)
+    return await service.check_usage_limit(current_user.client_id)

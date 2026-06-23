@@ -22,9 +22,9 @@ class ActionStatus(str, enum.Enum):
     OVERDUE = "OVERDUE"
 
 class SuggestionStatus(str, enum.Enum):
-    SUGGESTED = "suggested"
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
+    SUGGESTED = "SUGGESTED"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
 
 class ActionSuggestion(Base):
     __tablename__ = "action_suggestions"

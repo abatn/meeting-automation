@@ -57,9 +57,9 @@ class ActionAutomation(BaseModel):
         from_attributes = True
 
 class SuggestionStatus(str, Enum):
-    SUGGESTED = "suggested"
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"
+    SUGGESTED = "SUGGESTED"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
 
 class ActionSuggestionBase(BaseModel):
     client_id: Optional[str] = None

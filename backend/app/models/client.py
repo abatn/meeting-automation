@@ -58,6 +58,8 @@ class Client(Base):
     payment_method: Mapped[Optional[PaymentMethod]] = mapped_column(
         Enum(PaymentMethod), nullable=True
     )
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     observations: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     created_at: Mapped[datetime] = mapped_column(

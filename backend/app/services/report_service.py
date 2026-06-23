@@ -8,7 +8,7 @@ from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.meeting import Meeting
+from app.models.meeting import Meeting, MeetingStatus
 from app.models.action import Action
 from app.models.user import User as UserModel
 
@@ -329,7 +329,7 @@ class ReportService:
                 )
                 .where(
                     Meeting.client_id == client_id,
-                    Meeting.status == "completed",
+                    Meeting.status == MeetingStatus.COMPLETED,
                     Meeting.end_time > (now - timedelta(days=30)),
                 )
                 .outerjoin(Participant, Meeting.id == Participant.meeting_id)
@@ -468,7 +468,7 @@ class ReportService:
             .outerjoin(Participant)
             .where(
                 Meeting.client_id == client_id,
-                Meeting.status != "cancelled", # Filter cancelled as per protocol
+                Meeting.status != MeetingStatus.CANCELLED, # Filter cancelled as per protocol
                 Meeting.start_time >= (now - timedelta(hours=2)) # Show in-progress too
             )
         )
@@ -492,8 +492,8 @@ class ReportService:
             query
             .order_by(
                 case(
-                    (Meeting.status == "in_progress", 0),
-                    (Meeting.status == "planned", 1),
+                    (Meeting.status == MeetingStatus.IN_PROGRESS, 0),
+                    (Meeting.status == MeetingStatus.PLANNED, 1),
                     else_=2
                 ),
                 Meeting.start_time.asc()

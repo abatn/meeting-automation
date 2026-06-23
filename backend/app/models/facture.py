@@ -10,10 +10,10 @@ if TYPE_CHECKING:
     from app.models.client import Client
 
 class FactureStatus(str, enum.Enum):
-    PAID = "paid"
-    PENDING = "pending"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
+    PAID = "PAID"
+    PENDING = "PENDING"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 class Facture(Base):
     __tablename__ = "factures"

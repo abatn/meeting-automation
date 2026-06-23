@@ -7,8 +7,9 @@ from pydantic import BaseModel
 
 from app.api import deps
 from app.models.user import User as UserModel, UserRole
-from app.models.client import Client as ClientModel, SubscriptionStatus
+from app.models.client import Client as ClientModel, SubscriptionStatus, SubscriptionPlan
 from app.models.usage_minute import UsageMinute
+from app.models.cms import PricingPlan
 from app.schemas.client import Client, ClientUpdate
 from app.services.audit_service import AuditService
 
@@ -177,18 +178,30 @@ async def get_revenue_statistics(
     status_result = await db.execute(status_stmt)
     status_counts = {str(s.name if hasattr(s, 'name') else s): count for s, count in status_result.all()}
     
-    # 2. Client counts by plan
-    plan_stmt = select(ClientModel.subscription_plan, func.count(ClientModel.id)).group_by(ClientModel.subscription_plan)
+    # 2. Client counts by plan (only ACTIVE clients)
+    plan_stmt = (
+        select(ClientModel.subscription_plan, func.count(ClientModel.id))
+        .where(ClientModel.subscription_status == SubscriptionStatus.ACTIVE)
+        .group_by(ClientModel.subscription_plan)
+    )
     plan_result = await db.execute(plan_stmt)
     plan_counts = {str(p.name if hasattr(p, 'name') else p): count for p, count in plan_result.all()}
     
-    # 3. Estimated Monthly Revenue
-    revenue = 0
-    active_pro = plan_counts.get("PRO", 0) if status_counts.get("ACTIVE", 0) > 0 else 0
-    active_enterprise = plan_counts.get("ENTREPRISE", 0) if status_counts.get("ACTIVE", 0) > 0 else 0
+    # 3. Get prices from CMS pricing_plans (fallback to defaults)
+    prices = {}
+    for plan_code in ["PRO", "ENTREPRISE"]:
+        price_stmt = select(PricingPlan.price_monthly).where(PricingPlan.plan_code == plan_code, PricingPlan.is_active == True)
+        price_result = await db.execute(price_stmt)
+        price_row = price_result.scalar_one_or_none()
+        prices[plan_code] = price_row if price_row else (99 if plan_code == "PRO" else 499)
     
-    revenue += (active_pro * 99)
-    revenue += (active_enterprise * 499)
+    # 4. Calculate Estimated Monthly Revenue (only ACTIVE clients)
+    revenue = 0
+    active_pro = plan_counts.get("PRO", 0)
+    active_enterprise = plan_counts.get("ENTREPRISE", 0)
+    
+    revenue += active_pro * prices["PRO"]
+    revenue += active_enterprise * prices["ENTREPRISE"]
     
     return {
         "total_clients": sum(status_counts.values()),

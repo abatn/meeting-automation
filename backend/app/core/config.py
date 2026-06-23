@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     S3_ACCESS_KEY: str = "minio_user"
     S3_SECRET_KEY: str = "minio_password"
     S3_BUCKET_NAME: str = "meeting-recordings"
+    LIVEKIT_EGRESS_S3_ENDPOINT: str = ""
 
     # AI Services
     OPENAI_API_KEY: str = ""

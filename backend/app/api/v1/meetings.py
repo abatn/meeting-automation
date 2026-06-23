@@ -151,6 +151,17 @@ async def create_meeting(
     """
     Create new meeting.
     """
+    # Phase 4: Usage enforcement — check hard limit
+    from app.services.billing_service import BillingService
+    billing_service = BillingService(db)
+    usage_check = await billing_service.check_usage_limit(current_user.client_id)
+
+    if not usage_check["allowed"]:
+        raise HTTPException(
+            status_code=403,
+            detail=usage_check["reason"]
+        )
+
     meeting = await meeting_service.create_meeting(
         meeting_in=meeting_in, owner_id=current_user.id, client_id=current_user.client_id
     )
