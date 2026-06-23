@@ -1,3 +1,10 @@
+# ============================================================
+# E2E TESTS ONLY
+# ============================================================
+# Isolated test environment with separate database.
+# LiveKit runs in k3s cluster (no host-side docker-compose needed)
+# ============================================================
+
 services:
   postgres-test:
     image: postgres:15-alpine
@@ -63,9 +70,6 @@ services:
     networks:
       - e2e-network
 
-  # celery-worker service removed for E2E tests - using eager mode instead
-  # celery-beat service also not needed in E2E (periodic tasks disabled)
-
   minio-test:
     image: minio/minio:latest
     restart: unless-stopped
@@ -84,36 +88,6 @@ services:
       timeout: 10s
       retries: 10
       start_period: 30s
-    networks:
-      - e2e-network
-
-  n8n-test:
-    image: n8nio/n8n:latest
-    restart: unless-stopped
-    environment:
-      - N8N_SECURE_COOKIE=false
-      - N8N_HOST=localhost
-      - N8N_PORT=5678
-      - WEBHOOK_URL=http://localhost:5678
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres-test
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=meeting_db_test
-      - DB_POSTGRESDB_USER=meeting_user
-      - DB_POSTGRESDB_PASSWORD=meeting_password
-    ports:
-      - "5679:5678"
-    volumes:
-      - n8n_test_data:/home/node/.n8n
-   # healthcheck:
-   #   test:  ["CMD", "n8n", "health-check"]
-   #   interval: 30s
-   #   timeout: 10s
-   #   retries: 10
-   #   start_period: 90s
-    depends_on:
-      postgres-test:
-        condition: service_healthy
     networks:
       - e2e-network
 
@@ -145,6 +119,8 @@ services:
         E2E_BUILD: "true"
     container_name: meeting-automation-backend-e2e
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    extra_hosts:
+      - "livekit-server:host-gateway"
     environment:
       - PYTHONPATH=/app
       - APP_ROLE=backend
@@ -164,16 +140,18 @@ services:
       - ONLYOFFICE_URL=http://onlyoffice-test:80
       - N8N_WEBHOOK_URL=http://n8n-test:5678/webhook
       - SECRET_KEY=test-secret-key-for-e2e-only
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
-      - GLADIA_API_KEY=${GLADIA_API_KEY}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - GLADIA_API_KEY=${GLADIA_API_KEY:-}
       - DEBUG=true
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
       - INTERNAL_API_SECRET=test-internal-api-secret-key-2026
-      - LIVEKIT_URL=${LIVEKIT_URL}
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - LIVEKIT_URL=ws://livekit-server:7880
+      - LIVEKIT_PUBLIC_URL=ws://livekit-server:7880
+      - LIVEKIT_API_KEY=meeting-api-key-2026
+      - LIVEKIT_API_SECRET=meeting-api-secret-2026-meeting-automation-staging
       - LIVEKIT_EGRESS_BUCKET=meeting-recordings
+      - LIVEKIT_EGRESS_S3_ENDPOINT=http://localhost:9000
     ports:
       - "8001:8000"
     volumes:
@@ -190,71 +168,8 @@ services:
         condition: service_healthy
       onlyoffice-test:
         condition: service_healthy
-      livekit-server:
-        condition: service_healthy
     networks:
       - e2e-network
-
-  livekit-server:
-    image: livekit/livekit-server:latest
-    container_name: meeting-automation-livekit-server-e2e
-    restart: unless-stopped
-    environment:
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
-      - LIVEKIT_NODE_IP=${LIVEKIT_NODE_IP:-}
-    # Dynamische IP-Erkennung via custom Entrypoint-Script
-    # Verhindert IPv6/IPv4-Mismatch in Pion (Egress)
-    entrypoint: /opt/livekit/entrypoint.sh
-    command: --config /etc/livekit.yaml
-    ports:
-      - "7880:7880"
-      - "7881:7881/tcp"
-      - "7881-7890:7881-7890/udp"
-    volumes:
-      - ./livekit-e2e.yaml:/etc/livekit.yaml:ro
-      - ./livekit-entrypoint.sh:/opt/livekit/entrypoint.sh:ro
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7880"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-    networks:
-      - e2e-network
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
-  livekit-egress:
-    image: livekit/egress:latest
-    container_name: meeting-automation-livekit-egress-e2e
-    restart: unless-stopped
-    environment:
-      - EGRESS_CONFIG_FILE=/etc/livekit-egress/config.yaml
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
-      - LIVEKIT_WS_URL=${LIVEKIT_URL}
-    volumes:
-      - ./livekit-egress-e2e.yaml:/etc/livekit-egress/config.yaml:ro
-    depends_on:
-      livekit-server:
-        condition: service_healthy
-      redis-test:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7000/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - e2e-network
-    deploy:
-      resources:
-        limits:
-          memory: 2G
 
 networks:
   e2e-network:
@@ -265,5 +180,4 @@ volumes:
   redis_test_data:
   rabbitmq_test_data:
   minio_test_data:
-  n8n_test_data:
   onlyoffice_test_data:

@@ -32,6 +32,8 @@ Vor Beginn der Umsetzung wurde der Ist-Zustand der Produktion-Datenbank verifizi
 - `minutes_included` (integer)
 - `minutes_used` (integer)
 - `payment_method` (enum: CARD, TRANSFER, CASH)
+- `stripe_subscription_id` (string, nullable) — Stripe Subscription-ID für Webhook-Matching
+- `stripe_customer_id` (string, nullable) — Stripe Customer-ID für wiederkehrende Kunden
 - `observations` (text)
 - `created_at` (timestamp)
 - `updated_at` (timestamp)
@@ -93,6 +95,16 @@ Alle folgenden Tabellen bekommen eine `client_id` (foreign key to `clients`):
 ### 4.2 Minuten-Tracking
 - Jede Meeting-Minute wird erfasst und vom Kontingent abgezogen.
 - Automatisierte Warnungen bei Erreichen des Limits.
+
+### 4.3 Revenue-Berechnung (Admin Dashboard)
+- Preise werden dynamisch aus `pricing_plans` Tabelle gelesen (nicht hardcoded).
+- Nur ACTIVE Clients werden für MRR-Berechnung herangezogen.
+- Bug behoben: `active_pro`/`active_enterprise` zählt jetzt korrekt pro Plan.
+
+### 4.4 Landing-Page Preise
+- Preise werden aus CMS API (`/api/v1/cms/pricing`) geladen.
+- Dynamisch bei Sprachwechsel aktualisiert.
+- Fallback auf Defaults ($0/$99/$499) wenn API nicht erreichbar.
 
 ---
 

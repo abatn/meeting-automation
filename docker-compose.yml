@@ -1,5 +1,14 @@
 version: '3.8'
 
+# ============================================================
+# LOCAL DEVELOPMENT ONLY
+# ============================================================
+# This compose file is for local development on a single machine.
+# All services run in Docker containers.
+# For staging: use K8s (k3s) — LiveKit und MinIO sind im Cluster
+# For E2E tests: use docker-compose.e2e.yml
+# ============================================================
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -17,15 +26,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      default:
-        aliases:
-          - postgres
     deploy:
       resources:
         limits:
           memory: 512M
-          cpus: '0.5'
 
   redis:
     image: redis:7-alpine
@@ -44,7 +48,6 @@ services:
       resources:
         limits:
           memory: 512M
-          cpus: '0.5'
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -72,9 +75,8 @@ services:
       start_period: 60s
     deploy:
       resources:
-        limits: 
+        limits:
           memory: 2G
-          cpus: '1.0'
 
   minio:
     image: minio/minio:latest
@@ -97,15 +99,14 @@ services:
       resources:
         limits:
           memory: 512M
-          cpus: '0.5'
-  
+
   n8n:
     image: n8nio/n8n:latest
     restart: unless-stopped
     env_file: .env
     environment:
-      - N8N_SECURE_COOKIE=false #TOBEDEAKTIVATED
-      - N8N_RUNNERS_ENABLED=false 
+      - N8N_SECURE_COOKIE=false
+      - N8N_RUNNERS_ENABLED=false
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
@@ -124,7 +125,6 @@ services:
       resources:
         limits:
           memory: 1G
-          cpus: '0.5'
 
   onlyoffice:
     image: onlyoffice/documentserver:latest
@@ -149,7 +149,6 @@ services:
       resources:
         limits:
           memory: 2G
-          cpus: '1.0'
 
   backend:
     build: ./backend
@@ -177,18 +176,19 @@ services:
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
       - INTERNAL_API_SECRET=super-secret-automation-key-2026
-      - LIVEKIT_URL=${LIVEKIT_URL}
-      - LIVEKIT_PUBLIC_URL=${LIVEKIT_PUBLIC_URL}
-      # TEST-ONLY: ngrok-Signal-URL für Teilnehmer über ngrok. Für Produktion entfernen.
-      - LIVEKIT_NGROK_URL=${LIVEKIT_NGROK_URL}
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - LIVEKIT_URL=${LIVEKIT_URL:-ws://localhost:7880}
+      - LIVEKIT_PUBLIC_URL=${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
+      - LIVEKIT_NGROK_URL=${LIVEKIT_NGROK_URL:-}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-meeting-api-key-2026}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-meeting-api-secret-2026-meeting-automation-staging}
       - LIVEKIT_EGRESS_BUCKET=meeting-recordings
+      - LIVEKIT_EGRESS_S3_ENDPOINT=http://localhost:9000
+      - GLADIA_API_KEY=${GLADIA_API_KEY:-}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -208,7 +208,6 @@ services:
       resources:
         limits:
           memory: 1G
-          cpus: '0.5'
 
   celery-worker:
     build: ./backend
@@ -241,7 +240,6 @@ services:
       resources:
         limits:
           memory: 2G
-          cpus: '1.0'
 
   celery-beat:
     build: ./backend
@@ -274,7 +272,6 @@ services:
       resources:
         limits:
           memory: 512M
-          cpus: '0.5'
 
   frontend:
     build:
@@ -291,28 +288,15 @@ services:
       resources:
         limits:
           memory: 512M
-          cpus: '0.5'
 
   livekit-server:
     image: livekit/livekit-server:latest
     restart: unless-stopped
-    environment:
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
-      # TEST-ONLY: ngrok-Host aus .env für LiveKit-Media-TCP-Test. Vor Produktion entfernen.
-      - LIVEKIT_NODE_IP=${LIVEKIT_NODE_IP:-}
-    # Dynamische IP-Erkennung via custom Entrypoint-Script
-    # Verhindert IPv6/IPv4-Mismatch in Pion (Egress)
-    # Eigenes Script liegt unter /opt/livekit/ (überschreibt NICHT Original-Entrypoint)
-    entrypoint: /opt/livekit/entrypoint.sh
-    command: --config /etc/livekit.yaml
-    ports:
-      - "7880:7880"
-      - "7881:7881/tcp"
-      - "7881-7890:7881-7890/udp"
+    network_mode: host
+    command: --config /etc/livekit.yaml --bind 0.0.0.0
     volumes:
-      - ./livekit.yaml:/etc/livekit.yaml:ro
-      - ./livekit-entrypoint.sh:/opt/livekit/entrypoint.sh:ro
+      # Webhook URL: port 8000 (local backend port). Staging uses entrypoint with LIVEKIT_WEBHOOK_PORT=8080.
+      - ./livekit-host.yaml:/etc/livekit.yaml:ro
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:7880"]
       interval: 15s
@@ -324,20 +308,37 @@ services:
         limits:
           memory: 512M
 
+  livekit-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6380:6379"
+    volumes:
+      - livekit-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
   livekit-egress:
     image: livekit/egress:latest
     restart: unless-stopped
+    network_mode: host
     environment:
       - EGRESS_CONFIG_FILE=/etc/livekit-egress/config.yaml
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
-      - LIVEKIT_WS_URL=${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-meeting-api-key-2026}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-meeting-api-secret-2026-meeting-automation-staging}
+      - LIVEKIT_WS_URL=ws://localhost:7880
     volumes:
       - ./livekit-egress.yaml:/etc/livekit-egress/config.yaml:ro
     depends_on:
       livekit-server:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:7000/health"]
@@ -357,3 +358,4 @@ volumes:
   minio_data:
   n8n_data:
   onlyoffice_data:
+  livekit-redis-data:

@@ -53,7 +53,7 @@ async def test_p31_meeting_status_change_triggers_webhook(db_session: AsyncSessi
         id=str(uuid.uuid4()),
         client_id=test_client.id,
         title="Team Standup",
-        status="planned",
+        status="PLANNED",
         creator_id=creator.id,
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         end_time=datetime.now(timezone.utc) + timedelta(hours=2),
@@ -67,10 +67,10 @@ async def test_p31_meeting_status_change_triggers_webhook(db_session: AsyncSessi
     updated = await meeting_service.update_meeting(
         meeting_id=meeting.id,
         client_id=test_client.id,
-        meeting_in=MeetingUpdate(status="in_progress"),
+        meeting_in=MeetingUpdate(status="IN_PROGRESS"),
         current_user_id=creator.id
     )
-    assert updated.status == "in_progress"
+    assert updated.status == "IN_PROGRESS"
 
 
 @pytest.mark.asyncio
@@ -94,7 +94,7 @@ async def test_p31_cancelled_meeting_triggers_webhook(db_session: AsyncSession):
         id=str(uuid.uuid4()),
         client_id=test_client.id,
         title="Cancelled Meeting",
-        status="planned",
+        status="PLANNED",
         creator_id=creator.id,
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         created_at=datetime.now(timezone.utc),
@@ -106,10 +106,10 @@ async def test_p31_cancelled_meeting_triggers_webhook(db_session: AsyncSession):
     updated = await meeting_service.update_meeting(
         meeting_id=meeting.id,
         client_id=test_client.id,
-        meeting_in=MeetingUpdate(status="cancelled"),
+        meeting_in=MeetingUpdate(status="CANCELLED"),
         current_user_id=creator.id
     )
-    assert updated.status == "cancelled"
+    assert updated.status == "CANCELLED"
 
 
 @pytest.mark.asyncio
@@ -143,7 +143,7 @@ async def test_p32_non_creator_cannot_update_meeting(db_session: AsyncSession):
         id=str(uuid.uuid4()),
         client_id=test_client.id,
         title="Test",
-        status="planned",
+        status="PLANNED",
         creator_id=creator.id,
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         created_at=datetime.now(timezone.utc),
@@ -156,7 +156,7 @@ async def test_p32_non_creator_cannot_update_meeting(db_session: AsyncSession):
         await meeting_service.update_meeting(
             meeting_id=meeting.id,
             client_id=test_client.id,
-            meeting_in=MeetingUpdate(status="in_progress"),
+            meeting_in=MeetingUpdate(status="IN_PROGRESS"),
             current_user_id=other.id
         )
 
@@ -182,7 +182,7 @@ async def test_p32_creator_can_update_meeting(db_session: AsyncSession):
         id=str(uuid.uuid4()),
         client_id=test_client.id,
         title="Test",
-        status="planned",
+        status="PLANNED",
         creator_id=creator.id,
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         created_at=datetime.now(timezone.utc),
@@ -194,10 +194,10 @@ async def test_p32_creator_can_update_meeting(db_session: AsyncSession):
     updated = await meeting_service.update_meeting(
         meeting_id=meeting.id,
         client_id=test_client.id,
-        meeting_in=MeetingUpdate(status="in_progress"),
+        meeting_in=MeetingUpdate(status="IN_PROGRESS"),
         current_user_id=creator.id
     )
-    assert updated.status == "in_progress"
+    assert updated.status == "IN_PROGRESS"
 
 
 @pytest.mark.asyncio
@@ -286,7 +286,7 @@ async def test_p34_duplicate_participant_email_rejected(db_session: AsyncSession
         id=str(uuid.uuid4()),
         client_id=test_client.id,
         title="Team",
-        status="planned",
+        status="PLANNED",
         creator_id=creator.id,
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         created_at=datetime.now(timezone.utc),
@@ -336,7 +336,7 @@ async def test_p34_same_email_different_meetings_allowed(db_session: AsyncSessio
         id=str(uuid.uuid4()),
         client_id=test_client.id,
         title="M1",
-        status="planned",
+        status="PLANNED",
         creator_id=creator.id,
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         created_at=datetime.now(timezone.utc),
@@ -346,7 +346,7 @@ async def test_p34_same_email_different_meetings_allowed(db_session: AsyncSessio
         id=str(uuid.uuid4()),
         client_id=test_client.id,
         title="M2",
-        status="planned",
+        status="PLANNED",
         creator_id=creator.id,
         start_time=datetime.now(timezone.utc) + timedelta(hours=2),
         created_at=datetime.now(timezone.utc),

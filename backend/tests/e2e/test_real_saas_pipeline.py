@@ -348,7 +348,7 @@ class TestRealSaasPipeline:
             "room_id": room_id,
             "start_time": (now + timedelta(hours=1)).isoformat(),
             "end_time": (now + timedelta(hours=2)).isoformat(),
-            "status": "planned",
+            "status": "PLANNED",
             "participants": [],
         }
 
@@ -376,7 +376,7 @@ class TestRealSaasPipeline:
         db_meeting = meeting_result.scalar_one_or_none()
 
         assert db_meeting is not None
-        assert db_meeting.status == "planned"
+        assert db_meeting.status == "PLANNED"
         assert db_meeting.room_id == room_id
         assert db_meeting.client_id == "test-client-id"
 
@@ -407,7 +407,7 @@ class TestRealSaasPipeline:
             start_time=now + timedelta(hours=1),
             end_time=now + timedelta(hours=2),
             creator_id="test-user-id",
-            status="planned",
+            status="PLANNED",
         )
         db_session.add(meeting)
         await db_session.commit()
@@ -490,7 +490,7 @@ class TestRealSaasPipeline:
             start_time=now,
             end_time=now + timedelta(hours=1),
             creator_id="test-user-id",
-            status="in_progress",
+            status="IN_PROGRESS",
         )
         db_session.add(meeting)
         await db_session.flush()
@@ -553,7 +553,7 @@ class TestRealSaasPipeline:
             title="Meeting with Transcription",
             start_time=now,
             creator_id="test-user-id",
-            status="in_progress",
+            status="IN_PROGRESS",
         )
         db_session.add(meeting)
         await db_session.flush()
@@ -635,7 +635,7 @@ class TestRealSaasPipeline:
             title="Meeting with PV",
             start_time=now,
             creator_id="test-user-id",
-            status="completed",
+            status="COMPLETED",
         )
         db_session.add(meeting)
         await db_session.flush()
@@ -759,7 +759,7 @@ class TestRealSaasPipeline:
             title="SECRET MEETING",
             start_time=datetime.now(timezone.utc),
             creator_id=other_user_id,
-            status="planned",
+            status="PLANNED",
         )
         db_session.add(other_meeting)
         await db_session.commit()

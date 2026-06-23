@@ -1,0 +1,25 @@
+port: 7880
+log_level: info
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 60000
+  use_external_ip: true
+  force_tcp: false
+
+redis:
+  address: localhost:6380
+  db: 0
+
+keys:
+  meeting-api-key-2026: meeting-api-secret-2026-meeting-automation-staging
+
+turn:
+  enabled: true
+  udp_port: 3478
+
+webhook:
+  api_key: meeting-api-key-2026
+  urls:
+    - http://172.18.0.1:8000/api/v1/livekit/webhooks

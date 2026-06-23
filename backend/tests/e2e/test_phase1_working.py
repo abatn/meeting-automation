@@ -96,7 +96,7 @@ class TestPhase1Fixes:
             creator_id=user_a.id,
             start_time=datetime.utcnow() - timedelta(days=5),
             end_time=datetime.utcnow() - timedelta(days=5, hours=-1),
-            status="completed",
+            status="COMPLETED",
         )
         db_session.add(meeting)
         await db_session.flush()
@@ -107,7 +107,7 @@ class TestPhase1Fixes:
             client_id=client_a.id,
             meeting_id=meeting.id,
             file_path="/storage/recordings/team_meeting.mp4",
-            status="completed",
+            status="COMPLETED",
             access_policy="organizer_only",  # ← NEW FIELD ADDED
         )
         db_session.add(recording)

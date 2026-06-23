@@ -315,3 +315,37 @@ Alle kritischen Pfade der SaaS-Multi-Tenant-Pipeline erfolgreich validiert gegen
 - ✅ Performance (23s full suite)
 
 **RECOMMENDATION:** System is **PRODUCTION-READY**
+
+---
+
+## 🔧 UPDATE — 2026-06-21: Billing Phase 1 Quick-Wins ✅
+
+### Behobene Probleme:
+1. **Revenue-Bug** — `active_pro`/`active_enterprise` zählte irreführend alle Clients statt nur ACTIVE pro Plan
+2. **Hardcoded Preise** — Revenue-Berechnung nutzte $99/$499 statt `PricingPlan.price_monthly` aus CMS
+3. **Landing-Page Preise** — Drei Preiskarten hardcoded statt aus CMS API dynamisch
+
+### Implementierung:
+- `admin.py`: Korrekte SQL-Query für ACTIVE Clients pro Plan + dynamische CMS-Preis-Lesung
+- `LandingPage.tsx`: `useEffect` mit `cmsService.getPricing()` + Fallback auf Defaults
+- `.env.example`: Stripe-Keys dokumentiert (leer = Mock-Modus)
+
+### Offene Billing-Phasen:
+- Phase 3: Plan-Wechsel, Kündigung, Customer Portal
+- Phase 4: Usage-Enforcement (Alerts bei 80%, Hard-Limit bei 100%)
+
+---
+
+## 🔧 UPDATE — 2026-06-21: Billing Phase 2 — Stripe Lifecycle ✅
+
+### Behobene Probleme:
+1. **Checkout ohne Email** — `customer_email` fehlte in Checkout-Session
+2. **Kein `invoice.paid` Handler** — Wiederkehrende Zahlungen wurden nicht verbucht
+3. **Subscription-Events ohne Logik** — `customer.subscription.*` war nur Stub
+4. **Subscription-IDs fehlten** — `stripe_subscription_id`/`stripe_customer_id` nicht in Client
+5. **`next_billing_date` naiv** — +30 Tage statt aus Stripe `current_period_end`
+
+### Implementierung:
+- `billing_service.py`: Checkout mit `customer_email`, `subscription_data.metadata`, `stripe_customer_id`
+- `webhooks_stripe.py`: `invoice.paid` → Facture-Record, `customer.subscription.*` → Status-Sync
+- `client.py`: `stripe_subscription_id` + `stripe_customer_id` (Migration `8779f409105a`)

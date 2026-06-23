@@ -1,0 +1,471 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.15, pytest-9.1.1, pluggy-1.6.0 -- /usr/local/bin/python3.11
+cachedir: .pytest_cache
+rootdir: /app
+configfile: pyproject.toml
+plugins: asyncio-1.4.0, anyio-4.14.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 279 items
+
+tests/e2e/test_action_status_e2e.py::test_update_action_status_with_valid_enum_values PASSED [  0%]
+tests/e2e/test_action_status_e2e.py::test_update_action_status_rejects_invalid_values PASSED [  0%]
+tests/e2e/test_action_status_e2e.py::test_update_action_status_audit_logging_iso27001 PASSED [  1%]
+tests/e2e/test_action_status_e2e.py::test_update_action_status_n8n_webhook_integration SKIPPED [  1%]
+tests/e2e/test_action_status_e2e.py::test_action_status_never_stores_invalid_enum_in_db PASSED [  1%]
+tests/e2e/test_assignee_resolver.py::TestDoubleMetaphone::test_empty_string PASSED [  2%]
+tests/e2e/test_assignee_resolver.py::TestDoubleMetaphone::test_simple_name PASSED [  2%]
+tests/e2e/test_assignee_resolver.py::TestDoubleMetaphone::test_phonetic_variants_same_code PASSED [  2%]
+tests/e2e/test_assignee_resolver.py::TestDoubleMetaphone::test_abdelkader_variants PASSED [  3%]
+tests/e2e/test_assignee_resolver.py::TestPhoneticMatch::test_exact_match PASSED [  3%]
+tests/e2e/test_assignee_resolver.py::TestPhoneticMatch::test_case_insensitive PASSED [  3%]
+tests/e2e/test_assignee_resolver.py::TestPhoneticMatch::test_phonetic_variants PASSED [  4%]
+tests/e2e/test_assignee_resolver.py::TestPhoneticMatch::test_abdelkader_variants PASSED [  4%]
+tests/e2e/test_assignee_resolver.py::TestPhoneticMatch::test_unrelated_names PASSED [  5%]
+tests/e2e/test_assignee_resolver.py::TestPhoneticMatch::test_empty_names PASSED [  5%]
+tests/e2e/test_assignee_resolver.py::TestPhoneticCandidates::test_find_phonetic_match PASSED [  5%]
+tests/e2e/test_assignee_resolver.py::TestPhoneticCandidates::test_no_match PASSED [  6%]
+tests/e2e/test_assignee_resolver.py::TestPhoneticCandidates::test_sorted_by_score PASSED [  6%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_speaker_mapping_exact PASSED [  6%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_speaker_mapping_phonetic PASSED [  7%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_participant_exact PASSED [  7%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_phonetic_match PASSED [  7%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_invalid_assignee PASSED [  8%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_invalid_assignee_single_speaker PASSED [  8%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_external_email PASSED [  8%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_external_name PASSED [  9%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_single_speaker_fallback PASSED [  9%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_null_assignee PASSED [ 10%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_empty_assignee PASSED [ 10%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolver::test_fuzzy_match PASSED [ 10%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolution::test_to_dict PASSED [ 11%]
+tests/e2e/test_assignee_resolver.py::TestAssigneeResolution::test_ambiguous_resolution PASSED [ 11%]
+tests/e2e/test_cms_pricing_connection.py::test_c1_pricing_plan_model_has_new_fields PASSED [ 11%]
+tests/e2e/test_cms_pricing_connection.py::test_c2_client_service_reads_from_cms PASSED [ 12%]
+tests/e2e/test_cms_pricing_connection.py::test_c3_billing_service_has_cms_method PASSED [ 12%]
+tests/e2e/test_cms_pricing_connection.py::test_c4_pricing_plan_schema_has_new_fields PASSED [ 12%]
+tests/e2e/test_cms_pricing_connection.py::test_c5_default_plan_minutes_fallback PASSED [ 13%]
+tests/e2e/test_cms_pricing_connection.py::test_c6_default_plan_config_fallback PASSED [ 13%]
+tests/e2e/test_cms_pricing_connection.py::test_c7_handle_stripe_webhook_uses_cms PASSED [ 13%]
+tests/e2e/test_frontend_pricing.py::test_f1_billing_panel_has_pricing_interface PASSED [ 14%]
+tests/e2e/test_frontend_pricing.py::test_f2_billing_panel_has_get_price_function PASSED [ 14%]
+tests/e2e/test_frontend_pricing.py::test_f3_billing_panel_fetches_cms_pricing PASSED [ 15%]
+tests/e2e/test_frontend_pricing.py::test_f4_billing_panel_uses_dynamic_prices PASSED [ 15%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_speaker_mappings_used_for_assignment PASSED [ 15%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_assignment_priority_order PASSED [ 16%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_mistral_assignee_validation PASSED [ 16%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_audit_logs_for_pv_creation PASSED [ 16%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_audit_logs_for_action_assignment PASSED [ 17%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_learn_from_feedback_resolves_user PASSED [ 17%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_learn_from_feedback_imports PASSED [ 17%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_save_pv_and_actions_with_speaker_mappings_integration PASSED [ 18%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_save_pv_and_actions_fallback_to_ilike PASSED [ 18%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_save_pv_and_actions_external_assignment PASSED [ 18%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_learn_from_feedback_user_match PASSED [ 19%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_learn_from_feedback_external_fallback PASSED [ 19%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_speaker_resolved_name_column PASSED [ 20%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_learn_from_feedback_null_assignee_single_speaker PASSED [ 20%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_learn_from_feedback_uses_resolved_name PASSED [ 20%]
+tests/e2e/test_intelligent_speaker_assignment.py::test_learn_from_feedback_transcript_segment_match PASSED [ 21%]
+tests/e2e/test_invitation_e2e.py::TestInvitationE2E::test_complete_invitation_flow PASSED [ 21%]
+tests/e2e/test_invitation_e2e.py::TestInvitationE2E::test_expired_token_cannot_be_used PASSED [ 21%]
+tests/e2e/test_invitation_e2e.py::TestInvitationE2E::test_invalid_token_rejected PASSED [ 22%]
+tests/e2e/test_invitation_e2e.py::TestInvitationE2E::test_double_activation_prevented PASSED [ 22%]
+tests/e2e/test_invitation_e2e.py::TestInvitationE2E::test_pending_user_cannot_login PASSED [ 22%]
+tests/e2e/test_livekit_integration.py::test_livekit_token_endpoint PASSED [ 23%]
+tests/e2e/test_livekit_integration.py::test_livekit_start_recording PASSED [ 23%]
+tests/e2e/test_livekit_integration.py::test_livekit_webhook_egress_completed PASSED [ 24%]
+tests/e2e/test_livekit_integration.py::test_livekit_webhook_unauthorized PASSED [ 24%]
+tests/e2e/test_livekit_integration.py::test_livekit_webhook_unknown_event PASSED [ 24%]
+tests/e2e/test_livekit_integration.py::test_livekit_meeting_creates_room PASSED [ 25%]
+tests/e2e/test_livekit_integration.py::test_livekit_token_response_structure PASSED [ 25%]
+tests/e2e/test_livekit_integration.py::test_livekit_recording_status_idle PASSED [ 25%]
+tests/e2e/test_livekit_integration.py::test_livekit_stop_recording_no_active PASSED [ 26%]
+tests/e2e/test_livekit_integration.py::test_livekit_stop_recording_requires_auth PASSED [ 26%]
+tests/e2e/test_meeting_creation_flow.py::test_create_meeting_basic PASSED [ 26%]
+tests/e2e/test_meeting_creation_flow.py::test_create_meeting_with_participants PASSED [ 27%]
+tests/e2e/test_meeting_creation_flow.py::test_create_meeting_requires_auth PASSED [ 27%]
+tests/e2e/test_meeting_creation_flow.py::test_create_meeting_missing_required_fields PASSED [ 27%]
+tests/e2e/test_meeting_creation_flow.py::test_create_meeting_invalid_time_range PASSED [ 28%]
+tests/e2e/test_meeting_creation_flow.py::test_meeting_fixture_works PASSED [ 28%]
+tests/e2e/test_meeting_creation_flow.py::test_meeting_list_includes_created PASSED [ 29%]
+tests/e2e/test_meeting_creation_flow.py::test_get_meeting_by_id PASSED   [ 29%]
+tests/e2e/test_minutes_usage.py::test_m1_record_usage_function_exists PASSED [ 29%]
+tests/e2e/test_minutes_usage.py::test_m2_record_minutes_usage_called_in_pipeline PASSED [ 30%]
+tests/e2e/test_minutes_usage.py::test_m3_record_minutes_usage_function_exists PASSED [ 30%]
+tests/e2e/test_minutes_usage.py::test_m5_minutes_calculation_from_segments PASSED [ 30%]
+tests/e2e/test_minutes_usage.py::test_m6_zero_segments_no_minutes_recorded PASSED [ 31%]
+tests/e2e/test_minutes_usage.py::test_m7_record_minutes_usage_calculates_correct_minutes PASSED [ 31%]
+tests/e2e/test_minutes_usage.py::test_m8_billing_service_record_usage_signature PASSED [ 31%]
+tests/e2e/test_n8n_webhook_integration.py::test_n8n_webhook_on_transcription_completion PASSED [ 32%]
+tests/e2e/test_n8n_webhook_integration.py::test_n8n_webhook_on_action_status_update PASSED [ 32%]
+tests/e2e/test_p0_deleted_at_user.py::test_user_deleted_at_field_exists PASSED [ 32%]
+tests/e2e/test_p0_deleted_at_user.py::test_cross_tenant_validation_with_deleted_at PASSED [ 33%]
+tests/e2e/test_p0_deleted_at_user.py::test_user_soft_delete PASSED       [ 33%]
+tests/e2e/test_phase1_fixes.py::TestPhase1Fixes::test_fix_8_cross_tenant_user_validation PASSED [ 34%]
+tests/e2e/test_phase1_fixes.py::TestPhase1Fixes::test_fix_1_recording_access_validation PASSED [ 34%]
+tests/e2e/test_phase1_fixes.py::TestPhase1Fixes::test_fix_9_token_validation_soft_delete PASSED [ 34%]
+tests/e2e/test_phase1_simple.py::TestPhase1Fixes::test_phase1_all_fixes PASSED [ 35%]
+tests/e2e/test_phase1_working.py::TestPhase1Fixes::test_phase1_fixes PASSED [ 35%]
+tests/e2e/test_phase2_team_management.py::test_p21_register_deletes_existing_team_member PASSED [ 35%]
+tests/e2e/test_phase2_team_management.py::test_p21_register_rejects_duplicate_email PASSED [ 36%]
+tests/e2e/test_phase2_team_management.py::test_p22_team_member_has_secure_placeholder_password PASSED [ 36%]
+tests/e2e/test_phase2_team_management.py::test_p22_pending_user_cannot_login_before_activation PASSED [ 36%]
+tests/e2e/test_phase2_team_management.py::test_p23_non_creator_cannot_update_meeting PASSED [ 37%]
+tests/e2e/test_phase2_team_management.py::test_p23_creator_can_update_meeting PASSED [ 37%]
+tests/e2e/test_phase2_team_management.py::test_p23_admin_can_update_any_meeting PASSED [ 37%]
+tests/e2e/test_phase2_team_management.py::test_p24_meeting_end_time_must_be_after_start_time PASSED [ 38%]
+tests/e2e/test_phase2_team_management.py::test_p24_meeting_with_null_end_time_is_allowed PASSED [ 38%]
+tests/e2e/test_phase2_team_management.py::test_p25_duplicate_participant_email_rejected PASSED [ 39%]
+tests/e2e/test_phase2_team_management.py::test_p25_same_email_different_meetings_allowed PASSED [ 39%]
+tests/e2e/test_phase3_meeting_lifecycle.py::test_p31_meeting_status_change_triggers_webhook PASSED [ 39%]
+tests/e2e/test_phase3_meeting_lifecycle.py::test_p31_cancelled_meeting_triggers_webhook PASSED [ 40%]
+tests/e2e/test_phase3_meeting_lifecycle.py::test_p32_non_creator_cannot_update_meeting PASSED [ 40%]
+tests/e2e/test_phase3_meeting_lifecycle.py::test_p32_creator_can_update_meeting PASSED [ 40%]
+tests/e2e/test_phase3_meeting_lifecycle.py::test_p33_end_time_must_be_after_start_time PASSED [ 41%]
+tests/e2e/test_phase3_meeting_lifecycle.py::test_p33_end_time_can_be_null PASSED [ 41%]
+tests/e2e/test_phase3_meeting_lifecycle.py::test_p34_duplicate_participant_email_rejected PASSED [ 41%]
+tests/e2e/test_phase3_meeting_lifecycle.py::test_p34_same_email_different_meetings_allowed PASSED [ 42%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p42_celery_task_has_retry_config PASSED [ 42%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p42_celery_exponential_backoff PASSED [ 43%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p41_error_handling_with_rollback PASSED [ 43%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p43_temp_file_cleanup_in_finally PASSED [ 43%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p41_recording_status_change_points PASSED [ 44%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p44_after_upload_webhook_configured PASSED [ 44%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p44_recording_service_has_after_upload PASSED [ 44%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p41_publish_status_called_on_error PASSED [ 45%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p41_exception_reraised_for_celery PASSED [ 45%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p43_error_handling_in_cleanup PASSED [ 45%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p41_gladia_failure_triggers_rollback PASSED [ 46%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p42_retry_backoff_max_reasonable PASSED [ 46%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p42_max_retries_reasonable PASSED [ 46%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p44_n8n_completion_webhook_exists PASSED [ 47%]
+tests/e2e/test_phase4_ai_pipeline.py::test_p41_redis_status_published PASSED [ 47%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_fuzzy_matching_implemented PASSED [ 48%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_assignment_creation_in_save_pv PASSED [ 48%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_external_assignment_fallback PASSED [ 48%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_assignee_name_extraction PASSED [ 49%]
+tests/e2e/test_phase5_action_assignment.py::test_p19_completed_at_set_on_completion PASSED [ 49%]
+tests/e2e/test_phase5_action_assignment.py::test_p19_completed_at_timestamp PASSED [ 49%]
+tests/e2e/test_phase5_action_assignment.py::test_p28_indices_exist PASSED [ 50%]
+tests/e2e/test_phase5_action_assignment.py::test_p28_actions_meeting_status_index PASSED [ 50%]
+tests/e2e/test_phase5_action_assignment.py::test_p28_action_assignments_user_id_index PASSED [ 50%]
+tests/e2e/test_phase5_action_assignment.py::test_p28_recordings_meeting_status_index PASSED [ 51%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_fuzzy_matching_order PASSED [ 51%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_client_id_isolation_in_fuzzy_match PASSED [ 51%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_assignments_linked_to_action PASSED [ 52%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_handles_missing_assignee PASSED [ 52%]
+tests/e2e/test_phase5_action_assignment.py::test_p19_only_completed_sets_timestamp PASSED [ 53%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_pv_data_structure PASSED [ 53%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_action_title_from_description PASSED [ 53%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_deadline_parsing PASSED [ 54%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_action_status_pending_on_create PASSED [ 54%]
+tests/e2e/test_phase5_action_assignment.py::test_p28_indices_have_correct_columns PASSED [ 54%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_assignments_model_structure PASSED [ 55%]
+tests/e2e/test_phase5_action_assignment.py::test_p19_action_model_has_completed_at PASSED [ 55%]
+tests/e2e/test_phase5_action_assignment.py::test_p15_fuzzy_matching_case_insensitive PASSED [ 55%]
+tests/e2e/test_phase5_action_assignment.py::test_p28_index_performance_benefit PASSED [ 56%]
+tests/e2e/test_phase5_action_assignment.py::test_p19_assignment_creation_context PASSED [ 56%]
+tests/e2e/test_phase6_n8n_automation.py::test_p30_meeting_status_change_method_exists PASSED [ 56%]
+tests/e2e/test_phase6_n8n_automation.py::test_p30_meeting_status_change_implementation PASSED [ 57%]
+tests/e2e/test_phase6_n8n_automation.py::test_p30_meeting_status_change_has_audit_log PASSED [ 57%]
+tests/e2e/test_phase6_n8n_automation.py::test_p30_update_meeting_calls_status_webhook PASSED [ 58%]
+tests/e2e/test_phase6_n8n_automation.py::test_p31_after_upload_method_exists PASSED [ 58%]
+tests/e2e/test_phase6_n8n_automation.py::test_p31_after_upload_implementation PASSED [ 58%]
+tests/e2e/test_phase6_n8n_automation.py::test_p31_upload_recording_calls_after_upload PASSED [ 59%]
+tests/e2e/test_phase6_n8n_automation.py::test_p32_n8n_meetings_table_exists PASSED [ 59%]
+tests/e2e/test_phase6_n8n_automation.py::test_p32_n8n_meetings_columns PASSED [ 59%]
+tests/e2e/test_phase6_n8n_automation.py::test_p33_n8n_webhook_configs_exist PASSED [ 60%]
+tests/e2e/test_phase6_n8n_automation.py::test_p33_webhook_urls_are_valid PASSED [ 60%]
+tests/e2e/test_phase6_n8n_automation.py::test_p34_meeting_created_webhook_exists PASSED [ 60%]
+tests/e2e/test_phase6_n8n_automation.py::test_p34_meeting_created_implementation PASSED [ 61%]
+tests/e2e/test_phase6_n8n_automation.py::test_p34_create_meeting_calls_webhook PASSED [ 61%]
+tests/e2e/test_phase6_n8n_automation.py::test_p35_transcription_webhook_called SKIPPED [ 62%]
+tests/e2e/test_phase6_n8n_automation.py::test_p36_webhook_respects_client_isolation PASSED [ 62%]
+tests/e2e/test_phase6_n8n_automation.py::test_p37_webhook_has_error_handling PASSED [ 62%]
+tests/e2e/test_phase6_n8n_automation.py::test_p38_webhook_does_not_block_on_failure PASSED [ 63%]
+tests/e2e/test_phase6_n8n_automation.py::test_p39_user_invited_webhook_exists PASSED [ 63%]
+tests/e2e/test_phase6_n8n_automation.py::test_p40_phase6_summary PASSED  [ 63%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_upload_recording_creates_client_id_prefix PASSED [ 64%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_stream_recording_creates_client_id_prefix PASSED [ 64%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_presigned_upload_url_generation PASSED [ 64%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_presigned_download_url_generation PASSED [ 65%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_api_presigned_upload_url_endpoint PASSED [ 65%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_api_presigned_download_url_endpoint PASSED [ 65%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_cross_tenant_isolation_upload_url PASSED [ 66%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_recording_not_found_returns_404 PASSED [ 66%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_onlyoffice_config_uses_public_url PASSED [ 67%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_recording_file_key_format_validation PASSED [ 67%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_presigned_url_expiry_configuration PASSED [ 67%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_audit_logging_for_presigned_url_generation PASSED [ 68%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinIOIntegration::test_meeting_client_id_isolation_in_presigned_endpoint PASSED [ 68%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinioBucketPolicy::test_minio_bucket_private_by_default PASSED [ 68%]
+tests/e2e/test_phase7_minio_integration.py::TestPhase7MinioBucketPolicy::test_client_id_prefix_prevents_path_traversal PASSED [ 69%]
+tests/e2e/test_phase8_01_onnx_model_loading.py::test_phase8_01_onnx_model_loading PASSED [ 69%]
+tests/e2e/test_phase8_01_onnx_model_loading.py::test_phase8_02_embedding_extraction PASSED [ 69%]
+tests/e2e/test_phase8_01_onnx_model_loading.py::test_phase8_03_embedding_from_bytes PASSED [ 70%]
+tests/e2e/test_phase8_01_onnx_model_loading.py::test_phase8_04_embedding_too_short_audio PASSED [ 70%]
+tests/e2e/test_phase8_01_onnx_model_loading.py::test_phase8_05_singleton_pattern PASSED [ 70%]
+tests/e2e/test_phase8_02_speaker_profile.py::test_phase8_06_create_speaker_profile PASSED [ 71%]
+tests/e2e/test_phase8_02_speaker_profile.py::test_phase8_07_get_profiles PASSED [ 71%]
+tests/e2e/test_phase8_02_speaker_profile.py::test_phase8_08_match_speaker_high_confidence PASSED [ 72%]
+tests/e2e/test_phase8_02_speaker_profile.py::test_phase8_09_match_speaker_no_match PASSED [ 72%]
+tests/e2e/test_phase8_02_speaker_profile.py::test_phase8_10_update_profile_embedding PASSED [ 72%]
+tests/e2e/test_phase8_02_speaker_profile.py::test_phase8_12_tenant_isolation PASSED [ 73%]
+tests/e2e/test_phase8_03_audio_segments.py::test_phase8_13_group_by_speaker PASSED [ 73%]
+tests/e2e/test_phase8_03_audio_segments.py::test_phase8_14_extract_speaker_segments PASSED [ 73%]
+tests/e2e/test_phase8_03_audio_segments.py::test_phase8_15_extract_embeddings PASSED [ 74%]
+tests/e2e/test_phase8_03_audio_segments.py::test_phase8_16_skip_short_speaker PASSED [ 74%]
+tests/e2e/test_phase8_03_audio_segments.py::test_phase8_17_cleanup_temp_files PASSED [ 74%]
+tests/e2e/test_phase8_04_cosine_matching.py::test_phase8_18_enroll_and_match_same_speaker PASSED [ 75%]
+tests/e2e/test_phase8_04_cosine_matching.py::test_phase8_19_enroll_and_match_different_speaker PASSED [ 75%]
+tests/e2e/test_phase8_04_cosine_matching.py::test_phase8_20_multi_speaker_matching PASSED [ 75%]
+tests/e2e/test_phase8_04_cosine_matching.py::test_phase8_21_no_profiles_returns_no_match PASSED [ 76%]
+tests/e2e/test_phase8_05_mistral_fusion.py::test_phase8_22_fusion_high_audio_confidence PASSED [ 76%]
+tests/e2e/test_phase8_05_mistral_fusion.py::test_phase8_23_fusion_resolves_ambiguous_audio PASSED [ 77%]
+tests/e2e/test_phase8_05_mistral_fusion.py::test_phase8_24_text_only_inference PASSED [ 77%]
+tests/e2e/test_phase8_05_mistral_fusion.py::test_phase8_25_no_match_returns_none PASSED [ 77%]
+tests/e2e/test_phase8_05_mistral_fusion.py::test_phase8_26_fusion_fallback_to_audio PASSED [ 78%]
+tests/e2e/test_phase8_05_mistral_fusion.py::test_phase8_27_fusion_invalid_json_response PASSED [ 78%]
+tests/e2e/test_phase8_06_auto_enrollment.py::test_phase8_28_auto_enroll_new_speaker PASSED [ 78%]
+tests/e2e/test_phase8_06_auto_enrollment.py::test_phase8_29_update_existing_speaker PASSED [ 79%]
+tests/e2e/test_phase8_06_auto_enrollment.py::test_phase8_30_skip_low_confidence PASSED [ 79%]
+tests/e2e/test_phase8_06_auto_enrollment.py::test_phase8_31_batch_enrollment PASSED [ 79%]
+tests/e2e/test_phase8_07_pipeline_integration.py::test_phase8_32_identify_speakers_full_pipeline PASSED [ 80%]
+tests/e2e/test_phase8_07_pipeline_integration.py::test_phase8_33_identify_speakers_no_segments PASSED [ 80%]
+tests/e2e/test_phase8_07_pipeline_integration.py::test_phase8_34_identify_speakers_embedding_unavailable PASSED [ 81%]
+tests/e2e/test_pipeline_fixes.py::TestGladiaMimeType::test_mime_type_detection_wav PASSED [ 81%]
+tests/e2e/test_pipeline_fixes.py::TestGladiaMimeType::test_mime_type_detection_mp3 PASSED [ 81%]
+tests/e2e/test_pipeline_fixes.py::TestGladiaMimeType::test_mime_type_fallback PASSED [ 82%]
+tests/e2e/test_pipeline_fixes.py::TestCosineDistance::test_identical_embeddings_zero_distance PASSED [ 82%]
+tests/e2e/test_pipeline_fixes.py::TestCosineDistance::test_orthogonal_embeddings_unit_distance PASSED [ 82%]
+tests/e2e/test_pipeline_fixes.py::TestCosineDistance::test_cosine_distance_thresholds PASSED [ 83%]
+tests/e2e/test_pipeline_fixes.py::TestCosineDistance::test_confidence_levels PASSED [ 83%]
+tests/e2e/test_pipeline_fixes.py::TestTranscriptImmutability::test_display_copy_preserves_original PASSED [ 83%]
+tests/e2e/test_pipeline_fixes.py::TestConfidenceNormalization::test_single_signal_no_penalty PASSED [ 84%]
+tests/e2e/test_pipeline_fixes.py::TestConfidenceNormalization::test_consensus_bonus PASSED [ 84%]
+tests/e2e/test_pipeline_fixes.py::TestConfidenceNormalization::test_conflict_penalty PASSED [ 84%]
+tests/e2e/test_pipeline_fixes.py::TestSingleSpeakerContextAware::test_context_reject_patterns PASSED [ 85%]
+tests/e2e/test_pipeline_fixes.py::TestSingleSpeakerContextAware::test_context_valid_assignee PASSED [ 85%]
+tests/e2e/test_pipeline_fixes.py::TestSentinelSemaphore::test_semaphore_allows_concurrent PASSED [ 86%]
+tests/e2e/test_pipeline_fixes.py::TestPVSchemaValidation::test_missing_keys_filled PASSED [ 86%]
+tests/e2e/test_pipeline_fixes.py::TestPVSchemaValidation::test_invalid_actions_removed PASSED [ 86%]
+tests/e2e/test_pipeline_fixes.py::TestPVSchemaValidation::test_valid_pv_unchanged PASSED [ 87%]
+tests/e2e/test_pipeline_fixes.py::TestSoftDeletedUserFilter::test_deleted_at_filter_in_query PASSED [ 87%]
+tests/e2e/test_pipeline_fixes.py::TestUnifiedFuzzyThreshold::test_threshold_is_60 PASSED [ 87%]
+tests/e2e/test_placeholder.py::test_placeholder PASSED                   [ 88%]
+tests/e2e/test_pv_generation_flow.py::test_automatic_pv_generation_from_transcription PASSED [ 88%]
+tests/e2e/test_pv_generation_flow.py::test_get_pv_by_meeting PASSED      [ 88%]
+tests/e2e/test_pv_generation_flow.py::test_get_pv_by_id PASSED           [ 89%]
+tests/e2e/test_pv_generation_flow.py::test_validate_pv PASSED            [ 89%]
+tests/e2e/test_pv_generation_flow.py::test_update_pv PASSED              [ 89%]
+tests/e2e/test_pv_generation_flow.py::test_pv_versioning_creates_snapshots PASSED [ 90%]
+tests/e2e/test_pv_generation_flow.py::test_pv_download_endpoints_require_validation PASSED [ 90%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_01_dg_login_with_real_credentials PASSED [ 91%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_02_dg_creates_team_members PASSED [ 91%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_03_team_member_activates_account PASSED [ 91%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_04_dg_creates_meeting_in_room PASSED [ 92%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_05_dg_invites_team_members_to_meeting PASSED [ 92%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_06_meeting_starts_and_audio_uploaded PASSED [ 92%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_07_transcription_webhook_callback PASSED [ 93%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_08_pv_generation_and_distribution PASSED [ 93%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_09_verify_multi_tenant_isolation PASSED [ 93%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_10_audit_logging_iso_27001 PASSED [ 94%]
+tests/e2e/test_real_saas_pipeline.py::TestRealSaasPipeline::test_11_audio_counter_synchronization PASSED [ 94%]
+tests/e2e/test_recording_transcription_pipeline.py::test_full_recording_transcription_pipeline PASSED [ 94%]
+tests/e2e/test_recording_transcription_pipeline.py::test_recording_upload_success PASSED [ 95%]
+tests/e2e/test_recording_transcription_pipeline.py::test_transcription_uses_mocked_gladia PASSED [ 95%]
+tests/e2e/test_recording_transcription_pipeline.py::test_pv_generated_from_transcription PASSED [ 96%]
+tests/e2e/test_recording_transcription_pipeline.py::test_actions_extracted_from_pv PASSED [ 96%]
+tests/e2e/test_recording_transcription_pipeline.py::test_n8n_webhook_notified_on_completion PASSED [ 96%]
+tests/e2e/test_smoke.py::test_health_check PASSED                        [ 97%]
+tests/e2e/test_smoke.py::test_admin_login PASSED                         [ 97%]
+tests/e2e/test_smoke.py::test_create_meeting_smoke PASSED                [ 97%]
+tests/e2e/test_smoke.py::test_action_status_update_smoke PASSED          [ 98%]
+tests/e2e/test_smoke.py::test_api_endpoints_responsive PASSED            [ 98%]
+tests/e2e/test_tier2_pipeline_hardening.py::test_tier24_webhook_idempotency_egress_ended PASSED [ 98%]
+tests/e2e/test_tier2_pipeline_hardening.py::test_tier24_webhook_idempotency_egress_failed PASSED [ 99%]
+tests/e2e/test_tier2_pipeline_hardening.py::test_tier24_different_egress_ids_not_deduplicated PASSED [ 99%]
+tests/e2e/test_tier2_pipeline_hardening.py::test_tier21_22_23_pipeline_completes PASSED [100%]
+
+=============================== warnings summary ===============================
+../usr/local/lib/python3.11/site-packages/pydantic/_internal/_config.py:271: 25 warnings
+  /usr/local/lib/python3.11/site-packages/pydantic/_internal/_config.py:271: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.5/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../usr/local/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /usr/local/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+app/models/user.py:74
+  /app/app/models/user.py:74: DeprecationWarning: The 'EncryptedType' class will change implementation from 'LargeBinary' to 'String' in a future version. Use 'StringEncryptedType' to use the 'String' implementation.
+    EncryptedType(String, settings.SECRET_KEY), nullable=True
+
+tests/e2e/test_action_status_e2e.py:49
+  /app/tests/e2e/test_action_status_e2e.py:49: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_action_status_e2e.py:99
+  /app/tests/e2e/test_action_status_e2e.py:99: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_action_status_e2e.py:136
+  /app/tests/e2e/test_action_status_e2e.py:136: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_action_status_e2e.py:191
+  /app/tests/e2e/test_action_status_e2e.py:191: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_action_status_e2e.py:244
+  /app/tests/e2e/test_action_status_e2e.py:244: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/conftest.py:35
+  /app/tests/e2e/conftest.py:35: PytestCollectionWarning: cannot collect test class 'TestEnvironment' because it has a __init__ constructor (from: tests/e2e/test_action_status_e2e.py)
+    class TestEnvironment(str, Enum):
+
+tests/e2e/test_meeting_creation_flow.py:18
+  /app/tests/e2e/test_meeting_creation_flow.py:18: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_meeting_creation_flow.py:39
+  /app/tests/e2e/test_meeting_creation_flow.py:39: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_meeting_creation_flow.py:60
+  /app/tests/e2e/test_meeting_creation_flow.py:60: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_meeting_creation_flow.py:75
+  /app/tests/e2e/test_meeting_creation_flow.py:75: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_meeting_creation_flow.py:89
+  /app/tests/e2e/test_meeting_creation_flow.py:89: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_meeting_creation_flow.py:106
+  /app/tests/e2e/test_meeting_creation_flow.py:106: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_meeting_creation_flow.py:116
+  /app/tests/e2e/test_meeting_creation_flow.py:116: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_meeting_creation_flow.py:132
+  /app/tests/e2e/test_meeting_creation_flow.py:132: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_n8n_webhook_integration.py:17
+  /app/tests/e2e/test_n8n_webhook_integration.py:17: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_n8n_webhook_integration.py:45
+  /app/tests/e2e/test_n8n_webhook_integration.py:45: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_pv_generation_flow.py:29
+  /app/tests/e2e/test_pv_generation_flow.py:29: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_pv_generation_flow.py:47
+  /app/tests/e2e/test_pv_generation_flow.py:47: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_pv_generation_flow.py:66
+  /app/tests/e2e/test_pv_generation_flow.py:66: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_pv_generation_flow.py:83
+  /app/tests/e2e/test_pv_generation_flow.py:83: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_pv_generation_flow.py:109
+  /app/tests/e2e/test_pv_generation_flow.py:109: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_pv_generation_flow.py:150
+  /app/tests/e2e/test_pv_generation_flow.py:150: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_pv_generation_flow.py:184
+  /app/tests/e2e/test_pv_generation_flow.py:184: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_recording_transcription_pipeline.py:33
+  /app/tests/e2e/test_recording_transcription_pipeline.py:33: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_recording_transcription_pipeline.py:83
+  /app/tests/e2e/test_recording_transcription_pipeline.py:83: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_recording_transcription_pipeline.py:105
+  /app/tests/e2e/test_recording_transcription_pipeline.py:105: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_recording_transcription_pipeline.py:127
+  /app/tests/e2e/test_recording_transcription_pipeline.py:127: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_recording_transcription_pipeline.py:142
+  /app/tests/e2e/test_recording_transcription_pipeline.py:142: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_recording_transcription_pipeline.py:174
+  /app/tests/e2e/test_recording_transcription_pipeline.py:174: PytestUnknownMarkWarning: Unknown pytest.mark.e2e - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.e2e
+
+tests/e2e/test_smoke.py:20
+  /app/tests/e2e/test_smoke.py:20: PytestUnknownMarkWarning: Unknown pytest.mark.smoke - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.smoke
+
+tests/e2e/test_smoke.py:30
+  /app/tests/e2e/test_smoke.py:30: PytestUnknownMarkWarning: Unknown pytest.mark.smoke - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.smoke
+
+tests/e2e/test_smoke.py:42
+  /app/tests/e2e/test_smoke.py:42: PytestUnknownMarkWarning: Unknown pytest.mark.smoke - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.smoke
+
+tests/e2e/test_smoke.py:64
+  /app/tests/e2e/test_smoke.py:64: PytestUnknownMarkWarning: Unknown pytest.mark.smoke - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.smoke
+
+tests/e2e/test_smoke.py:104
+  /app/tests/e2e/test_smoke.py:104: PytestUnknownMarkWarning: Unknown pytest.mark.smoke - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.smoke
+
+tests/e2e/conftest.py:35
+  /app/tests/e2e/conftest.py:35: PytestCollectionWarning: cannot collect test class 'TestEnvironment' because it has a __init__ constructor (from: tests/e2e/test_smoke.py)
+    class TestEnvironment(str, Enum):
+
+tests/e2e/test_action_status_e2e.py::test_update_action_status_with_valid_enum_values
+  /usr/local/lib/python3.11/site-packages/pytest_asyncio/plugin.py:916: PytestDeprecationWarning: Overriding the "event_loop_policy" fixture is deprecated and will be removed in a future version of pytest-asyncio. Use the "pytest_asyncio_loop_factories" hook to customize event loop creation.
+    warnings.warn(
+
+tests/e2e/test_phase8_01_onnx_model_loading.py::test_phase8_02_embedding_extraction
+  /usr/local/lib/python3.11/site-packages/librosa/core/intervals.py:15: DeprecationWarning: path is deprecated. Use files() instead. Refer to https://importlib-resources.readthedocs.io/en/latest/using.html#migrating-from-legacy for migration advice.
+    with resources.path("librosa.core", "intervals.msgpack") as imsgpack:
+
+tests/e2e/test_phase8_01_onnx_model_loading.py::test_phase8_02_embedding_extraction
+  /usr/local/lib/python3.11/site-packages/audioread/rawread.py:16: DeprecationWarning: 'aifc' is deprecated and slated for removal in Python 3.13
+    import aifc
+
+tests/e2e/test_phase8_01_onnx_model_loading.py::test_phase8_02_embedding_extraction
+  /usr/local/lib/python3.11/site-packages/audioread/rawread.py:17: DeprecationWarning: 'audioop' is deprecated and slated for removal in Python 3.13
+    import audioop
+
+tests/e2e/test_phase8_01_onnx_model_loading.py::test_phase8_02_embedding_extraction
+  /usr/local/lib/python3.11/site-packages/audioread/rawread.py:19: DeprecationWarning: 'sunau' is deprecated and slated for removal in Python 3.13
+    import sunau
+
+tests/e2e/test_phase8_07_pipeline_integration.py::test_phase8_32_identify_speakers_full_pipeline
+tests/e2e/test_phase8_07_pipeline_integration.py::test_phase8_34_identify_speakers_embedding_unavailable
+  /app/app/services/audit_service.py:39: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    db.add(audit_entry)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========== 277 passed, 2 skipped, 69 warnings in 550.16s (0:09:10) ============

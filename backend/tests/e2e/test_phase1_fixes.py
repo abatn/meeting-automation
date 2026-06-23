@@ -132,7 +132,7 @@ class TestPhase1Fixes:
             creator_id=organizer.id,
             start_time=datetime.utcnow() - timedelta(days=5),
             end_time=datetime.utcnow() - timedelta(days=5, hours=-1),
-            status="completed",
+            status="COMPLETED",
             created_at=datetime.utcnow(),
         )
         db_session.add(meeting)
@@ -144,7 +144,7 @@ class TestPhase1Fixes:
             client_id=client.id,
             meeting_id=meeting.id,
             file_path="/storage/recordings/test.mp4",
-            status="completed",
+            status="COMPLETED",
             access_policy="organizer_only",  # ← NEW FIELD
             created_at=datetime.utcnow(),
         )

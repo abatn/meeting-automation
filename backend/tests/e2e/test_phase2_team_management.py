@@ -260,7 +260,7 @@ async def test_p23_non_creator_cannot_update_meeting(db_session: AsyncSession):
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         end_time=datetime.now(timezone.utc) + timedelta(hours=2),
         creator_id=creator.id,
-        status="planned"
+        status="PLANNED"
     )
     db_session.add(meeting)
     await db_session.commit()
@@ -269,7 +269,7 @@ async def test_p23_non_creator_cannot_update_meeting(db_session: AsyncSession):
     meeting_service = MeetingService(db_session)
     from fastapi import HTTPException
 
-    update_data = MeetingUpdate(status="cancelled")
+    update_data = MeetingUpdate(status="CANCELLED")
     
     # Should raise HTTPException with 403
     with pytest.raises(HTTPException) as exc_info:
@@ -318,7 +318,7 @@ async def test_p23_creator_can_update_meeting(db_session: AsyncSession):
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         end_time=datetime.now(timezone.utc) + timedelta(hours=2),
         creator_id=creator.id,
-        status="planned"
+        status="PLANNED"
     )
     db_session.add(meeting)
     await db_session.commit()
@@ -326,7 +326,7 @@ async def test_p23_creator_can_update_meeting(db_session: AsyncSession):
     # Update meeting as creator
     meeting_service = MeetingService(db_session)
 
-    update_data = MeetingUpdate(status="cancelled")
+    update_data = MeetingUpdate(status="CANCELLED")
     updated_meeting = await meeting_service.update_meeting(
         meeting.id, 
         client_id, 
@@ -335,7 +335,7 @@ async def test_p23_creator_can_update_meeting(db_session: AsyncSession):
     )
     
     assert updated_meeting is not None
-    assert updated_meeting.status == "cancelled"
+    assert updated_meeting.status == "CANCELLED"
 
 
 @pytest.mark.asyncio
@@ -392,7 +392,7 @@ async def test_p23_admin_can_update_any_meeting(db_session: AsyncSession):
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         end_time=datetime.now(timezone.utc) + timedelta(hours=2),
         creator_id=creator.id,
-        status="planned"
+        status="PLANNED"
     )
     db_session.add(meeting)
     await db_session.commit()
@@ -400,7 +400,7 @@ async def test_p23_admin_can_update_any_meeting(db_session: AsyncSession):
     # Update meeting as admin (not creator)
     meeting_service = MeetingService(db_session)
 
-    update_data = MeetingUpdate(status="cancelled")
+    update_data = MeetingUpdate(status="CANCELLED")
     updated_meeting = await meeting_service.update_meeting(
         meeting.id, 
         client_id, 
@@ -409,7 +409,7 @@ async def test_p23_admin_can_update_any_meeting(db_session: AsyncSession):
     )
     
     assert updated_meeting is not None
-    assert updated_meeting.status == "cancelled"
+    assert updated_meeting.status == "CANCELLED"
 
 
 @pytest.mark.asyncio
@@ -447,7 +447,7 @@ async def test_p24_meeting_end_time_must_be_after_start_time(db_session: AsyncSe
         start_time=now + timedelta(hours=2),
         end_time=now + timedelta(hours=1),  # ← end_time BEFORE start_time
         creator_id=creator.id,
-        status="planned"
+        status="PLANNED"
     )
     db_session.add(invalid_meeting)
     
@@ -492,7 +492,7 @@ async def test_p24_meeting_with_null_end_time_is_allowed(db_session: AsyncSessio
         start_time=now + timedelta(hours=1),
         end_time=None,  # ← NULL end_time
         creator_id=creator.id,
-        status="planned"
+        status="PLANNED"
     )
     db_session.add(meeting)
     await db_session.commit()
@@ -536,7 +536,7 @@ async def test_p25_duplicate_participant_email_rejected(db_session: AsyncSession
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         end_time=datetime.now(timezone.utc) + timedelta(hours=2),
         creator_id=creator.id,
-        status="planned"
+        status="PLANNED"
     )
     db_session.add(meeting)
     await db_session.flush()
@@ -599,7 +599,7 @@ async def test_p25_same_email_different_meetings_allowed(db_session: AsyncSessio
         start_time=datetime.now(timezone.utc) + timedelta(hours=1),
         end_time=datetime.now(timezone.utc) + timedelta(hours=2),
         creator_id=creator.id,
-        status="planned"
+        status="PLANNED"
     )
     meeting2 = Meeting(
         id=str(uuid.uuid4()),
@@ -608,7 +608,7 @@ async def test_p25_same_email_different_meetings_allowed(db_session: AsyncSessio
         start_time=datetime.now(timezone.utc) + timedelta(hours=3),
         end_time=datetime.now(timezone.utc) + timedelta(hours=4),
         creator_id=creator.id,
-        status="planned"
+        status="PLANNED"
     )
     db_session.add_all([meeting1, meeting2])
     await db_session.flush()

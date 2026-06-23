@@ -1,8 +1,8 @@
 # System Architecture for Meeting Automation System
 
-## ✅ CURRENT STATUS — 2026-06-14: PIPELINE OPERATIONAL
+## ✅ CURRENT STATUS — 2026-06-23: PIPELINE OPERATIONAL
 
-**355+ Tests Passing | Pipeline ~14s (testbobo)**
+**Staging Pipeline Verified | ~31s End-to-End**
 
 All critical architectural components validated:
 - Multi-tenant data isolation ✅
@@ -18,12 +18,24 @@ All critical architectural components validated:
 - Duplicate Action Prevention ✅
 - Confidence Fallback Fix (NULL ≠ 0.0) ✅
 
-### Pipeline Performance (Verified)
-- **Total Pipeline**: ~14s (testbobo)
-- **Gladia Transcription**: 6s
-- **Speaker Identification**: 7s (heuristic)
-- **Mistral PV**: 2s
+### Pipeline Performance (Verified 2026-06-23)
+- **Total Pipeline**: ~31s (testbibo, staging)
+- **S3 Upload/Download**: ~2s
+- **Gladia Transcription**: 6s (3 utterances, Arabic)
+- **Speaker Identification**: 18s (ONNX embedding + heuristic)
+- **Mistral PV**: 5s (3 sections + action suggestions)
+- **DB Persistence**: 1s
 - **Target**: ≤90s ✅
+
+### Staging Infrastructure
+- **Cluster**: k3s auf OCI VM (158.180.18.110, 4 CPU, 22GB RAM, ARM64)
+- **Namespace**: `meeting-automation-staging`
+- **LiveKit**: Im Cluster (hostNetwork: true fuer UDP)
+- **MinIO**: Im Cluster (ClusterIP, minio-user/minio_password)
+- **S3 Architecture**: EIN Endpoint fuer alles: `minio-staging:9000` (DNS funktioniert nativ)
+- **Secrets**: K8s Secrets (ISO 27001 compliant) fuer GLADIA/MISTRAL API keys
+- **Network Policies**: 7 Policies deployed (default-deny + service-specific rules)
+- **DNS**: K3s CoreDNS — kein hostAlias noetig
 
 ---
 
@@ -113,6 +125,173 @@ graph TD
     N8N --> Email
 ```
 
+### 2.1. Staging Infrastructure (K8s + Host Services)
+
+```mermaid
+graph TB
+    classDef host fill:#ff6b6b,stroke:#333,color:#fff
+    classDef k8s fill:#4ecdc4,stroke:#333,color:#fff
+    classDef external fill:#45b7d1,stroke:#333,color:#fff
+
+    subgraph "HOST (Docker)"
+        LK[LiveKit Server<br/>network_mode:host<br/>Port 7880/TCP + UDP]:::host
+        LE[LiveKit Egress<br/>network_mode:host]:::host
+        LR[LiveKit Redis<br/>Port 6380]:::host
+        MINIO_HOST[MinIO<br/>Port 9000<br/>minio_user/minio_password]:::host
+    end
+
+    subgraph "K8s (Kind Cluster)"
+        subgraph "Frontend"
+            FE[Frontend<br/>Nginx → Backend FQDN]:::k8s
+        end
+        subgraph "Backend"
+            BE[Backend API<br/>NodePort 30080→8080]:::k8s
+            CW[Celery Worker]:::k8s
+            CB[Celery Beat]:::k8s
+        end
+        subgraph "Data"
+            PG[PostgreSQL]:::k8s
+            RD[Redis]:::k8s
+            MQ[RabbitMQ]:::k8s
+            MINIO_K8S[MinIO<br/>NodePort 30090]:::k8s
+        end
+    end
+
+    subgraph "External APIs"
+        GLADIA[Gladia V2 API]:::external
+        MISTRAL[Mistral AI API]:::external
+    end
+
+    %% Connections
+    LK -- "Webhooks :8080" --> BE
+    LE -- "Upload localhost:9000" --> MINIO_HOST
+    BE -- "Download minio-host.local:9000" --> MINIO_HOST
+    CW -- "Download minio-host.local:9000" --> MINIO_HOST
+    CW -- "Transcription" --> GLADIA
+    CW -- "PV Generation" --> MISTRAL
+    FE -- "Nginx proxy_pass" --> BE
+    BE --> PG
+    BE --> RD
+    CW --> MQ
+```
+
+### 2.2. Recording Pipeline Flow
+
+```mermaid
+graph LR
+    classDef step fill:#4ecdc4,stroke:#333,color:#fff
+    classDef external fill:#45b7d1,stroke:#333,color:#fff
+    classDef storage fill:#ff9900,stroke:#333,color:#000
+
+    A[Browser:<br/>Join Room]:::step
+    B[Frontend:<br/>Start Recording]:::step
+    C[Backend:<br/>Egress API]:::step
+    D[LiveKit Egress:<br/>Audio Capture]:::step
+    E[MinIO:<br/>S3 Upload]:::storage
+    F[Webhook:<br/>egress_ended]:::step
+    G[Celery Worker:<br/>process_recording]:::step
+    H[S3 Download:<br/>Audio File]:::storage
+    I[Gladia V2:<br/>Transcription +<br/>Diarization]:::external
+    J[Speaker ID:<br/>ONNX Embeddings]:::step
+    K[Mistral AI:<br/>PV + Actions]:::external
+    L[PostgreSQL:<br/>Save Results]:::storage
+    M[Frontend:<br/>Display PV]:::step
+
+    A --> B --> C --> D --> E
+    E -->|"Webhook POST"| F --> G --> H
+    H --> I --> J --> K --> L --> M
+```
+
+**Pipeline Steps (verified 2026-06-23, ~31.7s total):**
+1. **Recording**: Browser captures audio via WebRTC → LiveKit Egress → MinIO S3 (~2s)
+2. **Webhook**: LiveKit sends `egress_ended` → Backend → Celery task
+3. **S3 Download**: Celery downloads audio from host MinIO via `minio-host.local:9000`
+4. **Gladia V2**: Audio → Text + Speaker Diarization (~6s)
+5. **Speaker ID**: ONNX embeddings match speakers to participants (~18s)
+6. **Mistral PV**: Transcript → Structured PV + Action Suggestions (~5s)
+7. **Persistence**: Transcription, PV, Actions saved to PostgreSQL
+
+### 2.3. Deployment Map — k3s Staging
+
+```mermaid
+graph TB
+    classDef internet fill:#e74c3c,stroke:#333,color:#fff
+    classDef k3s_pod fill:#4ecdc4,stroke:#333,color:#fff
+    classDef k3s_svc fill:#45b7d1,stroke:#333,color:#fff
+    classDef k3s_conf fill:#95a5a6,stroke:#333,color:#fff
+    classDef ext fill:#2ecc71,stroke:#333,color:#fff
+
+    BROWSER["Browser<br/>158.180.18.110"]:::internet
+
+    subgraph K3S["k3s Cluster (OCI VM)"]
+        subgraph K3S_FRONTEND["Frontend"]
+            FE["Frontend<br/>Traefik Ingress<br/>:80"]:::k3s_pod
+        end
+
+        subgraph K3S_BACKEND["Backend"]
+            BE1["Backend API<br/>:8000 ClusterIP"]:::k3s_pod
+            BE2["Backend (Replica 2)"]:::k3s_pod
+            CW["Celery Worker"]:::k3s_pod
+            CB["Celery Beat"]:::k3s_pod
+        end
+
+        subgraph K3S_LIVEKIT["LiveKit (hostNetwork)"]
+            LK["LiveKit Server<br/>:7880 TCP+UDP"]:::k3s_pod
+            LE["LiveKit Egress<br/>hostNetwork: true"]:::k3s_pod
+        end
+
+        subgraph K3S_DATA["Data Layer"]
+            PG["PostgreSQL<br/>:5432"]:::k3s_pod
+            RD["Redis<br/>:6379"]:::k3s_pod
+            MQ["RabbitMQ<br/>:5672"]:::k3s_pod
+            MINIO["MinIO<br/>:9000<br/>minio_user/minio_password"]:::k3s_pod
+        end
+
+        subgraph K3S_OTHER["Other"]
+            N8N["n8n<br/>:5678"]:::k3s_pod
+            OO["OnlyOffice<br/>:80"]:::k3s_pod
+        end
+
+        subgraph K3S_SECURITY["Security"]
+             NP["NetworkPolicies<br/>9 Rules<br/>(ISO 27001 A.8.20)"]:::k3s_conf
+            SEC["Secrets<br/>GLADIA ✅ MISTRAL ✅<br/>LIVEKIT ✅ DB ✅ MinIO ✅"]:::k3s_conf
+        end
+    end
+
+    GLADIA["Gladia V2 API"]:::ext
+    MISTRAL["Mistral AI API"]:::ext
+
+    BROWSER -- "WebRTC UDP :7881-7890" --> LK
+    BROWSER -- "HTTP :80" --> FE
+    FE --> BE1
+    LK -- "Webhooks" --> BE1
+    LE -- "S3 Upload" --> MINIO
+    BE1 -- "S3 Download" --> MINIO
+    CW -- "S3 Download" --> MINIO
+    CW --> GLADIA
+    CW --> MISTRAL
+    BE1 --> PG
+    BE1 --> RD
+    CW --> MQ
+    CB --> MQ
+    FE --> OO
+    BE1 --> N8N
+```
+
+**Service-Endpunkte (k3s):**
+| Service | Typ | Endpoint |
+|---------|-----|----------|
+| Frontend | Traefik Ingress | `http://158.180.18.110` (Port 80) |
+| Backend | ClusterIP | `backend.meeting-automation.svc.cluster.local:8000` |
+| LiveKit | hostNetwork | `:7880` (TCP+UDP) |
+| LiveKit ICE | hostNetwork | `:7881-7890` (UDP) |
+| MinIO | ClusterIP | `minio.meeting-automation.svc.cluster.local:9000` |
+| PostgreSQL | ClusterIP | `postgres.meeting-automation.svc.cluster.local:5432` |
+| Redis | ClusterIP | `redis.meeting-automation.svc.cluster.local:6379` |
+| RabbitMQ | ClusterIP | `rabbitmq.meeting-automation.svc.cluster.local:5672` |
+
+**DNS**: Keine hostAliases noetig — k3s CoreDNS funktioniert nativ.
+
 ## 3. Component Breakdown
 
 ### 3.1. Frontend (React/TypeScript)
@@ -193,10 +372,28 @@ graph TD
 
 ## 5. Security & Compliance (ISO 27001)
 
-- **Audit Middleware**: Comprehensive audit trail for all significant actions.
+- **Audit Middleware**: Comprehensive audit trail for all significant actions (118+ logs in staging).
 - **Data Isolation**: Application-level Row Level Security via `client_id` filtering.
-- **Data Encryption**: AES-256 for data at rest, TLS for data in transit.
-- **Confidence Handling**: NULL confidence values default to 0.5 (neutral), not 0.0 (explicitly low). This prevents false negatives in speaker identification and assignee resolution.
+- **Data Encryption**: Fernet AES-128 for data at rest (PV, MFA secrets encrypted in PostgreSQL).
+- **Confidence Handling**: NULL confidence values default to 0.5 (neutral), not 0.0 (explicitly low).
+- **Secret Management**: K8s Secrets (not ConfigMaps) for GLADIA/MISTRAL/LIVEKIT API keys (ISO 27001 A.8.24).
+- **Network Policies**: 9 NetworkPolicies deployed in staging (ISO 27001 A.8.20):
+  - `default-deny-all`: Blocks all ingress by default
+  - `postgres-policy`: Backend, Celery, n8n → PostgreSQL
+  - `redis-policy`: Backend, Celery → Redis
+  - `rabbitmq-policy`: Backend, Celery → RabbitMQ
+  - `minio-policy`: Backend, Celery, Frontend → MinIO
+  - `backend-policy`: Frontend → Backend
+  - `n8n-policy`: Backend → n8n
+  - `frontend-nodeport-policy`: Extern → Frontend (NodePort 31362)
+  - `backend-nodeport-policy`: Extern → Backend (NodePort 32222)
+- **Pod Security**: No privileged containers in staging cluster.
+
+### Security Roadmap (vor Go-Live)
+- **TLS/HTTPS (A.10)**: Traefik TLS mit Let's Encrypt, X-Forwarded-Proto für Backend
+- **WAF + Rate Limiting (A.8.21)**: Traefik Middleware für DDoS, Bot-Schutz, Rate-Limits
+- **Vulnerability Scanning (A.12.6.1)**: Trivy in CI/CD Pipeline
+- **Session Management**: Session-Fixation Protection, Inaktivitäts-Timeout
 
 ## 6. Cultural Adaptations (Tunisia/Maghreb)
 
