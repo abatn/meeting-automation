@@ -182,8 +182,8 @@ const DashboardManager: React.FC = () => {
                 <Stack divider={<Divider />}>
                   {data.upcoming_meetings_list
                     .filter((m: any) => {
-                      if (m.status === 'cancelled') return false;
-                      if (m.status === 'in_progress') return true;
+                      if (m.status === 'CANCELLED') return false;
+                      if (m.status === 'IN_PROGRESS') return true;
                       
                       const now = dayjs().utc();
                       const mStart = dayjs(m.start_time).utc();
@@ -204,13 +204,13 @@ const DashboardManager: React.FC = () => {
                     return (
                       <Box key={mtg.id} sx={{ px: 3, py: 2.5, display: "flex", alignItems: "center", justifyContent: "space-between", transition: 'all 0.2s', "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.02), transform: isRtl ? 'translateX(-4px)' : 'translateX(4px)' } }}>
                         <Stack direction="row" spacing={3} alignItems="center">
-                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: mtg.status === "in_progress" ? "#10B981" : "#3B82F6" }} />
+                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: mtg.status === "IN_PROGRESS" ? "#10B981" : "#3B82F6" }} />
                           <Box>
                             <Stack direction="row" spacing={1} alignItems="center">
                               <Typography sx={{ fontSize: 14, fontWeight: 600, color: "text.primary" }}>
                                 {mtg.title}
                               </Typography>
-                              {isLate && mtg.status === "planned" && (
+                              {isLate && mtg.status === "PLANNED" && (
                                 <Chip label={t("meetings.late")} size="small" color="error" variant="outlined" sx={{ height: 18, fontSize: 10, fontWeight: 700 }} />
                               )}
                             </Stack>

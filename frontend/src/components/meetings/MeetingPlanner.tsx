@@ -102,18 +102,18 @@ const MeetingPlanner: React.FC = () => {
       const processed = meetings.map((m: any) => {
         const mStart = dayjs(m.start_time).valueOf();
         const mEnd = m.end_time ? dayjs(m.end_time).valueOf() : mStart + (3600 * 1000);
-        const result = { ...m, isExpired: nowTs > mEnd && m.status === 'planned' };
+        const result = { ...m, isExpired: nowTs > mEnd && m.status === 'PLANNED' };
         const isCreatorCheck = currentUser?.id && m.creator_id && String(currentUser.id) === String(m.creator_id);
         console.log(`DEBUG: Meeting "${m.title}" - creator_id: "${m.creator_id}" (type: ${typeof m.creator_id}), currentUser.id: "${currentUser?.id}" (type: ${typeof currentUser?.id}), isCreator: ${isCreatorCheck}`);
         return result;
       });
 
       const activeMeetings = processed.filter((m: any) => 
-        m.status === 'in_progress' || (m.status === 'planned' && !m.isExpired)
+        m.status === 'IN_PROGRESS' || (m.status === 'PLANNED' && !m.isExpired)
       );
 
       const historyMeetings = processed
-        .filter((m: any) => m.status === 'cancelled' || m.isExpired)
+        .filter((m: any) => m.status === 'CANCELLED' || m.isExpired)
         .sort((a: any, b: any) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
       
       // 2. Combine all active + the single latest from history (cancelled or expired)
@@ -128,8 +128,8 @@ const MeetingPlanner: React.FC = () => {
           const startB = dayjs(b.start_time).valueOf();
 
           const getStatusScore = (m: any) => {
-            if (m.status === 'in_progress') return 0;
-            if (m.status === 'planned' && !m.isExpired) return 1;
+            if (m.status === 'IN_PROGRESS') return 0;
+            if (m.status === 'PLANNED' && !m.isExpired) return 1;
             return 2; // Cancelled or Expired
           };
 
@@ -143,7 +143,7 @@ const MeetingPlanner: React.FC = () => {
 
       const pvs: { [key: string]: string } = {};
       for (const m of sorted) {
-        if (m.status === 'completed') {
+        if (m.status === 'COMPLETED') {
           try {
             const pvRes = await api.get(`/pv/meeting/${m.id}`);
             if (pvRes.data) pvs[m.id] = pvRes.data.id;
@@ -183,7 +183,7 @@ const MeetingPlanner: React.FC = () => {
       const start = meetingDate!.hour(meetingTime!.hour()).minute(meetingTime!.minute()).second(0);
       const data = {
         title,
-        status: "planned",
+        status: "PLANNED",
         start_time: start.toISOString(),
         end_time: start.add(plannedDuration, 'minute').toISOString(),
         participants: selectedParticipants.map(p => typeof p === 'string' ? { email: p, name: p } : { email: p.email, name: p.full_name, user_id: p.id }),
@@ -269,7 +269,7 @@ const MeetingPlanner: React.FC = () => {
                     const mEnd = m.end_time ? dayjs(m.end_time) : mStart.add(1, 'hour');
                     
                      const isLate = now.isAfter(mStart) && now.isBefore(mEnd);
-                     const isExpired = now.isAfter(mEnd) && m.status === 'planned';
+                      const isExpired = now.isAfter(mEnd) && m.status === 'PLANNED';
                      const isSoon = mStart.diff(now, 'minute') <= 15 && mStart.diff(now, 'minute') >= 0;
                      const isCreator = currentUser?.id && m.creator_id && String(currentUser.id) === String(m.creator_id);
                      console.log(`DEBUG: Rendering meeting "${m.title}" - currentUser?.id: "${currentUser?.id}" (type: ${typeof currentUser?.id}) vs m.creator_id: "${m.creator_id}" (type: ${typeof m.creator_id}), isCreator: ${isCreator}`);

@@ -385,7 +385,9 @@
     "amount": "Amount",
     "status": "Status",
     "action": "Action",
-    "noHistory": "No invoice history available."
+    "noHistory": "No invoice history available.",
+    "usageWarning": "Usage Warning",
+    "usageExceeded": "Usage Limit Reached"
   },
   "clientList": {
     "title": "Manage Clients",

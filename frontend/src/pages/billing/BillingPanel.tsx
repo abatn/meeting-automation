@@ -3,7 +3,8 @@ import {
   Box, Typography, Grid, Paper, Divider, Button, 
   CircularProgress, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Chip,
-  Card, CardContent, CardActions, IconButton, useTheme, alpha
+  Card, CardContent, CardActions, IconButton, useTheme, alpha,
+  Alert, AlertTitle
 } from '@mui/material';
 import { 
   CheckCircle as ActiveIcon, 
@@ -51,7 +52,7 @@ const BillingPanel: React.FC = () => {
       try {
         const [invoicesRes, usageRes, pricingRes] = await Promise.all([
           api.get('/billing/invoices'),
-          api.get('/billing/usage'),
+          api.get('/billing/usage-status'),
           api.get('/cms/pricing')
         ]);
         setInvoices(invoicesRes.data);
@@ -119,6 +120,20 @@ const BillingPanel: React.FC = () => {
                 label={t('billing.monthlyLimit')}
               />
             </Box>
+          )}
+
+          {/* Usage Alert */}
+          {usage && usage.alert_level === 'warning' && (
+            <Alert severity="warning" sx={{ mt: 3, borderRadius: 3 }}>
+              <AlertTitle>{t('billing.usageWarning')}</AlertTitle>
+              {usage.alert_message}
+            </Alert>
+          )}
+          {usage && usage.alert_level === 'exceeded' && (
+            <Alert severity="error" sx={{ mt: 3, borderRadius: 3 }}>
+              <AlertTitle>{t('billing.usageExceeded')}</AlertTitle>
+              {usage.alert_message}
+            </Alert>
           )}
         </Grid>
 

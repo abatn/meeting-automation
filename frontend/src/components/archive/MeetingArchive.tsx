@@ -70,7 +70,7 @@ const MeetingArchive: React.FC = () => {
         ]);
         // Show meetings that are completed OR already have a PV
         setMeetings(
-          meetingsData.filter((m: any) => m.pv || m.status === "completed")
+          meetingsData.filter((m: any) => m.pv || m.status === "COMPLETED")
         );
         setRooms(roomsData);
       } catch (error) {

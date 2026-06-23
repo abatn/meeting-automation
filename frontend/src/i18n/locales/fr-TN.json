@@ -386,7 +386,9 @@
     "amount": "Montant",
     "status": "Statut",
     "action": "Action",
-    "noHistory": "Aucun historique de facturation disponible."
+    "noHistory": "Aucun historique de facturation disponible.",
+    "usageWarning": "Alerte d'utilisation",
+    "usageExceeded": "Limite d'utilisation atteinte"
   },
   "clientList": {
     "title": "Gestion des Clients",

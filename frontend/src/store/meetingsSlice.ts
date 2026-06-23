@@ -4,7 +4,7 @@ interface Meeting {
   id: string;
   title: string;
   description: string;
-  status: "planned" | "in_progress" | "completed";
+  status: "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
   scheduled_at: string;
   creator_id: string;
 }

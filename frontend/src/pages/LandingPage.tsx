@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, Container, Typography, Button, Grid, Stack,
   AppBar, Toolbar, Link as MuiLink, Divider,
@@ -15,6 +15,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
+import cmsService from '../services/cms';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 15 },
@@ -31,6 +32,11 @@ const LandingPage: React.FC = () => {
 
   const [anchorElLang, setAnchorElLang] = useState<null | HTMLElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pricingPlans, setPricingPlans] = useState<Record<string, number>>({
+    GRATUIT: 0,
+    PRO: 99,
+    ENTREPRISE: 499,
+  });
 
   const handleOpenLangMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElLang(event.currentTarget);
   const handleCloseLangMenu = () => setAnchorElLang(null);
@@ -40,6 +46,25 @@ const LandingPage: React.FC = () => {
     handleCloseLangMenu();
     setMobileMenuOpen(false);
   };
+
+  // Fetch pricing from CMS API
+  useEffect(() => {
+    const fetchPricing = async () => {
+      try {
+        const plans = await cmsService.getPricing(i18n.language);
+        const priceMap: Record<string, number> = { GRATUIT: 0 };
+        plans.forEach((plan: any) => {
+          if (plan.plan_code && plan.price_monthly !== undefined) {
+            priceMap[plan.plan_code] = plan.price_monthly;
+          }
+        });
+        setPricingPlans(priceMap);
+      } catch (err) {
+        console.warn('Failed to fetch CMS pricing, using defaults');
+      }
+    };
+    fetchPricing();
+  }, [i18n.language]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -325,9 +350,9 @@ const LandingPage: React.FC = () => {
           <Typography variant="h2" fontWeight="800" textAlign="center" sx={{ mb: { xs: 6, md: 10 }, fontSize: { xs: '2rem', md: '3rem' } }}>{t('landing.pricing.title')}</Typography>
           <Grid container spacing={4} justifyContent="center">
             {[
-              { nameKey: 'landing.pricing.free_name', price: "0", featsKey: 'landing.pricing.starter_feats', h: false },
-              { nameKey: 'landing.pricing.pro_name', price: "99", featsKey: 'landing.pricing.pro_feats', h: true },
-              { nameKey: 'landing.pricing.ent_name', price: "499", featsKey: 'landing.pricing.ent_feats', h: false }
+              { nameKey: 'landing.pricing.free_name', price: String(pricingPlans.GRATUIT || 0), featsKey: 'landing.pricing.starter_feats', h: false },
+              { nameKey: 'landing.pricing.pro_name', price: String(pricingPlans.PRO || 99), featsKey: 'landing.pricing.pro_feats', h: true },
+              { nameKey: 'landing.pricing.ent_name', price: String(pricingPlans.ENTREPRISE || 499), featsKey: 'landing.pricing.ent_feats', h: false }
             ].map((p, i) => (
               <Grid item xs={12} md={4} key={i}>
                 <Box className="glass-card" sx={{ p: { xs: 4, md: 6 }, border: p.h ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
