@@ -74,8 +74,8 @@ class RecordingService:
         await self.db.commit()
         await self.db.refresh(db_recording)
 
-        # Trigger n8n audio-uploaded webhook (P1-11: after_upload hook aufrufen)
-        await self.after_upload(db_recording)
+        # TODO: n8n audio-uploaded workflow deactivated (redundant with Celery pipeline).
+        # await self.after_upload(db_recording)
 
         # Trigger Celery Pipeline
         from app.tasks.transcription_tasks import process_recording
