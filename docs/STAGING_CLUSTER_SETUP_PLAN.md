@@ -1,6 +1,6 @@
 # Staging Cluster Setup Plan
 
-> **Aktualisiert**: 2026-06-23 | k3s Migration abgeschlossen
+> **Aktualisiert**: 2026-06-24 | k3s Migration abgeschlossen, n8n Workflows importiert
 
 ## 🎯 Ziel
 

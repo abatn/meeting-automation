@@ -13,7 +13,7 @@ data:
   S3_ENDPOINT: "http://minio-staging:9000"
   S3_BUCKET_NAME: "meeting-recordings-staging"
   LIVEKIT_URL: "ws://livekit-server-staging:7880"
-  LIVEKIT_PUBLIC_URL: "wss://staging.meeting-automate.tn"
+  LIVEKIT_PUBLIC_URL: "wss://staging.meeting-automation.com"
   LIVEKIT_EGRESS_BUCKET: "meeting-recordings-staging"
   LIVEKIT_EGRESS_S3_ENDPOINT: "http://minio-staging:9000"
   # IMPORTANT: After deployment, update to MinIO ClusterIP for hostNetwork Egress:
@@ -21,7 +21,7 @@ data:
   SMTP_HOST: "smtp.sendgrid.net"
   SMTP_PORT: "587"
   SMTP_USER: "apikey"
-  EMAIL_FROM: "noreply@staging.meeting-automate.tn"
+  EMAIL_FROM: "noreply@staging.meeting-automation.com"
   WHATSAPP_API_URL: "https://graph.facebook.com/v18.0"
   WHATSAPP_PHONE_ID: "staging-phone-id"
   N8N_WEBHOOK_URL: "http://n8n-staging:5678/webhook"
@@ -31,6 +31,6 @@ data:
   N8N_WEBHOOK_PV_VALIDATED: "http://n8n-staging:5678/webhook/pv-validated"
   N8N_WEBHOOK_DAILY_REMINDER: "http://n8n-staging:5678/webhook/daily-reminders"
   N8N_WEBHOOK_TRANSCRIPTION_COMPLETED: "http://n8n-staging:5678/webhook/transcription-completed"
-  PUBLIC_BACKEND_URL: "https://staging.meeting-automate.tn"
-  FRONTEND_URL: "https://staging.meeting-automate.tn"
-  CORS_ORIGINS: '["https://staging.meeting-automate.tn","http://localhost:3000"]'
+  PUBLIC_BACKEND_URL: "https://staging.meeting-automation.com"
+  FRONTEND_URL: "https://staging.meeting-automation.com"
+  CORS_ORIGINS: '["https://staging.meeting-automation.com","http://localhost:3000"]'

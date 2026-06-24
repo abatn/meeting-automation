@@ -1,7 +1,7 @@
 # Dokumentation Übersicht — Meeting Automation System
 
-> Automatisch kategorisiert: 2026-06-23 | 115+ Dateien in `docs/`
-> **Status**: k3s Staging aktiv, 13 Pods Running, Pipeline 31.7s, Phase 46 abgeschlossen
+> Automatisch kategorisiert: 2026-06-24 | 115+ Dateien in `docs/`
+> **Status**: k3s Staging aktiv, 21 Pods Running, Pipeline 31.7s, Phase 53 abgeschlossen (cert-manager + nginx-ingress)
 
 ## 1. Architektur & Systemdesign
 
@@ -72,15 +72,18 @@
 | `STAGING_DB_SCHEMA_DRIFT_2026-06-22.md` | DB Schema Drift (Alembic) |
 | `STAGING_ENUM_DRIFT_2026-06-22.md` | Enum Drift (meetingstatus) |
 | `STAGING_PIPELINE_TEST_RESULTS_2026-06-22.md` | Pipeline Test-Ergebnisse |
+| `STAGING_RECOVERY_PLAN.md` | Recovery & Rekonstruktionsplan (k3s) |
+| `STAGING_CLUSTER_SETUP_PLAN.md` | Cluster Setup (k3s) |
+| `ROADMAP_STAGING_VS_PRODUCTION.md` | Staging vs Production Gap Analysis |
 | `kubernetes-deployment-workarounds.md` | **HISTORISCH** — Kind-Workarounds (Phase 1-32) |
-| `PRODUCTION_DEPLOYMENT_PLAN.md` | Production Deployment (historisch) |
+| `PRODUCTION_DEPLOYMENT_PLAN.md` | Production Deployment Plan |
 | `PRODUCTION_PLAN.md` | Production Plan (Kubernetes) |
 
 ## 6. Security & Compliance
 
 | Datei | Beschreibung |
 |-------|-------------|
-| `ISO27001.md` | **ISO 27001 Compliance** — Controls, Roadmap, Status |
+| `ISO27001.md` | **ISO 27001 Compliance** — Controls, Roadmap, Status (13 NetworkPolicies) |
 | `PHASE1_SECURITY_FIXES.md` | Kritische Security Fixes (JWT, bcrypt, Fernet) |
 | `FALSE_ALARMS_AUDIT_2026-06-05.md` | False Alarms Security Audit |
 | `PROTOCOL_PART_27_SECRET_MANAGEMENT_PHASE_1.md` | Secret Management Phase 1 |
@@ -112,6 +115,8 @@
 | `N8N_WORKFLOWS.md` | n8n Workflow Integration |
 | `PROTOCOL_N8N_AUTOMATION_&_SMTP.md` | Protokoll: n8n Automatisierung |
 | `SMTP_CREDENTIAL_CLEANUP.md` | SMTP Credential Cleanup |
+
+**Status (Phase 48):** n8n 7 Workflows importiert und aktiv via API. NodePort 31678 für Web UI.
 
 ## 9. Pipeline & Recording
 
@@ -228,11 +233,14 @@
 2. `GETTING_STARTED.md` — Einstieg (Pipeline, Stack, Multi-Tenancy, Compliance)
 3. `production/README.md` — Produktions-Roadmap (5 Sprints)
 4. `production/k3s-migration-analysis.md` — Kind → k3s Analyse + Vorteile
-5. `ISO27001.md` — Security Compliance (6/10 Controls)
+5. `ISO27001.md` — Security Compliance (13 NetworkPolicies, 6/10 Controls)
 6. `DATABASE_SCHEMA.md` — DB-Schema (9 Tabellen)
 
-**Aktueller Stand (Phase 46):**
+**Aktueller Stand (Phase 50):**
 - 13 Pods Running auf k3s v1.35.5+k3s1
 - Pipeline: 31.7s (Target ≤90s)
 - Migration Chain: 1 Head (`n2o3p4q5r6s7`)
+- 13 NetworkPolicies (ISO 27001 A.8.20)
+- n8n: 7 Workflows importiert und aktiv (Phase 48)
 - 0 hardcoded IPs, 0 hardcoded Credentials
+- TLS: HTTP-only (deferred to Sprint 5)

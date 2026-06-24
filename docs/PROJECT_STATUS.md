@@ -1,22 +1,48 @@
-## 🎉 CURRENT STATUS — 2026-06-23: PHASE 46 COMPLETE ✅
+## 🎉 CURRENT STATUS — 2026-06-24: PHASE 56 COMPLETE ✅
 
-**k3s Migration Complete | 13 Pods Running | Pipeline 31.7s | Phase 46**
+**k3s + HTTPS + LiveKit WebSocket | 13 Pods Running | Pipeline 39s | Phase 56**
 
-### System Status (Phase 46)
-- **Pods**: 13 Running, 0 Restart, alle Ready
-- **Backend Health**: `{"status":"healthy","version":"1.0.0"}`
-- **Frontend**: HTTP 200 via NodePort 31362
-- **Pipeline**: 31.7s (Target ≤90s) ✅
+### System Status (Phase 56)
+- **Pods**: 13 Running (meeting-automation-staging), 3 cert-manager, 1 nginx-ingress
+- **Backend Health**: `{"status":"healthy","version":"1.0.0"}` via HTTPS
+- **Frontend**: HTTP 200 via `https://staging.meeting-automation.com`
+- **TLS Certificate**: `staging-tls` READY=True (Let's Encrypt HTTP-01)
+- **Pipeline**: 39s (Target ≤90s) ✅
 - **Migration Chain**: 1 Head (`n2o3p4q5r6s7`), 33 Migrations
 - **Credentials**: 6/6 synchronisiert (backend ↔ n8n)
-- **Network Policies**: 12 aktiv (ISO 27001)
+- **Network Policies**: 14 aktiv (ISO 27001 A.8.20)
 - **Resource Limits**: Alle Workloads konfiguriert
+- **n8n**: 7 Workflows importiert und aktiv, NodePort 31678
 
-### Phase 46: System-Analyse + Migration Heads Verifikation
-- Migration Chain analysiert: 1 Head, keine disjunkten Heads
-- `.loop.md` korrigiert: "4 disjunkte Heads" war veraltet
-- Alle Pods healthy, keine CrashLoops
-- n8n: Health OK, Workflows nicht importiert (API Key fehlt)
+### Phase 56: LiveKit WebSocket + OnlyOffice + Egress S3 Fixes
+- **LiveKit WebSocket**: `/rtc` + `/twirp` via nginx-ingress mit TLS (kein Signal Connection Error mehr)
+- **Egress S3**: MinIO ClusterIP `10.43.110.217:9000` (hostNetwork kompatibel, `/etc/hosts` bereinigt)
+- **OnlyOffice**: NetworkPolicy erweitert (backend → onlyoffice erlaubt)
+- **Pipeline Test**: Recording → Transcription (5.1s) → PV (2 sections) → 39s ✅
+
+### Phase 55: TLS Certificate + nginx-ingress hostPort
+- nginx-ingress: hostPort 80/443 mit hostNetwork (kein NodePort mehr noetig)
+- Certificate: `staging-tls` READY=True (Let's Encrypt HTTP-01)
+- ConfigMap `custom-headers`: X-Forwarded-Proto fuer Backend
+- OCI Security List: Ports 80/443 geoeffnet
+
+### Phase 50: ISO 27001 TLS Korrektur
+- ISO27001.md: A.10 TLS Status korrigiert ("Nur HTTP" → "Nur HTTPS, TLS deferred to Sprint 5")
+- TLS ist Plan-Ziel, nicht aktueller Zustand
+
+### Phase 49: ISO 27001 Compliance Update
+- Network Policies: 7 → 13 (inkl. NodePort-Policies)
+- n8n API Key in K8s Secret dokumentiert
+- n8n UI (NodePort 31678) in Informationsweitergabe dokumentiert
+
+### Phase 48: n8n API Key + Workflow Import
+- N8N_API_KEY in K8s Secret `n8n-secrets` gepatcht
+- 7 Workflows via n8n API importiert und aktiviert
+- n8n UI: http://158.180.18.110:31678
+
+### Phase 47: n8n NodePort + NetworkPolicy
+- NodePort 31678 für n8n Web UI erstellt
+- NetworkPolicy für Port 5678 (ISO 27001 A.8.20 konform)
 
 ### Phase 45: Orphaned PVC Cleanup
 - 2 verwaiste Pending PVCs gelöscht (`minio-staging-data`, `postgres-staging-data`)
@@ -200,13 +226,13 @@ Status: PRODUCTION READY ✅
 Basierend auf dem jüngsten Security-Audit (ISO 27001:2022) wurden folgende Architektur-Erweiterungen und Maßnahmen als kritisch eingestuft und umgesetzt:
 
 - [x] **Sofort (Phase 1)**: Secret Management. Migration aller Credentials (DB, API-Keys) aus der lokalen .env-Datei in einen sicheren Speicher (SOPS mit age-Verschlüsselung für Kubernetes Secrets).
-- [x] **Kurzfristig**: Netzwerksegmentierung. Isolierung von Datenbank, Redis und Message Broker in strikt getrennten Kubernetes Namespaces mittels NetworkPolicies.
+- [x] **Kurzfristig**: Netzwerksegmentierung. 14 NetworkPolicies für Isolierung von Datenbank, Redis, Message Broker, OnlyOffice, LiveKit (ISO 27001 A.8.20, Phase 32+56).
 - [x] **Kurzfristig**: Infrastruktur & Startup-Stabilisierung (Probes, Ressourcen, RabbitMQ Fixes).
 - [x] **Parallel**: API Gateway & Rate Limiting. Einsatz von Traefik vor Nginx zur Abwehr von DDoS, Bot-Management und Zero-Trust Access.
 - [x] **Vor Go-Live**:
     - Session Management: Implementierung von Session-Fixation Protection und automatischer Terminierung bei Inaktivität.
     - JWT-Härtung: Reduzierung der `ACCESS_TOKEN_EXPIRE_MINUTES` von 1440 (24h) auf 30 Minuten.
-    - [x] SSL/TLS: Verschlüsselung für jeglichen Traffic (auch intern via HTTPS/TLS).
+    - [x] SSL/TLS: Verschlüsselung via cert-manager v1.20.2 + Let's Encrypt HTTP-01 (Phase 53+55). LiveKit WebSocket via nginx-ingress (Phase 56).
 
 ## Roadmap für Phase 2 (Feature Expansion)
 
@@ -258,8 +284,7 @@ Diese Phase konzentriert sich auf den stabilen Betrieb unter Last, die Benutzere
   - **KI-Services**: Response-Zeit (Mistral PV-Generierung), Fehlerquote, Anfragen pro Minute.
   - **MinIO/S3**: Korrekte Speicherplatzberechnung, Anzahl Objekte, Upload/Download Rate.
   - **n8n**: Workflow-Fehler der letzten 24h, Durchschnittliche Ausführungszeit.
-- [x] **Online Document Editing (OnlyOffice)**: Integration für ISO-27001-konforme Online-Bearbeitung von KI-Protokollen. (Optimiert: PDF-Sync-Staleness behoben via Forcesave-Callback & Redis-Sync).
-  > ⚠️ **TODO Produktion**: `ONLYOFFICE_URL` in `.env` ist aktuell auf VM-Test-IP gesetzt. Vor Produktion durch echte Domain ersetzen oder dynamische Host-Ableitung implementieren. Siehe `PROTOCOL_PART_41_ONLYOFFICE_INTEGRATION.md`.
+- [x] **Online Document Editing (OnlyOffice)**: Integration für ISO-27001-konforme Online-Bearbeitung von KI-Protokollen. (k3s Deployment, NetworkPolicy: frontend + backend, Phase 40+56)
 - [x] **Enterprise Onboarding (Way B)**: Implementierung eines sicheren, token-basierten Einladungssystems mit `PENDING` User-Status, n8n-Integration und automatisierter Passwort-Setzung.
 
 ## Phase 8: Speaker Identification (In Entwicklung)

@@ -248,4 +248,82 @@ curl -b cookies.txt http://localhost:8000/api/v1/meetings/{id}/ai-insights
 
 ---
 
+## 9. LiveKit WebSocket via nginx-ingress (Phase 56)
+
+### Problem
+Browser verbindet `wss://staging.meeting-automation.com/rtc` aber nginx-ingress leitet nur `/api` und `/` weiter → "LiveKit Signal Connection Error".
+
+### Solution
+LiveKit WebSocket-Endpunkte (`/rtc`, `/twirp`) werden ueber nginx-ingress mit TLS geproxied.
+
+**Ingress-Konfiguration** (staging-ingress):
+```yaml
+spec:
+  rules:
+  - host: staging.meeting-automation.com
+    http:
+      paths:
+      - path: /rtc
+        pathType: Prefix
+        backend:
+          service:
+            name: livekit-server-staging
+            port:
+              number: 7880
+      - path: /twirp
+        pathType: Prefix
+        backend:
+          service:
+            name: livekit-server-staging
+            port:
+              number: 7880
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 8000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - staging.meeting-automation.com
+    secretName: staging-tls
+```
+
+**Annotations**:
+```yaml
+nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+```
+
+### Backend Configuration
+- `LIVEKIT_PUBLIC_URL=wss://staging.meeting-automation.com` (ConfigMap `backend-config`)
+- Backend returned `serverUrl: wss://staging.meeting-automation.com` an Frontend
+- LiveKit JS Client verbindet automatisch zu `wss://staging.meeting-automation.com/rtc?token=...`
+
+### Verification
+```bash
+# WebSocket-Handshake (401 ohne Token = erwartet)
+python3 -c "
+import asyncio, websockets, ssl
+async def test():
+    ssl_ctx = ssl.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+    async with websockets.connect('wss://staging.meeting-automation.com/rtc', ssl=ssl_ctx) as ws:
+        print('Connected!')
+asyncio.run(test())
+"
+# Output: WebSocket error: server rejected WebSocket connection: HTTP 401
+```
+
+---
+
 **End of Document**

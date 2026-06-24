@@ -1,0 +1,16 @@
+# n8n NodePort: Allow external access to Web UI (ISO 27001 A.8.20 compliant)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: n8n-nodeport-policy
+  namespace: meeting-automation-staging
+spec:
+  podSelector:
+    matchLabels:
+      app: n8n-staging
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 5678
+  policyTypes:
+  - Ingress

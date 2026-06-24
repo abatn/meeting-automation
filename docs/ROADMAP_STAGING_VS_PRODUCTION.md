@@ -1,16 +1,16 @@
 # Roadmap: Staging vs Production Readiness
 
-> **Aktualisiert**: 2026-06-23 | k3s Migration abgeschlossen
+> **Aktualisiert**: 2026-06-24 | k3s Migration abgeschlossen, n8n Workflows importiert und aktiv
 
 **Datum:** 2026-04-05  
-**Status:** Staging läuft auf k3s, Pipeline funktional ✅  
+**Status:** Staging läuft auf k3s, Pipeline funktional ✅, n8n 7 Workflows aktiv ✅  
 **Autor:** Claude Code  
 
 ---
 
 ## 📋 Executive Summary
 
-Das Staging-Cluster läuft auf **k3s v1.35.5+k3s1** auf OCI VM. Die Pipeline (Recording → Transcription → PV) ist funktional und getestet (Phase 33-46). Nächste Schritte: Production-Readiness (Storage, Monitoring, GitOps, TLS).
+Das Staging-Cluster läuft auf **k3s v1.35.5+k3s1** auf OCI VM. Die Pipeline (Recording → Transcription → PV) ist funktional und getestet (Phase 33-50). n8n 7 Workflows importiert und aktiv (Phase 48). Nächste Schritte: Production-Readiness (Storage, Monitoring, GitOps, TLS).
 
 **Aktueller Stand:**
 1. ✅ k3s Migration abgeschlossen (Phase 33)
@@ -18,9 +18,9 @@ Das Staging-Cluster läuft auf **k3s v1.35.5+k3s1** auf OCI VM. Die Pipeline (Re
 3. ✅ Externer Zugriff via Public IP (158.180.18.110)
 4. ✅ 13 Pods stabil, alle healthy
 5. ✅ Alembic 1 Head, 33 Migrations
-6. ❌ Kein HTTPS/TLS (nur HTTP über NodePorts)
-7. ❌ Kein Monitoring Stack
-8. ❌ Kein GitOps/CI/CD für Staging
+6. ✅ n8n 7 Workflows importiert und aktiv (Phase 48)
+7. ✅ 13 NetworkPolicies (ISO 27001 A.8.20) aktiv (Phase 47)
+8. ❌ HTTP-only (TLS deferred to Sprint 5)
 
 ---
 
@@ -32,18 +32,19 @@ Das Staging-Cluster läuft auf **k3s v1.35.5+k3s1** auf OCI VM. Die Pipeline (Re
 - ✅ Backend: 2/2 Replicas Running, Health Check OK
 - ✅ Celery Worker & Beat: 1/1 Running
 - ✅ LiveKit + Egress: hostNetwork für UDP/WebRTC
-- ✅ Externer Zugriff: NodePort 31362 (Frontend), 32222 (Backend)
-- ⚠️ HTTP-only oder self-signed TLS (kein Let's Encrypt)
+- ✅ Externer Zugriff: NodePort 31362 (Frontend), 32222 (Backend), 31678 (n8n UI)
+- ✅ 13 NetworkPolicies (ISO 27001 A.8.20)
+- ✅ n8n: 7 Workflows importiert und aktiv (Phase 48), N8N_API_KEY in K8s Secret
+- ⚠️ HTTP-only (TLS deferred to Sprint 5)
 - ❌ Keine automatisierten Backups
 - ❌ Kein Monitoring Stack
 - ❌ Secrets nicht SOPS-verschlüsselt (plain YAML)
-- ❌ Workflows in n8n nicht persistent (verloren bei Reset)
 
 ### Production (Geplant)
 - ✅ Namespace: `meeting-automation-prod` (definiert in docs)
 - ✅ Network Policies: `default-deny` + allow-regeln (ISO 27001)
 - ✅ Resource Limits: Höher (Backend 2Gi RAM, 3 Replicas)
-- ✅ TLS: Let's Encrypt Production Zertifikat
+- ⏳ TLS: Let's Encrypt Production Zertifikat (Sprint 5)
 - ✅ Monitoring: Custom Dashboard + Prometheus/Grafana geplant
 - ✅ Backup: PostgreSQL pg_dump → S3 (täglich 2:00 UTC) + WAL Archiving
 - ✅ Secrets: SOPS-verschlüsselt mit age
@@ -158,17 +159,18 @@ Das Staging-Cluster läuft auf **k3s v1.35.5+k3s1** auf OCI VM. Die Pipeline (Re
 
 | Aspekt | Staging | Production Plan |
 |--------|---------|-----------------|
-| Workflow Storage | ❌ In-Memory DB (SQLite) | ✅ PostgreSQL Persistent |
-| PVC für n8n Data | ❌ Nein | ✅ Geplant (`n8n-pvc.yaml` existiert) |
-| Automatischer Import | ❌ Manuell via UI | ✅ API-basiert als Fallback |
-| Backup | ❌ Kein Workflow-Backup | ✅ In DB-Backup enthalten |
+| Workflow Storage | ✅ In PostgreSQL (via n8n DB) | ✅ PostgreSQL Persistent |
+| PVC für n8n Data | ❌ Nein (ephemeral) | ✅ Geplant (`n8n-pvc.yaml` existiert) |
+| Automatischer Import | ✅ API-basiert (Phase 48) | ✅ API-basiert als Fallback |
+| Workflow Persistence | ⚠️ Verloren bei Pod-Neustart | ✅ In DB-Backup enthalten |
+| N8N_API_KEY | ✅ In K8s Secret `n8n-secrets` | ✅ In K8s Secret |
 
-**Current Issue:** Nach Cluster-Reset oder Pod-Neustart sind alle n8n-Workflows verloren → müssen manuell aus `n8n/workflows/` importiert werden.
+**Current Issue:** Workflows sind in DB gespeichert (n8n nutzt PostgreSQL), aber bei Pod-Neustart ohne PVC gehen die Workflows verloren → müssen via n8n-API neu importiert werden.
 
 **Production Solution:**
 1. `n8n-deployment.yaml` um VolumeMount erweitern (`/home/node/.n8n`)
 2. PVC `n8n-pvc` binden (bereits definiert in `n8n-pvc.yaml`)
-3. Optional: Skript `import_n8n_workflows.py` für automatischen Import via n8n-API
+3. API-Import als Fallback via n8n-API (bereits implementiert in Phase 48)
 
 **Impact:** Workflow-Verlust bei Ausfällen → Automatisierung (Meeting Invites, Transcriptions, Reminders) funktioniert nicht.
 

@@ -1,6 +1,6 @@
 # Staging Cluster — Recovery & Rekonstruktionsplan
 
-> **Aktualisiert**: 2026-06-23 | k3s Migration abgeschlossen
+> **Aktualisiert**: 2026-06-24 | k3s Migration abgeschlossen, n8n workflows importiert
 
 **Erstellt:** 2026-04-05  
 **Kontext:** Dokumentiert alle Probleme und Lösungen aus der Wiederherstellungssession nach versehentlichem Cluster-Löschen.  
@@ -19,7 +19,7 @@ Host (Oracle Cloud ARM64 aarch64, 158.180.18.110)
 │       ├── redis-staging (StatefulSet, PVC)
 │       ├── rabbitmq-staging (StatefulSet, PVC)
 │       ├── minio-staging (StatefulSet, PVC)
-│       ├── n8n-staging (Deployment, PVC)
+│       ├── n8n-staging (Deployment, NodePort 31678)
 │       ├── onlyoffice-staging (Deployment, PVC)
 │       ├── backend-staging (2x Deployment)
 │       ├── celery-worker-staging (Deployment)
@@ -462,5 +462,7 @@ kubectl port-forward svc/frontend 3001:80 \
 | `infrastructure/kubernetes/staging/minio-statefulset.yaml` | hostPath Storage |
 | `infrastructure/kubernetes/staging/traefik-ingressroute-local.yaml` | HTTP-only IngressRoute |
 | `infrastructure/kubernetes/staging/frontend-deployment.yaml` | Frontend Deployment |
+| `infrastructure/kubernetes/staging/n8n-service-nodeport.yaml` | n8n NodePort 31678 (Phase 47) |
+| `infrastructure/kubernetes/staging/n8n-nodeport-policy.yaml` | ISO 27001 A.8.20 compliant NetworkPolicy (Phase 47) |
 | `data/postgres/` | PostgreSQL Daten (persistent) |
 | `data/minio/` | MinIO Daten (persistent) |

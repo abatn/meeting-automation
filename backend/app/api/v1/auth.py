@@ -357,11 +357,11 @@ async def resend_activation(
     if not email:
         raise HTTPException(status_code=400, detail="Email is required")
     
-    # Check if user exists and is pending
+    # Check if user exists and is pending (eagerly load client to avoid MissingGreenlet)
     stmt = select(UserModel).where(
         UserModel.email == email,
         UserModel.status == UserStatus.PENDING.value
-    )
+    ).options(selectinload(UserModel.client))
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     

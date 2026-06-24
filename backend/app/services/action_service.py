@@ -393,21 +393,22 @@ Return ONLY a JSON array of objects with the following structure:
             self.db.add(assignment)
             await self.db.commit()
 
-        # WhatsApp Reminder via n8n
-        payload = {
-            "event": "action.assigned",
-            "action_id": action.id,
-            "title": str(action.title),
-            "assignee_id": user_id,
-            "due_date": action.due_date.isoformat() if action.due_date else None,
-        }
-
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.post(settings.N8N_WEBHOOK_URL, json=payload, timeout=5.0)
-                logger.info(f"n8n notification triggered for action {action_id}")
-        except Exception as e:
-            logger.error(f"Failed to trigger n8n notification: {e}")
+        # TODO: n8n workflow for "action.assigned" not yet created.
+        # Previously fired to base N8N_WEBHOOK_URL (no path) → 404.
+        # Re-enable when n8n/workflows/action-assigned.json is deployed.
+        # payload = {
+        #     "event": "action.assigned",
+        #     "action_id": action.id,
+        #     "title": str(action.title),
+        #     "assignee_id": user_id,
+        #     "due_date": action.due_date.isoformat() if action.due_date else None,
+        # }
+        # try:
+        #     async with httpx.AsyncClient() as client:
+        #         await client.post(f"{settings.N8N_WEBHOOK_URL}/action-assigned", json=payload, timeout=5.0)
+        #         logger.info(f"n8n notification triggered for action {action_id}")
+        # except Exception as e:
+        #     logger.error(f"Failed to trigger n8n notification: {e}")
 
         return action
 
@@ -464,19 +465,20 @@ Return ONLY a JSON array of objects with the following structure:
         )
         action = result.scalar_one()
 
-        # n8n Notification (e.g., to Manager)
-        payload = {
-            "event": "action.status_updated",
-            "action_id": action.id,
-            "status": status,
-            "title": str(action.title),
-        }
-
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.post(settings.N8N_WEBHOOK_URL, json=payload, timeout=5.0)
-        except Exception as e:
-            logger.error(f"Failed to trigger n8n status notification: {e}")
+        # TODO: n8n workflow for "action.status_updated" not yet created.
+        # Previously fired to base N8N_WEBHOOK_URL (no path) → 404.
+        # Re-enable when n8n/workflows/action-status-updated.json is deployed.
+        # payload = {
+        #     "event": "action.status_updated",
+        #     "action_id": action.id,
+        #     "status": status,
+        #     "title": str(action.title),
+        # }
+        # try:
+        #     async with httpx.AsyncClient() as client:
+        #         await client.post(f"{settings.N8N_WEBHOOK_URL}/action-status-updated", json=payload, timeout=5.0)
+        # except Exception as e:
+        #     logger.error(f"Failed to trigger n8n status notification: {e}")
 
         return action
 
@@ -975,9 +977,12 @@ Example format:
 
     async def escalate_overdue(self, action_id: str) -> None:
         """Eskalation an Manager"""
-        payload = {"event": "action.escalate", "action_id": action_id}
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.post(settings.N8N_WEBHOOK_URL, json=payload, timeout=5.0)
-        except Exception as e:
-            logger.error(f"Failed to trigger n8n escalate notification: {e}")
+        # TODO: n8n workflow for "action.escalate" not yet created.
+        # Previously fired to base N8N_WEBHOOK_URL (no path) → 404.
+        # Re-enable when n8n/workflows/action-escalate.json is deployed.
+        # payload = {"event": "action.escalate", "action_id": action_id}
+        # try:
+        #     async with httpx.AsyncClient() as client:
+        #         await client.post(f"{settings.N8N_WEBHOOK_URL}/action-escalate", json=payload, timeout=5.0)
+        # except Exception as e:
+        #     logger.error(f"Failed to trigger n8n escalate notification: {e}")

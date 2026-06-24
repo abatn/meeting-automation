@@ -131,5 +131,71 @@ HOST_IP=158.180.18.110   # ← Einzige Zeile bei IP-Wechsel anpassen
 docker compose up -d backend onlyoffice
 ```
 
+## Update 2026-06-24 — k3s Migration + NetworkPolicy Fix
+
+### k3s Deployment
+OnlyOffice läuft jetzt als K8s Deployment in k3s (nicht mehr Docker Compose):
+- **Image**: `onlyoffice/documentserver:latest-arm64` (ARM64 kompatibel)
+- **Service**: ClusterIP `onlyoffice-staging.meeting-automation-staging.svc.cluster.local:80`
+- **Health Check**: `httpGet /healthcheck` Port 80 (initialDelay 60s)
+- **Ressourcen**: CPU 500m/1000m, Memory 512Mi/2Gi
+
+### NetworkPolicy (Phase 40 + 56)
+```yaml
+# Phase 40: Initial (nur frontend)
+spec:
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - port: 80
+
+# Phase 56: Backend hinzugefuegt
+spec:
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    - podSelector:
+        matchLabels:
+          app: backend    # ← NEU (Phase 56)
+    ports:
+    - port: 80
+```
+
+**Problem**: Backend (Celery Worker) konnte OnlyOffice nicht erreichen → PV-Callback schlug fehl.
+**Fix**: `onlyoffice-policy` erweitert um `backend` als Quelle.
+
+### Frontend Nginx Proxy
+```nginx
+# OnlyOffice Document Server (Port 8081 nicht von außen erreichbar)
+location /web-apps/ {
+    proxy_pass http://onlyoffice-staging.meeting-automation-staging.svc.cluster.local:80;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+# OnlyOffice Cache
+location /cache/ {
+    proxy_pass http://onlyoffice-staging.meeting-automation-staging.svc.cluster.local:80;
+}
+
+# OnlyOffice versionierter Redirect-Pfad
+location ~ ^/[0-9]+\.[0-9]+\.[0-9]+[-.] {
+    proxy_pass http://onlyoffice-staging.meeting-automation-staging.svc.cluster.local:80;
+}
+```
+
+### SSL/TLS (Phase 55+56)
+OnlyOffice wird jetzt ueber `https://staging.meeting-automation.com/web-apps/...` erreicht (nginx-ingress hostPort 443). Mixed Content wird durch nginx-ingress SSL-Termination vermieden.
+
+---
+
 📊 ERGEBNIS
-Der Online-Editor ist für Arabisch, Französisch und Englisch voll einsatzfähig. Das Layout ist stabil. Die PDF-Konvertierung nach manueller Änderung ist nun wasserdicht synchronisiert.
+Der Online-Editor ist für Arabisch, Französisch und Englisch voll einsatzfähig. Das Layout ist stabil. Die PDF-Konvertierung nach manueller Änderung ist nun wasserdicht synchronisiert. In k3s läuft OnlyOffice als Container mit Health Probes und NetworkPolicy-Segmentierung (ISO 27001 A.8.20 konform).

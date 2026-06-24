@@ -1,6 +1,6 @@
 # System Architecture for Meeting Automation System
 
-## ✅ CURRENT STATUS — 2026-06-23: PIPELINE OPERATIONAL
+## ✅ CURRENT STATUS — 2026-06-24: PIPELINE OPERATIONAL
 
 **Staging Pipeline Verified | ~31s End-to-End**
 
@@ -32,10 +32,12 @@ All critical architectural components validated:
 - **Namespace**: `meeting-automation-staging`
 - **LiveKit**: Im Cluster (hostNetwork: true fuer UDP)
 - **MinIO**: Im Cluster (ClusterIP, minio-user/minio_password)
-- **S3 Architecture**: EIN Endpoint fuer alles: `minio-staging:9000` (DNS funktioniert nativ)
+- **S3 Architecture**: EIN Endpoint fuer alles: ClusterIP `10.43.110.217:9000` (hostNetwork kompatibel)
 - **Secrets**: K8s Secrets (ISO 27001 compliant) fuer GLADIA/MISTRAL API keys
-- **Network Policies**: 7 Policies deployed (default-deny + service-specific rules)
+- **Network Policies**: 14 Policies deployed (default-deny + service-specific rules + NodePort + nginx-ingress)
 - **DNS**: K3s CoreDNS — kein hostAlias noetig
+- **Ingress**: nginx-ingress hostPort 80/443 + cert-manager v1.20.2 + LiveKit WebSocket (Phase 53+56)
+- **TLS**: cert-manager + Let's Encrypt HTTP-01 fuer `staging.meeting-automation.com` (Phase 53)
 
 ---
 
@@ -225,7 +227,7 @@ graph TB
 
     subgraph K3S["k3s Cluster (OCI VM)"]
         subgraph K3S_FRONTEND["Frontend"]
-            FE["Frontend<br/>Traefik Ingress<br/>:80"]:::k3s_pod
+            FE["Frontend<br/>nginx-ingress hostPort<br/>:80/:443"]:::k3s_pod
         end
 
         subgraph K3S_BACKEND["Backend"]
@@ -281,11 +283,11 @@ graph TB
 **Service-Endpunkte (k3s):**
 | Service | Typ | Endpoint |
 |---------|-----|----------|
-| Frontend | Traefik Ingress | `http://158.180.18.110` (Port 80) |
-| Backend | ClusterIP | `backend.meeting-automation.svc.cluster.local:8000` |
-| LiveKit | hostNetwork | `:7880` (TCP+UDP) |
+| Frontend | nginx-ingress hostPort | `https://staging.meeting-automation.com` (Port 443) |
+| Backend | ClusterIP | `backend.meeting-automation-staging.svc.cluster.local:8000` |
+| LiveKit | hostNetwork | `:7880` (TCP+UDP) + WebSocket via `/rtc`, `/twirp` (Phase 56) |
 | LiveKit ICE | hostNetwork | `:7881-7890` (UDP) |
-| MinIO | ClusterIP | `minio.meeting-automation.svc.cluster.local:9000` |
+| MinIO | ClusterIP | `10.43.110.217:9000` (hostNetwork kompatibel, Phase 56) |
 | PostgreSQL | ClusterIP | `postgres.meeting-automation.svc.cluster.local:5432` |
 | Redis | ClusterIP | `redis.meeting-automation.svc.cluster.local:6379` |
 | RabbitMQ | ClusterIP | `rabbitmq.meeting-automation.svc.cluster.local:5672` |
@@ -377,7 +379,7 @@ graph TB
 - **Data Encryption**: Fernet AES-128 for data at rest (PV, MFA secrets encrypted in PostgreSQL).
 - **Confidence Handling**: NULL confidence values default to 0.5 (neutral), not 0.0 (explicitly low).
 - **Secret Management**: K8s Secrets (not ConfigMaps) for GLADIA/MISTRAL/LIVEKIT API keys (ISO 27001 A.8.24).
-- **Network Policies**: 9 NetworkPolicies deployed in staging (ISO 27001 A.8.20):
+- **Network Policies**: 14 NetworkPolicies deployed in staging (ISO 27001 A.8.20):
   - `default-deny-all`: Blocks all ingress by default
   - `postgres-policy`: Backend, Celery, n8n → PostgreSQL
   - `redis-policy`: Backend, Celery → Redis
@@ -387,11 +389,13 @@ graph TB
   - `n8n-policy`: Backend → n8n
   - `frontend-nodeport-policy`: Extern → Frontend (NodePort 31362)
   - `backend-nodeport-policy`: Extern → Backend (NodePort 32222)
+  - `onlyoffice-policy`: Frontend + Backend → OnlyOffice (Phase 56)
 - **Pod Security**: No privileged containers in staging cluster.
 
 ### Security Roadmap (vor Go-Live)
-- **TLS/HTTPS (A.10)**: Traefik TLS mit Let's Encrypt, X-Forwarded-Proto für Backend
-- **WAF + Rate Limiting (A.8.21)**: Traefik Middleware für DDoS, Bot-Schutz, Rate-Limits
+- **TLS/HTTPS (A.10)**: cert-manager v1.20.2 + nginx-ingress hostPort 80/443 (Phase 53+55), Let's Encrypt HTTP-01, X-Forwarded-Proto via ConfigMap (Phase 55)
+- **LiveKit WebSocket (Phase 56)**: `/rtc` + `/twirp` Pfade via nginx-ingress mit TLS + WebSocket-Timeouts 86400s
+- **WAF + Rate Limiting (A.8.21)**: Offen — nginx-ingress Rate-Limiting + Bot-Schutz
 - **Vulnerability Scanning (A.12.6.1)**: Trivy in CI/CD Pipeline
 - **Session Management**: Session-Fixation Protection, Inaktivitäts-Timeout
 

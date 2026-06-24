@@ -1,18 +1,28 @@
 # Sprint 2: TLS + Image Registry
 
-> **Dauer:** ~1 Woche | **Status:** ⬜ Offen
-> **Komponenten:** cert-manager (CNCF), Let's Encrypt, Docker Hub / Harbor (CNCF)
+| Feld | Wert |
+|------|------|
+| **Status** | ✅ Teilweise abgeschlossen (Phase 53) |
+| **Dauer** | ~1 Woche (geschätzt) |
+| **Komponenten** | cert-manager v1.20.2, nginx-ingress, Let's Encrypt |
 
-## TLS mit cert-manager
+## 1. TLS mit cert-manager (Phase 53 abgeschlossen)
 
-### Installation
+### Installiert
 
 ```bash
-# cert-manager installieren
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.15.0/cert-manager.yaml
+# cert-manager v1.20.2 (Helm, CRDs.enabled=true)
+helm install cert-manager oci://quay.io/jetstack/charts/cert-manager \
+  --version v1.20.2 \
+  --set crds.enabled=true \
+  -n cert-manager --create-namespace
 
-# Prüfen
-kubectl get pods -n cert-manager
+# nginx-ingress (NodePort 30080/30443)
+helm install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx --create-namespace \
+  --set controller.service.type=NodePort \
+  --set controller.service.nodePorts.http=30080 \
+  --set controller.service.nodePorts.https=30443
 ```
 
 ### ClusterIssuer (Let's Encrypt)
@@ -25,13 +35,13 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: admin@meeting.tn
+    email: admin@meeting-automation.com
     privateKeySecretRef:
-      name: letsencrypt-prod
+      name: letsencrypt-prod-account-key
     solvers:
     - http01:
         ingress:
-          class: traefik
+          class: nginx
 ```
 
 ### Ingress mit TLS
@@ -40,18 +50,19 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: meeting-automation-ingress
-  namespace: meeting-automation
+  name: staging-ingress
+  namespace: meeting-automation-staging
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
-  ingressClassName: traefik
+  ingressClassName: nginx
   tls:
   - hosts:
-    - app.meeting.tn
-    secretName: meeting-tls
+    - staging.meeting-automation.com
+    secretName: staging-tls
   rules:
-  - host: app.meeting.tn
+  - host: staging.meeting-automation.com
     http:
       paths:
       - path: /api
@@ -70,92 +81,71 @@ spec:
               number: 80
 ```
 
-### Validation
+### Validierung
 
 ```bash
 # Zertifikats-Status prüfen
-kubectl get certificate -n meeting-automation
-kubectl describe certificate meeting-tls -n meeting-automation
+kubectl get certificate -n meeting-automation-staging
+kubectl describe certificate staging-tls -n meeting-automation-staging
 
-# TLS testen
-curl -vI https://app.meeting.tn
+# TLS testen (nach OCI Ports 30080/30443 geöffnet)
+curl -vI https://staging.meeting-automation.com
 ```
 
-## Image Registry
+### Offene Schritte
+
+| # | Schritt | Status |
+|---|---------|--------|
+| 1 | OCI Security List Ports 30080/30443 öffnen | ⏳ User Action |
+| 2 | DNS `staging.meeting-automation.com` → 158.180.18.110 verifizieren | ⏳ |
+| 3 | Let's Encrypt Certificate verifizieren | ⏳ (nach 1+2) |
+| 4 | X-Forwarded-Proto Header für Backend | ❌ Offen |
+| 5 | LiveKit WSS Migration | ❌ Offen |
+
+## 2. Image Registry (Offen — Production)
 
 ### Option 1: Docker Hub (kostenlos)
 
 ```bash
-# Login
 docker login
-
-# Taggen & Pushen
 docker tag meeting-automation-backend:latest youruser/meeting-automation-backend:latest
-docker tag meeting-automation-frontend:latest youruser/meeting-automation-frontend:latest
 docker push youruser/meeting-automation-backend:latest
-docker push youruser/meeting-automation-frontend:latest
-
-# Im Deployment verwenden
-# image: youruser/meeting-automation-backend:latest
-# imagePullPolicy: Always
 ```
 
 ### Option 2: Harbor (CNCF, self-hosted)
 
 ```bash
-# Harbor installieren
 helm repo add harbor https://helm.goharbor.io
 helm upgrade --install harbor harbor/harbor \
   --namespace harbor --create-namespace \
   --set expose.type=nodePort \
-  --set expose.tls.auto.commonName=harbor.meeting.tn \
   --set persistence.enabled=true
-
-# Zugriff
-kubectl port-forward -n harbor svc/harbor-portal 8080:80
-# URL: http://localhost:8080
-# User: admin
-# Pass: kubectl get secret harbor-harbor-core -n harbor -o jsonpath='{.data.HARBOR_ADMIN_PASSWORD}' | base64 -d
-
-# Image pushen
-docker tag meeting-automation-backend:latest harbor.meeting.tn/library/backend:latest
-docker push harbor.meeting.tn/library/backend:latest
 ```
 
-### Option 3: Docker Registry (minimal)
+### Option 3: OCI Container Registry (Oracle Cloud)
 
 ```bash
-# Einfacher lokaler Registry
-kubectl create deployment registry --image=registry:2 -n meeting-automation
-kubectl expose deployment registry --port=5000 -n meeting-automation
-
-# Nutzung
-docker tag meeting-automation-backend:latest localhost:5000/backend:latest
-docker push localhost:5000/backend:latest
-
-# ImagePullSecret für private Registry
-kubectl create secret docker-registry regcred \
-  --docker-server=localhost:5000 \
-  --docker-username=admin \
-  --docker-password=admin \
-  -n meeting-automation
+# Oracle Cloud hat integrierten Container Registry (kostenlos für OCI-Kunden)
+# Kein extra Setup nötig — Images direkt aus OCI pushen
 ```
 
-## Migration von docker save/load zu Registry
+## 3. Migration von docker save/load zu Registry
 
-### Aktuell (setup-kubernetes.sh)
+### Aktuell (Staging)
 
 ```bash
-docker save meeting-automation-backend:latest | gzip > /tmp/backend.tar.gz
-kind load image-archive /tmp/backend.tar.gz
+# Images werden direkt in k3s geladen (kein Kind mehr)
+# k3s pulled Images direkt aus der Registry
 ```
 
-### Ziel
+### Ziel (Production)
 
 ```bash
-# In setup-kubernetes.sh ersetzen durch:
-docker pull youruser/meeting-automation-backend:latest
-kind load docker-image youruser/meeting-automation-backend:latest
-# Oder direkt:
-kubectl set image deployment/backend backend=youruser/meeting-automation-backend:latest
+# In CI/CD Pipeline:
+docker build -t registry.meeting-automation.com/backend:latest .
+docker push registry.meeting-automation.com/backend:latest
+
+# In K8s Deployment:
+# image: registry.meeting-automation.com/backend:latest
+# imagePullPolicy: Always
 ```

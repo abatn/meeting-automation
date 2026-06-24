@@ -1,8 +1,8 @@
 # 🚀 Production Deployment Plan: Meeting Automation System
 
-> **Staging Status (2026-06-23)**: k3s v1.35.5+k3s1 auf OCI VM (158.180.18.110), Pipeline funktional ✅
+> **Staging Status (2026-06-24)**: k3s v1.35.5+k3s1 auf OCI VM (158.180.18.110), Pipeline funktional ✅, n8n 7 Workflows aktiv ✅, cert-manager v1.20.2 + nginx-ingress installiert (Phase 53)
 
-**Stand:** 2026-04-03
+**Stand:** 2026-04-03 (aktualisiert 2026-06-24)
 **Status:** Test abgeschlossen (53/53 E2E-Tests passed ✅)
 **Ziel:** Deployment von Test → Staging → Production
 
@@ -19,16 +19,16 @@
 | **Redis** | Port 6380 | Port 6379 | ClusterIP: 6379 | ClusterIP: 6379 |
 | **RabbitMQ** | Ports 5673/15673 | Ports 5672/15672 | ClusterIP: 5672/15672 | ClusterIP: 5672/15672 |
 | **MinIO** | Ports 9002/9003 | Ports 9000/9001 | ClusterIP: 9000/9001 | ClusterIP: 9000/9001 |
-| **n8n** | Port 5679 | Port 5678 | ClusterIP: 5678 | ClusterIP: 5678 |
+| **n8n** | Port 5679 | Port 5678 | ClusterIP: 5678 + NodePort 31678 (UI) | ClusterIP: 5678 |
 | **OnlyOffice** | Port 8081, test secret | Port 8080, .env secret | ClusterIP: 8080 | ClusterIP: 8080 |
 | **Backend** | Port 8001, test env | Port 8000, .env | 2 Replicas, 1Gi RAM | 3 Replicas, 2Gi RAM |
 | **Frontend** | Nicht vorhanden | Port 3000 | 2 Replicas, Nginx | 3 Replicas, Nginx |
 | **Celery Worker** | Nicht vorhanden | 2G RAM, bg process | 1 Replica, 512Mi | 3 Replicas, 2Gi |
 | **Celery Beat** | Nicht vorhanden | 512M RAM | 1 Replica | 1 Replica (mit leader election) |
-| **Ingress** | Lokal: Ports | Kein Ingress | Traefik LoadBalancer | Traefik LoadBalancer |
-| **Domain** | localhost | localhost | staging.meeting-automate.tn | meeting-automate.tn |
-| **TLS** | Self-signed (localhost) | Kein TLS | Let's Encrypt (Staging) | Let's Encrypt (Production) |
-| **Network Policies** | Keine | Keine | default-deny + allow-regeln | default-deny + allow-regeln |
+| **Ingress** | Lokal: Ports | Kein Ingress | nginx-ingress NodePort 30080/30443 | nginx-ingress LoadBalancer |
+| **Domain** | localhost | localhost | staging.meeting-automation.com | meeting-automation.com |
+| **TLS** | Self-signed (localhost) | Kein TLS | cert-manager v1.20.2 + Let's Encrypt HTTP-01 (Phase 53) | Let's Encrypt (Production) |
+| **Network Policies** | Keine | Keine | 14 Policies (default-deny + allow-regeln + NodePort + nginx-ingress) | 13+ Policies (default-deny + allow-regeln) |
 | **Resource Limits** | Nein | Ja (deploy.resources) | ✅ Ja | ✅ Ja (höher) |
 | **Secrets** | .env (klartext) | .env (klartext) | SOPS-verschlüsselte K8s Secrets | SOPS-verschlüsselte K8s Secrets |
 | **Monitoring** | Manuell | Manuell | Custom Dashboard + Prometheus optional | Custom Dashboard + Prometheus + Alertmanager |
@@ -48,7 +48,7 @@
 | `redis-secrets.yaml` | Redis Auth | REDIS_PASSWORD |
 | `rabbitmq-secrets.yaml` | Message Broker | RABBITMQ_DEFAULT_USER/PASS, ERLANG_COOKIE |
 | `minio-secrets.yaml` | Object Storage | MINIO_ROOT_USER/PASSWORD |
-| `n8n-secrets.yaml` | n8n DB Access | DB_USER/PASSWORD |
+| `n8n-secrets.yaml` | n8n DB Access + API Key | DB_USER/PASSWORD, N8N_API_KEY |
 | `traefik-tls-secret.yaml` | HTTPS Zertifikat | TLS cert/key (Let's Encrypt) |
 
 ### 2.2 Mapping: .env Variable → K8s Secret
@@ -974,7 +974,17 @@ kubectl set image deployment/backend backend=$DOCKERHUB_USERNAME/meeting-automat
 
 ### C) n8n Workflows
 
-**Problem:** Laut `PROTOCOL_PART_35` müssen Workflows manuell in n8n UI importiert werden nach Cluster-Reset.
+**Status (2026-06-24):** 7 Workflows via n8n API importiert und aktiv ✅
+
+| Workflow | ID | Status |
+|----------|-----|--------|
+| meeting-created | ergr03uwrFJZJbOT | ✅ Active |
+| audio-uploaded | yUabduHmFMTK11jZ | ✅ Active |
+| daily-reminders | GpER66AvYwapRNP4 | ✅ Active |
+| meeting-status-changed | kf94JbBu2ewnSzS8 | ✅ Active |
+| pv-validated | DAd2jClIdg6wJtfy | ✅ Active |
+| transcription-completed | BOlWu12gdUfABJWW | ✅ Active |
+| user-invited | CqkpcBkdkXlJtZbo | ✅ Active |
 
 **Lösung Optionen:**
 1. **PVC** für n8n Data (empfohlen):
@@ -990,13 +1000,12 @@ kubectl set image deployment/backend backend=$DOCKERHUB_USERNAME/meeting-automat
    ```
    → Workflows werden in DB gespeichert, DB ist persistent → Workflows bleiben erhalten.
 
-2. **Automatisierter Import** via n8n-API:
-   ```bash
-   # Skript, das Workflows aus Git-JSON importiert
-   python scripts/import_n8n_workflows.py --api-key $N8N_API_KEY
-   ```
+2. **Automatisierter Import** via n8n-API (bereits implementiert):
+   - N8N_API_KEY in K8s Secret `n8n-secrets` hinterlegt
+   - Import via `POST /api/v1/workflows` mit JSON-Format
+   - Aktivierung via `POST /api/v1/workflows/{id}/activate`
 
-**Empfehlung:** Option 1 (PVC) + Option 2 (Backup-Import) als Fallback.
+**Empfehlung:** Option 1 (PVC) + Option 2 (API-Import) als Fallback.
 
 ---
 
