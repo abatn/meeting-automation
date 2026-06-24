@@ -1,7 +1,7 @@
 # Dokumentation Übersicht — Meeting Automation System
 
 > Automatisch kategorisiert: 2026-06-23 | 115+ Dateien in `docs/`
-> **Status**: k3s Staging aktiv, Pipeline funktional (39s), 0 hardcoded IPs
+> **Status**: k3s Staging aktiv, 13 Pods Running, Pipeline 31.7s, Phase 46 abgeschlossen
 
 ## 1. Architektur & Systemdesign
 
@@ -72,6 +72,7 @@
 | `STAGING_DB_SCHEMA_DRIFT_2026-06-22.md` | DB Schema Drift (Alembic) |
 | `STAGING_ENUM_DRIFT_2026-06-22.md` | Enum Drift (meetingstatus) |
 | `STAGING_PIPELINE_TEST_RESULTS_2026-06-22.md` | Pipeline Test-Ergebnisse |
+| `kubernetes-deployment-workarounds.md` | **HISTORISCH** — Kind-Workarounds (Phase 1-32) |
 | `PRODUCTION_DEPLOYMENT_PLAN.md` | Production Deployment (historisch) |
 | `PRODUCTION_PLAN.md` | Production Plan (Kubernetes) |
 
@@ -213,7 +214,7 @@
 | Architektur & Systemdesign | 7 | Hoch |
 | LiveKit Pipeline | 10 | **Kritisch** |
 | KI-Pipeline | 10 | **Kritisch** |
-| Kubernetes & Staging (k3s) | 13 | Hoch |
+| Kubernetes & Staging (k3s) | 14 | Hoch |
 | Security & Compliance | 9 | Hoch |
 | Frontend & UI | 6 | Mittel |
 | n8n Integration | 6 | Mittel |
@@ -229,3 +230,9 @@
 4. `production/k3s-migration-analysis.md` — Kind → k3s Analyse + Vorteile
 5. `ISO27001.md` — Security Compliance (6/10 Controls)
 6. `DATABASE_SCHEMA.md` — DB-Schema (9 Tabellen)
+
+**Aktueller Stand (Phase 46):**
+- 13 Pods Running auf k3s v1.35.5+k3s1
+- Pipeline: 31.7s (Target ≤90s)
+- Migration Chain: 1 Head (`n2o3p4q5r6s7`)
+- 0 hardcoded IPs, 0 hardcoded Credentials

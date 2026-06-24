@@ -1,7 +1,7 @@
 # Getting Started — Meeting Automation System
 
 > Abgeleitet aus: ARCHITECTURE.md, ISO27001.md, DATABASE_SCHEMA.md, production/
-> Stand: 2026-06-23 | k3s Staging aktiv, 13 Pods, Pipeline 39s
+> Stand: 2026-06-23 | k3s Staging aktiv, 13 Pods, Pipeline 31.7s, Phase 46
 
 ## 1. Was ist Meeting Automation?
 
@@ -77,11 +77,15 @@ clients (Organisation)
 # Login: dg@meeting.tn / Password123!
 ```
 
-### Staging (k3s)
+### Staging (k3s) — AKTIV
 ```bash
 ./setup-kubernetes-staging.sh
-# Frontend: http://158.180.18.110 (Traefik Ingress)
+# Frontend: http://158.180.18.110:31362 (NodePort)
+# Backend: http://158.180.18.110:32222 (NodePort)
 # Login: dg@meeting.tn / Password123!
+# Pods: 13 Running (backend×2, frontend, celery-worker, celery-beat,
+#        postgres, redis, minio, rabbitmq, livekit-server, livekit-egress,
+#        onlyoffice, n8n)
 ```
 
 ### Production (k3s)
@@ -93,16 +97,29 @@ clients (Organisation)
 ## 7. Nächste Schritte
 
 ### Produktions-Roadmap (5 Sprints)
-1. **Storage + HA + Backups** — Longhorn, CloudNativePG, Velero
-2. **Monitoring + HPA** — Prometheus, Grafana, Loki, Auto-Scaling
-3. **GitOps + Environments** — ArgoCD, Kustomize, Namespace-Isolation
-4. **Resource Limits + Probes** — CPU/Memory für alle Workloads
-5. **TLS + Registry** — cert-manager, Image-Registry
+1. **Storage + HA + Backups** — Longhorn, CloudNativePG, Velero ❌ Offen
+2. **Monitoring + HPA** — Prometheus, Grafana, Loki, Auto-Scaling ❌ Offen
+3. **GitOps + Environments** — ArgoCD, Kustomize, Namespace-Isolation ❌ Offen
+4. **Resource Limits + Probes** — CPU/Memory für alle Workloads ✅ Abgeschlossen (Phase 42-43)
+5. **TLS + Registry** — cert-manager, Image-Registry ❌ Offen
 
 ### Offen
-- HTTPS/TLS implementieren
-- LiveKit WSS aktivieren
-- n8n Workflows aktivieren (optional)
+- HTTPS/TLS implementieren (Sprint 5)
+- LiveKit WSS aktivieren (Sprint 5)
+- n8n Workflows aktivieren — API Key muss zuerst konfiguriert werden
+
+### Abgeschlossen (Phasen 33-46)
+- ✅ k3s Migration (Phase 33)
+- ✅ Full Pipeline Test (Phase 34)
+- ✅ Hardcoded Werte eliminiert (Phase 37)
+- ✅ External Access via NodePort (Phase 39)
+- ✅ OnlyOffice NetworkPolicy (Phase 40)
+- ✅ LiveKit Egress API Key Fix (Phase 41)
+- ✅ Health Probes für 6 Workloads (Phase 42)
+- ✅ n8n PostgreSQL Credential Sync (Phase 43)
+- ✅ Git Commits (Phase 44)
+- ✅ PVC Cleanup (Phase 45)
+- ✅ Migration Heads Verifikation (Phase 46)
 
 ## 8. Dokumentation
 

@@ -1,22 +1,27 @@
 # Kubernetes Deployment Workarounds & Known Issues
 
 > **Datum**: 2026-06-22 (updated)
-> **Umgebung**: Kind Cluster `meeting-staging` (Node: `meeting-staging-control-plane`, IP: `172.18.0.3`)
-> **Status**: Alle 14 Pods Running ✅, LiveKit PUBLIC_URL gefixt ✅
+> **Umgebung**: **HISTORISCH** — Kind Cluster `meeting-staging` (Node: `meeting-staging-control-plane`, IP: `172.18.0.3`)
+> **Status**: ⚠️ **VERALTET** — Kind → k3s Migration abgeschlossen (Phase 33)
+> **Aktuelle Umgebung**: k3s v1.35.5+k3s1 auf ARM64 (Oracle Linux 9.7)
+> **Hinweis**: Diese Workarounds galten nur für Kind-Cluster und sind in k3s nicht mehr relevant.
 
 ---
 
-## Quick Start: Clean Deploy
+## Quick Start: Clean Deploy (k3s)
 
 ```bash
-# 1. Alten Stack löschen
-kubectl delete namespace meeting-automation 2>/dev/null
+# 1. Setup-Script ausführen
+./setup-kubernetes-staging.sh
 
-# 2. Setup-Script ausführen
-bash setup-kubernetes.sh
+# 2. Alle Pods prüfen
+kubectl get pods -n meeting-automation-staging
+
+# 3. Backend Health prüfen
+curl http://158.180.18.110:32222/health
 ```
 
-> ⚠️ Das Script wird bei **Postgres wait** timeouten (DNS fehlt noch). Die folgenden Workarounds manuell anwenden.
+> ✅ k3s hat alle hier dokumentierten Kind-Workarounds eliminiert (Phase 33-34).
 
 ---
 
