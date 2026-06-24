@@ -1,5 +1,7 @@
 # LiveKit Production Architecture
 
+> **Aktualisiert**: 2026-06-23 | k3s Migration abgeschlossen (Phase 33)
+
 ## Problem Statement
 
 LiveKit WebRTC requires direct UDP access for real-time media traffic. Kind clusters (Kubernetes in Docker) have multiple NAT layers that block UDP traffic, making them fundamentally incompatible with LiveKit WebRTC.
@@ -33,36 +35,39 @@ Reference: https://docs.livekit.io/transport/self-hosting/kubernetes/
 
 ## Architecture Overview
 
-### Staging (Current: Kind Cluster)
+### Staging (Current: k3s Cluster) ✅
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Host Machine (158.180.18.110)                              │
+│  OCI VM (158.180.18.110, 4 CPU, 22GB RAM, ARM64)           │
+│  k3s v1.35.5+k3s1                                          │
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │  LiveKit + Redis (Docker Compose)                   │   │
-│  │  network_mode: host                                 │   │
+│  │  meeting-automation-staging namespace                │   │
 │  │                                                      │   │
-│  │  Port 7880 (TCP) ✓ ← Direkter Zugriff              │   │
-│  │  Port 50000-60000 (UDP) ✓ ← Direkter Zugriff       │   │
-│  └─────────────────────────────────────────────────────┘   │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │  Kind Cluster (172.18.0.3)                          │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌─────────────┐ │   │
+│  │  │ LiveKit      │ │ Backend      │ │ Frontend    │ │   │
+│  │  │ (hostNetwork)│ │ (2 replicas) │ │ (NodePort)  │ │   │
+│  │  │ :7880 TCP    │ │ :8000        │ │ :31362      │ │   │
+│  │  │ :7881 TCP    │ │              │ │             │ │   │
+│  │  │ UDP ✓        │ │              │ │             │ │   │
+│  │  └──────────────┘ └──────────────┘ └─────────────┘ │   │
 │  │                                                      │   │
-│  │  ┌──────────────┐ ┌──────────────┐                 │   │
-│  │  │ Backend Pod  │ │ Frontend Pod │                 │   │
-│  │  │ :8000        │ │ :80          │                 │   │
-│  │  └──────────────┘ └──────────────┘                 │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌─────────────┐ │   │
+│  │  │ Egress       │ │ PostgreSQL   │ │ MinIO       │ │   │
+│  │  │ (hostNetwork)│ │ (StatefulSet)│ │ (StatefulSet│ │   │
+│  │  │ S3: minio    │ │ :5432        │ │ :9000       │ │   │
+│  │  └──────────────┘ └──────────────┘ └─────────────┘ │   │
 │  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Connection Flow**:
-1. Browser → `ws://158.180.18.110:7880` (LiveKit signaling)
+**Connection Flow (k3s)**:
+1. Browser → `ws://158.180.18.110:7880` (LiveKit signaling via hostNetwork)
 2. Browser ← LiveKit returns ICE candidates (UDP ports)
-3. Browser ↔ LiveKit (UDP media stream)
-4. Backend → `ws://host.docker.internal:7880` (internal API)
+3. Browser ↔ LiveKit (UDP media stream via hostNetwork)
+4. Backend → `ws://livekit-server-staging:7880` (internal K8s DNS)
+5. Egress → `minio-staging:9000` (internal K8s DNS)
 
 ### Production (Cloud-VM)
 

@@ -1,5 +1,7 @@
 # 🚀 Production Deployment Plan: Meeting Automation System
 
+> **Staging Status (2026-06-23)**: k3s v1.35.5+k3s1 auf OCI VM (158.180.18.110), Pipeline funktional ✅
+
 **Stand:** 2026-04-03
 **Status:** Test abgeschlossen (53/53 E2E-Tests passed ✅)
 **Ziel:** Deployment von Test → Staging → Production

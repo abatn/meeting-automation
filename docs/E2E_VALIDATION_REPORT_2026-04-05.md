@@ -1,8 +1,11 @@
 # E2E Staging Validation Report
 
+> **Aktualisiert**: 2026-06-23 | k3s Migration abgeschlossen (Phase 33)
+
 **Datum:** 2026-04-05  
 **Cluster:** Kind (lokal), Namespace `meeting-automation-staging`  
-**Status:** ✅ Gate 95% ERREICHT — Staging E2E-stabil
+**Status:** ✅ Gate 95% ERREICHT — Staging E2E-stabil  
+**Aktueller Status:** k3s v1.35.5+k3s1 auf OCI VM (158.180.18.110)
 
 ---
 

@@ -1,8 +1,14 @@
 # Staging Cluster Setup Plan
 
+> **Aktualisiert**: 2026-06-23 | k3s Migration abgeschlossen
+
 ## 🎯 Ziel
 
 Einrichtung eines Kubernetes Staging-Clusters, das die **Produktionsumgebung exakt widerspiegelt**, um sichere E2E-Tests vor dem Production-Deploy zu ermöglichen. Das Setup muss sowohl **lokal** (für Entwicklung) als auch **extern/cloud** (für CI/CD) funktionieren.
+
+## ✅ Aktueller Status: k3s
+
+Staging läuft auf **k3s v1.35.5+k3s1** auf OCI VM (158.180.18.110). Details siehe Phase 33-46 in `.loop.md`.
 
 ---
 

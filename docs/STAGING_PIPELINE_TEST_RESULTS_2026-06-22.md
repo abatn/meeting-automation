@@ -1,4 +1,6 @@
-# Staging Pipeline Test Results (2026-06-22)
+# Staging Pipeline Test Results (2026-06-23)
+
+> **Aktualisiert**: 2026-06-23 | k3s Migration abgeschlossen (Phase 33)
 
 ## Test Execution Summary
 
@@ -29,31 +31,26 @@
 
 ## Connection Notes
 
-### LiveKit Configuration
-- Host LiveKit running on Docker bridge with `network_mode: host`
-- Browser connects to: `ws://158.180.18.110:7880`
-- Backend connects to: `ws://livekit-host.local:7880` (via hostAliases)
-- TURN server enabled on port 3478
+### LiveKit Configuration (k3s)
+- LiveKit running in cluster with `hostNetwork: true`
+- Browser connects to: `ws://158.180.18.110:7880` (hostNetwork)
+- Backend connects to: `ws://livekit-server-staging:7880` (internal K8s DNS)
+- Egress connects to: `minio-staging:9000` (internal K8s DNS)
 
-### Error Observed
-```
-LiveKit Connection Error: could not establish pc connection
-```
-
-**Root Cause**: Browser JavaScript attempting UDP ICE candidates through Kind NAT.
-**Solution Applied**: Updated ConfigMap with external IP, backend pods restarted.
+### No hostAliases needed
+K3s CoreDNS provides native DNS resolution — no hostAliases required.
 
 ## Documentation References
 
-- `docs/LIVEKIT_PRODUCTION_ARCHITECTURE.md` - Host-based deployment architecture
+- `docs/LIVEKIT_PRODUCTION_ARCHITECTURE.md` - k3s cluster architecture
 - `backend/app/api/v1/livekit.py:106` - Token endpoint with LIVEKIT_PUBLIC_URL
 - `frontend/src/components/meetings/MeetingRoom.tsx:498-506` - Frontend URL handling
 
 ## Status Endpoint Verification
 
 ```bash
-curl -s http://158.180.18.110:3000/health
-# Returns: {"status":"healthy"}
+curl -s http://158.180.18.110:32222/health
+# Returns: {"status":"healthy","version":"1.0.0"}
 ```
 
-All pods running: 14/14 ✅
+All pods running: 13/13 ✅

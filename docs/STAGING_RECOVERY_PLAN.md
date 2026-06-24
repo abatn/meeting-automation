@@ -1,11 +1,39 @@
 # Staging Cluster — Recovery & Rekonstruktionsplan
 
+> **Aktualisiert**: 2026-06-23 | k3s Migration abgeschlossen
+
 **Erstellt:** 2026-04-05  
-**Kontext:** Dokumentiert alle Probleme und Lösungen aus der Wiederherstellungssession nach versehentlichem Cluster-Löschen.
+**Kontext:** Dokumentiert alle Probleme und Lösungen aus der Wiederherstellungssession nach versehentlichem Cluster-Löschen.  
+**Status:** Kind-basiertes Setup ist HISTORISCH. Aktuelles Setup: k3s v1.35.5+k3s1 auf OCI VM.
 
 ---
 
-## Architektur-Übersicht
+## Architektur-Übersicht (AKTUELL: k3s)
+
+```
+Host (Oracle Cloud ARM64 aarch64, 158.180.18.110)
+│
+├── k3s v1.35.5+k3s1
+│   └── Namespace: meeting-automation-staging
+│       ├── postgres-staging (StatefulSet, PVC)
+│       ├── redis-staging (StatefulSet, PVC)
+│       ├── rabbitmq-staging (StatefulSet, PVC)
+│       ├── minio-staging (StatefulSet, PVC)
+│       ├── n8n-staging (Deployment, PVC)
+│       ├── onlyoffice-staging (Deployment, PVC)
+│       ├── backend-staging (2x Deployment)
+│       ├── celery-worker-staging (Deployment)
+│       ├── celery-beat-staging (Deployment)
+│       ├── frontend-staging (Deployment, NodePort 31362)
+│       ├── livekit-server-staging (Deployment, hostNetwork)
+│       └── livekit-egress-staging (Deployment, hostNetwork)
+│
+└── Docker Daemon (nur für lokale Entwicklung)
+```
+
+---
+
+## Architektur-Übersicht (HISTORISCH: Kind)
 
 ```
 Host (Oracle Cloud ARM64 aarch64)

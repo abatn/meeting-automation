@@ -1,33 +1,38 @@
 # Roadmap: Staging vs Production Readiness
 
+> **Aktualisiert**: 2026-06-23 | k3s Migration abgeschlossen
+
 **Datum:** 2026-04-05  
-**Status:** Staging E2E-stabil (97% Pass-Rate), Production-Readiness unvollständig  
+**Status:** Staging läuft auf k3s, Pipeline funktional ✅  
 **Autor:** Claude Code  
 
 ---
 
 ## 📋 Executive Summary
 
-Das lokale Staging-Cluster ist **funktional und E2E-getestet** (97% Pass-Rate), jedoch **nicht CI/CD-tauglich** und fehlt kritische Production-Komponenten. Ein Cloud-Staging-Cluster sowie Production-API-Keys müssen beschafft werden, bevor das System in Produktion gehen kann.
+Das Staging-Cluster läuft auf **k3s v1.35.5+k3s1** auf OCI VM. Die Pipeline (Recording → Transcription → PV) ist funktional und getestet (Phase 33-46). Nächste Schritte: Production-Readiness (Storage, Monitoring, GitOps, TLS).
 
-**Kritischste Blockaden:**
-1. ❌ Kein Cloud-Staging-Cluster → CI/CD Pipeline Job 2 kann nicht laufen
-2. ❌ Production-API-Keys fehlen (Mistral, Gladia, SMTP, Stripe, WhatsApp)
-3. ❌ Backup-Strategie nicht implementiert
-4. ❌ Terraform-Config für Cloud-Infrastruktur nicht geschrieben
-5. ❌ Monitoring-Stack (Prometheus/Grafana/Alertmanager) nicht deployt
+**Aktueller Stand:**
+1. ✅ k3s Migration abgeschlossen (Phase 33)
+2. ✅ Pipeline funktional (Recording → Transcription → PV, ~31s)
+3. ✅ Externer Zugriff via Public IP (158.180.18.110)
+4. ✅ 13 Pods stabil, alle healthy
+5. ✅ Alembic 1 Head, 33 Migrations
+6. ❌ Kein HTTPS/TLS (nur HTTP über NodePorts)
+7. ❌ Kein Monitoring Stack
+8. ❌ Kein GitOps/CI/CD für Staging
 
 ---
 
 ## 🎯 Current State Overview
 
-### Staging (Lokal mit Kind)
+### Staging (k3s)
 - ✅ Namespace: `meeting-automation-staging`
 - ✅ Alle Infrastruktur-Pods: Running (Postgres, Redis, RabbitMQ, MinIO, n8n, OnlyOffice)
 - ✅ Backend: 2/2 Replicas Running, Health Check OK
 - ✅ Celery Worker & Beat: 1/1 Running
-- ✅ E2E Pass-Rate: 97% (33/34 Tests)
-- ✅ Traefik Ingress installiert
+- ✅ LiveKit + Egress: hostNetwork für UDP/WebRTC
+- ✅ Externer Zugriff: NodePort 31362 (Frontend), 32222 (Backend)
 - ⚠️ HTTP-only oder self-signed TLS (kein Let's Encrypt)
 - ❌ Keine automatisierten Backups
 - ❌ Kein Monitoring Stack
