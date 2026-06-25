@@ -346,7 +346,7 @@ async def get_onlyoffice_config(pv_id: str, language: str = "fr", request: Reque
     callback_url = f"{public_base}/api/v1/pv/{pv_id}/onlyoffice/callback"
     oo_lang = "ar-SA" if (language == "ar") else language
     config = {
-        "document": {"fileType": "docx", "key": f"{pv_id}_{int(datetime.now(timezone.utc).timestamp())}", "title": f"PV_{pv.title}.docx", "url": download_url, "permissions": {"edit": True, "download": True}},
+        "document": {"documentType": "word", "fileType": "docx", "key": f"{pv_id}_{int(datetime.now(timezone.utc).timestamp())}", "title": f"PV_{pv.title}.docx", "url": download_url, "permissions": {"edit": True, "download": True}},
         "editorConfig": {"callbackUrl": callback_url, "user": {"id": current_user.id, "name": current_user.full_name or current_user.email}, "lang": oo_lang, "customization": {"forcesave": True, "onlyOfficeUrl": f"{scheme}://{host}"}}
     }
     config["token"] = jwt.encode(config, settings.ONLYOFFICE_SECRET, algorithm="HS256")
