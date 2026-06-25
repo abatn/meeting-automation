@@ -21,6 +21,7 @@ const OnlyOfficeEditor: React.FC<Props> = ({ pvId, language, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const editorInstanceRef = useRef<any>(null);
   const [config, setConfig] = useState<any>(null);
 
   useEffect(() => {
@@ -42,34 +43,51 @@ const OnlyOfficeEditor: React.FC<Props> = ({ pvId, language, onClose }) => {
   useEffect(() => {
     if (!config || !editorRef.current) return;
 
-    // Dynamically load OnlyOffice script
+    const destroyExistingEditor = () => {
+      if (editorInstanceRef.current) {
+        try {
+          editorInstanceRef.current.destroy();
+        } catch (e) {
+          console.warn("OnlyOffice destroy failed:", e);
+        }
+        editorInstanceRef.current = null;
+      }
+      if (editorRef.current) {
+        editorRef.current.innerHTML = "";
+      }
+    };
+
+    destroyExistingEditor();
+
     const scriptId = "onlyoffice-api-script";
     let script = document.getElementById(scriptId) as HTMLScriptElement;
 
     const initEditor = () => {
       if (window.DocsAPI && editorRef.current) {
-        // Use config as is from backend (Stable LTR-wrap for Arabic)
-        new window.DocsAPI.DocEditor("onlyoffice-editor-container", config);
+        try {
+          editorInstanceRef.current = new window.DocsAPI.DocEditor("onlyoffice-editor-container", config);
+        } catch (e) {
+          console.error("OnlyOffice DocEditor init failed:", e);
+          setError(t("pv.editor_load_error"));
+        }
       }
     };
 
     if (!script) {
       script = document.createElement("script");
       script.id = scriptId;
-      // Use the URL from config, pointing to the documentserver
       const baseUrl = config.editorConfig.customization?.onlyOfficeUrl || "http://localhost:8080";
       script.src = `${baseUrl}/web-apps/apps/api/documents/api.js`;
       script.onload = initEditor;
       document.body.appendChild(script);
     } else {
-      // Re-run init if script already exists but editor needs refresh
       if (window.DocsAPI) initEditor();
     }
 
     return () => {
-      // Cleanup logic if necessary (DocsAPI usually cleans up when container is removed)
+      destroyExistingEditor();
     };
-  }, [config]);
+  }, [config, pvId]);
 
   if (loading) {
     return (
