@@ -272,6 +272,19 @@ def mock_n8n_transcription():
 
 
 @pytest.fixture
+def mock_pv_validation_n8n():
+    """
+    Mocks the _notify_validation function in PVService.
+    Prevents n8n webhook calls during PV validation in E2E tests.
+    """
+    with patch(
+        "app.services.pv_service.PVService._notify_validation",
+        new=AsyncMock()
+    ) as m:
+        yield m
+
+
+@pytest.fixture
 def mock_n8n_action():
     """
     Mocks n8n webhook calls in action_service (status updates, escalations)
@@ -305,12 +318,16 @@ def mock_n8n_action():
 @pytest.fixture
 def mock_sentinel():
     """
-    Mocks sentinel.summarize_chunk to return deterministic summary.
-    Prevents real API calls to external LLM service.
+    Mocks get_sentinel_service().summarize_chunk to return deterministic summary.
+    Prevents real LLM calls during tests.
     """
+    mock_service = AsyncMock()
+    mock_service.summarize_chunk = AsyncMock(
+        return_value="Mocked summary: This is a short summary of the chunk."
+    )
     with patch(
-        "app.services.sentinel_service.sentinel.summarize_chunk",
-        new=AsyncMock(return_value="Mocked summary: This is a short summary of the chunk.")
+        "app.tasks.transcription_tasks.get_sentinel_service",
+        return_value=mock_service
     ) as m:
         yield m
 
