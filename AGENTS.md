@@ -170,6 +170,10 @@ docker logs meeting-automation-celery-worker-1 | grep TIMING
 - Triggered via webhooks at `/webhooks/n8n`
 - Integrations: WhatsApp Business, SendGrid, Stripe
 - **Known issue**: n8n webhooks return 404 if workflows not activated (see docs/LIVEKIT_N8N_WORKFLOWS.md)
+- **CRITICAL**: Automation API requires `?client_id=e052b451-0cc3-4932-9c68-7c46240b1936` parameter
+- **CRITICAL**: n8n only activates 3/7 workflows on startup. Must call `POST /api/v1/workflows/{id}/activate` with `X-N8N-API-KEY` header for others
+- **CRITICAL**: DB changes don't propagate to n8n in-memory state. Must DELETE + RE-IMPORT workflow via API
+- **Workflow IDs**: meeting-created `uB0bPHLt0FNxsaBe`, pv-validated `o9NXKZqiDnksQeO3`, transcription-completed `00tDUsvHjpnWD6oG`, meeting-status-changed `6jsJVqySI9VpnvoO`, daily-reminders `GpER66AvYwapRNP4`, user-invited `CqkpcBkdkXlJtZbo`
 
 ### LiveKit Recording Pipeline
 ```

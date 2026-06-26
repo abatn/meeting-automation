@@ -1,43 +1,48 @@
-## 🎉 CURRENT STATUS — 2026-06-24: PHASE 56 COMPLETE ✅
+## 🎉 CURRENT STATUS — 2026-06-25: PHASE 75 COMPLETE ✅
 
-**k3s + HTTPS + LiveKit WebSocket | 13 Pods Running | Pipeline 39s | Phase 56**
+**k3s + HTTPS + LiveKit WebSocket + OnlyOffice PDF Pipeline | 21 Pods Running | Pipeline 31.7s | Phase 75**
 
-### System Status (Phase 56)
-- **Pods**: 13 Running (meeting-automation-staging), 3 cert-manager, 1 nginx-ingress
+### System Status (Phase 75)
+- **Pods**: 16 App + 3 cert-manager + 1 nginx-ingress + 1 acme-solver = 21 Running
 - **Backend Health**: `{"status":"healthy","version":"1.0.0"}` via HTTPS
 - **Frontend**: HTTP 200 via `https://staging.meeting-automation.com`
 - **TLS Certificate**: `staging-tls` READY=True (Let's Encrypt HTTP-01)
-- **Pipeline**: 39s (Target ≤90s) ✅
+- **Pipeline**: 31.7s (Target ≤90s) ✅
 - **Migration Chain**: 1 Head (`n2o3p4q5r6s7`), 33 Migrations
 - **Credentials**: 6/6 synchronisiert (backend ↔ n8n)
-- **Network Policies**: 14 aktiv (ISO 27001 A.8.20)
+- **Network Policies**: 15 aktiv (ISO 27001 A.8.20)
 - **Resource Limits**: Alle Workloads konfiguriert
-- **n8n**: 7 Workflows importiert und aktiv, NodePort 31678
+- **n8n**: 6 Workflows aktiv (meeting-created, pv-validated, transcription-completed, meeting-status-changed, daily-reminders, user-invited), NodePort 31678
+- **OnlyOffice**: PDF Edit + Konvertierung funktional (Phase 64-73)
+  - Socket.IO via `/doc/` Pfad
+  - Forcesave aktiviert
+  - PDF Download: 2.2s synchron (Phase 73)
+  - DOCX Download: sofort
+
+### Phase 73: OnlyOffice PDF Conversion — Synchroner Fix
+- PDF-Konvertierung synchron (`await run_pdf_conversion`) statt Background-Task
+- Download gibt sofort PDF (2.2s) statt 50s Timeout → DOCX
+- Converter-Speed: 0.09s (DOCX → PDF)
+
+### Phase 71: HTTPS → HTTP URL-Mapping
+- Converter gibt `https://onlyoffice-staging/...` zurück
+- Backend kann nur `http://onlyoffice-staging:80/...` erreichen
+- URL-Mapping in `pv.py:69-72`
+
+### Phase 64-70: OnlyOffice Fixes
+- `documentType: "word"` hinzugefügt
+- Socket.IO `/doc/` WebSocket Proxy
+- WebSocket-Header in `ds-docservice.conf`
+- Hardcoded Hostnames → `settings.ONLYOFFICE_URL`
+- Callback status 1 verarbeitet
+- Forcesave via Editor-Config
+- EBUSY Fix (ConfigMap Mount entfernt)
 
 ### Phase 56: LiveKit WebSocket + OnlyOffice + Egress S3 Fixes
-- **LiveKit WebSocket**: `/rtc` + `/twirp` via nginx-ingress mit TLS (kein Signal Connection Error mehr)
-- **Egress S3**: MinIO ClusterIP `10.43.110.217:9000` (hostNetwork kompatibel, `/etc/hosts` bereinigt)
-- **OnlyOffice**: NetworkPolicy erweitert (backend → onlyoffice erlaubt)
-- **Pipeline Test**: Recording → Transcription (5.1s) → PV (2 sections) → 39s ✅
-
-### Phase 55: TLS Certificate + nginx-ingress hostPort
-- nginx-ingress: hostPort 80/443 mit hostNetwork (kein NodePort mehr noetig)
-- Certificate: `staging-tls` READY=True (Let's Encrypt HTTP-01)
-- ConfigMap `custom-headers`: X-Forwarded-Proto fuer Backend
-- OCI Security List: Ports 80/443 geoeffnet
-
-### Phase 50: ISO 27001 TLS Korrektur
-- ISO27001.md: A.10 TLS Status korrigiert ("Nur HTTP" → "Nur HTTPS, TLS deferred to Sprint 5")
-- TLS ist Plan-Ziel, nicht aktueller Zustand
-
-### Phase 49: ISO 27001 Compliance Update
-- Network Policies: 7 → 13 (inkl. NodePort-Policies)
-- n8n API Key in K8s Secret dokumentiert
-- n8n UI (NodePort 31678) in Informationsweitergabe dokumentiert
-
-### Phase 48: n8n API Key + Workflow Import
-- N8N_API_KEY in K8s Secret `n8n-secrets` gepatcht
-- 7 Workflows via n8n API importiert und aktiviert
+- LiveKit WebSocket: `/rtc` + `/twirp` via nginx-ingress mit TLS
+- Egress S3: MinIO ClusterIP `10.43.110.217:9000`
+- OnlyOffice: NetworkPolicy erweitert (backend → onlyoffice erlaubt)
+- Pipeline Test: 39s ✅
 - n8n UI: http://158.180.18.110:31678
 
 ### Phase 47: n8n NodePort + NetworkPolicy

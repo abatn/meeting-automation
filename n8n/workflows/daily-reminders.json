@@ -23,7 +23,7 @@
     },
     {
       "parameters": {
-        "url": "http://meeting-automation-backend-1:8000/api/v1/actions/pending",
+        "url": "http://backend.meeting-automation-staging.svc.cluster.local:8000/api/v1/actions/pending",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

@@ -1,7 +1,7 @@
 # Getting Started — Meeting Automation System
 
 > Abgeleitet aus: ARCHITECTURE.md, ISO27001.md, DATABASE_SCHEMA.md, production/
-> Stand: 2026-06-24 | k3s Staging aktiv, 21 Pods, Pipeline 31.7s, Phase 53 (cert-manager + nginx-ingress)
+> Stand: 2026-06-25 | k3s Staging aktiv, 21 Pods, Pipeline 31.7s, Phase 73 abgeschlossen
 
 ## 1. Was ist Meeting Automation?
 
@@ -11,6 +11,7 @@ Multi-Tenant SaaS-Plattform für Meeting-Automatisierung (Tunesien/Maghreb):
 - **PV-Generierung** via Mistral AI (Strukturierte Sitzungsprotokolle)
 - **Action Assignment** via ONNX + Heuristik
 - **Multi-Tenancy** mit JWT + client_id Isolation
+- **OnlyOffice** für PV-Bearbeitung online (Document Editor)
 
 ## 2. Pipeline-Flow (31.7s)
 
@@ -28,7 +29,23 @@ Browser → LiveKit Egress → MinIO S3 → Webhook
 | Mistral PV | ~5s | Mistral AI API |
 | DB Persistence | ~1s | PostgreSQL |
 
-## 3. Technologie-Stack
+## 3. OnlyOffice PDF Edit Pipeline
+
+```
+Frontend (Edit Online) → Backend Config → OnlyOffice Editor (Socket.IO)
+  → User bearbeitet → Speichert → Callback
+  → Backend: DOCX in S3 + PDF-Konvertierung (0.09s)
+  → Download: PDF (2.2s) oder DOCX (sofort)
+```
+
+| Schritt | Dauer | Details |
+|---------|-------|---------|
+| Editor öffnen | ~1s | Config + JWT Token generiert |
+| PDF-Konvertierung | 0.09s | OnlyOffice Converter (DOCX→PDF) |
+| PDF Download | 2.2s | S3 → Konvertierung → Browser |
+| DOCX Download | sofort | S3 → Browser |
+
+## 4. Technologie-Stack
 
 | Komponente | Technologie |
 |------------|------------|
@@ -41,9 +58,9 @@ Browser → LiveKit Egress → MinIO S3 → Webhook
 | KI | Gladia V2 (Transcription) + Mistral (PV) |
 | Recording | LiveKit (WebRTC) |
 | Automation | n8n |
-| Doku | OnlyOffice |
+| Dokumente | OnlyOffice (PDF/DOCX Edit + Konvertierung) |
 
-## 4. Multi-Tenancy
+## 5. Multi-Tenancy
 
 ```
 clients (Organisation)
@@ -56,7 +73,7 @@ clients (Organisation)
 
 **RBAC**: DG (Admin) → Manager → Participant | System Admin | Tech Admin
 
-## 5. ISO 27001 Compliance (6/10 Controls)
+## 6. ISO 27001 Compliance (6/10 Controls)
 
 | Control | Status |
 |---------|--------|
@@ -65,9 +82,9 @@ clients (Organisation)
 | A.8.26 Tenant Isolation | ✅ client_id Filter |
 | A.12.4.1 Audit Logging | ✅ 118+ Logs |
 | A.5.17 Auth & RBAC | ✅ JWT + 5 Rollen |
-| A.8.20 Network Policies | ✅ 13 Policies deployt |
+| A.8.20 Network Policies | ✅ 15 Policies deployt |
 
-## 6. Infrastruktur
+## 7. Infrastruktur
 
 ### Lokal (Docker Compose)
 ```bash
@@ -80,13 +97,13 @@ clients (Organisation)
 ### Staging (k3s) — AKTIV
 ```bash
 ./setup-kubernetes-staging.sh
-# Frontend: http://158.180.18.110:31362 (NodePort)
+# Frontend: https://staging.meeting-automation.com (nginx-ingress)
 # Backend: http://158.180.18.110:32222 (NodePort)
 # n8n UI: http://158.180.18.110:31678 (NodePort)
 # Login: dg@meeting.tn / Password123!
-# Pods: 13 Running (backend×2, frontend, celery-worker, celery-beat,
+# Pods: 21 Running (backend×2, frontend, celery-worker, celery-beat,
 #        postgres, redis, minio, rabbitmq, livekit-server, livekit-egress,
-#        onlyoffice, n8n)
+#        onlyoffice, n8n, cert-manager×3, nginx-ingress)
 ```
 
 ### Production (k3s)
@@ -95,20 +112,16 @@ clients (Organisation)
 # Docs: docs/production/
 ```
 
-## 7. Nächste Schritte
+## 8. Nächste Schritte
 
 ### Produktions-Roadmap (5 Sprints)
 1. **Storage + HA + Backups** — Longhorn, CloudNativePG, Velero ❌ Offen
 2. **Monitoring + HPA** — Prometheus, Grafana, Loki, Auto-Scaling ❌ Offen
 3. **GitOps + Environments** — ArgoCD, Kustomize, Namespace-Isolation ❌ Offen
 4. **Resource Limits + Probes** — CPU/Memory für alle Workloads ✅ Abgeschlossen (Phase 42-43)
-5. **TLS + Registry** — cert-manager, Image-Registry ❌ Offen
+5. **TLS + Registry** — cert-manager ✅ Abgeschlossen (Phase 53-57), Image-Registry ❌ Offen
 
-### Offen
-- HTTPS/TLS implementieren (Sprint 5)
-- LiveKit WSS aktivieren (Sprint 5)
-
-### Abgeschlossen (Phasen 33-50)
+### Abgeschlossen (Phasen 33-73)
 - ✅ k3s Migration (Phase 33)
 - ✅ Full Pipeline Test (Phase 34)
 - ✅ Hardcoded Werte eliminiert (Phase 37)
@@ -122,12 +135,17 @@ clients (Organisation)
 - ✅ Migration Heads Verifikation (Phase 46)
 - ✅ n8n NodePort + NetworkPolicy (Phase 47)
 - ✅ n8n API Key + 7 Workflows importiert (Phase 48)
-- ✅ ISO 27001 Compliance Update — 13 NetworkPolicies (Phase 49)
-- ✅ ISO 27001 TLS Korrektur (Phase 50)
+- ✅ ISO 27001 Compliance Update (Phase 49-50)
+- ✅ k3s Endpoint Fix + cert-manager + nginx-ingress (Phase 53)
+- ✅ TLS Certificate (Phase 55-57)
+- ✅ LiveKit WebSocket + OnlyOffice Fixes (Phase 56)
+- ✅ SSL/TLS vollständig (Phase 57)
+- ✅ OnlyOffice PDF Edit Pipeline (Phase 64-73)
 
-## 8. Dokumentation
+## 9. Dokumentation
 
 - **Hauptdokument**: `docs/ARCHITECTURE.md`
-- **Index**: `docs/DOCUMENTATION_INDEX.md` (113+ Dateien kategorisiert)
+- **Index**: `docs/DOCUMENTATION_INDEX.md` (115+ Dateien kategorisiert)
 - **Produktion**: `docs/production/` (5 Sprints + k3s-Analyse)
 - **ISO 27001**: `docs/ISO27001.md`
+- **OnlyOffice Pipeline**: `docs/pipeline-onlyoffice-pdf-edit.md`

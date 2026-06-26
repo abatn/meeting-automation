@@ -1,7 +1,7 @@
 # Dokumentation Übersicht — Meeting Automation System
 
-> Automatisch kategorisiert: 2026-06-24 | 115+ Dateien in `docs/`
-> **Status**: k3s Staging aktiv, 21 Pods Running, Pipeline 31.7s, Phase 53 abgeschlossen (cert-manager + nginx-ingress)
+> Automatisch kategorisiert: 2026-06-25 | 115+ Dateien in `docs/`
+> **Status**: k3s Staging aktiv, 21 Pods Running, Pipeline 31.7s, Phase 75 abgeschlossen (n8n Workflows fully functional)
 
 ## 1. Architektur & Systemdesign
 
@@ -83,7 +83,7 @@
 
 | Datei | Beschreibung |
 |-------|-------------|
-| `ISO27001.md` | **ISO 27001 Compliance** — Controls, Roadmap, Status (13 NetworkPolicies) |
+| `ISO27001.md` | **ISO 27001 Compliance** — Controls, Roadmap, Status (15 NetworkPolicies) |
 | `PHASE1_SECURITY_FIXES.md` | Kritische Security Fixes (JWT, bcrypt, Fernet) |
 | `FALSE_ALARMS_AUDIT_2026-06-05.md` | False Alarms Security Audit |
 | `PROTOCOL_PART_27_SECRET_MANAGEMENT_PHASE_1.md` | Secret Management Phase 1 |
@@ -116,7 +116,7 @@
 | `PROTOCOL_N8N_AUTOMATION_&_SMTP.md` | Protokoll: n8n Automatisierung |
 | `SMTP_CREDENTIAL_CLEANUP.md` | SMTP Credential Cleanup |
 
-**Status (Phase 48):** n8n 7 Workflows importiert und aktiv via API. NodePort 31678 für Web UI.
+**Status (Phase 75):** n8n 6 Workflows aktiv (meeting-created, pv-validated, transcription-completed, meeting-status-changed, daily-reminders, user-invited). NodePort 31678 für Web UI. Automation API requires `?client_id=` parameter.
 
 ## 9. Pipeline & Recording
 
@@ -126,7 +126,7 @@
 | `PIPELINE_OPTIMIZATION_2026-06-12.md` | Pipeline-Optimierung |
 | `PIPELINE_QUICK_WINS.md` | Quick Wins |
 | `PIPELINE_STATUS_2026-04-06.md` | Pipeline-Status |
-| `pipeline-onlyoffice-pdf-edit.md` | OnlyOffice PDF Edit Pipeline |
+| `pipeline-onlyoffice-pdf-edit.md` | OnlyOffice PDF Edit Pipeline (Phase 64-73) |
 | `pipeline-pv-validate-pdf.md` | PV Validate → PDF Email Pipeline |
 | `plan-onlyoffice-pdf-in-n8n-pipeline.md` | OnlyOffice PDF in n8n Pipeline |
 
@@ -188,7 +188,7 @@
 |-------|-------------|
 | `pdf-generation-methods-analysis.md` | PDF-Generierung Methoden |
 | `implementation-plan-pdf-s3-fallback.md` | PDF Download mit S3-Prüfung |
-| `pipeline-onlyoffice-pdf-edit.md` | OnlyOffice PDF Edit Pipeline |
+| `pipeline-onlyoffice-pdf-edit.md` | **OnlyOffice PDF Edit Pipeline** (Phase 64-73) |
 | `pipeline-pv-validate-pdf.md` | PV Validate → PDF Email |
 | `plan-onlyoffice-pdf-in-n8n-pipeline.md` | OnlyOffice PDF in n8n |
 | `onlyoffice/Nginx-Redirect-Fix.md` | Nginx Redirect Fix |
@@ -233,14 +233,16 @@
 2. `GETTING_STARTED.md` — Einstieg (Pipeline, Stack, Multi-Tenancy, Compliance)
 3. `production/README.md` — Produktions-Roadmap (5 Sprints)
 4. `production/k3s-migration-analysis.md` — Kind → k3s Analyse + Vorteile
-5. `ISO27001.md` — Security Compliance (13 NetworkPolicies, 6/10 Controls)
+5. `ISO27001.md` — Security Compliance (15 NetworkPolicies, 6/10 Controls)
 6. `DATABASE_SCHEMA.md` — DB-Schema (9 Tabellen)
+7. `pipeline-onlyoffice-pdf-edit.md` — OnlyOffice PDF Edit Pipeline
 
-**Aktueller Stand (Phase 50):**
-- 13 Pods Running auf k3s v1.35.5+k3s1
+**Aktueller Stand (Phase 75):**
+- 21 Pods Running auf k3s v1.35.5+k3s1
 - Pipeline: 31.7s (Target ≤90s)
 - Migration Chain: 1 Head (`n2o3p4q5r6s7`)
-- 13 NetworkPolicies (ISO 27001 A.8.20)
-- n8n: 7 Workflows importiert und aktiv (Phase 48)
+- 15 NetworkPolicies (ISO 27001 A.8.20)
+- n8n: 6 Workflows aktiv (Phase 75 — all workflows functional with client_id parameter)
+- OnlyOffice: PDF Edit + Konvertierung funktional (Phase 64-73)
+- TLS: Let's Encrypt aktiv (Phase 53-57)
 - 0 hardcoded IPs, 0 hardcoded Credentials
-- TLS: HTTP-only (deferred to Sprint 5)

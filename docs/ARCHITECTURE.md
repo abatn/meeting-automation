@@ -1,8 +1,8 @@
 # System Architecture for Meeting Automation System
 
-## ✅ CURRENT STATUS — 2026-06-24: PIPELINE OPERATIONAL
+## ✅ CURRENT STATUS — 2026-06-25: PIPELINE OPERATIONAL
 
-**Staging Pipeline Verified | ~31s End-to-End**
+**Staging Pipeline Verified | ~31s End-to-End | Phase 75**
 
 All critical architectural components validated:
 - Multi-tenant data isolation ✅
@@ -343,12 +343,15 @@ graph TB
 
 - **Technology**: n8n (Node.js based workflow automation tool).
 - **Purpose**: Automates complex business workflows and integrates with various external services.
+- **Status**: 6 active workflows (Phase 75). Automation API requires `?client_id=` parameter.
+- **Note**: n8n only activates 3/7 workflows on startup — others need `POST /api/v1/workflows/{id}/activate`. DB changes don't propagate to in-memory state — DELETE + RE-IMPORT required.
 - **Key Workflows**:
-    - `meeting-created.json`: Triggered when a new meeting is created.
-    - `audio-uploaded.json`: Triggered after a recording is uploaded.
-    - `pv-validated.json`: Triggered when a PV is validated.
-    - `daily-reminders.json`: Sends daily reminders via WhatsApp/Email.
-    - `user-invited.json`: Enterprise Onboarding workflow (Way B). Sends tokenized activation links to new employees.
+    - `meeting-created` (ID: `uB0bPHLt0FNxsaBe`): Triggered when a new meeting is created.
+    - `pv-validated` (ID: `o9NXKZqiDnksQeO3`): Triggered when a PV is validated.
+    - `transcription-completed` (ID: `00tDUsvHjpnWD6oG`): Triggered after transcription completes.
+    - `meeting-status-changed` (ID: `6jsJVqySI9VpnvoO`): Sends status notifications.
+    - `daily-reminders` (ID: `GpER66AvYwapRNP4`): Sends daily reminders via WhatsApp/Email (cron-triggered).
+    - `user-invited` (ID: `CqkpcBkdkXlJtZbo`): Enterprise Onboarding workflow (Way B).
 - **Integration**: Connects to the Backend API via webhooks and external APIs.
 
 ### 3.5. Infrastructure
@@ -357,15 +360,20 @@ graph TB
 - **Kubernetes**: Orchestrates containerized applications in production environments.
 - **Minio (S3-compatible Object Storage)**: Stores meeting recordings and other large files.
 
-### 3.6. OnlyOffice (Document Editing)
+### 3.6. OnlyOffice (Document Editing + PDF Konvertierung)
 
-- **Technology**: OnlyOffice Document Server
-- **Purpose**: Provides online document editing capabilities for meeting transcripts, PVs, and other documents.
+- **Technology**: OnlyOffice Document Server v9.4.0
+- **Purpose**: Online document editing + PDF/DOCX conversion für PV-Dokumente
 - **Key Features**:
-    - Real-time collaborative editing of documents, spreadsheets, and presentations
-    - Support for DOCX, XLSX, PPTX, ODT, ODS, ODP, PDF, and more
-    - Integration with the backend via JWT for secure document access
-    - Used for viewing and editing meeting transcriptions and generated PVs
+    - Real-time collaborative editing via Socket.IO (`/doc/` Pfad)
+    - Document Editor mit `documentType: "word"` (Phase 64)
+    - Forcesave via Editor-Config (`forcesave: true`)
+    - PDF-Konvertierung: DOCX → PDF via OnlyOffice Converter (0.09s)
+    - HTTPS → HTTP URL-Mapping für interne Konvertierung (Phase 71)
+    - Synchroner Download: PDF in 2.2s (Phase 73)
+- **Traffic Chain**: Browser → nginx-ingress → frontend nginx (`/doc/` WebSocket) → onlyoffice internal nginx → NodeJS
+- **K8s Service**: `onlyoffice-staging:80` (ClusterIP)
+- **NetworkPolicy**: `onlyoffice-policy` — Frontend + Backend → OnlyOffice
 
 ## 4. CI/CD Pipelines (.github/workflows)
 
@@ -379,7 +387,7 @@ graph TB
 - **Data Encryption**: Fernet AES-128 for data at rest (PV, MFA secrets encrypted in PostgreSQL).
 - **Confidence Handling**: NULL confidence values default to 0.5 (neutral), not 0.0 (explicitly low).
 - **Secret Management**: K8s Secrets (not ConfigMaps) for GLADIA/MISTRAL/LIVEKIT API keys (ISO 27001 A.8.24).
-- **Network Policies**: 14 NetworkPolicies deployed in staging (ISO 27001 A.8.20):
+- **Network Policies**: 15 NetworkPolicies deployed in staging (ISO 27001 A.8.20):
   - `default-deny-all`: Blocks all ingress by default
   - `postgres-policy`: Backend, Celery, n8n → PostgreSQL
   - `redis-policy`: Backend, Celery → Redis

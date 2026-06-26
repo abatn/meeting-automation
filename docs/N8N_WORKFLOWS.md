@@ -1,8 +1,9 @@
 # n8n Workflow Integration
 
-**Last Updated:** 2026-06-24 (Phase 63)
+**Last Updated:** 2026-06-25 (Phase 75)
 **Deployment:** k3s `meeting-automation-staging` namespace
 **n8n Version:** 2.27.4
+**Client ID:** `e052b451-0cc3-4932-9c68-7c46240b1936`
 
 ## Architecture
 
@@ -25,38 +26,40 @@ Backend (FastAPI) → Webhook → n8n → SMTP/WhatsApp → External
 
 ## Active Workflows (6)
 
-### 1. User Invited (`user-invited`)
+> **Important:** Automation API requires `?client_id=` parameter. n8n only activates 3/7 workflows on startup — others need `POST /api/v1/workflows/{id}/activate`. DB changes don't propagate to n8n in-memory state — DELETE + RE-IMPORT required.
+
+### 1. User Invited (`user-invited`) — ID: `CqkpcBkdkXlJtZbo`
 - **Trigger:** Webhook `POST /webhook/user-invited`
 - **Backend Caller:** `email_tasks.py:156` (send_invitation_email)
 - **Payload:** `{email, full_name, company_name, activation_link}`
 - **Actions:** Validate payload → Send HTML invitation email via SMTP
 - **Status:** ✅ Production (fixed 2026-06-24: responseMode=onReceived, credentials fixed)
 
-### 2. Meeting Created (`meeting-created`)
+### 2. Meeting Created (`meeting-created`) — ID: `uB0bPHLt0FNxsaBe`
 - **Trigger:** Webhook `POST /webhook/meeting-created`
 - **Backend Caller:** `meeting_service.py:194`
 - **Actions:** Store metadata in `n8n_meetings` table → Send invitation email to participants
 - **Status:** ✅ Active (credentials fixed 2026-06-24)
 
-### 3. Meeting Status Changed (`meeting-status-changed`)
+### 3. Meeting Status Changed (`meeting-status-changed`) — ID: `6jsJVqySI9VpnvoO`
 - **Trigger:** Webhook `POST /webhook/meeting-status-changed`
 - **Backend Caller:** `meeting_service.py:236`
 - **Actions:** Send status notification email (in_progress/completed/cancelled)
 - **Status:** ✅ Active (credentials fixed 2026-06-24)
 
-### 4. Transcription Completed (`transcription-completed`)
+### 4. Transcription Completed (`transcription-completed`) — ID: `00tDUsvHjpnWD6oG`
 - **Trigger:** Webhook `POST /webhook/transcription-completed`
 - **Backend Caller:** `transcription_tasks.py:1147`
 - **Actions:** Fetch meeting details → Download PDF → Send as email attachment
 - **Status:** ✅ Active (credentials fixed 2026-06-24)
 
-### 5. PV Validated (`pv-validated`)
+### 5. PV Validated (`pv-validated`) — ID: `o9NXKZqiDnksQeO3`
 - **Trigger:** Webhook `POST /webhook/pv-validated`
 - **Backend Caller:** `pv_service.py:392`
 - **Actions:** Fetch meeting details → Download final PDF → Send as email attachment
 - **Status:** ✅ Active
 
-### 6. Daily Reminders (`daily-reminders`)
+### 6. Daily Reminders (`daily-reminders`) — ID: `GpER66AvYwapRNP4`
 - **Trigger:** Cron schedule (08:00 daily)
 - **Backend Caller:** None (n8n self-triggering)
 - **Actions:** Poll `/api/v1/actions/pending` → Send WhatsApp reminders → Escalate overdue tasks via email
@@ -186,6 +189,18 @@ kubectl exec -n meeting-automation-staging postgres-staging-0 -- psql -U meeting
 - **Cause:** `Respond to Webhook` node failed after SMTP succeeded
 - **Impact:** Email delivered, but n8n reports execution as error
 - **Fix:** Use `responseMode: "onReceived"` instead of `Respond to Webhook` node
+
+### 6. "ENOTFOUND" on Backend API Call
+- **Cause:** Workflow references wrong hostname (`meeting-automation-backend-1:8000`)
+- **Fix:** Update URL in n8n DB:
+  ```bash
+  kubectl exec -n meeting-automation-staging postgres-staging-0 -- psql -U meeting_user -d meeting_db_staging -c \
+    "UPDATE workflow_entity SET nodes = replace(nodes::text, 'meeting-automation-backend-1:8000', 'backend.meeting-automation-staging.svc.cluster.local:8000')::jsonb WHERE nodes::text LIKE '%meeting-automation-backend-1%';"
+  
+  # Restart n8n
+  kubectl rollout restart deployment n8n-staging -n meeting-automation-staging
+  ```
+- **Correct URL:** `backend.meeting-automation-staging.svc.cluster.local:8000`
 
 ## Testing
 
