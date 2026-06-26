@@ -23,10 +23,11 @@ from app.models.recording import Recording
 from app.models.transcription import Transcription
 from app.models.user import User
 from app.models.meeting import Meeting, MeetingStatus
+from app.models.client import Client, SubscriptionPlan
 from sqlalchemy.orm import selectinload
 from app.services.gladia_service import gladia_service
 from app.services.pv_service import PVService
-from app.services.sentinel_service import sentinel
+from app.services.sentinel_service import get_sentinel_service, reset_sentinel
 from app.services.speaker_embedding_service import speaker_embedding_service
 from app.services.speaker_profile_service import speaker_profile_service, SpeakerProfileService
 from app.services.mistral_fusion_service import mistral_fusion_service
@@ -208,6 +209,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 meeting_id=meeting_id,
                 participant_names=participant_names,
                 meeting=meeting,
+                room_participants=recording.room_participants or [],
             )
 
             # 1.6 APPLY SPEAKER NAMES TO TRANSCRIPT (Display-Kopie, Original bleibt erhalten)
@@ -226,17 +228,30 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                             seg["speaker"] = name
                 logger.info(f"Speaker names applied to display transcript: {name_map}")
 
-            # 2. MAP PHASE (Local SLM Sentinel) — verwendet DISPLAY transcript mit aufgelösten Namen
-            publish_status(recording_id, "analyzing", 45, "Local Semantic Synthesis (Qwen-1.5B)...")
+            # 2. MAP PHASE (Local SLM Sentinel) — Feature Gate by Subscription Plan
+            # GRATUIT: skip Sentinel LLM (no memory overhead, faster pipeline)
+            # PRO/ENTREPRISE: full Sentinel summarization
+            client_result = await db.execute(select(Client).where(Client.id == client_id))
+            client = client_result.scalar_one_or_none()
+            plan = client.subscription_plan if client else None
 
-            # Chunking: split by time or length
-            chunks = [display_text[i:i+3000] for i in range(0, len(display_text), 3000)]
+            if plan == SubscriptionPlan.GRATUIT:
+                logger.info(f"GRATUIT plan detected — skipping Sentinel LLM for recording {recording_id}")
+                publish_status(recording_id, "analyzing", 45, "Text Synthesis (GRATUIT — no Sentinel)...")
+                # Fallback: use truncated display text as summary (no LLM overhead)
+                sentinel_summary = display_text[:3000] + ("..." if len(display_text) > 3000 else "")
+            else:
+                logger.info(f"Plan {plan} — using Sentinel LLM for recording {recording_id}")
+                publish_status(recording_id, "analyzing", 45, "Local Semantic Synthesis (Qwen-1.5B)...")
 
-            # Parallel Map execution
-            map_tasks = [sentinel.summarize_chunk(chunk) for chunk in chunks]
-            partial_summaries = await asyncio.gather(*map_tasks)
+                # Chunking: split by time or length
+                chunks = [display_text[i:i+3000] for i in range(0, len(display_text), 3000)]
 
-            sentinel_summary = "\n---\n".join(partial_summaries)
+                # Parallel Map execution
+                map_tasks = [get_sentinel_service().summarize_chunk(chunk) for chunk in chunks]
+                partial_summaries = await asyncio.gather(*map_tasks)
+
+                sentinel_summary = "\n---\n".join(partial_summaries)
 
             # 3. REDUCE PHASE (Mistral) — dual context: Summary + Full Transcript (DISPLAY mit Namen)
             publish_status(recording_id, "analyzing", 75, "Final Protocol Refinement (Mistral)...")
@@ -318,6 +333,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             except Exception as e:
                 logger.warning(f"Failed to delete temp file {temp_path}: {e}")
         cleanup_redis_pool()
+        reset_sentinel()
 
 async def _match_speaker_to_participant(
     speaker_label: str,
@@ -410,12 +426,14 @@ async def _identify_speakers(
     meeting_id: str,
     participant_names: List[str],
     meeting=None,
+    room_participants: Optional[List[Dict]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Intelligent Speaker Identification Pipeline with parallel processing.
 
     Flow:
-    0. Deterministic heuristic (participant matching, creator detection)
+    0. LIVEKIT IDENTITY (Phase 79): Match via room participant identity
+    0b. Deterministic heuristic (participant matching, creator detection)
     1. Build candidate list from meeting participants + enrolled ONNX profiles
     2. Extract ONNX embedding per speaker (in parallel where possible)
     3. Match against enrolled profiles (cosine distance)
@@ -429,6 +447,8 @@ async def _identify_speakers(
     Returns:
         List of speaker mapping dicts for downstream use.
     """
+    if room_participants is None:
+        room_participants = []
     segments = gladia_result.get("segments", [])
     if not segments:
         logger.warning("No segments found for speaker identification")
@@ -466,7 +486,41 @@ async def _identify_speakers(
             # Collect ALL signals (no short-circuit)
             signals = []
 
-            # SIGNAL 0: Deterministic Heuristic (participant matching, creator detection)
+            # SIGNAL 0: LIVEKIT IDENTITY (Phase 79) — room participants identity
+            if room_participants:
+                rp_names = [rp.get("name", "") for rp in room_participants if rp.get("name")]
+                rp_user_ids = [rp.get("user_id", "") for rp in room_participants if rp.get("user_id")]
+
+                # If only 1 room participant and this is the first speaker → high confidence match
+                if len(room_participants) == 1 and speaker_index == 0:
+                    rp = room_participants[0]
+                    signals.append({
+                        "source": "livekit_identity",
+                        "name": rp["name"],
+                        "score": 0.95,
+                        "user_id": rp.get("user_id"),
+                    })
+                    logger.info(
+                        f"LiveKit Identity: {speaker_label} → {rp['name']} "
+                        f"(single room participant, score=0.95)"
+                    )
+
+                # If speaker text mentions a room participant name → match
+                for rp in room_participants:
+                    rp_name = rp.get("name", "")
+                    if rp_name and rp_name.lower() in text_context.lower():
+                        signals.append({
+                            "source": "livekit_identity",
+                            "name": rp_name,
+                            "score": 0.90,
+                            "user_id": rp.get("user_id"),
+                        })
+                        logger.info(
+                            f"LiveKit Identity: {speaker_label} mentions {rp_name} in speech (score=0.90)"
+                        )
+                        break
+
+            # SIGNAL 1: Deterministic Heuristic (participant matching, creator detection)
             heuristic_name = await _match_speaker_to_participant(
                 speaker_label=speaker_label,
                 speaker_segments=speaker_segments,

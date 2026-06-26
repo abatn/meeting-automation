@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy import String, ForeignKey, DateTime, Integer, Float, Index
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -36,6 +37,7 @@ class Recording(Base):
     )  # everyone, organizer_only, specific_people
     error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     egress_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    room_participants: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

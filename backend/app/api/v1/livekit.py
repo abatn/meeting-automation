@@ -145,6 +145,9 @@ async def start_livekit_recording(
     service = LiveKitService()
     file_key = f"{current_user.client_id}/recordings/{meeting_id}/{uuid.uuid4()}_livekit.ogg"
 
+    # Phase 79: Capture active room participants before starting egress
+    room_participants = await service.get_room_participants(meeting_id)
+
     async with AsyncSessionLocal() as db:
         db_recording = Recording(
             id=str(uuid.uuid4()),
@@ -153,6 +156,7 @@ async def start_livekit_recording(
             file_path=file_key,
             status="streaming",
             format="audio/ogg",
+            room_participants=room_participants,
             created_at=datetime.now(timezone.utc),
         )
         db.add(db_recording)

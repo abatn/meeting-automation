@@ -105,3 +105,34 @@ class LiveKitService:
         req.active = True
         response = await self.api.egress.list_egress(req)
         return list(response.items)
+
+    async def get_room_participants(self, meeting_id: str) -> list:
+        """List active participants in a LiveKit room.
+
+        Returns a list of dicts: [{"identity": str, "name": str, "user_id": str}, ...]
+        The identity format is ``{user_id}_{hex4}`` (see generate_token).
+        """
+        try:
+            from livekit.protocol.room import ListRoomsRequest, Room
+            req = ListRoomsRequest()
+            req.names.append(meeting_id)
+            resp = await self.api.room.list_rooms(req)
+            if not resp.rooms:
+                logger.warning(f"No LiveKit room found for {meeting_id}")
+                return []
+
+            room = resp.rooms[0]
+            participants = []
+            for p in room.participants:
+                identity = p.identity or ""
+                user_id = identity.split("_")[0] if "_" in identity else identity
+                participants.append({
+                    "identity": identity,
+                    "name": p.name or user_id,
+                    "user_id": user_id,
+                })
+            logger.info(f"LiveKit room {meeting_id}: {len(participants)} participants")
+            return participants
+        except Exception as e:
+            logger.warning(f"Failed to get LiveKit room participants: {e}")
+            return []
