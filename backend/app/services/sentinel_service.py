@@ -1,3 +1,4 @@
+import gc
 import logging
 import os
 import asyncio
@@ -73,4 +74,27 @@ class SentinelService:
             
         return response["choices"][0]["text"].strip()
 
-sentinel = SentinelService()
+# Lazy singleton: only loads Qwen-1.5B when first accessed
+_sentinel_instance: SentinelService | None = None
+
+
+def get_sentinel_service() -> SentinelService:
+    """Return the singleton SentinelService, creating it on first call.
+
+    Workers 2-4 avoid importing the ~1.5 GB Qwen model at startup.
+    The model is loaded once on first ``summarize_chunk`` call and reused.
+    """
+    global _sentinel_instance
+    if _sentinel_instance is None:
+        _sentinel_instance = SentinelService()
+    return _sentinel_instance
+
+
+def reset_sentinel() -> None:
+    """Release the SentinelService singleton and its LLM memory."""
+    global _sentinel_instance
+    if _sentinel_instance is not None:
+        if hasattr(_sentinel_instance, "llm") and _sentinel_instance.llm is not None:
+            del _sentinel_instance.llm
+        _sentinel_instance = None
+        gc.collect()

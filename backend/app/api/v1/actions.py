@@ -314,12 +314,13 @@ async def list_team_actions(
 
 @router.get("/pending", response_model=List[ActionAutomation])
 async def get_pending_actions_for_automation(
+    client_id: str,
     db: AsyncSession = Depends(deps.get_db),
     api_key_valid: bool = Depends(deps.verify_internal_api_key),
 ) -> Any:
     """
     Retrieve all pending action items with enriched contact info for N8N automation.
-    Protected by X-Internal-API-Key.
+    Protected by X-Internal-API-Key. Requires client_id query parameter.
     """
     from sqlalchemy.orm import joinedload
     from app.models.user import User as UserModel
@@ -331,6 +332,7 @@ async def get_pending_actions_for_automation(
             joinedload(ActionModel.assignments).joinedload(AssignmentModel.user)
         )
         .where(ActionModel.status == DB_ActionStatus.PENDING)
+        .where(ActionModel.client_id == client_id)
     )
     result = await db.execute(stmt)
     actions = result.scalars().unique().all()

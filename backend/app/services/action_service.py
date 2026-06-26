@@ -965,12 +965,12 @@ Example format:
             logger.error(f"Failed to translate suggestions: {e}")
             return suggestions_data
 
-    async def get_due_actions(self) -> List[Action]:
+    async def get_due_actions(self, client_id: str) -> List[Action]:
         """Für tägliche Reminder (via Celery)"""
         tomorrow = datetime.now(timezone.utc) + timedelta(days=1)
         result = await self.db.execute(
             select(Action).where(
-                Action.due_date <= tomorrow, Action.status != "COMPLETED"
+                Action.due_date <= tomorrow, Action.status != "COMPLETED", Action.client_id == client_id
             )
         )
         return list(result.scalars().all())

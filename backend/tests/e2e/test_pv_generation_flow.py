@@ -88,6 +88,7 @@ async def test_validate_pv(
 ):
     """
     E2E: Validate a PV (sets is_validated=True).
+    Note: n8n notification is tested in staging only (HTTP server is a separate process).
     """
     pv_id = e2e_pv["id"]
     resp = await e2e_client.post(f"/api/v1/pv/{pv_id}/validate")
@@ -103,6 +104,38 @@ async def test_validate_pv(
     pv = result.scalar_one()
     assert pv.is_validated is True
     assert pv.validated_by_id is not None
+
+
+@pytest.mark.asyncio
+@pytest.mark.e2e
+async def test_validate_pv_response_status(
+    e2e_client: AsyncClient,
+    e2e_pv: dict
+):
+    """
+    E2E: Validate returns correct status in response body.
+    """
+    pv_id = e2e_pv["id"]
+    resp = await e2e_client.post(f"/api/v1/pv/{pv_id}/validate")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "published"
+
+
+@pytest.mark.asyncio
+@pytest.mark.e2e
+async def test_validate_pv_idempotent(
+    e2e_client: AsyncClient,
+    e2e_pv: dict
+):
+    """
+    E2E: Validating an already-validated PV should still return 200.
+    """
+    pv_id = e2e_pv["id"]
+    resp1 = await e2e_client.post(f"/api/v1/pv/{pv_id}/validate")
+    assert resp1.status_code == 200
+    resp2 = await e2e_client.post(f"/api/v1/pv/{pv_id}/validate")
+    assert resp2.status_code == 200
 
 
 @pytest.mark.asyncio
