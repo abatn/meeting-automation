@@ -109,21 +109,22 @@ class LiveKitService:
     async def get_room_participants(self, meeting_id: str) -> list:
         """List active participants in a LiveKit room.
 
-        Returns a list of dicts: [{"identity": str, "name": str, "user_id": str}, ...]
-        The identity format is ``{user_id}_{hex4}`` (see generate_token).
+        Uses ``ListParticipantsRequest`` to query the server for all participants
+        currently in the room. Each ``ParticipantInfo`` carries the identity set
+        during token generation (``{user_id}_{hex4}``).
+
+        Returns:
+            list[dict]: [{"identity": str, "name": str, "user_id": str}, ...]
         """
         try:
-            from livekit.protocol.room import ListRoomsRequest, Room
-            req = ListRoomsRequest()
-            req.names.append(meeting_id)
-            resp = await self.api.room.list_rooms(req)
-            if not resp.rooms:
-                logger.warning(f"No LiveKit room found for {meeting_id}")
-                return []
+            from livekit.protocol.room import ListParticipantsRequest
 
-            room = resp.rooms[0]
+            req = ListParticipantsRequest()
+            req.room = meeting_id
+            resp = await self.api.room.list_participants(req)
+
             participants = []
-            for p in room.participants:
+            for p in resp.participants:
                 identity = p.identity or ""
                 user_id = identity.split("_")[0] if "_" in identity else identity
                 participants.append({
