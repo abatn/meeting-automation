@@ -25,7 +25,7 @@ class GladiaService:
         self.api_key = settings.GLADIA_API_KEY
         self.base_url = "https://api.gladia.io/v2"
 
-    async def transcribe_and_diarize(self, audio_file_path: str) -> dict:
+    async def transcribe_and_diarize(self, audio_file_path: str, num_room_participants: int = 0) -> dict:
         """
         Implements the correct 3-step Gladia V2 process:
         1. Upload file to get audio_url.
@@ -61,7 +61,10 @@ class GladiaService:
                 logger.info("Step 2/3: Requesting transcription with diarization...")
                 payload = {
                     "audio_url": audio_url,
-                    "diarization": True
+                    "diarization": True,
+                    "diarization_config": {
+                        "min_speakers": min(num_room_participants, 2) if num_room_participants > 0 else 2,
+                    },
                 }
                 transcribe_response = await client.post(
                     f"{self.base_url}/pre-recorded", headers=headers, json=payload, timeout=60.0

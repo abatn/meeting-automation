@@ -186,8 +186,9 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 )
 
             # 1. GLADIA PHASE (Diarization)
+            num_participants = len(recording.room_participants or [])
             publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
-            gladia_result = await gladia_service.transcribe_and_diarize(temp_path)
+            gladia_result = await gladia_service.transcribe_and_diarize(temp_path, num_room_participants=num_participants)
 
             # 1.5 SPEAKER IDENTIFICATION PHASE (Audio + Text Fusion)
             publish_status(recording_id, "transcribing", 30, "Identifying Speakers...")
@@ -703,28 +704,28 @@ async def _identify_speakers(
                 "method": "error",
             }
 
-    # Process speakers with limited concurrency (max 3 at a time to avoid resource exhaustion)
+    # Process speakers: sequential for 5+ speakers (avoids OOM from parallel ONNX),
+    # batched for fewer speakers (keeps throughput)
     
-    # Process in batches of 3 to balance parallelism with resource constraints
-    batch_size = 3
+    total_speakers = len(speaker_list)
     all_mappings = []
     
-    for i in range(0, len(speaker_list), batch_size):
-        batch = speaker_list[i:i+batch_size]
-        tasks = []
-        
-        for j, (speaker_label, speaker_segments) in enumerate(batch):
-            speaker_index = i + j
-            task = process_single_speaker(speaker_index, speaker_label, speaker_segments)
-            tasks.append(task)
-        
-        # Wait for batch to complete
-        batch_results = await asyncio.gather(*tasks)
-        all_mappings.extend(batch_results)
-        
-        # Small delay between batches to prevent resource exhaustion
-        if i + batch_size < len(speaker_list):
-            await asyncio.sleep(0.1)
+    if total_speakers >= 5:
+        # Large meeting: process sequentially to avoid memory spikes
+        logger.info(f"Large meeting ({total_speakers} speakers): sequential processing to avoid OOM")
+        for i, (speaker_label, speaker_segments) in enumerate(speaker_list):
+            result = await process_single_speaker(i, speaker_label, speaker_segments)
+            all_mappings.append(result)
+    else:
+        # Small meeting: batch processing for speed
+        batch_size = 3
+        for i in range(0, total_speakers, batch_size):
+            batch = speaker_list[i:i+batch_size]
+            tasks = [process_single_speaker(i + j, sl, segs) for j, (sl, segs) in enumerate(batch)]
+            batch_results = await asyncio.gather(*tasks)
+            all_mappings.extend(batch_results)
+            if i + batch_size < total_speakers:
+                await asyncio.sleep(0.1)
 
     return all_mappings
 
