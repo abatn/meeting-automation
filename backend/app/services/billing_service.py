@@ -22,9 +22,9 @@ stripe.api_key = settings.STRIPE_API_KEY
 
 # Fallback values if CMS pricing_plans not found
 DEFAULT_PLAN_CONFIG = {
-    "GRATUIT": {"minutes": 600, "price": 0.0},
-    "PRO": {"minutes": 3000, "price": 99.0},
-    "ENTREPRISE": {"minutes": 12000, "price": 499.0}
+    "GRATUIT": {"minutes": 120, "price": 0.0},
+    "PRO": {"minutes": 1800, "price": 99.0},
+    "ENTREPRISE": {"minutes": 3600, "price": 499.0}
 }
 
 

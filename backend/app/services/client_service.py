@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 # Fallback values if CMS pricing_plans not found
 DEFAULT_PLAN_MINUTES = {
-    SubscriptionPlan.GRATUIT: 600,    # 10 hours
-    SubscriptionPlan.PRO: 3000,       # 50 hours
-    SubscriptionPlan.ENTREPRISE: 12000  # 200 hours
+    SubscriptionPlan.GRATUIT: 120,    # 2 hours (matches Teams Free limit)
+    SubscriptionPlan.PRO: 1800,       # 30 hours (matches Microsoft Teams Pro)
+    SubscriptionPlan.ENTREPRISE: 3600  # 60 hours (2x Teams Enterprise)
 }
 
 
