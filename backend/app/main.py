@@ -46,6 +46,9 @@ async def lifespan(app: FastAPI):
     # Ensure S3 Buckets exist (Auto-Healing)
     await ensure_s3_buckets_exist()
 
+    # Ensure CMS Pricing Plans are populated (Auto-Healing)
+    await ensure_pricing_plans_exist()
+
     # Start Redis WebSocket Listener task
     asyncio.create_task(manager.listen_to_redis())
 
@@ -90,6 +93,79 @@ async def ensure_s3_buckets_exist():
                     logger.error(f"Failed to create bucket '{bucket}': {ce}")
             else:
                 logger.error(f"Error checking S3 bucket '{bucket}': {e}")
+
+async def ensure_pricing_plans_exist():
+    """Populates CMS pricing_plans table if empty (single source of truth)."""
+    import uuid as _uuid
+    from sqlalchemy import select, func
+    from app.core.database import AsyncSessionLocal
+    from app.models.cms import PricingPlan
+
+    async with AsyncSessionLocal() as db:
+        count = await db.scalar(select(func.count()).select_from(PricingPlan))
+        if count and count > 0:
+            logger.info(f"CMS pricing_plans: {count} rows exist.")
+            return
+
+        logger.info("CMS pricing_plans empty — populating defaults...")
+        plans = [
+            {
+                "id": str(_uuid.uuid4()),
+                "name": {"en": "Gratuit", "fr": "Gratuit", "ar": "مجاني"},
+                "plan_code": "GRATUIT",
+                "price_monthly": 0,
+                "price_yearly": 0,
+                "minutes_included": 120,
+                "features": [
+                    {"en": "Basic Transcription", "fr": "Transcription de base"},
+                    {"en": "1 PV per meeting", "fr": "1 PV par réunion"},
+                    {"en": "Email notifications", "fr": "Notifications par email"},
+                ],
+                "is_popular": False,
+                "order": 1,
+                "is_active": True,
+            },
+            {
+                "id": str(_uuid.uuid4()),
+                "name": {"en": "Pro", "fr": "Pro"},
+                "plan_code": "PRO",
+                "price_monthly": 99,
+                "price_yearly": 990,
+                "minutes_included": 1800,
+                "features": [
+                    {"en": "Sentinel LLM Summarization", "fr": "Résumé par Sentinel LLM"},
+                    {"en": "Speaker Voice ID", "fr": "Identification vocale"},
+                    {"en": "PDF Export", "fr": "Export PDF"},
+                    {"en": "Advanced Analytics", "fr": "Analyses avancées"},
+                ],
+                "is_popular": True,
+                "order": 2,
+                "is_active": True,
+            },
+            {
+                "id": str(_uuid.uuid4()),
+                "name": {"en": "Enterprise", "fr": "Entreprise"},
+                "plan_code": "ENTREPRISE",
+                "price_monthly": 499,
+                "price_yearly": 4990,
+                "minutes_included": 3600,
+                "features": [
+                    {"en": "Everything in Pro", "fr": "Tout dans Pro"},
+                    {"en": "Meeting Analytics", "fr": "Analytiques de réunion"},
+                    {"en": "Voice Biometric Auth", "fr": "Authentification biométrique vocale"},
+                    {"en": "External Speaker CRM", "fr": "CRM intervenants externes"},
+                    {"en": "Priority Support", "fr": "Support prioritaire"},
+                ],
+                "is_popular": False,
+                "order": 3,
+                "is_active": True,
+            },
+        ]
+        for plan in plans:
+            db.add(PricingPlan(**plan))
+        await db.commit()
+        logger.info("CMS pricing_plans: 3 plans created (GRATUIT/PRO/ENTREPRISE).")
+
 
 app = FastAPI(
     title="Meeting Automation API",
