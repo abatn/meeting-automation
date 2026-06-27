@@ -374,9 +374,9 @@
     "proPlan": "Pro Plan",
     "enterprisePlan": "Enterprise",
     "unlimitedMeetings": "Unlimited Meetings",
-    "proHours": "50h Transcription",
+    "proHours": "30h Transcription",
     "dedicatedSupport": "Dedicated Support",
-    "entHours": "200h Transcription",
+    "entHours": "60h Transcription",
     "upgradeNow": "Upgrade Now",
     "contactSales": "Contact Sales",
     "invoiceHistory": "Invoice History",
@@ -458,7 +458,7 @@
       "start_pro": "Start Pro",
       "start_enterprise": "Start Enterprise",
       "starter_feats": [
-        "10 meetings / mo",
+        "2h Transcription / mo",
         "Standard Transcription"
       ],
       "pro_feats": [

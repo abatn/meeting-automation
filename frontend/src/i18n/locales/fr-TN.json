@@ -375,9 +375,9 @@
     "proPlan": "Forfait Pro",
     "enterprisePlan": "Entreprise",
     "unlimitedMeetings": "Réunions illimitées",
-    "proHours": "50h de transcription",
+    "proHours": "30h de transcription",
     "dedicatedSupport": "Support dédié",
-    "entHours": "200h de transcription",
+    "entHours": "60h de transcription",
     "upgradeNow": "Mettre à niveau",
     "contactSales": "Contacter les ventes",
     "invoiceHistory": "Historique des factures",
@@ -459,7 +459,7 @@
       "start_pro": "Commencer Pro",
       "start_enterprise": "Commencer Entreprise",
       "starter_feats": [
-        "10 réunions / mois",
+        "2h de transcription / mois",
         "Transcription Standard"
       ],
       "pro_feats": [

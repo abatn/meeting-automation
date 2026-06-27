@@ -369,9 +369,9 @@
     "proPlan": "الباقة الاحترافية",
     "enterprisePlan": "باقة الشركات",
     "unlimitedMeetings": "اجتماعات غير محدودة",
-    "proHours": "50 ساعة نسخ",
+    "proHours": "30 ساعة نسخ",
     "dedicatedSupport": "دعم مخصص",
-    "entHours": "200 ساعة نسخ",
+    "entHours": "60 ساعة نسخ",
     "upgradeNow": "ترقية الآن",
     "contactSales": "تواصل مع المبيعات",
     "invoiceHistory": "سجل الفواتير",
@@ -453,7 +453,7 @@
       "start_pro": "ابدأ الاحترافي",
       "start_enterprise": "ابدأ المؤسسي",
       "starter_feats": [
-        "10 اجتماعات / شهر",
+        "2 ساعة نسخ / شهر",
         "نسخ قياسي"
       ],
       "pro_feats": [
