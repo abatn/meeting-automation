@@ -460,17 +460,26 @@
       "start_enterprise": "Commencer Entreprise",
       "starter_feats": [
         "2h de transcription / mois",
-        "Transcription Standard"
-      ],
-      "pro_feats": [
-        "Réunions illimitées",
-        "IA Haute Précision",
+        "Réunions WebRTC LiveKit",
+        "Reconnaissance vocale IA",
         "Export PDF"
       ],
+      "pro_feats": [
+        "30h de transcription / mois",
+        "Résumé Sentinel LLM",
+        "Inscription vocale ONNX",
+        "CRM Intervenants externes",
+        "Export PDF + DOCX",
+        "Collaboration OnlyOffice"
+      ],
       "ent_feats": [
+        "60h de transcription / mois",
+        "Tableau de bord Analytiques",
+        "Auth biométrique vocale",
+        "CRM Intervenants externes",
         "Hébergement dédié",
-        "Pack ISO 27001",
-        "Support SLA"
+        "Pack Conformité ISO 27001",
+        "Support Prioritaire"
       ]
     },
     "footer": {

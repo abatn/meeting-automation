@@ -459,16 +459,25 @@
       "start_enterprise": "Start Enterprise",
       "starter_feats": [
         "2h Transcription / mo",
-        "Standard Transcription"
+        "LiveKit WebRTC Meetings",
+        "AI Speaker Recognition",
+        "PDF Document Export"
       ],
       "pro_feats": [
-        "Unlimited meetings",
-        "High-Precision AI",
-        "PDF Export"
+        "30h Transcription / mo",
+        "Sentinel LLM Summarization",
+        "ONNX Voice Enrollment",
+        "External Speaker CRM",
+        "PDF + DOCX Export",
+        "OnlyOffice Collaboration"
       ],
       "ent_feats": [
-        "Dedicated hosting",
-        "ISO 27001 Package",
+        "60h Transcription / mo",
+        "Meeting Analytics Dashboard",
+        "Voice Biometric Auth",
+        "External Speaker CRM",
+        "Dedicated Hosting",
+        "ISO 27001 Compliance Package",
         "SLA Support"
       ]
     },
