@@ -1,0 +1,56 @@
+# CloudNativePG Operator Installation (nach Node 2)
+# helm repo add cnpg https://cloudnative-pg.github.io/charts
+# helm upgrade --install cnpg cnpg/cloudnative-pg --namespace cnpg-system --create-namespace
+
+# PostgreSQL Cluster mit 2 Repliken
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: meeting-db
+  namespace: meeting-automation-staging
+spec:
+  instances: 2
+  primaryUpdateStrategy: unsupervised
+  
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "128MB"
+      effective_cache_size: "512MB"
+      work_mem: "4MB"
+      maintenance_work_mem: "64MB"
+    
+  bootstrap:
+    initdb:
+      database: meeting_db_staging
+      owner: meeting_user
+      secret:
+        name: postgres-secrets
+  
+  storage:
+    size: 10Gi
+    storageClass: longhorn
+  
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://backups/postgres/
+      endpointURL: http://minio-staging.meeting-automation-staging.svc.cluster.local:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio-secrets
+          key: MINIO_ACCESS_KEY
+        secretAccessKey:
+          name: minio-secrets
+          key: MINIO_SECRET_KEY
+    retentionPolicy: "30d"
+  
+  monitoring:
+    enablePodMonitor: false
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
