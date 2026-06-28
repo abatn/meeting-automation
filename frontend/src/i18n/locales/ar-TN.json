@@ -408,6 +408,7 @@
     "nav": {
       "features": "الميزات",
       "pricing": "الأسعار",
+      "contact": "اتصل بنا",
       "faq": "FAQ",
       "login": "دخول",
       "start": "ابدأ مجاناً",
@@ -479,7 +480,20 @@
     "footer": {
       "copyright": "© 2026 Meeting Automation.",
       "privacy": "الخصوصية",
-      "terms": "الشروط"
+      "terms": "الشروط",
+      "contact": "اتصل بنا"
+    },
+    "contact": {
+      "title": "اتصل بنا",
+      "subtitle": "نرد عليكم عادةً خلال 24 ساعة.",
+      "email_label": "البريد الإلكتروني",
+      "phone_label": "الهاتف",
+      "message_section": "أرسل لنا رسالة",
+      "name_label": "الاسم",
+      "email_field": "بريدك الإلكتروني",
+      "message_label": "الرسالة",
+      "send": "إرسال",
+      "close": "إغلاق"
     },
     "trust": {
       "title": "بنية تحتية موثوقة للمؤسسات",

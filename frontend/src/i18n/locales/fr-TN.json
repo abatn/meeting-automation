@@ -414,6 +414,7 @@
     "nav": {
       "features": "Fonctionnalités",
       "pricing": "Tarifs",
+      "contact": "Contact",
       "faq": "FAQ",
       "login": "Connexion",
       "start": "Démarrer",
@@ -485,7 +486,20 @@
     "footer": {
       "copyright": "© 2026 Meeting Automation.",
       "privacy": "Confidentialité",
-      "terms": "Conditions"
+      "terms": "Conditions",
+      "contact": "Contact"
+    },
+    "contact": {
+      "title": "Contactez-nous",
+      "subtitle": "Nous vous répondrons sous 24 heures.",
+      "email_label": "Email",
+      "phone_label": "Téléphone",
+      "message_section": "Envoyez-nous un message",
+      "name_label": "Nom",
+      "email_field": "Votre email",
+      "message_label": "Message",
+      "send": "Envoyer",
+      "close": "Fermer"
     },
     "trust": {
       "title": "ARCHITECTURE D'ENTREPRISE SÉCURISÉE",

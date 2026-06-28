@@ -300,7 +300,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             )
 
             publish_status(recording_id, "completed", 100, "ISS Synthesis Successful (33.3s target).")
-            await _notify_n8n_completion(str(recording.id), str(recording.meeting_id))
+            await _notify_n8n_completion(str(recording.id), str(recording.meeting_id), client_id)
 
     except Exception as e:
         logger.error(f"Pipeline failed for recording {recording_id}: {str(e)}", exc_info=True)
@@ -1196,10 +1196,10 @@ async def _save_pv_and_actions(db, recording, pv_data, language="fr", speaker_ma
         user_agent="celery",
     )
 
-async def _notify_n8n_completion(recording_id, meeting_id):
+async def _notify_n8n_completion(recording_id, meeting_id, client_id):
     try:
         async with httpx.AsyncClient() as client:
-            await client.post(settings.N8N_WEBHOOK_TRANSCRIPTION_COMPLETED, json={"event": "transcription.completed", "recording_id": recording_id, "meeting_id": meeting_id})
+            await client.post(settings.N8N_WEBHOOK_TRANSCRIPTION_COMPLETED, json={"event": "transcription.completed", "recording_id": recording_id, "meeting_id": meeting_id, "client_id": client_id})
     except Exception: pass
 
 @celery_app.task(

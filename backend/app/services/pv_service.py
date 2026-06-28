@@ -385,7 +385,7 @@ The output MUST be a valid JSON object with the identical structure as the input
         return pv
 
     async def _notify_validation(self, pv: PV):
-        payload = {"event": "pv.validated", "pv_id": pv.id, "meeting_id": pv.meeting_id}
+        payload = {"event": "pv.validated", "pv_id": pv.id, "meeting_id": pv.meeting_id, "client_id": pv.client_id}
         try:
             async with httpx.AsyncClient() as client:
                 await client.post(

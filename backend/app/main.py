@@ -27,6 +27,7 @@ from app.api.v1 import (
     audit,
     cms,
     livekit,
+    contact,
 )
 from app.core.websocket import manager
 import asyncio
@@ -236,6 +237,7 @@ app.include_router(rooms.router, prefix="/api/v1/rooms", tags=["Meeting Rooms"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit Logging"])
 app.include_router(webhooks_stripe.router, prefix="/api/v1/webhooks/stripe", tags=["Stripe Webhooks"])
 app.include_router(cms.router, prefix="/api/v1/cms", tags=["CMS"])
+app.include_router(contact.router, prefix="/api/v1", tags=["Contact"])
 app.include_router(livekit.router, prefix="/api/v1", tags=["LiveKit"])
 
 if __name__ == "__main__":

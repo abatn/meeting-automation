@@ -176,6 +176,7 @@ class MeetingService:
 
         payload = {
             "id": meeting.id,
+            "client_id": meeting.client_id,
             "title": meeting.title,
             "description": meeting.description,
             "location": meeting.location,
@@ -224,6 +225,7 @@ class MeetingService:
         """Triggert n8n Webhook für Statusänderungen"""
         payload = {
             "meeting_id": meeting.id,
+            "client_id": meeting.client_id,
             "status": meeting.status,
             "previous_status": previous_status,
             "attendees": [p.email for p in meeting.participants],

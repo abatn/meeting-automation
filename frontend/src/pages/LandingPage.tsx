@@ -3,19 +3,23 @@ import {
   Box, Container, Typography, Button, Grid, Stack,
   AppBar, Toolbar, Link as MuiLink, Divider,
   Menu, MenuItem, CssBaseline, Chip, Avatar,
-  IconButton, useTheme, useMediaQuery, Drawer, List, ListItem, ListItemText
+  IconButton, useTheme, useMediaQuery, Drawer, List, ListItem, ListItemText,
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField,
+  Snackbar, Alert
 } from '@mui/material';
 import { 
   AutoFixHigh as IAIcon, GraphicEq as VoiceIcon,
   CheckCircle as CheckIcon, Security as ShieldIcon, 
   WhatsApp as WhatsAppIcon, Public as GlobalIcon,
   Description as EditIcon, Translate as TranslateIcon, 
-  Memory as ChipIcon, Menu as MenuIcon
+  Memory as ChipIcon, Menu as MenuIcon,
+  Mail as MailIcon, Phone as PhoneIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import cmsService from '../services/cms';
+import api from '../services/api';
 
 const fadeIn = {
   hidden: { opacity: 0, y: 15 },
@@ -32,6 +36,11 @@ const LandingPage: React.FC = () => {
 
   const [anchorElLang, setAnchorElLang] = useState<null | HTMLElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
+  const [contactSending, setContactSending] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMsg, setSnackbarMsg] = useState('');
   const [pricingPlans, setPricingPlans] = useState<Record<string, number>>({
     GRATUIT: 0,
     PRO: 99,
@@ -45,6 +54,29 @@ const LandingPage: React.FC = () => {
     i18n.changeLanguage(lng);
     handleCloseLangMenu();
     setMobileMenuOpen(false);
+  };
+
+  const handleContactSend = async () => {
+    setContactSending(true);
+    try {
+      await api.post('/contact', contactForm);
+      setSnackbarMsg(i18n.language.startsWith('ar') ? 'تم الإرسال بنجاح!' : i18n.language.startsWith('fr') ? 'Envoyé avec succès !' : 'Message sent successfully!');
+      setSnackbarOpen(true);
+      setContactOpen(false);
+      setContactForm({ name: '', email: '', message: '' });
+    } catch {
+      setSnackbarMsg(i18n.language.startsWith('ar') ? 'فشل الإرسال' : i18n.language.startsWith('fr') ? "Échec de l'envoi" : 'Failed to send. Please try again.');
+      setSnackbarOpen(true);
+    } finally {
+      setContactSending(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setSnackbarMsg(i18n.language.startsWith('ar') ? 'تم النسخ!' : i18n.language.startsWith('fr') ? 'Copié !' : 'Copied!');
+      setSnackbarOpen(true);
+    });
   };
 
   // Fetch pricing from CMS API
@@ -94,8 +126,6 @@ const LandingPage: React.FC = () => {
       
       <style>
         {`
-          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;700&display=swap');
-          
           .glass-card {
             background: rgba(255, 255, 255, 0.02);
             backdrop-filter: blur(16px);
@@ -127,14 +157,15 @@ const LandingPage: React.FC = () => {
                 <IAIcon sx={{ color: '#000', fontSize: { xs: 16, md: 20 } }} />
               </Box>
               <Typography variant="h6" fontWeight="700" sx={{ letterSpacing: '-0.5px', color: 'white', fontSize: { xs: '1rem', md: '1.25rem' } }}>
-                {t('common.appNamePart1')}<Box component="span" sx={{ color: '#71717A' }}>{t('common.appNamePart2')}</Box>
+                {t('common.appNamePart1')} <Box component="span" sx={{ color: '#71717A' }}>{t('common.appNamePart2')}</Box>
               </Typography>
             </Stack>
 
             {!isMobile ? (
-              <Stack direction="row" spacing={3} alignItems="center">
+              <Stack direction="row" sx={{ gap: 3 }} alignItems="center">
                 <MuiLink component="button" onClick={() => scrollToSection('features')} sx={{ color: '#A1A1AA', textDecoration: 'none', fontWeight: 500, '&:hover': { color: '#FFF' } }}>{t('landing.nav.features')}</MuiLink>
                 <MuiLink component="button" onClick={() => scrollToSection('pricing')} sx={{ color: '#A1A1AA', textDecoration: 'none', fontWeight: 500, '&:hover': { color: '#FFF' } }}>{t('landing.nav.pricing')}</MuiLink>
+                <MuiLink component="button" onClick={() => setContactOpen(true)} sx={{ color: '#A1A1AA', textDecoration: 'none', fontWeight: 500, '&:hover': { color: '#FFF' } }}>{t('landing.nav.contact')}</MuiLink>
                 <Divider orientation="vertical" flexItem sx={{ borderColor: 'rgba(255,255,255,0.1)', height: 20 }} />
                 <Button onClick={handleOpenLangMenu} startIcon={<TranslateIcon sx={{fontSize: 18}} />} sx={{ color: '#A1A1AA', textTransform: 'none', fontWeight: 600 }}>
                   {i18n.language.split('-')[0].toUpperCase()}
@@ -185,6 +216,11 @@ const LandingPage: React.FC = () => {
                 </Button>
               </ListItem>
             ))}
+            <ListItem disablePadding sx={{ mb: 2 }}>
+              <Button fullWidth onClick={() => { setContactOpen(true); setMobileMenuOpen(false); }} sx={{ justifyContent: isRtl ? 'flex-end' : 'flex-start', color: '#A1A1AA', fontSize: '1.1rem', py: 1.5, textTransform: 'none' }}>
+                {t('landing.nav.contact')}
+              </Button>
+            </ListItem>
             <Divider sx={{ my: 3, bgcolor: 'rgba(255,255,255,0.1)' }} />
             <Typography variant="caption" sx={{ color: '#71717A', mb: 2, display: 'block', textTransform: 'uppercase' }}>{t('common.toggleLanguage')}</Typography>
             <Grid container spacing={1} sx={{ mb: 4 }}>
@@ -232,7 +268,14 @@ const LandingPage: React.FC = () => {
                   <Typography variant="h1" sx={{ 
                     fontSize: { xs: isSmallMobile ? '1.85rem' : '2.25rem', sm: '3rem', md: '4rem' }, 
                     fontWeight: 800, mb: 2.5, lineHeight: 1.1, letterSpacing: '-0.03em' 
-                  }} dangerouslySetInnerHTML={{ __html: t('landing.hero.title') }} />
+                  }}>
+                    {t('landing.hero.title').split('<br/>').map((line, i, arr) => (
+                      <React.Fragment key={i}>
+                        {line}
+                        {i < arr.length - 1 && <br />}
+                      </React.Fragment>
+                    ))}
+                  </Typography>
                 </motion.div>
                 <motion.div variants={fadeIn}>
                   <Typography variant="body1" sx={{ color: '#A1A1AA', mb: 5, fontSize: { xs: '1.05rem', md: '1.25rem' }, lineHeight: 1.6, maxWidth: 540 }}>
@@ -240,7 +283,7 @@ const LandingPage: React.FC = () => {
                   </Typography>
                 </motion.div>
                 <motion.div variants={fadeIn}>
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ gap: 2 }}>
                     <Button variant="contained" size="large" sx={{ bgcolor: '#FFF', color: '#000', borderRadius: '12px', py: { xs: 2, md: 2.5 }, px: 4, fontWeight: 800, textTransform: 'none', fontSize: '1.1rem' }} onClick={() => navigate('/register')}>{t('landing.hero.cta_primary')}</Button>
                     <Button variant="outlined" size="large" sx={{ color: '#FFF', borderColor: 'rgba(255,255,255,0.2)', borderRadius: '12px', py: { xs: 2, md: 2.5 }, px: 4, fontWeight: 700, textTransform: 'none', fontSize: '1.1rem' }}>{t('landing.hero.cta_secondary')}</Button>
                   </Stack>
@@ -248,9 +291,9 @@ const LandingPage: React.FC = () => {
               </motion.div>
             </Grid>
             <Grid item xs={12} md={6}>
-              <Box sx={{ position: 'relative', p: { xs: 0.5, md: 1.5 }, borderRadius: '32px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 90px rgba(0,0,0,0.6)' }}>
-                <Box component="img" src="/assets/landing/Automated_Meeting.png" sx={{ width: '100%', height: 'auto', borderRadius: '24px', display: 'block', maxWidth: '100%' }} alt="Dashboard" />
-              </Box>
+                <Box sx={{ position: 'relative', p: { xs: 0.5, md: 1.5 }, borderRadius: '32px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 30px 90px rgba(0,0,0,0.6)' }}>
+                  <Box component="img" src="/assets/landing/Automated_Meeting.png" sx={{ width: '100%', height: 'auto', borderRadius: '24px', display: 'block', maxWidth: '100%' }} alt={t('landing.hero.alt_dashboard')} loading="eager" />
+                </Box>
             </Grid>
           </Grid>
         </Container>
@@ -259,11 +302,11 @@ const LandingPage: React.FC = () => {
       {/* --- TRUST --- */}
       <Box sx={{ py: 6, borderY: '1px solid rgba(255,255,255,0.06)', bgcolor: 'rgba(255,255,255,0.01)' }}>
         <Container maxWidth="lg">
-          <Stack direction={{xs: 'column', md: 'row'}} spacing={{ xs: 3, md: 6 }} alignItems="center" justifyContent="center">
+          <Stack direction={{xs: 'column', md: 'row'}} sx={{ gap: { xs: 3, md: 6 } }} alignItems="center" justifyContent="center">
             <Typography variant="caption" sx={{ color: '#71717A', fontWeight: 800, letterSpacing: '0.15em', textTransform: 'uppercase' }}>
               {t('landing.trust.title')}
             </Typography>
-            <Stack direction="row" spacing={3} flexWrap="wrap" justifyContent="center" sx={{ gap: 2 }}>
+            <Stack direction="row" sx={{ gap: 3 }} flexWrap="wrap" justifyContent="center">
                {['iso', 'aes', 'gdpr'].map(item => (
                  <Chip key={item} label={t(`landing.trust.${item}`)} size="small" variant="outlined" sx={{ color: '#A1A1AA', borderColor: 'rgba(255,255,255,0.12)', py: 2, px: 1 }} />
                ))}
@@ -278,20 +321,20 @@ const LandingPage: React.FC = () => {
           <Typography variant="h2" fontWeight="800" textAlign="center" sx={{ mb: { xs: 6, md: 10 }, fontSize: { xs: '2rem', md: '3rem' }, letterSpacing: '-0.02em' }}>{t('landing.features.title')}</Typography>
           <Grid container spacing={3}>
             {[
-              { img: 'security.png', title: t('landing.features.security_title'), desc: t('landing.features.security_desc'), icon: <ShieldIcon /> },
-              { img: 'diarization.png', title: t('landing.features.diarization_title'), desc: t('landing.features.diarization_desc'), icon: <VoiceIcon /> },
-              { img: 'maghreb.png', title: t('landing.features.maghreb_title'), desc: t('landing.features.maghreb_desc'), icon: <GlobalIcon /> },
-              { img: 'automation.png', title: t('landing.features.automation_title'), desc: t('landing.features.automation_desc'), icon: <WhatsAppIcon /> }
+              { img: 'security.png', title: t('landing.features.security_title'), desc: t('landing.features.security_desc'), icon: <ShieldIcon />, alt: t('landing.features.security_title') },
+              { img: 'diarization.png', title: t('landing.features.diarization_title'), desc: t('landing.features.diarization_desc'), icon: <VoiceIcon />, alt: t('landing.features.diarization_title') },
+              { img: 'maghreb.png', title: t('landing.features.maghreb_title'), desc: t('landing.features.maghreb_desc'), icon: <GlobalIcon />, alt: t('landing.features.maghreb_title') },
+              { img: 'automation.png', title: t('landing.features.automation_title'), desc: t('landing.features.automation_desc'), icon: <WhatsAppIcon />, alt: t('landing.features.automation_title') }
             ].map((f, i) => (
               <Grid item xs={12} sm={6} key={i}>
                 <Box className="glass-card" sx={{ p: { xs: 3, md: 5 } }}>
-                  <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+                  <Stack direction="row" sx={{ gap: 2, mb: 3 }} alignItems="center">
                     <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#FFF', width: 48, height: 48, border: '1px solid rgba(255,255,255,0.1)' }}>{f.icon}</Avatar>
                     <Typography variant="h6" fontWeight="700" sx={{ fontSize: '1.2rem' }}>{f.title}</Typography>
                   </Stack>
                   <Typography variant="body2" sx={{ color: '#A1A1AA', lineHeight: 1.6, mb: 4, flexGrow: 1, fontSize: '1rem' }}>{f.desc}</Typography>
                   <Box sx={{ mt: 'auto', borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <Box component="img" src={`/assets/landing/${f.img}`} sx={{ width: '100%', height: { xs: 200, md: 240 }, objectFit: 'cover', opacity: 0.9 }} />
+                    <Box component="img" src={`/assets/landing/${f.img}`} sx={{ width: '100%', height: { xs: 200, md: 240 }, objectFit: 'cover', opacity: 0.9 }} alt={f.alt} loading="lazy" />
                   </Box>
                 </Box>
               </Grid>
@@ -358,13 +401,13 @@ const LandingPage: React.FC = () => {
                 <Box className="glass-card" sx={{ p: { xs: 4, md: 6 }, border: p.h ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
                   {p.h && <Chip label={t('landing.pricing.popular_badge')} size="small" sx={{ position: 'absolute', top: 20, right: 20, bgcolor: '#FFF', color: '#000', fontWeight: 900, borderRadius: '4px' }} />}
                   <Typography variant="h6" fontWeight="800" sx={{ mb: 1, color: p.h ? '#FFF' : '#71717A' }}>{t(p.nameKey)}</Typography>
-                  <Stack direction="row" alignItems="baseline" spacing={1} sx={{ mb: 4 }}>
+                  <Stack direction="row" alignItems="baseline" sx={{ gap: 1, mb: 4 }}>
                     <Typography variant="h3" fontWeight="800">${p.price}</Typography>
                     <Typography variant="body2" sx={{ color: '#71717A' }}>/{t('landing.pricing.monthly')}</Typography>
                   </Stack>
-                  <Stack spacing={2} sx={{ mb: 6, flexGrow: 1 }}>
+                  <Stack sx={{ gap: 2, mb: 6, flexGrow: 1 }}>
                     {(t(p.featsKey, { returnObjects: true }) as string[]).map((feat, j) => (
-                      <Stack direction="row" spacing={1.5} key={j} alignItems="center">
+                      <Stack direction="row" sx={{ gap: 1.5 }} key={j} alignItems="center">
                         <CheckIcon sx={{ fontSize: 18, color: '#22C55E' }} />
                         <Typography variant="body2" sx={{ color: '#A1A1AA', fontSize: '0.95rem' }}>{feat}</Typography>
                       </Stack>
@@ -381,18 +424,102 @@ const LandingPage: React.FC = () => {
       {/* --- FOOTER --- */}
       <Box sx={{ py: { xs: 6, md: 8 }, borderTop: '1px solid rgba(255,255,255,0.08)', bgcolor: '#000' }}>
         <Container maxWidth="lg">
-          <Stack direction={{xs: 'column', md: 'row'}} justifyContent="space-between" alignItems="center" spacing={4}>
+          <Stack direction={{xs: 'column', md: 'row'}} justifyContent="space-between" alignItems="center" sx={{ gap: 4 }}>
             <Box textAlign={{xs: 'center', md: isRtl ? 'right' : 'left'}}>
               <Typography variant="h6" fontWeight="800" sx={{ mb: 1 }}>{t('common.appNamePart1')}{t('common.appNamePart2')}</Typography>
               <Typography variant="body2" sx={{ color: '#52525B' }}>{t('landing.footer.copyright')}</Typography>
             </Box>
-            <Stack direction="row" spacing={4}>
-              <MuiLink href="#" sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem' }}>{t('landing.footer.privacy')}</MuiLink>
-              <MuiLink href="#" sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem' }}>{t('landing.footer.terms')}</MuiLink>
+            <Stack direction="row" sx={{ gap: 4 }}>
+              <MuiLink href="/privacy" sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem', '&:hover': { color: '#A1A1AA' } }}>{t('landing.footer.privacy')}</MuiLink>
+              <MuiLink href="/terms" sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem', '&:hover': { color: '#A1A1AA' } }}>{t('landing.footer.terms')}</MuiLink>
+              <MuiLink component="button" onClick={() => setContactOpen(true)} sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem', background: 'none', border: 'none', cursor: 'pointer', '&:hover': { color: '#A1A1AA' } }}>{t('landing.footer.contact')}</MuiLink>
             </Stack>
           </Stack>
         </Container>
       </Box>
+      {/* --- CONTACT MODAL --- */}
+      <Dialog 
+        open={contactOpen} 
+        onClose={() => setContactOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{ sx: { bgcolor: '#18181B', color: '#FAFAFA', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '1.5rem', pb: 1 }}>{t('landing.contact.title')}</DialogTitle>
+        <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.08)', pt: 3 }}>
+          <Typography variant="body2" sx={{ color: '#A1A1AA', mb: 4 }}>{t('landing.contact.subtitle')}</Typography>
+          
+          <Stack spacing={3} sx={{ mb: 4 }}>
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ cursor: 'pointer', '&:hover .MuiAvatar-root': { bgcolor: 'rgba(255,255,255,0.12)' } }} onClick={() => copyToClipboard('mohamedlarbinakti@gmail.com')}>
+              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#FFF', width: 40, height: 40, transition: 'bgcolor 0.2s' }}>
+                <MailIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#71717A', display: 'block' }}>{t('landing.contact.email_label')}</Typography>
+                <Typography variant="body2" sx={{ color: '#FFF', fontSize: '0.95rem' }}>mohamedlarbinakti@gmail.com</Typography>
+              </Box>
+            </Stack>
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ cursor: 'pointer', '&:hover .MuiAvatar-root': { bgcolor: 'rgba(255,255,255,0.12)' } }} onClick={() => copyToClipboard('+21652369325')}>
+              <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#FFF', width: 40, height: 40, transition: 'bgcolor 0.2s' }}>
+                <PhoneIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box>
+                <Typography variant="caption" sx={{ color: '#71717A', display: 'block' }}>{t('landing.contact.phone_label')}</Typography>
+                <Typography variant="body2" sx={{ color: '#FFF', fontSize: '0.95rem', direction: 'ltr' }}>+216 52 369 325</Typography>
+              </Box>
+            </Stack>
+          </Stack>
+
+          <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', mb: 4 }} />
+          
+          <Typography variant="body2" fontWeight="700" sx={{ mb: 2 }}>{t('landing.contact.message_section')}</Typography>
+          <Stack spacing={2.5}>
+            <TextField 
+              fullWidth 
+              size="small"
+              label={t('landing.contact.name_label')}
+              value={contactForm.name}
+              onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+              sx={{ '& .MuiOutlinedInput-root': { color: '#FAFAFA', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' }, '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.3)' } }, '& .MuiInputLabel-root': { color: '#71717A' } }}
+            />
+            <TextField 
+              fullWidth 
+              size="small"
+              label={t('landing.contact.email_field')}
+              type="email"
+              value={contactForm.email}
+              onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+              sx={{ '& .MuiOutlinedInput-root': { color: '#FAFAFA', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' }, '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.3)' } }, '& .MuiInputLabel-root': { color: '#71717A' } }}
+            />
+            <TextField 
+              fullWidth 
+              multiline 
+              rows={3}
+              label={t('landing.contact.message_label')}
+              value={contactForm.message}
+              onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+              sx={{ '& .MuiOutlinedInput-root': { color: '#FAFAFA', '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' }, '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.3)' } }, '& .MuiInputLabel-root': { color: '#71717A' } }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setContactOpen(false)} sx={{ color: '#71717A', textTransform: 'none' }}>{t('landing.contact.close')}</Button>
+          <Button 
+            variant="contained" 
+            onClick={handleContactSend}
+            disabled={!contactForm.name || !contactForm.email || !contactForm.message || contactSending}
+            sx={{ bgcolor: '#FFF', color: '#000', textTransform: 'none', fontWeight: 700, borderRadius: '8px', px: 3, '&:hover': { bgcolor: '#E4E4E7' } }}
+          >
+            {contactSending ? '...' : t('landing.contact.send')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar open={snackbarOpen} autoHideDuration={3000} onClose={() => setSnackbarOpen(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setSnackbarOpen(false)} severity="success" sx={{ width: '100%', bgcolor: '#22C55E', color: '#FFF', '& .MuiAlert-icon': { color: '#FFF' } }}>
+          {snackbarMsg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

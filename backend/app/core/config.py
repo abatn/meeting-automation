@@ -41,11 +41,11 @@ class Settings(BaseSettings):
     HUGGINGFACE_TOKEN: str = ""
 
     # Email
-    SMTP_HOST: str = "smtp.sendgrid.net"
+    SMTP_HOST: str = "smtp.mailtrap.io"
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    EMAIL_FROM: str = "noreply@example.com"
+    EMAIL_FROM: str = "noreply@meeting-automation.com"
 
     # WhatsApp Business API
     WHATSAPP_API_URL: str = "https://graph.facebook.com/v18.0"

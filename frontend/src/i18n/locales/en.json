@@ -413,6 +413,7 @@
     "nav": {
       "features": "Features",
       "pricing": "Pricing",
+      "contact": "Contact",
       "faq": "FAQ",
       "login": "Login",
       "start": "Start Free Trial",
@@ -484,7 +485,20 @@
     "footer": {
       "copyright": "© 2026 Meeting Automation.",
       "privacy": "Privacy",
-      "terms": "Terms"
+      "terms": "Terms",
+      "contact": "Contact"
+    },
+    "contact": {
+      "title": "Contact Us",
+      "subtitle": "We typically respond within 24 hours.",
+      "email_label": "Email",
+      "phone_label": "Phone",
+      "message_section": "Send us a message",
+      "name_label": "Name",
+      "email_field": "Your email",
+      "message_label": "Message",
+      "send": "Send",
+      "close": "Close"
     },
     "trust": {
       "title": "TRUSTED ENTERPRISE ARCHITECTURE",
