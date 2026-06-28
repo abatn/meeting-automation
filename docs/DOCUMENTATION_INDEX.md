@@ -1,7 +1,7 @@
 # Dokumentation Übersicht — Meeting Automation System
 
-> Automatisch kategorisiert: 2026-06-25 | 115+ Dateien in `docs/`
-> **Status**: k3s Staging aktiv, 21 Pods Running, Pipeline 31.7s, Phase 75 abgeschlossen (n8n Workflows fully functional)
+> Automatisch kategorisiert: 2026-06-27 | 115+ Dateien in `docs/`
+> **Status**: k3s Staging aktiv, 13 Pods Running, Pipeline 31.7s, Phase 90 abgeschlossen
 
 ## 1. Architektur & Systemdesign
 
@@ -116,7 +116,7 @@
 | `PROTOCOL_N8N_AUTOMATION_&_SMTP.md` | Protokoll: n8n Automatisierung |
 | `SMTP_CREDENTIAL_CLEANUP.md` | SMTP Credential Cleanup |
 
-**Status (Phase 75):** n8n 6 Workflows aktiv (meeting-created, pv-validated, transcription-completed, meeting-status-changed, daily-reminders, user-invited). NodePort 31678 für Web UI. Automation API requires `?client_id=` parameter.
+**Status (Phase 90):** n8n 6 Workflows aktiv (meeting-created, pv-validated, transcription-completed, meeting-status-changed, daily-reminders, user-invited). NodePort 31678 für Web UI. Dynamisches client_id in allen Workflows (Phase 88). Mailtrap SMTP (Phase 85).
 
 ## 9. Pipeline & Recording
 
@@ -237,12 +237,15 @@
 6. `DATABASE_SCHEMA.md` — DB-Schema (9 Tabellen)
 7. `pipeline-onlyoffice-pdf-edit.md` — OnlyOffice PDF Edit Pipeline
 
-**Aktueller Stand (Phase 75):**
-- 21 Pods Running auf k3s v1.35.5+k3s1
+**Aktueller Stand (Phase 90):**
+- 13 Pods Running auf k3s v1.35.5+k3s1
+- Memory: 9.7 Gi Limits (5.2 Gi eingespart durch Right-Sizing)
 - Pipeline: 31.7s (Target ≤90s)
 - Migration Chain: 1 Head (`n2o3p4q5r6s7`)
 - 15 NetworkPolicies (ISO 27001 A.8.20)
-- n8n: 6 Workflows aktiv (Phase 75 — all workflows functional with client_id parameter)
+- n8n: 6 Workflows aktiv mit dynamischem client_id (Phase 88)
 - OnlyOffice: PDF Edit + Konvertierung funktional (Phase 64-73)
 - TLS: Let's Encrypt aktiv (Phase 53-57)
-- 0 hardcoded IPs, 0 hardcoded Credentials
+- SMTP: Mailtrap (Phase 85) — SendGrid komplett entfernt
+- Contact-Formular: POST /api/v1/contact via Mailtrap (Phase 84)
+- 0 hardcoded IPs, 0 hardcoded Credentials, 0 hardcoded client_id

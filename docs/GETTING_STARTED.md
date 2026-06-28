@@ -1,7 +1,7 @@
 # Getting Started — Meeting Automation System
 
 > Abgeleitet aus: ARCHITECTURE.md, ISO27001.md, DATABASE_SCHEMA.md, production/
-> Stand: 2026-06-25 | k3s Staging aktiv, 21 Pods, Pipeline 31.7s, Phase 73 abgeschlossen
+> Stand: 2026-06-27 | k3s Staging aktiv, 13 Pods, Pipeline 31.7s, Phase 90 abgeschlossen
 
 ## 1. Was ist Meeting Automation?
 
@@ -101,9 +101,11 @@ clients (Organisation)
 # Backend: http://158.180.18.110:32222 (NodePort)
 # n8n UI: http://158.180.18.110:31678 (NodePort)
 # Login: dg@meeting.tn / Password123!
-# Pods: 21 Running (backend×2, frontend, celery-worker, celery-beat,
+# Pods: 13 Running (backend×2, frontend, celery-worker, celery-beat,
 #        postgres, redis, minio, rabbitmq, livekit-server, livekit-egress,
-#        onlyoffice, n8n, cert-manager×3, nginx-ingress)
+#        onlyoffice, n8n)
+# Memory: 9.7 Gi Limits (5.2 Gi eingespart durch Right-Sizing)
+# SMTP: Mailtrap (bulk.smtp.mailtrap.io)
 ```
 
 ### Production (k3s)
@@ -121,7 +123,7 @@ clients (Organisation)
 4. **Resource Limits + Probes** — CPU/Memory für alle Workloads ✅ Abgeschlossen (Phase 42-43)
 5. **TLS + Registry** — cert-manager ✅ Abgeschlossen (Phase 53-57), Image-Registry ❌ Offen
 
-### Abgeschlossen (Phasen 33-73)
+### Abgeschlossen (Phasen 33-90)
 - ✅ k3s Migration (Phase 33)
 - ✅ Full Pipeline Test (Phase 34)
 - ✅ Hardcoded Werte eliminiert (Phase 37)
@@ -141,6 +143,16 @@ clients (Organisation)
 - ✅ LiveKit WebSocket + OnlyOffice Fixes (Phase 56)
 - ✅ SSL/TLS vollständig (Phase 57)
 - ✅ OnlyOffice PDF Edit Pipeline (Phase 64-73)
+- ✅ Celery Worker Memory Fix — Lazy Loading (Phase 77)
+- ✅ Tenant Isolation Security Audit (Phase 76)
+- ✅ OnlyOffice Download + Callback HMAC Fix (Phase 79)
+- ✅ Abo-Minuten + CMS Pricing (Phase 82-83)
+- ✅ Contact Funktion — Header + Footer + Auto-Email (Phase 84)
+- ✅ Mailtrap SMTP Integration (Phase 85)
+- ✅ n8n Workflows dynamisches client_id (Phase 88)
+- ✅ Meeting Status Distribution Fix (Phase 88)
+- ✅ Resource Right-Sizing — 5.2 Gi eingespart (Phase 89)
+- ✅ Celery Worker Memory Decision — 4Gi beibehalten (Phase 90)
 
 ## 9. Dokumentation
 

@@ -1,9 +1,9 @@
-## 🎉 CURRENT STATUS — 2026-06-25: PHASE 75 COMPLETE ✅
+## 🎉 CURRENT STATUS — 2026-06-27: PHASE 90 COMPLETE ✅
 
-**k3s + HTTPS + LiveKit WebSocket + OnlyOffice PDF Pipeline | 21 Pods Running | Pipeline 31.7s | Phase 75**
+**k3s Staging | 13 Pods Running | Pipeline 31.7s | Mailtrap SMTP | Contact-Formular | Resource Right-Sizing (5.2 Gi eingespart)**
 
-### System Status (Phase 75)
-- **Pods**: 16 App + 3 cert-manager + 1 nginx-ingress + 1 acme-solver = 21 Running
+### System Status (Phase 90)
+- **Pods**: 13 Running (backend×2, frontend, celery-worker, celery-beat, postgres, redis, minio, rabbitmq, livekit-server, livekit-egress, onlyoffice, n8n)
 - **Backend Health**: `{"status":"healthy","version":"1.0.0"}` via HTTPS
 - **Frontend**: HTTP 200 via `https://staging.meeting-automation.com`
 - **TLS Certificate**: `staging-tls` READY=True (Let's Encrypt HTTP-01)
@@ -11,32 +11,46 @@
 - **Migration Chain**: 1 Head (`n2o3p4q5r6s7`), 33 Migrations
 - **Credentials**: 6/6 synchronisiert (backend ↔ n8n)
 - **Network Policies**: 15 aktiv (ISO 27001 A.8.20)
-- **Resource Limits**: Alle Workloads konfiguriert
-- **n8n**: 6 Workflows aktiv (meeting-created, pv-validated, transcription-completed, meeting-status-changed, daily-reminders, user-invited), NodePort 31678
-- **OnlyOffice**: PDF Edit + Konvertierung funktional (Phase 64-73)
-  - Socket.IO via `/doc/` Pfad
-  - Forcesave aktiviert
-  - PDF Download: 2.2s synchron (Phase 73)
-  - DOCX Download: sofort
+- **Resource Limits**: Alle Workloads optimiert (Phase 89: 5.2 Gi eingespart)
+- **n8n**: 6 Workflows aktiv, dynamisches client_id (Phase 88)
+- **SMTP**: Mailtrap (`bulk.smtp.mailtrap.io`) — SendGrid komplett entfernt
+- **Contact-Formular**: POST /api/v1/contact → Email via Mailtrap
 
-### Phase 73: OnlyOffice PDF Conversion — Synchroner Fix
-- PDF-Konvertierung synchron (`await run_pdf_conversion`) statt Background-Task
-- Download gibt sofort PDF (2.2s) statt 50s Timeout → DOCX
-- Converter-Speed: 0.09s (DOCX → PDF)
+### Phase 90: Celery Worker Memory — 4Gi beibehalten
+- Sentinel LLM (~1.5GB) wird nur bei PRO/ENTREPRISE Recordings geladen
+- Staging: 3 ENTREPRISE-Tenants, aktuell 0 aktive Recordings
+- Production: 4 Workers × 3.2GB Peak → 4Gi nötig
 
-### Phase 71: HTTPS → HTTP URL-Mapping
-- Converter gibt `https://onlyoffice-staging/...` zurück
-- Backend kann nur `http://onlyoffice-staging:80/...` erreichen
-- URL-Mapping in `pv.py:69-72`
+### Phase 89: Resource Right-Sizing — 5.2 Gi eingespart (34%)
+- Von 14.9 Gi auf 9.7 Gi Memory-Limits
+- Größte Einsparungen: livekit-egress (1.5Gi), rabbitmq (1.5Gi)
 
-### Phase 64-70: OnlyOffice Fixes
-- `documentType: "word"` hinzugefügt
-- Socket.IO `/doc/` WebSocket Proxy
-- WebSocket-Header in `ds-docservice.conf`
-- Hardcoded Hostnames → `settings.ONLYOFFICE_URL`
-- Callback status 1 verarbeitet
-- Forcesave via Editor-Config
-- EBUSY Fix (ConfigMap Mount entfernt)
+### Phase 88: n8n Workflows dynamisches client_id
+- Backend sendet client_id in Webhook-Payloads
+- n8n Workflows: hardcoded → `{{ $json.client_id }}`
+- Meeting Status Distribution: Pie Chart rendert korrekt (completed=28, scheduled=12, cancelled=3)
+
+### Phase 85: Mailtrap SMTP Integration
+- SendGrid komplett entfernt, `bulk.smtp.mailtrap.io` aktiv
+- Cloudflare DNS CNAME verifiziert (mt04, rwmt1/2._domainkey, mt-link)
+- Einladungs-Emails + Contact-Formular via Mailtrap
+
+### Phase 84: Contact Funktion
+- Header/Footer Contact Modal mit Email/Telefon + Nachricht-Formular
+- 3 Sprachen: EN, FR, AR (RTL-kompatibel)
+- POST /api/v1/contact (public, kein Auth)
+
+### Phase 79: OnlyOffice Download + Callback HMAC Fix
+- HMAC-signierte URLs für OnlyOffice Download/Callback
+- Kein 403/converter Fehler mehr
+
+### Phase 77: Celery Worker Memory Fix
+- Sentinel Lazy Loading Singleton (Idle: 11Mi, vorher: 1.5GB)
+- `--max-tasks-per-child=5` für Process Recycling
+
+### Phase 76: Tenant Isolation Security Audit
+- Multi-Tenant client_id Filter in allen Kern-Queries verifiziert
+- Cross-Tenant Access zurückgewiesen (404/403)
 
 ### Phase 56: LiveKit WebSocket + OnlyOffice + Egress S3 Fixes
 - LiveKit WebSocket: `/rtc` + `/twirp` via nginx-ingress mit TLS
