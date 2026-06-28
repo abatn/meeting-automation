@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-backup-pvc
+  namespace: meeting-automation-staging
+spec:
+  storageClassName: longhorn
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: meeting-automation-staging
+spec:
+  schedule: "0 3 * * *"
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: postgres-backup
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+          - name: pg-dump
+            image: postgres:15-alpine
+            command:
+            - sh
+            - -c
+            - |
+              TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+              echo "[$(date)] Starting backup: $TIMESTAMP"
+              pg_dump -h 10.43.101.189 -U meeting_user meeting_db_staging | gzip > /backup/meeting_db_${TIMESTAMP}.sql.gz
+              SIZE=$(ls -lh /backup/meeting_db_${TIMESTAMP}.sql.gz | awk '{print $5}')
+              echo "[$(date)] Backup complete: ${SIZE}"
+              # Keep only last 7 backups
+              cd /backup && ls -t meeting_db_*.sql.gz 2>/dev/null | tail -n +8 | xargs -r rm --
+              echo "[$(date)] Cleanup complete. Remaining backups:"
+              ls -lh /backup/meeting_db_*.sql.gz
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_PASSWORD
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          restartPolicy: OnFailure
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: postgres-backup-pvc
