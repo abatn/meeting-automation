@@ -396,6 +396,7 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
 
    // Room stabilization (for clean Egress recording start)
    const [roomConnectionReady, setRoomConnectionReady] = useState(false);
+   const [isStarting, setIsStarting] = useState(false);
 
    // Recording
   const [isRecording, setIsRecording]             = useState(false);
@@ -638,6 +639,8 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
         setRecordingStatus((prev) => {
           // Don't downgrade from a terminal state
           if ((prev === "completed" || prev === "failed") && next !== prev) return prev;
+          // Don't overwrite processing/paused — wait for polling to finish naturally
+          if (prev === "processing" || prev === "paused") return prev;
           return next;
         });
       }
@@ -704,8 +707,9 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleStartRecording = async () => {
-    if (!id) return;
+    if (!id || isStarting) return;
     try {
+      setIsStarting(true);
       setIsRecording(true);
       setRecordingStatus("recording");
       
@@ -723,6 +727,8 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
       console.error("Failed to start recording", err);
       setIsRecording(false);
       setRecordingStatus("idle");
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -994,6 +1000,7 @@ onError={(error) => {
                     }}
                     onDisconnected={() => {
                       setLivekitConnected(false);
+                      setRoomConnectionReady(false);
                     }}
                    >
                      <LiveKitConnectionBridge onStateChange={handleLiveKitConnectionState} />
@@ -1032,8 +1039,8 @@ onError={(error) => {
 
 {/* IDLE — Show Start button (only for creator) */}
                {recordingStatus === "idle" && meetingCreatorId === currentUser?.id && (
-                 <Button variant="contained" fullWidth disableElevation onClick={handleStartRecording}
-                   disabled={!roomConnectionReady}
+                <Button variant="contained" fullWidth disableElevation onClick={handleStartRecording}
+                    disabled={!roomConnectionReady || isStarting}
                    startIcon={<RecordIcon />}
                    sx={{ bgcolor: COLOR.error, color: "#FFF", borderRadius: 2, textTransform: "none", fontSize: 14, fontWeight: 600, py: 1.25, "&:hover": { bgcolor: "#DC2626" } }}
                  >
