@@ -1,7 +1,7 @@
 # Getting Started — Meeting Automation System
 
 > Abgeleitet aus: ARCHITECTURE.md, ISO27001.md, DATABASE_SCHEMA.md, production/
-> Stand: 2026-06-28 | k3s Staging 2-Node Cluster, Phase 92 in Arbeit, Longhorn 2-Replica, CloudNativePG + Velero installiert
+> Stand: 2026-07-02 | k3s Staging 2-Node Cluster, Phase 122 abgeschlossen, Longhorn 2-Replica, CloudNativePG HA + Velero installiert
 
 ## 1. Was ist Meeting Automation?
 
@@ -82,7 +82,7 @@ clients (Organisation)
 | A.8.26 Tenant Isolation | ✅ client_id Filter |
 | A.12.4.1 Audit Logging | ✅ 118+ Logs |
 | A.5.17 Auth & RBAC | ✅ JWT + 5 Rollen |
-| A.8.20 Network Policies | ✅ 15 Policies deployt |
+| A.8.20 Network Policies | ✅ 14 Policies deployt |
 
 ## 7. Infrastruktur
 

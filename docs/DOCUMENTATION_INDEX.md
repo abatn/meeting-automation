@@ -1,7 +1,7 @@
 # Dokumentation Übersicht — Meeting Automation System
 
 > Automatisch kategorisiert: 2026-06-28 | 118+ Dateien in `docs/`
-> **Status**: k3s Staging 2-Node aktiv, Phase 92 in Arbeit, Longhorn 2-Replica, CloudNativePG + Velero installiert
+> **Status**: k3s Staging 2-Node aktiv, Phase 122 abgeschlossen, Longhorn 2-Replica, CloudNativePG HA + Velero installiert
 
 ## 1. Architektur & Systemdesign
 
@@ -238,7 +238,7 @@
 7. `pipeline-onlyoffice-pdf-edit.md` — OnlyOffice PDF Edit Pipeline
 
 **Aktueller Stand (Phase 90):**
-- 13 Pods Running auf k3s v1.35.5+k3s1
+- 15 Pods Running auf k3s v1.35.5+k3s1
 - Memory: 9.7 Gi Limits (5.2 Gi eingespart durch Right-Sizing)
 - Pipeline: 31.7s (Target ≤90s)
 - Migration Chain: 1 Head (`n2o3p4q5r6s7`)
