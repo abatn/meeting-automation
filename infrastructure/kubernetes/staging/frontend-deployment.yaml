@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: meeting-automation-frontend:staging
+          image: docker.io/library/meeting-automation-frontend:v20260701214740
           imagePullPolicy: Never
           ports:
             - containerPort: 80

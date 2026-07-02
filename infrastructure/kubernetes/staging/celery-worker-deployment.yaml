@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: celery-worker
-        image: meeting-automation-backend:latest
+        image: docker.io/library/meeting-automation-backend:v20260701230046
         imagePullPolicy: IfNotPresent
         command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info"]
         resources:
