@@ -53,6 +53,13 @@ Tests are categorized by external dependency — not all "unit tests" run with S
 - **AuditMiddleware uses dedicated `AsyncSessionLocal()` session** — NOT the request's `get_db` session (prevents DB pool exhaustion)
 - `db.rollback()` in except-block prevents "Session als FAILED markiert"
 
+### "Löschen ist verboten" Rule (2026-07-01)
+- **User**: "wenn wir fehler haben wir behandeln der gründ und beheben es, das löschen die fehlers behandelt nicht die gründe"
+- **Translation**: "When we have errors, we treat the cause and fix it. Deleting the error does not treat the cause."
+- **Meaning**: Never just delete error reporting (e.g., don't remove a ServiceMonitor that reports a problem — fix the underlying issue so the monitor reports success)
+- **Example**: CNPG targets failing → fix CNPG metrics exposure, NOT delete the ServiceMonitor
+- **Example**: Duplicate backend targets → fix SM config, NOT delete one SM
+
 ### LiveKit Pipeline (Critical Timing)
 - **Recording → PV pipeline**: Target ≤90s end-to-end for Arabic transcriptions
 - **Current**: ~14s (testbobo), ~3m 10s (complex meetings)
@@ -70,6 +77,13 @@ Tests are categorized by external dependency — not all "unit tests" run with S
   - `backend/app/services/assignee_resolver.py` (5-step assignee resolution)
   - `backend/app/services/phonetic_matcher.py` (Double Metaphone for Arabic names)
   - `docs/LIVEKIT_ROUTE_PIPELINE_2026-06-07.md` (complete flow)
+
+### Prometheus Targets (2026-07-01)
+- **Backend `/metrics`**: Internal-only (not in Ingress) — no JWT auth needed
+- **node-exporter**: hostNetwork pods — use Service ClusterIP relabeling, not node IPs
+- **Node 2 firewalld**: Port 9100/tcp must be in trusted zone + source 10.0.0.0/24
+- **CNPG**: `enablePodMonitor` deprecated — need PodMonitor resource for port 9187
+- **Duplicate SMs**: Keep both but differentiate (e.g., different intervals)
 
 ### Speaker Identification (Microsoft Teams Architecture)
 - **Always use `resolved_name`** — `match_speaker()` returns `profile.resolved_name or profile.name`
@@ -317,6 +331,31 @@ Extract with: `docker logs celery-worker | grep TIMING`
 ### 12. Confidence NULL vs 0.0 Confusion
 - Symptom: `mapping_confidence or 0.0` treats NULL (unknown) same as 0.0 (explicitly low)
 - Fix: Use `s.mapping_confidence if s.mapping_confidence is not None else 0.5` — NULL means "never measured", 0.0 means "explicitly rejected"
+
+### 13. Backend /metrics requires JWT auth (blocks Prometheus)
+- Symptom: Prometheus backend targets "down" — `{"detail":"Not authenticated"}`
+- Fix: Remove `Depends(deps.get_current_user)` from `/metrics` endpoint — it's internal-only (not in Ingress)
+- Rule: "Löschen ist verboten — Fehler beheben, nicht löschen"
+
+### 14. hostNetwork pods unreachable from pod network via node IPs
+- Symptom: node-exporter targets "down" — `dial tcp 10.0.0.x:9100: connection refused`
+- Root Cause: Pod CIDR (10.42.x.x) and node CIDR (10.0.0.x) are different routing domains in k3s
+- Fix: Relabel `__address__` to Service ClusterIP in ServiceMonitor
+
+### 15. Node 2 firewalld blocks node-exporter
+- Symptom: node-exporter unreachable from Node 1 despite correct NetworkPolicy
+- Root Cause: firewalld RUNNING on Node 2 (NOT on Node 1), port 9100 not in trusted zone
+- Fix: `firewall-cmd --zone=trusted --add-port=9100/tcp --permanent` + add source `10.0.0.0/24`
+
+### 16. CNPG PostgreSQL has no /metrics on port 5432
+- Symptom: CNPG targets "down" — `dial tcp 10.42.5.x:5432: connection refused`
+- Root Cause: ServiceMonitor scrapes postgres port (5432), CNPG built-in exporter runs on port 9187
+- Fix: Create PodMonitor resource targeting port 9187 (enablePodMonitor deprecated)
+
+### 17. k3s ingress cross-namespace path priority
+- Symptom: `/grafana` and `/prometheus` redirect to React frontend `/login`
+- Root Cause: Catch-all `/` in staging-ingress wins over specific paths in monitoring-ingress
+- Fix: Add explicit path to the catch-all ingress too
 
 ## Development Workflow
 

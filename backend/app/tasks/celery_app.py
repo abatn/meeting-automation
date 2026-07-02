@@ -52,6 +52,7 @@ celery_app.autodiscover_tasks(
         "app.tasks.transcription_tasks",
         "app.tasks.data_retention",
         "app.tasks.feedback_tasks",
+        "app.tasks.storage_tasks",
     ]
 )
 
@@ -64,5 +65,9 @@ celery_app.conf.beat_schedule = {
     "cleanup-expired-data": {
         "task": "app.tasks.data_retention.cleanup_old_data_task",
         "schedule": crontab(hour=2, minute=0),  # Every day at 2:00 AM
+    },
+    "check-storage-quotas": {
+        "task": "check_storage_quotas",
+        "schedule": crontab(minute="*/15"),  # Every 15 minutes (ISO 27001 A.8.26)
     },
 }

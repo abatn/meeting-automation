@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: meeting-automation-staging
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/opc/meeting-automation.git
+    targetRevision: main
+    path: infrastructure/kubernetes/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: meeting-automation-staging
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=false
+    - PrunePropagationPolicy=foreground
+    - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ignoreDifferences:
+  - group: apps
+    kind: Deployment
+    jsonPointers:
+    - /spec/replicas
+  - group: apps
+    kind: StatefulSet
+    jsonPointers:
+    - /spec/replicas
+  - group: autoscaling
+    kind: HorizontalPodAutoscaler
+    jsonPointers:
+    - /spec/metrics

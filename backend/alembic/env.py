@@ -94,6 +94,7 @@ async def run_migrations_online() -> None:
         configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args={"ssl": False},
     )
 
     async with connectable.connect() as connection:

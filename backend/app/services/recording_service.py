@@ -11,9 +11,16 @@ from fastapi import UploadFile
 
 from app.models.recording import Recording
 from app.models.meeting import Meeting
-from app.core.config import settings
+from app.models.client import Client
+from app.core.config import settings, get_bucket_name
+from app.services.storage_quota import check_storage_quota
 
 logger = logging.getLogger(__name__)
+
+
+class StorageQuotaExceededError(Exception):
+    """Raised when a tenant exceeds their storage quota."""
+    pass
 
 
 class RecordingService:
@@ -35,11 +42,31 @@ class RecordingService:
         Backward-Compatible: Alte recordings/{meeting_id}/... keys bleiben lesbar, aber Uploads
         verwenden neuen Prefix.
         """
-        file_key = f"{client_id}/recordings/{meeting_id}/{uuid.uuid4()}_{file.filename}"
+        file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_{file.filename}"
 
-        # S3 Upload
+        # Storage-Quota prüfen
+        result = await self.db.execute(select(Client).where(Client.id == client_id))
+        client = result.scalar_one_or_none()
+        if client:
+            file_size = file.size or 0
+            quota_check = check_storage_quota(client_id, client.subscription_plan, file_size)
+            if not quota_check["allowed"]:
+                raise StorageQuotaExceededError(
+                    f"Speicherlimit erreicht: {quota_check['used'] / (1024**3):.2f}GB "
+                    f"von {quota_check['quota'] / (1024**3):.0f}GB "
+                    f"({client.subscription_plan.value} Plan)"
+                )
+
+        # S3 Upload — Bucket automatisch erstellen falls nicht vorhanden
+        bucket = get_bucket_name(client_id)
         try:
-            self.s3_client.upload_fileobj(file.file, settings.S3_BUCKET_NAME, file_key)
+            self.s3_client.head_bucket(Bucket=bucket)
+        except Exception:
+            self.s3_client.create_bucket(Bucket=bucket)
+            logger.info(f"S3 bucket '{bucket}' created for tenant")
+
+        try:
+            self.s3_client.upload_fileobj(file.file, bucket, file_key)
             logger.info(f"File {file.filename} uploaded to S3: {file_key}")
         except Exception as e:
             logger.error(f"S3 Upload failed: {e}")
@@ -93,7 +120,7 @@ class RecordingService:
 
         Multi-Tenant Isolation: file_key = "{client_id}/recordings/{meeting_id}/..."
         """
-        file_key = f"{client_id}/recordings/{meeting_id}/{uuid.uuid4()}_stream.webm"
+        file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_stream.webm"
         upload_id = str(uuid.uuid4())  # Use UUID as local temp file identifier
         try:
             # Update Meeting start_time to the exact moment recording starts
@@ -155,9 +182,29 @@ class RecordingService:
             if not os.path.exists(temp_path):
                 raise Exception(f"Temporary file {temp_path} not found.")
 
-            # Upload the complete file to MinIO
+            # Storage-Quota prüfen vor Upload
+            file_size = os.path.getsize(temp_path)
+            result = await self.db.execute(select(Client).where(Client.id == client_id))
+            client = result.scalar_one_or_none()
+            if client:
+                quota_check = check_storage_quota(client_id, client.subscription_plan, file_size)
+                if not quota_check["allowed"]:
+                    os.remove(temp_path)
+                    raise StorageQuotaExceededError(
+                        f"Speicherlimit erreicht: {quota_check['used'] / (1024**3):.2f}GB "
+                        f"von {quota_check['quota'] / (1024**3):.0f}GB "
+                        f"({client.subscription_plan.value} Plan)"
+                    )
+
+            # Upload the complete file to MinIO — Bucket auto-erstellen
+            bucket = get_bucket_name(client_id)
+            try:
+                self.s3_client.head_bucket(Bucket=bucket)
+            except Exception:
+                self.s3_client.create_bucket(Bucket=bucket)
+
             with open(temp_path, "rb") as f:
-                self.s3_client.upload_fileobj(f, settings.S3_BUCKET_NAME, file_key)
+                self.s3_client.upload_fileobj(f, bucket, file_key)
             logger.info(f"Successfully uploaded assembled file to {file_key}")
 
             # Clean up local temp file
@@ -217,12 +264,13 @@ class RecordingService:
             logger.error(f"Failed to trigger n8n audio-uploaded: {e}")
 
     def get_presigned_upload_url(
-        self, file_key: str, expires_in: int = 3600
+        self, file_key: str, client_id: str, expires_in: int = 3600
     ) -> str:
         """Generate presigned URL for direct frontend-to-MinIO upload
         
         Args:
             file_key: S3/MinIO file key (includes client_id prefix)
+            client_id: Tenant ID for bucket selection
             expires_in: URL expiry time in seconds (default: 1 hour)
         
         Returns:
@@ -231,7 +279,7 @@ class RecordingService:
         try:
             url = self.s3_client.generate_presigned_url(
                 "put_object",
-                Params={"Bucket": settings.S3_BUCKET_NAME, "Key": file_key},
+                Params={"Bucket": get_bucket_name(client_id), "Key": file_key},
                 ExpiresIn=expires_in,
             )
             logger.info(f"Generated presigned upload URL for {file_key}")
@@ -241,12 +289,13 @@ class RecordingService:
             raise
 
     def get_presigned_download_url(
-        self, file_key: str, expires_in: int = 3600
+        self, file_key: str, client_id: str, expires_in: int = 3600
     ) -> str:
         """Generate presigned URL for direct frontend-from-MinIO download
         
         Args:
             file_key: S3/MinIO file key
+            client_id: Tenant ID for bucket selection
             expires_in: URL expiry time in seconds (default: 1 hour)
         
         Returns:
@@ -255,7 +304,7 @@ class RecordingService:
         try:
             url = self.s3_client.generate_presigned_url(
                 "get_object",
-                Params={"Bucket": settings.S3_BUCKET_NAME, "Key": file_key},
+                Params={"Bucket": get_bucket_name(client_id), "Key": file_key},
                 ExpiresIn=expires_in,
             )
             logger.info(f"Generated presigned download URL for {file_key}")

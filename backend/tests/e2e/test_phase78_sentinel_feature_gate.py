@@ -83,8 +83,14 @@ async def _upload_and_run_pipeline(
     )
 
     file_key = f"{client_id}/recordings/{meeting_id}/{uuid.uuid4()}_test.wav"
+    from app.core.config import get_bucket_name
+    bucket = get_bucket_name(client_id)
+    try:
+        s3_client.create_bucket(Bucket=bucket)
+    except Exception:
+        pass
     s3_client.put_object(
-        Bucket=settings.S3_BUCKET_NAME,
+        Bucket=bucket,
         Key=file_key,
         Body=sample_audio_bytes,
         ContentType="audio/wav",

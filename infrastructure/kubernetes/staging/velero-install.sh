@@ -34,11 +34,8 @@ velero install \
   --secret-file /tmp/credentials-velero \
   --backup-location-config \
     region=minio,s3ForcePathStyle="true",s3Url=http://minio-staging.${NAMESPACE}.svc.cluster.local:9000 \
-  --snapshot-location-config \
-    region=minio \
   --plugins velero/velero-plugin-for-aws:v1.9.2 \
   --use-volume-snapshots=false \
-  --default-ttl 720h \
   --wait
 
 # 4. Backup-Schedule erstellen (täglich 2 Uhr)

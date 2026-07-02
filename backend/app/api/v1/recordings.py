@@ -15,7 +15,8 @@ from app.schemas.recording import (
     StreamChunkResponse,
     StreamStopRequest,
 )
-from app.services.recording_service import RecordingService
+from app.services.recording_service import RecordingService, StorageQuotaExceededError
+from app.services.rate_limiter import check_recording_rate_limit, check_api_rate_limit, RateLimitExceededError
 
 router = APIRouter()
 
@@ -34,8 +35,21 @@ async def upload_recording(
     if file.content_type is None or not file.content_type.startswith("audio/"):
         raise HTTPException(status_code=400, detail="File must be an audio recording")
 
+    # Rate-Limit prüfen
+    from app.models.client import Client
+    from sqlalchemy import select as sel
+    result = await db.execute(sel(Client).where(Client.id == current_user.client_id))
+    client = result.scalar_one_or_none()
+    plan = client.subscription_plan.value if client and client.subscription_plan else "GRATUIT"
+    rate = check_recording_rate_limit(current_user.client_id, plan)
+    if not rate["allowed"]:
+        raise HTTPException(status_code=429, detail=f"Recording-Limit erreicht: {rate['limit']}/Tag. Upgrade auf PRO für mehr.")
+
     service = RecordingService(db)
-    recording = await service.upload_recording(meeting_id, current_user.client_id, file, recording_id)
+    try:
+        recording = await service.upload_recording(meeting_id, current_user.client_id, file, recording_id)
+    except StorageQuotaExceededError as e:
+        raise HTTPException(status_code=413, detail=str(e))
 
     # Reload with selectinload to avoid MissingGreenlet error during serialization
     result = await db.execute(
@@ -117,7 +131,10 @@ async def stop_stream(
     
     service = RecordingService(db)
     parts = [{"PartNumber": p.PartNumber, "ETag": p.ETag} for p in request.parts]
-    return await service.stop_stream(recording_id, current_user.client_id, file_key, upload_id, parts)
+    try:
+        return await service.stop_stream(recording_id, current_user.client_id, file_key, upload_id, parts)
+    except StorageQuotaExceededError as e:
+        raise HTTPException(status_code=413, detail=str(e))
 
 
 @router.get("/{recording_id}", response_model=Recording)
@@ -166,16 +183,17 @@ async def get_presigned_upload_url(
     if not meeting:
         raise HTTPException(status_code=404, detail="Meeting not found")
     
-    # Generate file key with client_id prefix for multi-tenant isolation
-    file_key = f"{current_user.client_id}/recordings/{meeting_id}/{uuid.uuid4()}_{filename}"
+    # Generate file key — bucket-per-tenant, no client_id in key
+    file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_{filename}"
     
     service = RecordingService(db)
-    presigned_url = service.get_presigned_upload_url(file_key)
+    presigned_url = service.get_presigned_upload_url(file_key, current_user.client_id)
     
+    from app.core.config import get_bucket_name
     return {
         "presigned_url": presigned_url,
         "file_key": file_key,
-        "bucket": "meeting-recordings",
+        "bucket": get_bucket_name(current_user.client_id),
     }
 
 
@@ -205,7 +223,7 @@ async def get_presigned_download_url(
         raise HTTPException(status_code=404, detail="Recording not found")
     
     service = RecordingService(db)
-    presigned_url = service.get_presigned_download_url(recording.file_path, expires_in)
+    presigned_url = service.get_presigned_download_url(recording.file_path, recording.client_id, expires_in)
     
     return {
         "presigned_url": presigned_url,

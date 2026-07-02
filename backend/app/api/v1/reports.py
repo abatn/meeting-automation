@@ -162,7 +162,7 @@ async def get_meeting_pdf_for_automation(
     from fastapi.responses import FileResponse
     from fastapi import HTTPException
     from app.services.pdf_service import PDFService
-    from app.core.config import settings
+    from app.core.config import settings, get_bucket_name
     import boto3
 
     pv_stmt = select(PVModel).where(PVModel.meeting_id == meeting_id, PVModel.client_id == client_id)
@@ -181,9 +181,9 @@ async def get_meeting_pdf_for_automation(
     )
 
     try:
-        s3.head_object(Bucket=settings.S3_BUCKET_NAME, Key=pdf_key)
-        local_pdf_path = f"/tmp/automation_{pv.id}.pdf"
-        s3.download_file(settings.S3_BUCKET_NAME, pdf_key, local_pdf_path)
+        s3.head_object(Bucket=get_bucket_name(), Key=pdf_key)
+
+        s3.download_file(get_bucket_name(), pdf_key, local_pdf_path)
         return FileResponse(path=local_pdf_path, filename=f"Protocol_{meeting_id}.pdf")
     except Exception:
         pass

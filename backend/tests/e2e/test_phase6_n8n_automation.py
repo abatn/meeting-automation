@@ -171,8 +171,10 @@ async def test_p33_webhook_urls_are_valid(db_session: AsyncSession):
         settings.N8N_WEBHOOK_USER_INVITED,
         settings.N8N_WEBHOOK_MEETING_CREATED,
         settings.N8N_WEBHOOK_MEETING_STATUS_CHANGED,
-        settings.N8N_WEBHOOK_AUDIO_UPLOADED,
     ]
+    # N8N_WEBHOOK_AUDIO_UPLOADED is empty (workflow disabled in Phase 63)
+    if settings.N8N_WEBHOOK_AUDIO_UPLOADED:
+        webhooks_to_check.append(settings.N8N_WEBHOOK_AUDIO_UPLOADED)
     
     for url in webhooks_to_check:
         assert url.startswith("http://") or url.startswith("https://"), \

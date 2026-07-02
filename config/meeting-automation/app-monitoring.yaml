@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: meeting-automation-monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/opc/meeting-automation.git
+    targetRevision: main
+    path: infrastructure/kubernetes/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=false
+  ignoreDifferences:
+  - group: monitoring.coreos.com
+    kind: PrometheusRule
+    jsonPointers:
+    - /spec

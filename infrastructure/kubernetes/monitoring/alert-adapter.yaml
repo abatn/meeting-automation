@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alert-adapter-code
+  namespace: meeting-automation-staging
+data:
+  app.py: |
+    import os, json, logging
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    import urllib.request
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("alert-adapter")
+    OPENHIVE_CRITICAL_URL = os.environ.get("OPENHIVE_CRITICAL_URL", "")
+    OPENHIVE_WARNING_URL = os.environ.get("OPENHIVE_WARNING_URL", "")
+    def format_alert(ag):
+        alerts = ag.get("alerts", [])
+        lines = []
+        for a in alerts:
+            s = a.get("labels",{}).get("severity","?")
+            sum_ = a.get("annotations",{}).get("summary","?")
+            desc = a.get("annotations",{}).get("description","")
+            icon = "🔴" if s=="critical" else "🟡"
+            lines.append(f"{icon} **{sum_}**\n{desc}\nStatus: {ag.get('status','firing')}")
+        return {"text": "\n\n".join(lines), "username": "AlertManager"}
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get("Content-Length",0)))
+            try:
+                ag = json.loads(body)
+                rx = ag.get("receiver","")
+                url = OPENHIVE_CRITICAL_URL if "critical" in rx else OPENHIVE_WARNING_URL
+                if not url: self.send_response(200); self.end_headers(); return
+                data = json.dumps(format_alert(ag)).encode()
+                req = urllib.request.Request(url, data=data, headers={"Content-Type":"application/json"}, method="POST")
+                urllib.request.urlopen(req, timeout=10)
+                self.send_response(200); self.end_headers()
+            except Exception as e:
+                logger.error(f"Forward failed: {e}")
+                self.send_response(500); self.end_headers()
+        def do_GET(self):
+            self.send_response(200); self.end_headers(); self.wfile.write(b'{"status":"healthy"}')
+        def log_message(self, f, *a): logger.info(f%a)
+    if __name__=="__main__":
+        HTTPServer(("0.0.0.0", int(os.environ.get("PORT","5000"))), H).serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-adapter
+  namespace: meeting-automation-staging
+  labels:
+    app: alert-adapter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-adapter
+  template:
+    metadata:
+      labels:
+        app: alert-adapter
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: instance-20260329-0846
+      containers:
+      - name: alert-adapter
+        image: docker.io/library/python:3.11-alpine
+        command: ["python", "/app/app.py"]
+        volumeMounts:
+        - name: app-code
+          mountPath: /app/app.py
+          subPath: app.py
+        ports:
+        - containerPort: 5000
+        env:
+        - name: OPENHIVE_CRITICAL_URL
+          valueFrom:
+            secretKeyRef:
+              name: openhive-webhook-urls
+              key: critical-url
+        - name: OPENHIVE_WARNING_URL
+          valueFrom:
+            secretKeyRef:
+              name: openhive-webhook-urls
+              key: warning-url
+        resources:
+          limits:
+            cpu: 100m
+            memory: 64Mi
+          requests:
+            cpu: 50m
+            memory: 32Mi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 3
+          periodSeconds: 10
+      volumes:
+      - name: app-code
+        configMap:
+          name: alert-adapter-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-adapter
+  namespace: meeting-automation-staging
+spec:
+  selector:
+    app: alert-adapter
+  ports:
+  - port: 5000
+    targetPort: 5000

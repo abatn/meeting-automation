@@ -639,8 +639,8 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
         setRecordingStatus((prev) => {
           // Don't downgrade from a terminal state
           if ((prev === "completed" || prev === "failed") && next !== prev) return prev;
-          // Don't overwrite processing/paused — wait for polling to finish naturally
-          if (prev === "processing" || prev === "paused") return prev;
+          // Don't overwrite processing/paused with stale data — but allow terminal states through
+          if ((prev === "processing" || prev === "paused") && next !== "completed" && next !== "failed") return prev;
           return next;
         });
       }

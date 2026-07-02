@@ -1,7 +1,7 @@
 # Dokumentation Übersicht — Meeting Automation System
 
-> Automatisch kategorisiert: 2026-06-27 | 115+ Dateien in `docs/`
-> **Status**: k3s Staging aktiv, 13 Pods Running, Pipeline 31.7s, Phase 90 abgeschlossen
+> Automatisch kategorisiert: 2026-06-28 | 118+ Dateien in `docs/`
+> **Status**: k3s Staging 2-Node aktiv, Phase 92 in Arbeit, Longhorn 2-Replica, CloudNativePG + Velero installiert
 
 ## 1. Architektur & Systemdesign
 
@@ -83,7 +83,7 @@
 
 | Datei | Beschreibung |
 |-------|-------------|
-| `ISO27001.md` | **ISO 27001 Compliance** — Controls, Roadmap, Status (15 NetworkPolicies) |
+| `ISO27001.md` | **ISO 27001 Compliance** — Controls, Roadmap, Status (14 NetworkPolicies) |
 | `PHASE1_SECURITY_FIXES.md` | Kritische Security Fixes (JWT, bcrypt, Fernet) |
 | `FALSE_ALARMS_AUDIT_2026-06-05.md` | False Alarms Security Audit |
 | `PROTOCOL_PART_27_SECRET_MANAGEMENT_PHASE_1.md` | Secret Management Phase 1 |
@@ -233,7 +233,7 @@
 2. `GETTING_STARTED.md` — Einstieg (Pipeline, Stack, Multi-Tenancy, Compliance)
 3. `production/README.md` — Produktions-Roadmap (5 Sprints)
 4. `production/k3s-migration-analysis.md` — Kind → k3s Analyse + Vorteile
-5. `ISO27001.md` — Security Compliance (15 NetworkPolicies, 6/10 Controls)
+5. `ISO27001.md` — Security Compliance (14 NetworkPolicies, 9/10 Controls)
 6. `DATABASE_SCHEMA.md` — DB-Schema (9 Tabellen)
 7. `pipeline-onlyoffice-pdf-edit.md` — OnlyOffice PDF Edit Pipeline
 
@@ -242,7 +242,7 @@
 - Memory: 9.7 Gi Limits (5.2 Gi eingespart durch Right-Sizing)
 - Pipeline: 31.7s (Target ≤90s)
 - Migration Chain: 1 Head (`n2o3p4q5r6s7`)
-- 15 NetworkPolicies (ISO 27001 A.8.20)
+- 14 NetworkPolicies (ISO 27001 A.8.20)
 - n8n: 6 Workflows aktiv mit dynamischem client_id (Phase 88)
 - OnlyOffice: PDF Edit + Konvertierung funktional (Phase 64-73)
 - TLS: Let's Encrypt aktiv (Phase 53-57)

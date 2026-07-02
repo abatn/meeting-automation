@@ -674,7 +674,7 @@ Return ONLY a JSON array of objects with the following structure:
     async def _download_recording_audio(self, meeting_id: str) -> Optional[str]:
         """Download recording audio from S3 for embedding extraction."""
         try:
-            from app.core.config import settings as app_settings
+            from app.core.config import settings as app_settings, get_bucket_name
             result = await self.db.execute(
                 select(Recording).where(Recording.meeting_id == meeting_id).order_by(Recording.created_at.desc()).limit(1)
             )
@@ -692,7 +692,7 @@ Return ONLY a JSON array of objects with the following structure:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                 await loop.run_in_executor(
                     None,
-                    lambda: s3_client.download_fileobj(app_settings.S3_BUCKET_NAME, recording.file_path, tmp)
+                    lambda: s3_client.download_fileobj(get_bucket_name(str(recording.client_id)), recording.file_path, tmp)
                 )
                 return tmp.name
         except Exception as e:

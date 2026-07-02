@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     N8N_WEBHOOK_MEETING_CREATED: str = "http://n8n:5678/webhook/meeting-created"
     N8N_WEBHOOK_MEETING_STATUS_CHANGED: str = "http://n8n:5678/webhook/meeting-status-changed"
     N8N_WEBHOOK_PV_VALIDATED: str = "http://n8n:5678/webhook/pv-validated"
+    N8N_WEBHOOK_AUDIO_UPLOADED: str = ""
+    N8N_WEBHOOK_DAILY_REMINDER: str = ""
     N8N_WEBHOOK_TRANSCRIPTION_COMPLETED: str = "http://n8n:5678/webhook/transcription-completed"
 
     # Security
@@ -101,3 +103,31 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+_tenant_bucket_cache: dict = {}
+
+def get_bucket_name(client_id: str = None) -> str:
+    """Gibt den MinIO-Bucket-Namen für einen Tenant zurück.
+
+    Phase 97: Bucket pro Tenant für volle Isolation.
+    Fallback: shared Bucket wenn tenant-Bucket nicht existiert (Egress lädt immer in shared).
+    """
+    if not client_id:
+        return settings.S3_BUCKET_NAME
+
+    tenant_bucket = f"tenant-{client_id}"
+    if client_id in _tenant_bucket_cache:
+        return _tenant_bucket_cache[client_id]
+
+    try:
+        import boto3
+        s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT,
+                          aws_access_key_id=settings.S3_ACCESS_KEY,
+                          aws_secret_access_key=settings.S3_SECRET_KEY)
+        s3.head_bucket(Bucket=tenant_bucket)
+        _tenant_bucket_cache[client_id] = tenant_bucket
+        return tenant_bucket
+    except Exception:
+        _tenant_bucket_cache[client_id] = settings.S3_BUCKET_NAME
+        return settings.S3_BUCKET_NAME

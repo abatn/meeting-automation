@@ -1,7 +1,7 @@
 # Getting Started — Meeting Automation System
 
 > Abgeleitet aus: ARCHITECTURE.md, ISO27001.md, DATABASE_SCHEMA.md, production/
-> Stand: 2026-06-27 | k3s Staging aktiv, 13 Pods, Pipeline 31.7s, Phase 90 abgeschlossen
+> Stand: 2026-06-28 | k3s Staging 2-Node Cluster, Phase 92 in Arbeit, Longhorn 2-Replica, CloudNativePG + Velero installiert
 
 ## 1. Was ist Meeting Automation?
 

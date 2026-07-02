@@ -28,6 +28,7 @@ else:
 engine = create_async_engine(
     settings.DATABASE_URL,
     poolclass=pool_class,
+    connect_args={"ssl": False},
     **pool_kwargs,
 )
 

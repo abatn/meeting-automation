@@ -351,6 +351,78 @@ services:
         limits:
           memory: 2G
 
+  openhive:
+    image: docker.io/library/node:20-alpine
+    restart: unless-stopped
+    command: ["node", "/app/server.js"]
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=https://hwtxbuvokwgojgpvpjdx.supabase.co
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_zhrcEY6Vi9Pkn6k5kc2Jfg_uGQx4KUo
+      - NODE_ENV=production
+    volumes:
+      - openhive-code:/app
+    ports:
+      - "3001:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  alert-adapter:
+    build:
+      context: ./infrastructure/monitoring/alert-adapter
+    restart: unless-stopped
+    environment:
+      - OPENHIVE_CRITICAL_URL=http://openhive:3000/api/webhook/critical
+      - OPENHIVE_WARNING_URL=http://openhive:3000/api/webhook/warning
+    ports:
+      - "5000:5000"
+    depends_on:
+      - openhive
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - prometheus_data:/prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  loki:
+    image: grafana/loki:latest
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
 volumes:
   postgres_data:
   redis_data:
@@ -359,3 +431,6 @@ volumes:
   n8n_data:
   onlyoffice_data:
   livekit-redis-data:
+  prometheus_data:
+  grafana_data:
+  openhive-code:

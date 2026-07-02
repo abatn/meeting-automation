@@ -127,9 +127,15 @@ async def test_tier21_22_23_pipeline_completes(
         aws_secret_access_key=settings.S3_SECRET_KEY,
     )
     
-    file_key = f"{e2e_meeting['client_id']}/recordings/{meeting_id}/{uuid.uuid4()}_test.wav"
+    from app.core.config import get_bucket_name
+    bucket = get_bucket_name(e2e_meeting['client_id'])
+    file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_test.wav"
+    try:
+        s3_client.create_bucket(Bucket=bucket)
+    except Exception:
+        pass  # Bucket already exists
     s3_client.put_object(
-        Bucket=settings.S3_BUCKET_NAME,
+        Bucket=bucket,
         Key=file_key,
         Body=sample_audio_bytes,
         ContentType="audio/wav"

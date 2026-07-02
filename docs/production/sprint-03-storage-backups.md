@@ -1,7 +1,8 @@
 # Sprint 3: Storage + PostgreSQL HA + Backups
 
-> **Dauer:** ~2 Wochen | **Status:** ⬜ Offen
+> **Dauer:** ~2 Wochen | **Status:** 🔧 IN ARBEIT (Phase 92)
 > **Komponenten:** Longhorn (CNCF), CloudNativePG (CNCF), Velero (CNCF), MinIO (open source)
+> **Aktueller Stand (2026-06-28)**: Longhorn 2-Replica, CloudNativePG Operator + Cluster installiert, Velero installiert, MinIO cross-node Port 9000 offen (Security List)
 
 ## Storage: Longhorn
 

@@ -25,6 +25,7 @@ async def test_phase8_22_fusion_high_audio_confidence(fusion_service):
 
     text_context = "I think we should proceed with the project as planned."
 
+    fusion_service.api_key = "test-key"
     with patch.object(fusion_service, "_call_mistral", new_callable=AsyncMock) as mock_mistral:
         mock_mistral.return_value = json.dumps({
             "name": "Ahmed",
@@ -66,6 +67,7 @@ async def test_phase8_23_fusion_resolves_ambiguous_audio(fusion_service):
             "reasoning": "Speaker introduced herself as Sarah",
         })
 
+        fusion_service.api_key = "test-key"
         name, confidence, method = await fusion_service.fuse_speaker_mapping(
             speaker_label="Speaker 1",
             text_context=text_context,
@@ -88,6 +90,7 @@ async def test_phase8_24_text_only_inference(fusion_service):
     """
     text_context = "Hello everyone, my name is Ahmed and I'll lead this meeting."
 
+    fusion_service.api_key = "test-key"
     with patch.object(fusion_service, "_call_mistral", new_callable=AsyncMock) as mock_mistral:
         mock_mistral.return_value = json.dumps({
             "name": "Ahmed",

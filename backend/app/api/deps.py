@@ -186,13 +186,15 @@ async def get_current_system_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """
-    Dependency for system_admin only endpoints.
-    Used for platform-wide operations (CMS, tenant management, etc.)
-    Multi-Tenant: system_admin is the only role that can access cross-tenant data.
+    Dependency for system_admin and tech_admin endpoints.
+    Used for platform-wide operations (CMS, tenant management, monitoring, etc.)
+    Multi-Tenant: system_admin and tech_admin are the only roles that can access cross-tenant data.
     """
-    if current_user.role != UserRole.SYSTEM_ADMIN:
+    if (current_user.role != UserRole.SYSTEM_ADMIN and 
+        current_user.role != UserRole.TECH_ADMIN and
+        not current_user.is_superuser):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="System administrator privileges required",
+            detail="System administrator or tech admin privileges required",
         )
     return current_user

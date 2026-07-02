@@ -15,8 +15,6 @@ spec:
       labels:
         app: livekit-egress-staging
     spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
       containers:
       - name: egress
         image: livekit/egress:latest
@@ -28,11 +26,10 @@ spec:
         - name: LIVEKIT_API_SECRET
           value: "meeting-api-secret-2026"
         - name: LIVEKIT_WS_URL
-          value: "ws://localhost:7880"
+          value: "ws://livekit-server-staging:7880"
         ports:
         - containerPort: 7000
           name: health
-          hostPort: 7000
         volumeMounts:
         - name: egress-config
           mountPath: /etc/livekit-egress

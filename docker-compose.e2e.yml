@@ -171,6 +171,22 @@ services:
     networks:
       - e2e-network
 
+  alert-adapter:
+    build:
+      context: ./infrastructure/monitoring/alert-adapter
+    restart: unless-stopped
+    environment:
+      - OPENHIVE_CRITICAL_URL=http://localhost:5000/test/critical
+      - OPENHIVE_WARNING_URL=http://localhost:5000/test/warning
+    ports:
+      - "5000:5000"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    networks:
+      - e2e-network
+
 networks:
   e2e-network:
     driver: bridge

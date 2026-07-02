@@ -1,13 +1,17 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from contextlib import asynccontextmanager
 import logging
+import os
 
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.core.logging_config import setup_logging
 from app.middleware.audit_middleware import AuditMiddleware
+from app.middleware.metrics_middleware import MetricsMiddleware
+from app.api import deps
 from app.api.v1 import (
     auth,
     meetings,
@@ -32,10 +36,9 @@ from app.api.v1 import (
 from app.core.websocket import manager
 import asyncio
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# Configure structured logging (JSON for Loki, text for local dev)
+LOG_JSON = os.getenv("LOG_JSON", "true").lower() == "true"
+setup_logging(json_format=LOG_JSON)
 logger = logging.getLogger(__name__)
 
 
@@ -77,6 +80,7 @@ async def ensure_s3_buckets_exist():
     )
     
     buckets = [settings.S3_BUCKET_NAME, "meeting-pdfs"]
+    # Phase 97: Tenant-Buckets werden bei Tenant-Registrierung dynamisch erstellt (get_bucket_name(client_id))
     
     for bucket in buckets:
         try:
@@ -189,6 +193,9 @@ app.add_middleware(
 # Audit Middleware (ISO 27001)
 app.add_middleware(AuditMiddleware)
 
+# Metrics Middleware (Prometheus HTTP request tracking)
+app.add_middleware(MetricsMiddleware)
+
 
 # Exception handlers
 @app.exception_handler(RequestValidationError)
@@ -215,6 +222,90 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "version": "1.0.0"}
+
+
+# Prometheus Metrics — Professional Pipeline Monitoring
+from prometheus_client import Counter, Histogram, Gauge, Summary, generate_latest, CONTENT_TYPE_LATEST
+
+# Pipeline Stage Duration (pro Stage messen)
+PIPELINE_STAGE_DURATION = Histogram(
+    "pipeline_stage_duration_seconds",
+    "Pipeline stage processing duration",
+    ["stage"],
+    buckets=[0.5, 1, 2, 5, 10, 15, 30, 60, 90, 120, 180, 300],
+)
+
+# Pipeline Business Metrics (ISO 27001 A.8.26 Multi-Tenant: client_id Labels)
+PIPELINE_RECORDINGS = Counter(
+    "pipeline_recordings_total",
+    "Total recordings processed",
+    ["status", "client_id"],  # completed, failed + tenant isolation
+)
+PIPELINE_TRANSCRIPTIONS = Counter(
+    "pipeline_transcriptions_total",
+    "Total transcriptions generated",
+    ["status", "language", "client_id"],  # completed, failed + ar, fr, en + tenant isolation
+)
+PIPELINE_PV_SECTIONS = Counter(
+    "pipeline_pv_sections_total",
+    "Total PV sections generated",
+    ["client_id"],  # tenant isolation
+)
+PIPELINE_ACTIONS = Counter(
+    "pipeline_actions_total",
+    "Total actions created",
+    ["client_id"],  # tenant isolation
+)
+
+# Service Health Metrics (extern APIs)
+SERVICE_REQUEST_DURATION = Histogram(
+    "service_request_duration_seconds",
+    "External service request duration",
+    ["service", "operation"],
+    buckets=[0.1, 0.5, 1, 2, 5, 10, 30, 60],
+)
+SERVICE_REQUEST_ERRORS = Counter(
+    "service_request_errors_total",
+    "External service request errors",
+    ["service", "error_type"],  # timeout, 4xx, 5xx
+)
+
+# Celery Queue Metrics
+CELERY_QUEUE_DEPTH = Gauge(
+    "celery_queue_depth",
+    "Number of messages in Celery queue",
+    ["queue"],
+)
+
+# Legacy Metrics (backwards compatibility)
+PIPELINE_DURATION = Histogram(
+    "pipeline_duration_seconds",
+    "Total pipeline processing duration (legacy)",
+    ["stage"],
+    buckets=[1, 5, 10, 15, 30, 60, 90, 120],
+)
+PIPELINE_FAILURES = Counter(
+    "pipeline_failures_total",
+    "Total pipeline failures",
+    ["stage", "reason"],
+)
+ACTIVE_RECORDINGS = Gauge(
+    "active_recordings",
+    "Number of recordings currently being processed",
+)
+STORAGE_USAGE = Gauge(
+    "storage_usage_bytes",
+    "S3 storage usage per tenant",
+    ["client_id"],  # ISO 27001 A.8.26 Multi-Tenant
+)
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint. Internal only (PodIP, not via Ingress)."""
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 # API Routes

@@ -15,7 +15,7 @@ from botocore.exceptions import ClientError
 from sqlalchemy import select, insert, update, delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.core.config import settings, get_bucket_name
 from app.core.database import AsyncSessionLocal
 from app.models.action import Action, Assignment, ActionStatus
 from app.models.pv import PV, Section
@@ -138,6 +138,14 @@ def match_timestamps(words: List[Dict], segments: List[Dict]) -> List[Dict]:
     return result
 
 async def _process_recording_pipeline(recording_id: str, client_id: str) -> None:
+    from app.main import (
+        PIPELINE_STAGE_DURATION, PIPELINE_DURATION, PIPELINE_RECORDINGS, PIPELINE_TRANSCRIPTIONS,
+        PIPELINE_PV_SECTIONS, PIPELINE_ACTIONS, PIPELINE_FAILURES, ACTIVE_RECORDINGS,
+        SERVICE_REQUEST_DURATION, SERVICE_REQUEST_ERRORS,
+    )
+    import time
+    pipeline_start = time.time()
+    ACTIVE_RECORDINGS.inc()
     temp_path = None
     try:
         publish_status(recording_id, "uploaded", 5, "Initializing Map-Reduce Pipeline...")
@@ -169,7 +177,9 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             )
 
             # Download audio from S3
-            temp_path = await _download_audio(str(recording.file_path))
+            stage_start = time.time()
+            temp_path = await _download_audio(str(recording.file_path), str(recording.client_id))
+            PIPELINE_STAGE_DURATION.labels(stage="s3_download").observe(time.time() - stage_start)
             if not temp_path:
                 raise Exception("S3 Error: Failed to download audio from MinIO")
 
@@ -186,11 +196,14 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 )
 
             # 1. GLADIA PHASE (Diarization)
+            stage_start = time.time()
             num_participants = len(recording.room_participants or [])
             publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
             gladia_result = await gladia_service.transcribe_and_diarize(temp_path, num_room_participants=num_participants)
+            PIPELINE_STAGE_DURATION.labels(stage="transcription_gladia").observe(time.time() - stage_start)
 
             # 1.5 SPEAKER IDENTIFICATION PHASE (Audio + Text Fusion)
+            stage_start = time.time()
             publish_status(recording_id, "transcribing", 30, "Identifying Speakers...")
             await speaker_embedding_service.initialize()
 
@@ -212,6 +225,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 meeting=meeting,
                 room_participants=recording.room_participants or [],
             )
+            PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(time.time() - stage_start)
 
             # 1.6 APPLY SPEAKER NAMES TO TRANSCRIPT (Display-Kopie, Original bleibt erhalten)
             name_map = {
@@ -232,6 +246,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             # 2. MAP PHASE (Local SLM Sentinel) — Feature Gate by Subscription Plan
             # GRATUIT: skip Sentinel LLM (no memory overhead, faster pipeline)
             # PRO/ENTREPRISE: full Sentinel summarization
+            stage_start = time.time()
             client_result = await db.execute(select(Client).where(Client.id == client_id))
             client = client_result.scalar_one_or_none()
             plan = client.subscription_plan if client else None
@@ -253,8 +268,10 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 partial_summaries = await asyncio.gather(*map_tasks)
 
                 sentinel_summary = "\n---\n".join(partial_summaries)
+            PIPELINE_STAGE_DURATION.labels(stage="sentinel_llm").observe(time.time() - stage_start)
 
             # 3. REDUCE PHASE (Mistral) — dual context: Summary + Full Transcript (DISPLAY mit Namen)
+            stage_start = time.time()
             publish_status(recording_id, "analyzing", 75, "Final Protocol Refinement (Mistral)...")
 
             pv_data = await PVService.generate_pv(
@@ -265,8 +282,10 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 speaker_mappings=speaker_mappings,
                 speaker_segments=display_segments,  # DISPLAY segments mit Namen
             )
+            PIPELINE_STAGE_DURATION.labels(stage="pv_generation_mistral").observe(time.time() - stage_start)
 
             # 4. Persistence — verwendet DISPLAY-Kopie für Storage
+            stage_start = time.time()
             await _save_transcription(db, recording, {
                 "full_text": display_text,
                 "segments": display_segments,
@@ -275,6 +294,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 db, recording, pv_data, language="fr", speaker_mappings=speaker_mappings,
                 participant_names=participant_names
             )
+            PIPELINE_STAGE_DURATION.labels(stage="persistence").observe(time.time() - stage_start)
 
             recording.status = "completed"
 
@@ -301,8 +321,18 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
 
             publish_status(recording_id, "completed", 100, "ISS Synthesis Successful (33.3s target).")
             await _notify_n8n_completion(str(recording.id), str(recording.meeting_id), client_id)
+            duration = time.time() - pipeline_start
+            PIPELINE_DURATION.labels(stage="pipeline_total").observe(duration)
+            PIPELINE_STAGE_DURATION.labels(stage="pipeline_total").observe(duration)
+            PIPELINE_RECORDINGS.labels(status="completed", client_id=client_id).inc()
+            PIPELINE_TRANSCRIPTIONS.labels(status="completed", language="fr", client_id=client_id).inc()
+            if pv_data and pv_data.get("sections"):
+                PIPELINE_PV_SECTIONS.labels(client_id=client_id).inc(len(pv_data["sections"]))
+            logger.info(f"TIMING: pipeline_total duration={duration:.2f}s")
 
     except Exception as e:
+        PIPELINE_FAILURES.labels(stage="pipeline", reason=type(e).__name__).inc()
+        PIPELINE_RECORDINGS.labels(status="failed", client_id=client_id).inc()
         logger.error(f"Pipeline failed for recording {recording_id}: {str(e)}", exc_info=True)
         # Rollback: Set recording.status to "failed"
         async with AsyncSessionLocal() as db:
@@ -327,6 +357,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
         # Re-raise untuk Celery retry
         raise
     finally:
+        ACTIVE_RECORDINGS.dec()
         # Cleanup temp file
         if temp_path and os.path.exists(temp_path):
             try:
@@ -835,16 +866,17 @@ async def _save_transcription(db, recording, gladia_result):
 
     await _record_minutes_usage(db, recording, gladia_result)
 
-async def _download_audio(file_key: str) -> Optional[str]:
+async def _download_audio(file_key: str, client_id: str = None) -> Optional[str]:
     loop = asyncio.get_event_loop()
     s3_client = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
+    bucket = get_bucket_name(client_id)
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             await loop.run_in_executor(None,
-                lambda: s3_client.download_fileobj(settings.S3_BUCKET_NAME, file_key, tmp))
+                lambda: s3_client.download_fileobj(bucket, file_key, tmp))
             return tmp.name
     except Exception as e:
-        logger.error(f"S3 download failed: {e}")
+        logger.error(f"S3 download failed from bucket={bucket}: {e}")
         return None
 
 
@@ -863,13 +895,14 @@ async def _populate_recording_metadata(db, recording, file_key: str, temp_path: 
         aws_access_key_id=settings.S3_ACCESS_KEY,
         aws_secret_access_key=settings.S3_SECRET_KEY,
     )
+    bucket = get_bucket_name(str(recording.client_id))
 
     # 1. file_size via S3 HEAD (ContentLength)
     if recording.file_size is None:
         try:
             head = await loop.run_in_executor(
                 None,
-                lambda: s3_client.head_object(Bucket=settings.S3_BUCKET_NAME, Key=file_key),
+                lambda: s3_client.head_object(Bucket=bucket, Key=file_key),
             )
             size = head.get("ContentLength")
             if isinstance(size, int) and size > 0:

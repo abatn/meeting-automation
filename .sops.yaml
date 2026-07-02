@@ -1,3 +1,5 @@
 creation_rules:
-  - path_regex: infrastructure/kubernetes/.*secrets\.yaml$
-    age: age12f8u7gjf284d0ecr5x5uwshl9f96l4afxh0x2dlfa8rev5wm8u3smllfan
+  - path_regex: secrets/staging/.*\.yaml$
+    age: age1d77gyptx7kns6mx2mfsk8wwdpnaw97khkyyft9shdmslyzmkcguqq2g8ym
+  - path_regex: secrets/prod/.*\.yaml$
+    age: age1d77gyptx7kns6mx2mfsk8wwdpnaw97khkyyft9shdmslyzmkcguqq2g8ym

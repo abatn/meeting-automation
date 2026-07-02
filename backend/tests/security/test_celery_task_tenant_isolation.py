@@ -154,7 +154,7 @@ async def test_celery_task_no_client_id_filter_vulnerability(db_session: AsyncSe
         new_callable=AsyncMock,
         return_value=mock_pv_data,
     ), patch(
-        "app.tasks.transcription_tasks.sentinel"
+        "app.tasks.transcription_tasks.get_sentinel_service"
     ) as mock_sentinel, patch(
         "app.tasks.transcription_tasks.publish_status"
     ), patch(

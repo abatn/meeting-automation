@@ -70,7 +70,7 @@ async def get_my_usage(
 
 from fastapi.responses import Response
 import boto3
-from app.core.config import settings
+from app.core.config import settings, get_bucket_name
 
 @router.get("/invoices/download/{invoice_id}")
 async def download_invoice(
@@ -118,7 +118,7 @@ async def download_invoice(
         
         # Actually, let's just use the invoice_id in the filename in PDFService.
         
-        response = s3.get_object(Bucket=settings.S3_BUCKET_NAME, Key=key)
+        response = s3.get_object(Bucket=get_bucket_name(), Key=key)
         pdf_content = response['Body'].read()
         
         return Response(

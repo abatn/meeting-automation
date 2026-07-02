@@ -56,7 +56,7 @@ from app.services.pv_service import PVService
 from app.services.pdf_service import PDFService
 from app.services.docx_service import DOCXService
 from app.schemas.pv import PVUpdate, PVVersion as PVVersionSchema
-from app.core.config import settings
+from app.core.config import settings, get_bucket_name
 from app.core.database import AsyncSessionLocal
 
 router = APIRouter()
@@ -113,7 +113,7 @@ async def run_pdf_conversion(pv_id: str, docx_key: str, pdf_key: str):
                             s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT,
                                             aws_access_key_id=settings.S3_ACCESS_KEY,
                                             aws_secret_access_key=settings.S3_SECRET_KEY)
-                            s3.put_object(Bucket=settings.S3_BUCKET_NAME, Key=pdf_key, Body=pdf_resp.content)
+                            s3.put_object(Bucket=get_bucket_name(), Key=pdf_key, Body=pdf_resp.content)
                             logger.info(f"Background PDF conversion successful for {pv_id}")
                 else:
                     logger.error(f"OnlyOffice converter returned error for {pv_id}: {conv_data}")
@@ -184,7 +184,7 @@ async def download_pv_pdf(
     # Step 1: Check if edited DOCX exists in S3
     docx_exists = False
     try:
-        docx_meta = s3.head_object(Bucket=settings.S3_BUCKET_NAME, Key=docx_key)
+        docx_meta = s3.head_object(Bucket=get_bucket_name(), Key=docx_key)
         docx_exists = True
         docx_time = docx_meta['LastModified']
     except Exception:
@@ -215,14 +215,14 @@ async def download_pv_pdf(
             continue
         
         try:
-            pdf_meta = s3.head_object(Bucket=settings.S3_BUCKET_NAME, Key=pdf_key)
+            pdf_meta = s3.head_object(Bucket=get_bucket_name(), Key=pdf_key)
             pdf_time = pdf_meta['LastModified']
             
             if pdf_time >= docx_time:
                 # PDF is up-to-date → serve it
                 logger.info(f"Serving up-to-date edited PDF from S3 for PV {pv_id}")
                 local_pdf_path = f"/tmp/final_{pv_id}_{uuid.uuid4().hex[:6]}.pdf"
-                s3.download_file(settings.S3_BUCKET_NAME, pdf_key, local_pdf_path)
+                s3.download_file(get_bucket_name(), pdf_key, local_pdf_path)
                 return FileResponse(
                     path=local_pdf_path,
                     filename=f"final_{pv_id}.pdf",
@@ -253,7 +253,7 @@ async def download_pv_pdf(
     logger.warning(f"PDF conversion timed out for {pv_id}. Serving edited DOCX instead.")
     try:
         local_docx_path = f"/tmp/final_{pv_id}_{uuid.uuid4().hex[:6]}.docx"
-        s3.download_file(settings.S3_BUCKET_NAME, docx_key, local_docx_path)
+        s3.download_file(get_bucket_name(), docx_key, local_docx_path)
         return FileResponse(
             path=local_docx_path,
             filename=f"final_{pv_id}.docx",
@@ -282,7 +282,7 @@ async def download_pv_docx(
     s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
     try:
         local_docx_path = f"/tmp/final_{pv_id}_{uuid.uuid4().hex[:6]}.docx"
-        s3.download_file(settings.S3_BUCKET_NAME, s3_key, local_docx_path)
+        s3.download_file(get_bucket_name(), s3_key, local_docx_path)
         return FileResponse(local_docx_path, filename=f"final_minutes_{pv_id}.docx", media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     except Exception:
         try:
@@ -396,7 +396,7 @@ async def get_onlyoffice_config(pv_id: str, language: str = "fr", request: Reque
     local_path = await docx_service.generate_pv_docx(pv_id, current_user.client_id, language=language)
     file_key = f"tmp_edits/{pv_id}/{os.path.basename(local_path)}"
     s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
-    with open(local_path, "rb") as f: s3.upload_fileobj(f, settings.S3_BUCKET_NAME, file_key)
+    with open(local_path, "rb") as f: s3.upload_fileobj(f, get_bucket_name(), file_key)
     # Dynamische URLs aus Host-Header (funktioniert für localhost UND externe IP)
     host = request.headers.get("host", "localhost:3000") if request else "localhost:3000"
     scheme = request.headers.get("x-forwarded-proto", "http") if request else "http"
@@ -433,7 +433,7 @@ async def onlyoffice_download(
         raise HTTPException(status_code=403, detail="Invalid file key")
     s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
     try:
-        response = s3.get_object(Bucket=settings.S3_BUCKET_NAME, Key=file_key)
+        response = s3.get_object(Bucket=get_bucket_name(), Key=file_key)
         return StreamingResponse(response['Body'].iter_chunks(), media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     except Exception:
         raise HTTPException(status_code=404, detail="File not found")
@@ -453,7 +453,7 @@ async def onlyoffice_download_internal(
         raise HTTPException(status_code=403, detail="Invalid file key")
     s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
     try:
-        response = s3.get_object(Bucket=settings.S3_BUCKET_NAME, Key=file_key)
+        response = s3.get_object(Bucket=get_bucket_name(), Key=file_key)
         return StreamingResponse(response['Body'].iter_chunks(), media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     except Exception:
         raise HTTPException(status_code=404, detail="File not found")
@@ -508,7 +508,7 @@ async def onlyoffice_callback(pv_id: str, data: dict, request: Request, backgrou
         s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT, aws_access_key_id=settings.S3_ACCESS_KEY, aws_secret_access_key=settings.S3_SECRET_KEY)
         
         # 1. Update DOCX in S3
-        s3.put_object(Bucket=settings.S3_BUCKET_NAME, Key=docx_key, Body=content)
+        s3.put_object(Bucket=get_bucket_name(), Key=docx_key, Body=content)
         
         # 2. Synchronous Sync-State: Set Redis conversion key BEFORE responding to OnlyOffice
         # This ensures download_pv_pdf immediately sees the "in-progress" state.
@@ -517,7 +517,7 @@ async def onlyoffice_callback(pv_id: str, data: dict, request: Request, backgrou
         
         # 3. Cache-Busting: Delete old PDF to force a wait in the download endpoint
         try: 
-            s3.delete_object(Bucket=settings.S3_BUCKET_NAME, Key=pdf_key)
+            s3.delete_object(Bucket=get_bucket_name(), Key=pdf_key)
             logger.info(f"Old PDF deleted for PV {pv_id} to ensure fresh conversion")
         except Exception:
             pass

@@ -27,7 +27,7 @@ from sqlalchemy import select
 import os
 
 from app.main import app
-from app.core.config import settings
+from app.core.config import settings, get_bucket_name
 from app.models.meeting import Meeting
 from app.models.recording import Recording
 from app.models.user import User, UserRole, UserStatus
@@ -46,7 +46,7 @@ class TestPhase7MinIOIntegration:
         """
         Test P1-6: Recording upload creates file_key with client_id prefix
         
-        Expected: file_key = "{client_id}/recordings/{meeting_id}/{uuid}_{filename}"
+        Expected: file_key = "recordings/{meeting_id}/{uuid}_{filename}"
         """
         # Setup
         current_user = authenticated_user_a["user"]
@@ -84,9 +84,9 @@ class TestPhase7MinIOIntegration:
             file=mock_file
         )
         
-        # Assert: file_key contains client_id prefix
-        assert recording.file_path.startswith(authenticated_user_a["client_id"])
-        assert f"/recordings/{meeting.id}/" in recording.file_path
+        # Assert: file_key follows new format (bucket-per-tenant, no client_id in key)
+        assert recording.file_path.startswith("recordings/")
+        assert f"recordings/{meeting.id}/" in recording.file_path
         assert "test_audio.wav" in recording.file_path
         print(f"✅ File key with client_id prefix: {recording.file_path}")
 
@@ -95,7 +95,7 @@ class TestPhase7MinIOIntegration:
         """
         Test P1-6: Stream recording creates file_key with client_id prefix
         
-        Expected: file_key = "{client_id}/recordings/{meeting_id}/{uuid}_stream.webm"
+        Expected: file_key = "recordings/{meeting_id}/{uuid}_stream.webm"
         """
         # Setup
         current_user = authenticated_user_a["user"]
@@ -118,9 +118,9 @@ class TestPhase7MinIOIntegration:
             client_id=current_user.client_id
         )
         
-        # Assert: file_key contains client_id prefix
-        assert result["file_key"].startswith(authenticated_user_a["client_id"])
-        assert f"/recordings/{meeting.id}/" in result["file_key"]
+        # Assert: file_key follows new format
+        assert result["file_key"].startswith("recordings/")
+        assert f"recordings/{meeting.id}/" in result["file_key"]
         assert "stream.webm" in result["file_key"]
         print(f"✅ Stream file key with client_id prefix: {result['file_key']}")
 
@@ -147,8 +147,8 @@ class TestPhase7MinIOIntegration:
         
         # Generate presigned URL
         service = RecordingService(db_session)
-        file_key = f"{authenticated_user_a['client_id']}/recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
-        presigned_url = service.get_presigned_upload_url(file_key, expires_in=3600)
+        file_key = f"recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
+        presigned_url = service.get_presigned_upload_url(file_key, authenticated_user_a["client_id"], expires_in=3600)
         
         # Assert: URL is valid and contains signature
         assert presigned_url is not None
@@ -177,7 +177,7 @@ class TestPhase7MinIOIntegration:
         )
         db_session.add(meeting)
         
-        file_key = f"{authenticated_user_a['client_id']}/recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
+        file_key = f"recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
         recording = Recording(
             id=str(uuid.uuid4()),
             client_id=authenticated_user_a["client_id"],
@@ -191,7 +191,7 @@ class TestPhase7MinIOIntegration:
         
         # Generate presigned URL
         service = RecordingService(db_session)
-        presigned_url = service.get_presigned_download_url(file_key, expires_in=3600)
+        presigned_url = service.get_presigned_download_url(file_key, authenticated_user_a["client_id"], expires_in=3600)
         
         # Assert: URL is valid and contains signature
         assert presigned_url is not None
@@ -232,7 +232,7 @@ class TestPhase7MinIOIntegration:
         data = response.json()
         assert "presigned_url" in data
         assert "file_key" in data
-        assert data["file_key"].startswith(authenticated_user_a["client_id"])
+        assert data["file_key"].startswith("recordings/")
         assert "Signature=" in data["presigned_url"]
         print(f"✅ API presigned upload endpoint works: {data['file_key']}")
 
@@ -256,7 +256,7 @@ class TestPhase7MinIOIntegration:
         )
         db_session.add(meeting)
         
-        file_key = f"{authenticated_user_a['client_id']}/recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
+        file_key = f"recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
         recording = Recording(
             id=str(uuid.uuid4()),
             client_id=authenticated_user_a["client_id"],
@@ -306,11 +306,11 @@ class TestPhase7MinIOIntegration:
         
         # Generate presigned URL for Client A
         service = RecordingService(db_session)
-        file_key_a = f"{authenticated_user_a['client_id']}/recordings/{meeting_a.id}/{uuid.uuid4()}_test.wav"
-        presigned_url_a = service.get_presigned_upload_url(file_key_a)
+        file_key_a = f"recordings/{meeting_a.id}/{uuid.uuid4()}_test.wav"
+        presigned_url_a = service.get_presigned_upload_url(file_key_a, authenticated_user_a["client_id"])
         
         # Verify Client A's file_key contains their client_id
-        assert file_key_a.startswith(authenticated_user_a["client_id"])
+        assert file_key_a.startswith("recordings/")
         
         # Try to access with Client B's meeting
         user_b = authenticated_user_b["user"]
@@ -325,11 +325,11 @@ class TestPhase7MinIOIntegration:
         await db_session.commit()
         
         # Client B cannot access Client A's presigned URL
-        # Because the file_key contains Client A's client_id
-        assert not presigned_url_a.replace(user_a.client_id, user_b.client_id) == presigned_url_a
+        # Phase 97: bucket-per-tenant — URLs contain different bucket names
+        assert get_bucket_name(user_a.client_id) != get_bucket_name(user_b.client_id)
         
         # Verify bucket isolation by checking file_key structure
-        assert not file_key_a.startswith(user_b.client_id)
+        # Phase 97: bucket-per-tenant isoliert via bucket, nicht via key prefix
         print(f"✅ Cross-tenant isolation enforced: {user_a.client_id} != {user_b.client_id}")
 
     @pytest.mark.asyncio
@@ -378,7 +378,7 @@ class TestPhase7MinIOIntegration:
         """
         Test: Recording file_key follows required format with client_id prefix
         
-        Format: {client_id}/recordings/{meeting_id}/{uuid}_{filename}
+        Format: recordings/{meeting_id}/{uuid}_{filename}
         """
         current_user = authenticated_user_a["user"]
         
@@ -397,7 +397,7 @@ class TestPhase7MinIOIntegration:
         service = RecordingService(db_session)
         
         # Verify format is correct
-        expected_prefix = f"{authenticated_user_a['client_id']}/recordings/{meeting.id}/"
+        expected_prefix = f"recordings/{meeting.id}/"
         
         # Test with upload
         from fastapi import UploadFile
@@ -418,13 +418,12 @@ class TestPhase7MinIOIntegration:
             file=mock_file
         )
         
-        # Validate format
+        # Validate format — bucket-per-tenant, key = recordings/meeting_id/uuid_filename
         parts = recording.file_path.split("/")
-        assert len(parts) >= 4  # client_id/recordings/meeting_id/uuid_filename
-        assert parts[0] == authenticated_user_a["client_id"]
-        assert parts[1] == "recordings"
-        assert parts[2] == meeting.id
-        assert "_test_recording.mp3" in parts[3]  # UUID_filename
+        assert len(parts) == 3  # recordings/meeting_id/uuid_filename
+        assert parts[0] == "recordings"
+        assert parts[1] == meeting.id
+        assert "_test_recording.mp3" in parts[2]  # UUID_filename
         
         print(f"✅ File key format validated: {recording.file_path}")
 
@@ -448,11 +447,11 @@ class TestPhase7MinIOIntegration:
         await db_session.commit()
         
         service = RecordingService(db_session)
-        file_key = f"{authenticated_user_a['client_id']}/recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
+        file_key = f"recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
         
         # Test with custom expiry
-        presigned_url_1h = service.get_presigned_upload_url(file_key, expires_in=3600)
-        presigned_url_24h = service.get_presigned_upload_url(file_key, expires_in=86400)
+        presigned_url_1h = service.get_presigned_upload_url(file_key, authenticated_user_a["client_id"], expires_in=3600)
+        presigned_url_24h = service.get_presigned_upload_url(file_key, authenticated_user_a["client_id"], expires_in=86400)
         
         # Both should be valid URLs
         assert "Signature=" in presigned_url_1h
@@ -483,10 +482,10 @@ class TestPhase7MinIOIntegration:
         await db_session.commit()
         
         service = RecordingService(db_session)
-        file_key = f"{authenticated_user_a['client_id']}/recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
+        file_key = f"recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
         
         # Generate presigned URL (should be logged by service)
-        presigned_url = service.get_presigned_upload_url(file_key)
+        presigned_url = service.get_presigned_upload_url(file_key, authenticated_user_a["client_id"])
         
         # Verify URL is created (logging happens internally)
         assert presigned_url is not None
@@ -545,12 +544,12 @@ class TestPhase7MinioBucketPolicy:
         Security: No public read access to recordings
         """
         # Check S3/MinIO configuration
-        assert settings.S3_BUCKET_NAME == "meeting-recordings"
+        from app.core.config import get_bucket_name; assert get_bucket_name() == "meeting-recordings"
         assert settings.S3_ENDPOINT is not None
         
         # In production, bucket should not have public read policy
         # This is a manual verification step
-        print(f"✅ MinIO bucket configuration: {settings.S3_BUCKET_NAME}")
+        print(f"✅ MinIO bucket configuration: {get_bucket_name()}")
         print(f"   Endpoint: {settings.S3_ENDPOINT}")
         print(f"   Manual verification: Ensure bucket has no public read policy")
 
@@ -577,13 +576,13 @@ class TestPhase7MinioBucketPolicy:
         
         # Malicious attempt: Try to construct file_key with ../
         # Normal behavior: client_id is prefixed by service
-        legitimate_file_key = f"{authenticated_user_a['client_id']}/recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
+        legitimate_file_key = f"recordings/{meeting.id}/{uuid.uuid4()}_test.wav"
         
         # Verify legitimate key is properly formed
         assert not ".." in legitimate_file_key
-        assert legitimate_file_key.startswith(authenticated_user_a["client_id"])
+        assert legitimate_file_key.startswith("recordings/")
         
-        presigned_url = service.get_presigned_upload_url(legitimate_file_key)
+        presigned_url = service.get_presigned_upload_url(legitimate_file_key, authenticated_user_a["client_id"])
         
         # URL should contain the file_key exactly as constructed
         assert legitimate_file_key in presigned_url
@@ -596,7 +595,7 @@ class TestPhase7MinioBucketPolicy:
 async def authenticated_user_a(db_session: AsyncSession):
     """Fixture: Create and authenticate User A"""
     from jose import jwt
-    from app.core.config import settings
+    from app.core.config import settings, get_bucket_name
     from app.models.client import Client, SubscriptionStatus
 
     client_a = Client(
@@ -631,7 +630,7 @@ async def authenticated_user_a(db_session: AsyncSession):
 async def authenticated_user_b(db_session: AsyncSession):
     """Fixture: Create and authenticate User B (different tenant)"""
     from jose import jwt
-    from app.core.config import settings
+    from app.core.config import settings, get_bucket_name
     from app.models.client import Client, SubscriptionStatus
 
     client_b = Client(

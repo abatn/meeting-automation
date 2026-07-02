@@ -315,6 +315,26 @@ def mock_n8n_action():
         yield mock_post
 
 
+@pytest.fixture(autouse=True)
+def _reset_recording_rate_limit():
+    """
+    Reset Redis recording rate-limit keys before each test to avoid 429 errors
+    from accumulated uploads across tests.
+    """
+    try:
+        import redis
+        r = redis.from_url(settings.REDIS_URL, decode_responses=True)
+        day = time.strftime("%Y-%m-%d")
+        # Flush all rate:recording:* keys for today
+        for key in r.scan_iter("rate:recording:*"):
+            r.delete(key)
+        # Also flush rate:api:* keys
+        for key in r.scan_iter("rate:api:*"):
+            r.delete(key)
+    except Exception:
+        pass  # Redis not available — skip reset
+
+
 @pytest.fixture
 def mock_sentinel():
     """
@@ -380,9 +400,15 @@ async def e2e_recording(
         aws_secret_access_key=settings.S3_SECRET_KEY,
     )
     
-    file_key = f"{e2e_meeting['client_id']}/recordings/{meeting_id}/{uuid.uuid4()}_test.wav"
+    file_key = f"recordings/{meeting_id}/{uuid.uuid4()}_test.wav"
+    from app.core.config import get_bucket_name
+    bucket = get_bucket_name(e2e_meeting['client_id'])
+    try:
+        s3_client.create_bucket(Bucket=bucket)
+    except Exception:
+        pass  # Bucket already exists
     s3_client.put_object(
-        Bucket=settings.S3_BUCKET_NAME,
+        Bucket=bucket,
         Key=file_key,
         Body=sample_audio_bytes,
         ContentType="audio/wav"

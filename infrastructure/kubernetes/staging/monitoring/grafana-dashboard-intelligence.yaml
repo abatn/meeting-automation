@@ -1,0 +1,218 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-intelligence
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  meeting-pipeline-intelligence.json: |
+    {
+      "uid": "meeting-pipeline-intelligence",
+      "title": "Meeting Pipeline Intelligence",
+      "tags": ["meeting-automation", "intelligence"],
+      "timezone": "browser",
+      "refresh": "10s",
+      "time": { "from": "now-6h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "stage",
+            "type": "query",
+            "query": "label_values(pipeline_stage_duration_seconds_bucket, stage)",
+            "refresh": 2,
+            "multi": true,
+            "includeAll": true
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "Pipeline Success Rate",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 4, "x": 0, "y": 0 },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0, "max": 100,
+              "thresholds": {
+                "steps": [
+                  { "value": 0, "color": "red" },
+                  { "value": 95, "color": "yellow" },
+                  { "value": 99, "color": "green" }
+                ]
+              }
+            }
+          },
+          "targets": [
+            {
+              "expr": "pipeline:success_rate:5m or vector(100)",
+              "legendFormat": "Success Rate"
+            }
+          ]
+        },
+        {
+          "title": "Active Recordings",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 4, "x": 4, "y": 0 },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  { "value": 0, "color": "green" },
+                  { "value": 5, "color": "yellow" },
+                  { "value": 10, "color": "red" }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "active_recordings", "legendFormat": "Active" }
+          ]
+        },
+        {
+          "title": "Recordings (24h)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 4, "x": 8, "y": 0 },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  { "value": 0, "color": "blue" }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "sum(increase(pipeline_recordings_total[24h])) or vector(0)", "legendFormat": "Total" }
+          ]
+        },
+        {
+          "title": "Failed (24h)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 4, "x": 12, "y": 0 },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  { "value": 0, "color": "green" },
+                  { "value": 1, "color": "red" }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "sum(increase(pipeline_recordings_total{status=\"failed\"}[24h])) or vector(0)", "legendFormat": "Failed" }
+          ]
+        },
+        {
+          "title": "Celery Queue Depth",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 4, "x": 16, "y": 0 },
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "steps": [
+                  { "value": 0, "color": "green" },
+                  { "value": 10, "color": "yellow" },
+                  { "value": 50, "color": "red" }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "sum(celery_queue_depth) or vector(0)", "legendFormat": "Queue" }
+          ]
+        },
+        {
+          "title": "SLO Compliance (30d)",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 4, "x": 20, "y": 0 },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 90, "max": 100,
+              "thresholds": {
+                "steps": [
+                  { "value": 90, "color": "red" },
+                  { "value": 99, "color": "yellow" },
+                  { "value": 99.9, "color": "green" }
+                ]
+              }
+            }
+          },
+          "targets": [
+            { "expr": "(slo:api_availability:30d * 100) or vector(99.9)", "legendFormat": "Availability" }
+          ]
+        },
+        {
+          "title": "Pipeline Duration (P50 / P95 / P99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "pipeline:p50_duration:5m or vector(0)", "legendFormat": "P50" },
+            { "expr": "pipeline:p95_duration:5m or vector(0)", "legendFormat": "P95" },
+            { "expr": "pipeline:p99_duration:5m or vector(0)", "legendFormat": "P99" }
+          ]
+        },
+        {
+          "title": "Stage Breakdown (P95)",
+          "type": "barchart",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            {
+              "expr": "(histogram_quantile(0.95, sum(rate(pipeline_stage_duration_seconds_bucket[5m])) by (le, stage))) or vector(0)",
+              "legendFormat": "{{ stage }}",
+              "instant": true
+            }
+          ]
+        },
+        {
+          "title": "Recording Trend (per hour)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+          "targets": [
+            { "expr": "increase(pipeline_recordings_total[1h]) or vector(0)", "legendFormat": "Total" },
+            { "expr": "increase(pipeline_recordings_total{status=\"completed\"}[1h]) or vector(0)", "legendFormat": "Completed" },
+            { "expr": "increase(pipeline_recordings_total{status=\"failed\"}[1h]) or vector(0)", "legendFormat": "Failed" }
+          ]
+        },
+        {
+          "title": "Service Request Latency (Avg)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "sum(increase(http_request_duration_seconds_sum[1h])) / sum(increase(http_request_duration_seconds_count[1h]))", "legendFormat": "Avg Latency" }
+          ]
+        },
+        {
+          "title": "HTTP Request Error Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 22 },
+          "fieldConfig": { "defaults": { "unit": "percent" } },
+          "targets": [
+            { "expr": "(sum(rate(http_requests_total{status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total[5m])) * 100) or vector(0)", "legendFormat": "Error Rate %" }
+          ]
+        },
+        {
+          "title": "Tenant Activity",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 22 },
+          "targets": [
+            {
+              "expr": "(sum by (client_id) (increase(pipeline_recordings_total[24h]))) or vector(0)",
+              "legendFormat": "{{ client_id }}",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            { "id": "organize", "options": { "renameByName": { "client_id": "Tenant", "Value": "Recordings (24h)" } } }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

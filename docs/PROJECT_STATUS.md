@@ -1,9 +1,11 @@
-## 🎉 CURRENT STATUS — 2026-06-27: PHASE 90 COMPLETE ✅
+## CURRENT STATUS — 2026-06-28: PHASE 92 IN ARBEIT
 
-**k3s Staging | 13 Pods Running | Pipeline 31.7s | Mailtrap SMTP | Contact-Formular | Resource Right-Sizing (5.2 Gi eingespart)**
+**k3s Staging 2-Node | Longhorn 2-Replica | CloudNativePG + Velero installiert | firewalld ISO 27001 konform**
 
-### System Status (Phase 90)
-- **Pods**: 13 Running (backend×2, frontend, celery-worker, celery-beat, postgres, redis, minio, rabbitmq, livekit-server, livekit-egress, onlyoffice, n8n)
+### System Status (Phase 92)
+- **Nodes**: 2 (Node 1: 10.0.0.191 control-plane, Node 2: 10.0.0.11 agent)
+- **k3s Version**: v1.35.5+k3s1 (beide Nodes)
+- **Pods**: 21+ Running (inkl. cert-manager, nginx-ingress, cnpg-operator, velero)
 - **Backend Health**: `{"status":"healthy","version":"1.0.0"}` via HTTPS
 - **Frontend**: HTTP 200 via `https://staging.meeting-automation.com`
 - **TLS Certificate**: `staging-tls` READY=True (Let's Encrypt HTTP-01)

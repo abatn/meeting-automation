@@ -22,6 +22,7 @@ class UserRole(str, enum.Enum):
     MANAGER = "manager"
     PARTICIPANT = "participant"
     DG = "dg"
+    TECH_ADMIN = "tech_admin"
 
 
 class UserStatus(str, enum.Enum):

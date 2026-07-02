@@ -9,7 +9,7 @@ from typing import Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-from app.core.config import settings
+from app.core.config import settings, get_bucket_name
 from app.core.redis_client import get_redis_client
 
 logger = logging.getLogger(__name__)
@@ -18,81 +18,68 @@ class MonitoringService:
     
     @staticmethod
     async def get_container_metrics() -> Dict[str, Any]:
-        """Fetch container metrics via Docker socket or K8s API"""
+        """Fetch container metrics via Prometheus cadvisor"""
         metrics = {
             "frontend": {"cpu_percent": 0, "ram_mb": 0, "uptime_s": 0},
             "backend": {"cpu_percent": 0, "ram_mb": 0, "uptime_s": 0},
             "celery": {"cpu_percent": 0, "ram_mb": 0, "uptime_s": 0}
         }
         
-        # 1. Try Docker SDK if available
+        prom_url = "http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
+        
         try:
-            import docker
-            client = docker.from_env()
-            containers = client.containers.list()
-            for container in containers:
-                name = container.name.lower()
-                service_key = None
-                if "frontend" in name:
-                    service_key = "frontend"
-                elif "backend" in name:
-                    service_key = "backend"
-                elif "celery-worker" in name or "celery_worker" in name:
-                    service_key = "celery"
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                # Query container CPU usage rate (5min average)
+                cpu_resp = await client.get(
+                    f"{prom_url}/api/v1/query",
+                    params={"query": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"meeting-automation-staging\", container!=\"\"}[5m])) * 100"}
+                )
+                # Query container memory working set
+                mem_resp = await client.get(
+                    f"{prom_url}/api/v1/query",
+                    params={"query": "sum by (pod) (container_memory_working_set_bytes{namespace=\"meeting-automation-staging\", container!=\"\"}) / 1024 / 1024"}
+                )
+                # Query container uptime (start time)
+                uptime_resp = await client.get(
+                    f"{prom_url}/api/v1/query",
+                    params={"query": "time() - container_start_time_seconds{namespace=\"meeting-automation-staging\", container!=\"\"}"}
+                )
                 
-                if service_key:
-                    try:
-                        # stream=False returns a single snapshot. 
-                        # WARNING: Calculating CPU% correctly from docker stats requires 2 points, 
-                        # but stats API with stream=False provides precpu_stats.
-                        stats = container.stats(stream=False)
-                        
-                        # RAM
-                        mem_usage = stats.get('memory_stats', {}).get('usage', 0)
-                        # Exclude cache if possible (depends on OS)
-                        mem_cache = stats.get('memory_stats', {}).get('stats', {}).get('cache', 0)
-                        ram_mb = (mem_usage - mem_cache) / (1024 * 1024)
-                        
-                        # CPU 
-                        cpu_delta = stats['cpu_stats']['cpu_usage']['total_usage'] - stats['precpu_stats']['cpu_usage']['total_usage']
-                        system_cpu_delta = stats['cpu_stats']['system_cpu_usage'] - stats['precpu_stats'].get('system_cpu_usage', stats['cpu_stats']['system_cpu_usage'] - 1)
-                        number_cpus = stats['cpu_stats'].get('online_cpus', 1)
-                        cpu_percent = 0.0
-                        if system_cpu_delta > 0 and cpu_delta > 0:
-                            cpu_percent = (cpu_delta / system_cpu_delta) * number_cpus * 100.0
+                def map_pod_to_service(pod_name: str) -> str:
+                    if "frontend" in pod_name:
+                        return "frontend"
+                    elif "celery-worker" in pod_name or "celery_worker" in pod_name:
+                        return "celery"
+                    elif "backend" in pod_name:
+                        return "backend"
+                    return ""
+                
+                if cpu_resp.status_code == 200:
+                    for result in cpu_resp.json().get("data", {}).get("result", []):
+                        pod = result["metric"].get("pod", "")
+                        service = map_pod_to_service(pod)
+                        if service:
+                            cpu_val = float(result["value"][1]) if result["value"][1] != "NaN" else 0.0
+                            metrics[service]["cpu_percent"] = round(cpu_val, 2)
+                
+                if mem_resp.status_code == 200:
+                    for result in mem_resp.json().get("data", {}).get("result", []):
+                        pod = result["metric"].get("pod", "")
+                        service = map_pod_to_service(pod)
+                        if service:
+                            mem_val = float(result["value"][1]) if result["value"][1] != "NaN" else 0.0
+                            metrics[service]["ram_mb"] = round(mem_val, 1)
+                
+                if uptime_resp.status_code == 200:
+                    for result in uptime_resp.json().get("data", {}).get("result", []):
+                        pod = result["metric"].get("pod", "")
+                        service = map_pod_to_service(pod)
+                        if service:
+                            uptime_val = float(result["value"][1]) if result["value"][1] != "NaN" else 0.0
+                            metrics[service]["uptime_s"] = round(uptime_val, 0)
                             
-                        # Uptime approx
-                        import dateutil.parser
-                        import datetime
-                        started_at_str = container.attrs['State']['StartedAt']
-                        started_at = dateutil.parser.isoparse(started_at_str).replace(tzinfo=datetime.timezone.utc)
-                        now = datetime.datetime.now(datetime.timezone.utc)
-                        uptime_s = (now - started_at).total_seconds()
-                        
-                        metrics[service_key] = {
-                            "cpu_percent": round(cpu_percent, 2),
-                            "ram_mb": round(ram_mb, 2),
-                            "uptime_s": round(uptime_s, 0)
-                        }
-                    except Exception as inner_e:
-                        logger.warning(f"Failed getting stats for container {name}: {inner_e}")
-                        
         except Exception as e:
-            logger.info(f"Docker API unavailable: {e}")
-            # 2. Try K8s API as fallback
-            try:
-                from kubernetes import client, config
-                config.load_incluster_config()
-                v1 = client.CoreV1Api()
-                custom_api = client.CustomObjectsApi()
-                # Fetch pod metrics from metrics.k8s.io
-                pod_metrics = custom_api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods")
-                pods = v1.list_pod_for_all_namespaces(watch=False)
-                
-                # Logic to parse pod metrics and map to frontend/backend/celery...
-                # This is simplified for the example
-            except Exception as e2:
-                logger.info(f"K8s API unavailable: {e2}")
+            logger.warning(f"Prometheus container metrics unavailable: {e}")
                 
         return metrics
 
@@ -147,7 +134,11 @@ class MonitoringService:
             "latency_ms": -1,
             "hit_rate": 0.0,
             "memory_mb": 0.0,
-            "evicted_keys": 0
+            "memory_used": "0B",
+            "evicted_keys": 0,
+            "total_keys": 0,
+            "version": "unknown",
+            "uptime_seconds": 0
         }
         try:
             redis_start = time.time()
@@ -168,6 +159,18 @@ class MonitoringService:
             info_memory = await r_client.info('memory')
             mem_bytes = info_memory.get('used_memory', 0)
             metrics["memory_mb"] = mem_bytes / (1024 * 1024)
+            metrics["memory_used"] = info_memory.get('used_memory_human', f"{mem_bytes / (1024*1024):.1f}M")
+            
+            # Server info
+            info_server = await r_client.info('server')
+            metrics["version"] = info_server.get('redis_version', 'unknown')
+            metrics["uptime_seconds"] = int(info_server.get('uptime_in_seconds', 0))
+            
+            # Keys
+            info_keyspace = await r_client.info('keyspace')
+            for db_key, db_info in info_keyspace.items():
+                if db_key.startswith('db'):
+                    metrics["total_keys"] += int(db_info.get('keys', 0))
             
         except Exception as e:
             logger.error(f"Redis Monitoring error: {e}")
@@ -199,7 +202,7 @@ class MonitoringService:
             
             paginator = s3.get_paginator('list_objects_v2')
             try:
-                for page in paginator.paginate(Bucket=settings.S3_BUCKET_NAME):
+                for page in paginator.paginate(Bucket=get_bucket_name()):
                     if 'Contents' in page:
                         for obj in page['Contents']:
                             total_size += obj['Size']
@@ -231,7 +234,7 @@ class MonitoringService:
 
             async with httpx.AsyncClient(timeout=2.0) as client:
                 r = await client.get(
-                    "http://rabbitmq:15672/api/queues/", 
+                    "http://rabbitmq-staging:15672/api/queues/", 
                     auth=(rabbit_user, rabbit_pass)
                 )
                 if r.status_code == 200:
@@ -313,7 +316,7 @@ class MonitoringService:
         n8n_status = "unknown"
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
-                r = await client.get("http://n8n:5678/healthz")
+                r = await client.get("http://n8n-staging:5678/healthz")
                 if r.status_code == 200:
                     n8n_status = "healthy"
                 else:
