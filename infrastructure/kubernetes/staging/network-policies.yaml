@@ -9,7 +9,7 @@ spec:
   policyTypes:
   - Ingress
 ---
-# Postgres: Only allow Backend and n8n
+# Postgres: Only allow Backend, n8n, Celery
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -34,7 +34,7 @@ spec:
     - protocol: TCP
       port: 5432
 ---
-# Redis: Only allow Backend and Celery
+# Redis: Backend, Celery, Egress, LiveKit Server
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -55,6 +55,12 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-beat-staging
+    - podSelector:
+        matchLabels:
+          app: livekit-egress-staging
+    - podSelector:
+        matchLabels:
+          app: livekit-server-staging
     ports:
     - protocol: TCP
       port: 6379
@@ -113,7 +119,7 @@ spec:
     - protocol: TCP
       port: 9001
 ---
-# Backend: Only allow Frontend and Ingress
+# Backend: Only allow Frontend
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -132,7 +138,7 @@ spec:
     - protocol: TCP
       port: 8000
 ---
-# Frontend: Allow from everywhere (via Ingress/LoadBalancer)
+# Frontend: Allow from everywhere
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -149,8 +155,8 @@ spec:
     ports:
     - protocol: TCP
       port: 80
-
-# OnlyOffice: Allow Backend and Frontend ingress, egress to RabbitMQ
+---
+# OnlyOffice: Allow Backend and Frontend, egress to RabbitMQ
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -179,8 +185,8 @@ spec:
     ports:
     - protocol: TCP
       port: 5672
-
-# n8n: Allow Backend to access webhook port
+---
+# n8n: Allow Backend
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -199,7 +205,7 @@ spec:
     - protocol: TCP
       port: 5678
 ---
-# LiveKit: Allow egress to Redis and Backend (webhooks)
+# LiveKit Server: Egress to Redis, Backend, DNS
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -224,8 +230,15 @@ spec:
     ports:
     - protocol: TCP
       port: 8000
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    to:
+    - namespaceSelector: {}
 ---
-# LiveKit Egress: Allow egress to Redis, MinIO, and LiveKit
+# LiveKit Egress: Egress to Redis, MinIO, LiveKit, DNS
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -257,3 +270,10 @@ spec:
     ports:
     - protocol: TCP
       port: 7880
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    to:
+    - namespaceSelector: {}
