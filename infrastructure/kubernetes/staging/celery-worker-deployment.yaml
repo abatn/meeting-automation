@@ -22,7 +22,7 @@ spec:
         command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info"]
         resources:
           requests:
-            memory: "256Mi"
+            memory: "512Mi"
             cpu: "100m"
           limits:
             memory: "2Gi"
