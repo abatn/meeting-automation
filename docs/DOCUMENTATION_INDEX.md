@@ -1,7 +1,7 @@
 # Dokumentation Übersicht — Meeting Automation System
 
-> Automatisch kategorisiert: 2026-06-28 | 118+ Dateien in `docs/`
-> **Status**: k3s Staging 2-Node aktiv, Phase 122 abgeschlossen, Longhorn 2-Replica, CloudNativePG HA + Velero installiert
+> Automatisch kategorisiert: 2026-07-03 | 120+ Dateien in `docs/`
+> **Status**: k3s Staging 2-Node aktiv, Phase 137 abgeschlossen, Longhorn 2-Replica, CloudNativePG HA + Velero installiert
 
 ## 1. Architektur & Systemdesign
 
@@ -29,6 +29,7 @@
 | `LIVEKIT_CONNECTION_INSTABILITY_ANALYSIS_2026-06-11.md` | Instabilitätsanalyse (WebRTC, ICE) |
 | `LIVEKIT_URL_FIX_2026-06-11.md` | URL-Fix (PUBLIC_URL, Webhook) |
 | `LIVEKIT_TIER2_VERIFICATION_2026-06-06.md` | Tier-2 Pipeline Hardening Verification |
+| `LIVEKIT_ONLYOFFICE_K3S_FIX_2026-07-03.md` | **LiveKit + OnlyOffice K3s 2-Node Fix** (Phase 135-137) |
 
 ## 3. KI-Pipeline (Transcription, PV, Actions)
 
@@ -76,6 +77,7 @@
 | `STAGING_CLUSTER_SETUP_PLAN.md` | Cluster Setup (k3s) |
 | `ROADMAP_STAGING_VS_PRODUCTION.md` | Staging vs Production Gap Analysis |
 | `kubernetes-deployment-workarounds.md` | **HISTORISCH** — Kind-Workarounds (Phase 1-32) |
+| `LIVEKIT_ONLYOFFICE_K3S_FIX_2026-07-03.md` | **LiveKit + OnlyOffice K3s Fix** — hostNetwork, DNS, Service-Routing |
 | `PRODUCTION_DEPLOYMENT_PLAN.md` | Production Deployment Plan |
 | `PRODUCTION_PLAN.md` | Production Plan (Kubernetes) |
 
@@ -237,15 +239,20 @@
 6. `DATABASE_SCHEMA.md` — DB-Schema (9 Tabellen)
 7. `pipeline-onlyoffice-pdf-edit.md` — OnlyOffice PDF Edit Pipeline
 
-**Aktueller Stand (Phase 90):**
-- 15 Pods Running auf k3s v1.35.5+k3s1
+**Aktueller Stand (Phase 137):**
+- 18 Pods Running auf k3s v1.35.5+k3s1
 - Memory: 9.7 Gi Limits (5.2 Gi eingespart durch Right-Sizing)
 - Pipeline: 31.7s (Target ≤90s)
 - Migration Chain: 1 Head (`n2o3p4q5r6s7`)
-- 14 NetworkPolicies (ISO 27001 A.8.20)
+- 16 NetworkPolicies (ISO 27001 A.8.20)
 - n8n: 6 Workflows aktiv mit dynamischem client_id (Phase 88)
-- OnlyOffice: PDF Edit + Konvertierung funktional (Phase 64-73)
+- OnlyOffice: Interne K8s Service-DNS für Callbacks (Phase 137)
 - TLS: Let's Encrypt aktiv (Phase 53-57)
 - SMTP: Mailtrap (Phase 85) — SendGrid komplett entfernt
 - Contact-Formular: POST /api/v1/contact via Mailtrap (Phase 84)
+- LiveKit: hostNetwork + hostPort 7880/50000/60000 + port_range (Phase 135)
+- Egress: hostNetwork + DNS (`ws://livekit-server-staging:7880`)
+- Redis: auf Node 2 (gleicher Node wie LiveKit, Phase 135)
+- DB: CNPG HA (2 Replikas, Phase 121)
+- API Secret: ≥32 chars (Phase 135)
 - 0 hardcoded IPs, 0 hardcoded Credentials, 0 hardcoded client_id

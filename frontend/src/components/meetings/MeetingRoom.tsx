@@ -707,24 +707,26 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleStartRecording = async () => {
-    if (!id || isStarting) return;
+    console.log("[Recording] handleStartRecording called, id:", id, "isStarting:", isStarting, "livekitConnectionState:", livekitConnectionState);
+    if (!id || isStarting) {
+      console.warn("[Recording] Early return — id:", id, "isStarting:", isStarting);
+      return;
+    }
     try {
       setIsStarting(true);
       setIsRecording(true);
       setRecordingStatus("recording");
-      
-      // Wait for LiveKit room to stabilize before starting Egress recording
-      // This prevents packet dropping caused by LiveKit's oldPacketThreshold (2s)
-      if (livekitConnectionState !== ConnectionState.Connected) {
-        console.info("[Recording] Waiting for LiveKit room to stabilize before starting recording...");
-      }
-      
+      setLivekitError(null);
+
       const res = await meetingsApi.startRecording(id);
+      console.log("[Recording] API response:", res);
       setRecordingId(res.recording_id || null);
       setEgressId(res.egress_id || null);
       setRecordingDuration(0);
-    } catch (err) {
-      console.error("Failed to start recording", err);
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || String(err);
+      console.error("[Recording] Failed to start recording:", errorMsg, err);
+      setLivekitError(`Recording Error: ${errorMsg}`);
       setIsRecording(false);
       setRecordingStatus("idle");
     } finally {
@@ -739,8 +741,6 @@ const handleStopRecording = async () => {
     setIsRecording(false);
     await meetingsApi.stopRecording(id);
     setEgressId(null);
-    // Continue processing - polling will continue naturally from processing state
-    // No need to set to "stopped" and restart polling after timeout
   } catch (err) {
     console.error("Failed to stop recording", err);
     setRecordingStatus("recording");
@@ -1039,6 +1039,7 @@ onError={(error) => {
 
 {/* IDLE — Show Start button (only for creator) */}
                {recordingStatus === "idle" && meetingCreatorId === currentUser?.id && (
+                <>
                 <Button variant="contained" fullWidth disableElevation onClick={handleStartRecording}
                     disabled={!roomConnectionReady || isStarting}
                    startIcon={<RecordIcon />}
@@ -1046,6 +1047,12 @@ onError={(error) => {
                  >
                    {roomConnectionReady ? t("meeting_assistant.start_recording") : t("meeting_assistant.waiting_connection")}
                  </Button>
+                 {livekitError && livekitError.startsWith("Recording Error:") && (
+                   <Typography sx={{ fontSize: 11, color: COLOR.error, mt: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
+                     {livekitError}
+                   </Typography>
+                 )}
+                </>
                )}
 
               {/* IDLE — Non-creator waiting */}

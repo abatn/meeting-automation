@@ -32,5 +32,6 @@ data:
   N8N_WEBHOOK_DAILY_REMINDER: "http://n8n-staging:5678/webhook/daily-reminders"
   N8N_WEBHOOK_TRANSCRIPTION_COMPLETED: "http://n8n-staging:5678/webhook/transcription-completed"
   PUBLIC_BACKEND_URL: "https://staging.meeting-automation.com"
+  ONLYOFFICE_BACKEND_URL: "http://backend.meeting-automation-staging.svc.cluster.local:8000"
   FRONTEND_URL: "https://staging.meeting-automation.com"
   CORS_ORIGINS: '["https://staging.meeting-automation.com","http://localhost:3000"]'

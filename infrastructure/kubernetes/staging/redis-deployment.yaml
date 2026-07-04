@@ -15,6 +15,8 @@ spec:
       labels:
         app: redis-staging
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: instance-20260329-0846
       containers:
       - name: redis
         image: redis:7-alpine

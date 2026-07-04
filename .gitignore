@@ -116,3 +116,4 @@ test_*.txt
 # AI prompts
 CONTINUE_SETUP_PROMPT.md
 ONLYOFFICE_STRUCTURE_CHECK_PROMPT.md
+git_workflow.txt

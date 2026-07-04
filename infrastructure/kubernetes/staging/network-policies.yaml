@@ -119,7 +119,7 @@ spec:
     - protocol: TCP
       port: 9001
 ---
-# Backend: Allow Frontend + LiveKit (webhook)
+# Backend: Allow Frontend + LiveKit (webhook) + OnlyOffice (callback)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -137,6 +137,9 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-server-staging
+    - podSelector:
+        matchLabels:
+          app: onlyoffice-staging
     ports:
     - protocol: TCP
       port: 8000
@@ -159,7 +162,7 @@ spec:
     - protocol: TCP
       port: 80
 ---
-# OnlyOffice: Allow Backend and Frontend, egress to RabbitMQ
+# OnlyOffice: Allow Backend and Frontend, egress to RabbitMQ, DNS, Backend
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -188,6 +191,20 @@ spec:
     ports:
     - protocol: TCP
       port: 5672
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    to:
+    - namespaceSelector: {}
+  - to:
+    - podSelector:
+        matchLabels:
+          app: backend
+    ports:
+    - protocol: TCP
+      port: 8000
 ---
 # n8n: Allow Backend
 apiVersion: networking.k8s.io/v1
@@ -245,11 +262,22 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-egress-staging
+    - podSelector:
+        matchLabels:
+          app: backend
     ports:
     - protocol: TCP
       port: 7880
     - protocol: TCP
       port: 7881
+  - from:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 7881
+    - protocol: UDP
+      port: 3478
   policyTypes:
   - Ingress
   - Egress

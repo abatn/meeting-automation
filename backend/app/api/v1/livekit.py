@@ -142,6 +142,13 @@ async def start_livekit_recording(
         if meeting.creator_id != current_user.id:
             raise HTTPException(status_code=403, detail="Only meeting creator can start recording.")
 
+        # Phase 141: Guard gegen doppelte Recordings
+        existing = await db.execute(
+            select(Recording).where(Recording.meeting_id == meeting_id)
+        )
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="Recording already exists for this meeting")
+
     service = LiveKitService()
     file_key = f"{current_user.client_id}/recordings/{meeting_id}/{uuid.uuid4()}_livekit.ogg"
 
@@ -217,7 +224,7 @@ async def stop_livekit_recording(
             select(Recording).where(
                 Recording.meeting_id == meeting_id,
                 Recording.client_id == current_user.client_id,
-                Recording.status == "streaming",
+                Recording.status.in_(["streaming", "failed"]),
             ).order_by(Recording.created_at.desc()).limit(1)
         )
         recording = result.scalar_one_or_none()
@@ -432,7 +439,7 @@ async def _get_active_recording_for_meeting(db, meeting_id: str, client_id: str)
         .where(
             Recording.meeting_id == meeting_id,
             Meeting.client_id == client_id,
-            Recording.status == "streaming",
+            Recording.status.in_(["streaming", "failed"]),
         )
         .order_by(Recording.created_at.desc())
         .limit(1)

@@ -1,7 +1,7 @@
 # Getting Started — Meeting Automation System
 
 > Abgeleitet aus: ARCHITECTURE.md, ISO27001.md, DATABASE_SCHEMA.md, production/
-> Stand: 2026-07-02 | k3s Staging 2-Node Cluster, Phase 122 abgeschlossen, Longhorn 2-Replica, CloudNativePG HA + Velero installiert
+> Stand: 2026-07-03 | k3s Staging 2-Node Cluster, Phase 137 abgeschlossen, Longhorn 2-Replica, CloudNativePG HA + Velero installiert
 
 ## 1. Was ist Meeting Automation?
 
@@ -101,11 +101,15 @@ clients (Organisation)
 # Backend: http://158.180.18.110:32222 (NodePort)
 # n8n UI: http://158.180.18.110:31678 (NodePort)
 # Login: dg@meeting.tn / Password123!
-# Pods: 13 Running (backend×2, frontend, celery-worker, celery-beat,
+# Pods: 15 Running (backend×2, frontend, celery-worker, celery-beat,
 #        postgres, redis, minio, rabbitmq, livekit-server, livekit-egress,
-#        onlyoffice, n8n)
+#        onlyoffice, n8n, cnpg×2)
 # Memory: 9.7 Gi Limits (5.2 Gi eingespart durch Right-Sizing)
 # SMTP: Mailtrap (bulk.smtp.mailtrap.io)
+# LiveKit: hostPort 7880/50000/60000 + hostNetwork (Phase 135)
+# Redis: auf Node 2 (gleicher Node wie LiveKit, Phase 135)
+# OnlyOffice: Interne K8s Service-DNS für Callbacks (Phase 137)
+# DB: CNPG HA (2 Replikas, Phase 121)
 ```
 
 ### Production (k3s)
@@ -123,7 +127,7 @@ clients (Organisation)
 4. **Resource Limits + Probes** — CPU/Memory für alle Workloads ✅ Abgeschlossen (Phase 42-43)
 5. **TLS + Registry** — cert-manager ✅ Abgeschlossen (Phase 53-57), Image-Registry ❌ Offen
 
-### Abgeschlossen (Phasen 33-90)
+### Abgeschlossen (Phasen 33-126)
 - ✅ k3s Migration (Phase 33)
 - ✅ Full Pipeline Test (Phase 34)
 - ✅ Hardcoded Werte eliminiert (Phase 37)
@@ -153,6 +157,21 @@ clients (Organisation)
 - ✅ Meeting Status Distribution Fix (Phase 88)
 - ✅ Resource Right-Sizing — 5.2 Gi eingespart (Phase 89)
 - ✅ Celery Worker Memory Decision — 4Gi beibehalten (Phase 90)
+- ✅ Sprint 3: Storage + Backups + Longhorn (Phase 91)
+- ✅ CNPG HA + Velero (Phase 92)
+- ✅ Test Suite Fix — 34→0 failures (Phase 93)
+- ✅ ISO 27001 Compliance + Multi-Tenant Monitoring (Phase 94)
+- ✅ LiveKit Egress Fix + NetworkPolicy Hardening (Phase 95-96)
+- ✅ TechnikDashboard + Monitoring (Phase 98-101)
+- ✅ GitOps + ArgoCD + SOPS (Phase 99-100)
+- ✅ ArgoCD StatefulSet/PVC Fix (Phase 120)
+- ✅ CNPG HA Switch (Phase 121)
+- ✅ LiveKit hostNetwork entfernt (Phase 122)
+- ✅ Prometheus Ingress entfernt — Credential-Contamination Fix (Phase 124)
+- ✅ LiveKit WebRTC hostPort Fix — Redis Migration (Phase 126)
+- ✅ LiveKit Recording Fix — hostNetwork + port_range wiederhergestellt (Phase 135)
+- ✅ Recording UI-Flow Fix — Stop→Processing→Completed (Phase 136)
+- ✅ OnlyOffice Callback Fix — Interne K8s Service-DNS (Phase 137)
 
 ## 9. Dokumentation
 
