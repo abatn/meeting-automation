@@ -401,6 +401,7 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
    // Recording
   const [isRecording, setIsRecording]             = useState(false);
   const [recordingStatus, setRecordingStatus]     = useState<"idle" | "recording" | "paused" | "processing" | "stopped" | "completed" | "failed">("idle");
+  const [isSyncing, setIsSyncing]                 = useState(true);  // true until first syncFromBackend completes
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordingId, setRecordingId]             = useState<string | null>(null);
   const [egressId, setEgressId]                   = useState<string | null>(null);
@@ -449,9 +450,14 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
     }
   }, []);
 
+  // ── DIAGNOSTIC: Log all recordingStatus changes with stack trace ──────────
+  useEffect(() => {
+    console.log("[State] recordingStatus changed to:", recordingStatus, "\nstack:", new Error().stack?.split('\n').slice(1, 4).join(' <- '));
+  }, [recordingStatus]);
+
   // ── State Reset bei Meeting-Wechsel ─────────────────────────────────────
   useEffect(() => {
-    setRecordingStatus("idle");
+    setIsSyncing(true);
     setRecordingId(null);
     setEgressId(null);
     setIsRecording(false);
@@ -547,27 +553,37 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
     if (!id || !currentUser) return;
     const syncFromBackend = async () => {
       try {
+        console.log("[Sync] syncFromBackend called, current recordingStatus:", recordingStatus);
         const data = await meetingsApi.getAiInsights(id);
-        if (!data || data.status === "idle") return;
+        console.log("[Sync] backend returned:", { status: data?.status, recordingId: data?.recording_id, hasTranscription: !!data?.transcription });
 
         // Set the state machine to the real backend status
-        if (data.status) {
-          setRecordingStatus(data.status);
+        // Guard: don't overwrite frontend "processing" with stale backend data
+        if (data?.status) {
+          setRecordingStatus((prev) => {
+            if (prev === "processing" && data.status !== "completed" && data.status !== "failed") {
+              console.log("[Sync] BLOCKED overwrite:", { prev, attempted: data.status });
+              return prev;
+            }
+            console.log("[Sync] setting recordingStatus:", { from: prev, to: data.status });
+            return data.status;
+          });
         }
-        if (data.recording_id) {
+        if (data?.recording_id) {
           setRecordingId(data.recording_id);
         }
 
         // Populate transcription
-        if (data.transcription?.segments?.length > 0) {
+        if (data?.transcription?.segments?.length > 0) {
           setLiveTranscription(data.transcription.segments);
         }
 
         // Populate insights
-        if (data.insights?.length > 0) {
+        if (data?.insights?.length > 0) {
           setAiInsights(data.insights);
         }
-      } catch { /* no recording yet — that's fine */ }
+      } catch (err) { console.log("[Sync] syncFromBackend error:", err); }
+      finally { setIsSyncing(false); }
     };
     syncFromBackend();
   }, [id, currentUser]);
@@ -631,16 +647,25 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
     if (!id) return;
     setInsightsLoading(true);
     try {
+      console.log("[Poll] pollAIInsights called");
       const data = await meetingsApi.getAiInsights(id);
+      console.log("[Poll] pollAIInsights response:", { status: data?.status, hasTranscription: !!data?.transcription, insightsCount: data?.insights?.length, pvId: data?.pv_id || data?.pv?.id });
 
       // Update recording status from backend (single source of truth)
       if (data?.status) {
         const next = data.status as "idle" | "recording" | "processing" | "completed" | "failed";
         setRecordingStatus((prev) => {
           // Don't downgrade from a terminal state
-          if ((prev === "completed" || prev === "failed") && next !== prev) return prev;
+          if ((prev === "completed" || prev === "failed") && next !== prev) {
+            console.log("[Poll] BLOCKED terminal downgrade:", { prev, attempted: next });
+            return prev;
+          }
           // Don't overwrite processing/paused with stale data — but allow terminal states through
-          if ((prev === "processing" || prev === "paused") && next !== "completed" && next !== "failed") return prev;
+          if ((prev === "processing" || prev === "paused") && next !== "completed" && next !== "failed") {
+            console.log("[Poll] BLOCKED processing/paused overwrite:", { prev, attempted: next });
+            return prev;
+          }
+          console.log("[Poll] pollAIInsights setting recordingStatus:", { from: prev, to: next });
           return next;
         });
       }
@@ -689,10 +714,13 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
   // Start/stop polling based on recording state
   useEffect(() => {
     if (isRecording && recordingStatus !== "completed" && recordingStatus !== "failed") {
+      console.log("[Poll] START transcription polling, state:", { isRecording, recordingStatus });
       pollingRef.current = setInterval(pollTranscriptionData, 5000);
     } else if (recordingStatus === "processing") {
+      console.log("[Poll] START AI insights polling, state:", { isRecording, recordingStatus });
       pollingRef.current = setInterval(pollAIInsights, 8000);
     } else {
+      console.log("[Poll] STOP polling, state:", { isRecording, recordingStatus });
       if (pollingRef.current) clearInterval(pollingRef.current);
     }
     return () => {
@@ -737,12 +765,15 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
 const handleStopRecording = async () => {
   if (!id) return;
   try {
+    console.log("[Recording] STOP clicked — before setState:", { recordingStatus, isRecording, isSyncing });
     setRecordingStatus("processing");
     setIsRecording(false);
+    console.log("[Recording] STOP — after setState, before API call");
     await meetingsApi.stopRecording(id);
+    console.log("[Recording] STOP — API success");
     setEgressId(null);
   } catch (err) {
-    console.error("Failed to stop recording", err);
+    console.error("[Recording] STOP — API error:", err);
     setRecordingStatus("recording");
     setIsRecording(true);
   }
@@ -1038,7 +1069,7 @@ onError={(error) => {
               </Typography>
 
 {/* IDLE — Show Start button (only for creator) */}
-               {recordingStatus === "idle" && meetingCreatorId === currentUser?.id && (
+               {recordingStatus === "idle" && !isSyncing && meetingCreatorId === currentUser?.id && (
                 <>
                 <Button variant="contained" fullWidth disableElevation onClick={handleStartRecording}
                     disabled={!roomConnectionReady || isStarting}
@@ -1055,8 +1086,18 @@ onError={(error) => {
                 </>
                )}
 
+              {/* SYNCING — Loading state while backend status is fetched */}
+              {recordingStatus === "idle" && isSyncing && (
+                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5, borderRadius: 2, bgcolor: alpha(COLOR.primary, 0.05), border: `1px solid ${alpha(COLOR.primary, 0.15)}` }}>
+                  <CircularProgress size={18} sx={{ color: COLOR.primary }} />
+                  <Typography sx={{ fontSize: 13, color: COLOR.textMuted }}>
+                    {t("meeting_assistant.insights_processing") || "Loading..."}
+                  </Typography>
+                </Stack>
+              )}
+
               {/* IDLE — Non-creator waiting */}
-              {recordingStatus === "idle" && meetingCreatorId !== currentUser?.id && (
+              {recordingStatus === "idle" && !isSyncing && meetingCreatorId !== currentUser?.id && (
                  <Stack alignItems="center" spacing={1} sx={{ py: 1, color: COLOR.textMuted }}>
                    <RecordIcon sx={{ fontSize: 28, color: alpha("#000", 0.1) }} />
                    <Typography sx={{ fontSize: 12, textAlign: "center" }}>

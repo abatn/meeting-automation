@@ -229,12 +229,12 @@ function PodManager({ theme }: { theme: ThemeColors }) {
   const [logModal, setLogModal] = useState<{ pod: string; logs: string[] } | null>(null);
 
   useEffect(() => {
-    const load = async () => { try { const r = await api.get('/admin/management/pods'); setPods(r.data?.pods || []); } catch (e) {} };
+    const load = async () => { try { const r = await api.get('/admin/management/pods'); setPods(r.data?.pods || []); } catch { /* ignore */ } };
     load(); const i = setInterval(load, 15000); return () => clearInterval(i);
   }, []);
 
-  const restartPod = async (name: string) => { try { await api.post(`/admin/management/pods/${name}/restart`); setTimeout(() => api.get('/admin/management/pods').then(r => setPods(r.data?.pods || [])), 3000); } catch (e) {} };
-  const showLogs = async (name: string) => { try { const r = await api.get(`/admin/management/pods/${name}/logs?lines=100`); setLogModal({ pod: name, logs: r.data?.logs || [] }); } catch (e) {} };
+  const restartPod = async (name: string) => { try { await api.post(`/admin/management/pods/${name}/restart`); setTimeout(() => api.get('/admin/management/pods').then(r => setPods(r.data?.pods || [])), 3000); } catch { /* ignore */ } };
+  const showLogs = async (name: string) => { try { const r = await api.get(`/admin/management/pods/${name}/logs?lines=100`); setLogModal({ pod: name, logs: r.data?.logs || [] }); } catch { /* ignore */ } };
 
   return (
     <Paper sx={{ p: 3, bgcolor: theme.card, border: `1px solid ${theme.border}` }}>
@@ -270,11 +270,11 @@ function RedisManager({ theme, confirmOpen, setConfirmOpen }: { theme: ThemeColo
   const [info, setInfo] = useState<any>(null);
 
   useEffect(() => {
-    const load = async () => { try { const r = await api.get('/admin/management/redis/info'); setInfo(r.data); } catch (e) {} };
+    const load = async () => { try { const r = await api.get('/admin/management/redis/info'); setInfo(r.data); } catch { /* ignore */ } };
     load(); const i = setInterval(load, 30000); return () => clearInterval(i);
   }, []);
 
-  const flushRedis = async () => { try { await api.post('/admin/management/redis/flush'); setConfirmOpen(false); } catch (e) {} };
+  const flushRedis = async () => { try { await api.post('/admin/management/redis/flush'); setConfirmOpen(false); } catch { /* ignore */ } };
 
   return (
     <Paper sx={{ p: 3, bgcolor: theme.card, border: `1px solid ${theme.border}` }}>
@@ -303,7 +303,7 @@ function StorageManager({ theme }: { theme: ThemeColors }) {
   const [buckets, setBuckets] = useState<any[]>([]);
 
   useEffect(() => {
-    const load = async () => { try { const r = await api.get('/admin/management/storage/buckets'); setBuckets(r.data?.buckets || []); } catch (e) {} };
+    const load = async () => { try { const r = await api.get('/admin/management/storage/buckets'); setBuckets(r.data?.buckets || []); } catch { /* ignore */ } };
     load(); const i = setInterval(load, 30000); return () => clearInterval(i);
   }, []);
 
