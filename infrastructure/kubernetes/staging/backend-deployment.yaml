@@ -32,7 +32,7 @@ spec:
         - name: PYTHONPATH
           value: "/app"
         - name: DB_HOST
-          value: "postgres-staging"
+          value: "meeting-db-rw"
         - name: RUN_MIGRATIONS
           value: "true"
         - name: E2E_TEST
@@ -77,7 +77,7 @@ spec:
         - name: DEBUG
           value: "true"
         - name: DB_HOST
-          value: "postgres-staging"
+          value: "meeting-db-rw"
         - name: APP_ROLE
           value: "backend"
 ---

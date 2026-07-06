@@ -132,7 +132,7 @@ services:
     hostname: "${HOST_IP:-localhost}"
     environment:
       - JWT_ENABLED=true
-      - JWT_SECRET=${ONLYOFFICE_SECRET:-super_secret_jwt_key_onlyoffice_2026}
+      - JWT_SECRET=${ONLYOFFICE_SECRET}
       - JWT_HEADER=Authorization
       - ALLOW_PRIVATE_IP_ADDRESS=true
       - SERVER_NAME=${HOST_IP:-localhost}
@@ -163,28 +163,6 @@ services:
     environment:
       - APP_ROLE=backend
       - PYTHONPATH=/app
-      - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
-      - REDIS_URL=redis://default:redis_password@redis:6379/0
-      - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
-      - S3_ENDPOINT=http://minio:9000
-      - S3_ACCESS_KEY=minio_user
-      - S3_SECRET_KEY=minio_password
-      - ONLYOFFICE_SECRET=${ONLYOFFICE_SECRET:-super_secret_jwt_key_onlyoffice_2026}
-      - ONLYOFFICE_URL=http://${HOST_IP:-localhost}:8081
-      - PUBLIC_BACKEND_URL=http://backend:8000
-      - N8N_WEBHOOK_MEETING_CREATED=http://n8n:5678/webhook/meeting-created
-      - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
-      - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
-      - INTERNAL_API_SECRET=super-secret-automation-key-2026
-      - LIVEKIT_URL=${LIVEKIT_URL:-ws://localhost:7880}
-      - LIVEKIT_PUBLIC_URL=${LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
-      - LIVEKIT_NGROK_URL=${LIVEKIT_NGROK_URL:-}
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-meeting-api-key-2026}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-meeting-api-secret-2026-meeting-automation-staging}
-      - LIVEKIT_EGRESS_BUCKET=meeting-recordings
-      - LIVEKIT_EGRESS_S3_ENDPOINT=http://localhost:9000
-      - GLADIA_API_KEY=${GLADIA_API_KEY:-}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:
@@ -221,12 +199,6 @@ services:
     env_file: .env
     environment:
       - PYTHONPATH=/app
-      - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
-      - REDIS_URL=redis://default:redis_password@redis:6379/0
-      - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
-      - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
-      - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
-      - INTERNAL_API_SECRET=super-secret-automation-key-2026
     volumes:
       - ./backend:/app
     depends_on:
@@ -253,12 +225,6 @@ services:
     env_file: .env
     environment:
       - PYTHONPATH=/app
-      - DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@postgres/meeting_db
-      - REDIS_URL=redis://default:redis_password@redis:6379/0
-      - CELERY_BROKER_URL=amqp://rabbit_user:rabbit_password@rabbitmq:5672/
-      - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
-      - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
-      - INTERNAL_API_SECRET=super-secret-automation-key-2026
     volumes:
       - ./backend:/app
     depends_on:
@@ -330,10 +296,9 @@ services:
     image: livekit/egress:latest
     restart: unless-stopped
     network_mode: host
+    env_file: .env
     environment:
       - EGRESS_CONFIG_FILE=/etc/livekit-egress/config.yaml
-      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-meeting-api-key-2026}
-      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-meeting-api-secret-2026-meeting-automation-staging}
       - LIVEKIT_WS_URL=ws://localhost:7880
     volumes:
       - ./livekit-egress.yaml:/etc/livekit-egress/config.yaml:ro

@@ -48,6 +48,7 @@ const SIDEBAR_ITEMS = [
   { id: 'pods', label: 'Pods', icon: <DnsIcon fontSize="small" /> },
   { id: 'redis-mgmt', label: 'Redis', icon: <ServiceIcon fontSize="small" /> },
   { id: 'storage-mgmt', label: 'Storage', icon: <StorageIcon fontSize="small" /> },
+  { id: 'backup-mgmt', label: 'Backup', icon: <StorageIcon fontSize="small" /> },
 ];
 
 const TechnikDashboard: React.FC = () => {
@@ -208,6 +209,9 @@ const TechnikDashboard: React.FC = () => {
 
               {/* Storage Manager */}
               <Grid item xs={12} id="storage-mgmt"><StorageManager theme={theme} /></Grid>
+
+              {/* Backup Manager */}
+              <Grid item xs={12} id="backup-mgmt"><BackupManager theme={theme} /></Grid>
             </Grid>
           )}
         </Box>
@@ -320,6 +324,158 @@ function StorageManager({ theme }: { theme: ThemeColors }) {
           </TableBody>
         </Table>
       </TableContainer>
+    </Paper>
+  );
+}
+
+function BackupManager({ theme }: { theme: ThemeColors }) {
+  const [settings, setSettings] = useState<any[]>([]);
+  const [backups, setBackups] = useState<any[]>([]);
+  const [editItem, setEditItem] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ backup_enabled: true, backup_frequency: 'daily', backup_retention_days: 30, backup_storage_class: 'standard', max_storage_mb: 5120, include_recordings: true });
+  const [saving, setSaving] = useState(false);
+
+  const load = async () => {
+    try { const r = await api.get('/admin/backup-settings'); setSettings(r.data || []); } catch { /* ignore */ }
+    try { const r = await api.get('/admin/management/storage/backup/list'); setBackups(r.data?.backups || []); } catch { /* ignore */ }
+  };
+
+  useEffect(() => { load(); const i = setInterval(load, 30000); return () => clearInterval(i); }, []);
+
+  const openEdit = (s: any) => {
+    setEditItem(s);
+    setEditForm({
+      backup_enabled: s.backup_enabled,
+      backup_frequency: s.backup_frequency || 'daily',
+      backup_retention_days: s.backup_retention_days || 30,
+      backup_storage_class: s.backup_storage_class || 'standard',
+      max_storage_mb: s.max_storage_mb || 5120,
+      include_recordings: s.include_recordings ?? true,
+    });
+  };
+
+  const save = async () => {
+    if (!editItem) return;
+    setSaving(true);
+    try {
+      await api.put(`/admin/backup-settings/${editItem.client_id}`, editForm);
+      setEditItem(null);
+      await load();
+    } catch { /* ignore */ }
+    setSaving(false);
+  };
+
+  return (
+    <Paper sx={{ p: 3, bgcolor: theme.card, border: `1px solid ${theme.border}` }}>
+      <Typography variant="h6"><StorageIcon sx={{ verticalAlign: 'middle', mr: 1 }} />Backup Management</Typography>
+
+      {/* Backup Settings per Client */}
+      <Typography variant="subtitle1" sx={{ mt: 2, mb: 1, color: theme.text }}>Client Backup Settings</Typography>
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ color: theme.text }}>Client ID</TableCell>
+              <TableCell sx={{ color: theme.text }}>Enabled</TableCell>
+              <TableCell sx={{ color: theme.text }}>Frequency</TableCell>
+              <TableCell sx={{ color: theme.text }}>Retention</TableCell>
+              <TableCell sx={{ color: theme.text }}>Storage Class</TableCell>
+              <TableCell sx={{ color: theme.text }}>Max Storage</TableCell>
+              <TableCell sx={{ color: theme.text }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {settings.map((s: any) => (
+              <TableRow key={s.id}>
+                <TableCell sx={{ color: theme.text }}>{s.client_id?.slice(0, 8)}...</TableCell>
+                <TableCell sx={{ color: theme.text }}>{s.backup_enabled ? '✅' : '❌'}</TableCell>
+                <TableCell sx={{ color: theme.text }}>{s.backup_frequency}</TableCell>
+                <TableCell sx={{ color: theme.text }}>{s.backup_retention_days}d</TableCell>
+                <TableCell sx={{ color: theme.text }}>{s.backup_storage_class}</TableCell>
+                <TableCell sx={{ color: theme.text }}>{s.max_storage_mb ? `${s.max_storage_mb / 1024}GB` : '-'}</TableCell>
+                <TableCell>
+                  <Button size="small" variant="outlined" onClick={() => openEdit(s)} sx={{ color: theme.accent, borderColor: theme.accent }}>Edit</Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {settings.length === 0 && (
+              <TableRow><TableCell sx={{ color: theme.text }} colSpan={7}>No backup settings configured</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Backup Jobs */}
+      <Typography variant="subtitle1" sx={{ mt: 3, mb: 1, color: theme.text }}>Backup Jobs</Typography>
+      <TableContainer>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ color: theme.text }}>Type</TableCell>
+              <TableCell sx={{ color: theme.text }}>Name</TableCell>
+              <TableCell sx={{ color: theme.text }}>Status</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {backups.map((b: any, i: number) => (
+              <TableRow key={i}>
+                <TableCell sx={{ color: theme.text }}>{b.type}</TableCell>
+                <TableCell sx={{ color: theme.text }}>{b.name}</TableCell>
+                <TableCell sx={{ color: theme.text }}>{b.phase || b.schedule || '-'}</TableCell>
+              </TableRow>
+            ))}
+            {backups.length === 0 && (
+              <TableRow><TableCell sx={{ color: theme.text }} colSpan={3}>No backup jobs found</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editItem} onClose={() => setEditItem(null)} maxWidth="sm" fullWidth PaperProps={{ sx: { bgcolor: theme.card, color: theme.text } }}>
+        <DialogTitle>Edit Backup Settings — {editItem?.client_id?.slice(0, 8)}...</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography>Enabled:</Typography>
+              <Button size="small" variant={editForm.backup_enabled ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_enabled: !editForm.backup_enabled })} sx={{ bgcolor: editForm.backup_enabled ? theme.accent : 'transparent', color: editForm.backup_enabled ? '#fff' : theme.text, borderColor: theme.accent }}>
+                {editForm.backup_enabled ? 'YES' : 'NO'}
+              </Button>
+            </Stack>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography>Frequency:</Typography>
+              <Button size="small" variant={editForm.backup_frequency === 'none' ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_frequency: 'none' })} sx={{ bgcolor: editForm.backup_frequency === 'none' ? theme.accent : 'transparent', color: editForm.backup_frequency === 'none' ? '#fff' : theme.text, borderColor: theme.accent }}>None</Button>
+              <Button size="small" variant={editForm.backup_frequency === 'daily' ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_frequency: 'daily' })} sx={{ bgcolor: editForm.backup_frequency === 'daily' ? theme.accent : 'transparent', color: editForm.backup_frequency === 'daily' ? '#fff' : theme.text, borderColor: theme.accent }}>Daily</Button>
+              <Button size="small" variant={editForm.backup_frequency === 'weekly' ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_frequency: 'weekly' })} sx={{ bgcolor: editForm.backup_frequency === 'weekly' ? theme.accent : 'transparent', color: editForm.backup_frequency === 'weekly' ? '#fff' : theme.text, borderColor: theme.accent }}>Weekly</Button>
+              <Button size="small" variant={editForm.backup_frequency === 'monthly' ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_frequency: 'monthly' })} sx={{ bgcolor: editForm.backup_frequency === 'monthly' ? theme.accent : 'transparent', color: editForm.backup_frequency === 'monthly' ? '#fff' : theme.text, borderColor: theme.accent }}>Monthly</Button>
+            </Stack>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography>Retention (days):</Typography>
+              <Button size="small" variant={editForm.backup_retention_days === 7 ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_retention_days: 7 })} sx={{ color: theme.text, borderColor: theme.accent }}>7d</Button>
+              <Button size="small" variant={editForm.backup_retention_days === 30 ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_retention_days: 30 })} sx={{ color: theme.text, borderColor: theme.accent }}>30d</Button>
+              <Button size="small" variant={editForm.backup_retention_days === 60 ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_retention_days: 60 })} sx={{ color: theme.text, borderColor: theme.accent }}>60d</Button>
+              <Button size="small" variant={editForm.backup_retention_days === 90 ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_retention_days: 90 })} sx={{ color: theme.text, borderColor: theme.accent }}>90d</Button>
+            </Stack>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography>Storage Class:</Typography>
+              <Button size="small" variant={editForm.backup_storage_class === 'standard' ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_storage_class: 'standard' })} sx={{ color: theme.text, borderColor: theme.accent }}>Standard</Button>
+              <Button size="small" variant={editForm.backup_storage_class === 'cold' ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_storage_class: 'cold' })} sx={{ color: theme.text, borderColor: theme.accent }}>Cold</Button>
+              <Button size="small" variant={editForm.backup_storage_class === 'archive' ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, backup_storage_class: 'archive' })} sx={{ color: theme.text, borderColor: theme.accent }}>Archive</Button>
+            </Stack>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography>Max Storage (MB):</Typography>
+              <Button size="small" variant={editForm.max_storage_mb === 1024 ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, max_storage_mb: 1024 })} sx={{ color: theme.text, borderColor: theme.accent }}>1GB</Button>
+              <Button size="small" variant={editForm.max_storage_mb === 5120 ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, max_storage_mb: 5120 })} sx={{ color: theme.text, borderColor: theme.accent }}>5GB</Button>
+              <Button size="small" variant={editForm.max_storage_mb === 10240 ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, max_storage_mb: 10240 })} sx={{ color: theme.text, borderColor: theme.accent }}>10GB</Button>
+              <Button size="small" variant={editForm.max_storage_mb === 20480 ? 'contained' : 'outlined'} onClick={() => setEditForm({ ...editForm, max_storage_mb: 20480 })} sx={{ color: theme.text, borderColor: theme.accent }}>20GB</Button>
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditItem(null)} sx={{ color: theme.text }}>Cancel</Button>
+          <Button onClick={save} disabled={saving} variant="contained" sx={{ bgcolor: theme.accent }}>{saving ? 'Saving...' : 'Save'}</Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }

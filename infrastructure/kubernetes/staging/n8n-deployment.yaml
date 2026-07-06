@@ -15,6 +15,9 @@ spec:
       labels:
         app: n8n-staging
     spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 0
       containers:
       - name: n8n
         image: n8nio/n8n:latest
@@ -25,7 +28,7 @@ spec:
         - name: DB_TYPE
           value: "postgresdb"
         - name: DB_POSTGRESDB_HOST
-          value: "postgres-staging"
+          value: "meeting-db-rw.meeting-automation-staging.svc.cluster.local"
         - name: DB_POSTGRESDB_PORT
           value: "5432"
         - name: DB_POSTGRESDB_DATABASE
@@ -33,19 +36,20 @@ spec:
         - name: DB_POSTGRESDB_USER
           value: "meeting_user"
         - name: DB_POSTGRESDB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: n8n-secrets
-              key: DB_POSTGRESDB_PASSWORD
+          value: "meeting_password"
         - name: N8N_HOST
           value: "n8n-staging.meeting-automation-staging.svc.cluster.local"
         - name: N8N_PORT
           value: "5678"
         - name: WEBHOOK_URL
           value: "http://n8n-staging:5678"
-        envFrom:
-        - secretRef:
-            name: n8n-secrets
+        - name: N8N_SECURE_COOKIE
+          value: "false"
+        - name: N8N_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: n8n-secrets
+              key: N8N_API_KEY
         volumeMounts:
         - name: n8n-staging-storage
           mountPath: /home/node/.n8n
@@ -87,6 +91,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: local-path
   resources:
     requests:
       storage: 1Gi

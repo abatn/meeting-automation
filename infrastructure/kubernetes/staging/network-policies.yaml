@@ -92,7 +92,7 @@ spec:
     - protocol: TCP
       port: 15672
 ---
-# MinIO: Only allow Backend, Celery and Frontend
+# MinIO: Allow Backend, Celery, Frontend, CNPG (WAL-Archiv)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -113,6 +113,9 @@ spec:
     - podSelector:
         matchLabels:
           app: frontend
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
     ports:
     - protocol: TCP
       port: 9000
@@ -321,3 +324,38 @@ spec:
       port: 53
     to:
     - namespaceSelector: {}
+---
+# CNPG (meeting-db): Allow backend, n8n, celery-worker, cnpg-system
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cnpg-policy
+  namespace: meeting-automation-staging
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: cnpg-system
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: n8n-staging
+    - podSelector:
+        matchLabels:
+          app: celery-worker-staging
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9187
+
+# CNPG MinIO Access: CNPG Pods brauchen Zugriff auf MinIO fuer WAL-Archiv
+# (Bereits in minio-policy enthalten via CNPG Label app.kubernetes.io/name=postgresql)

@@ -1119,3 +1119,250 @@ async def argocd_diff_app(
     """ArgoCD Application Diff (gewünscht vs aktuell)."""
     return await _argocd_api(f"/api/v1/applications/{app_name}/diff?respectspect=true")
 
+
+# ============================================================
+# BACKUP MANAGEMENT
+# ============================================================
+
+from app.models.client import ClientBackupSettings, BackupFrequency, BackupStorageClass
+import uuid
+
+
+class BackupSettingsUpdate(BaseModel):
+    backup_enabled: Optional[bool] = None
+    backup_frequency: Optional[str] = None
+    backup_retention_days: Optional[int] = None
+    backup_storage_class: Optional[str] = None
+    include_recordings: Optional[bool] = None
+    include_pv: Optional[bool] = None
+    max_storage_mb: Optional[int] = None
+
+
+class BackupSettingsResponse(BaseModel):
+    id: str
+    client_id: str
+    backup_enabled: bool
+    backup_frequency: Optional[str]
+    backup_retention_days: int
+    backup_storage_class: Optional[str]
+    include_recordings: bool
+    include_pv: bool
+    max_storage_mb: int
+    last_backup_at: Optional[datetime]
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+
+@router.get("/backup-settings")
+async def list_all_backup_settings(
+    current_user: UserModel = Depends(deps.get_current_system_admin),
+    db: AsyncSession = Depends(deps.get_db),
+):
+    """Alle Backup-Einstellungen auflisten."""
+    result = await db.execute(select(ClientBackupSettings))
+    settings = result.scalars().all()
+    return [{"id": s.id, "client_id": s.client_id, "backup_enabled": s.backup_enabled,
+             "backup_frequency": s.backup_frequency, "backup_retention_days": s.backup_retention_days,
+             "backup_storage_class": s.backup_storage_class, "max_storage_mb": s.max_storage_mb,
+             "last_backup_at": s.last_backup_at.isoformat() if s.last_backup_at else None} for s in settings]
+
+
+@router.get("/backup-settings/{client_id}")
+async def get_backup_settings(
+    client_id: str,
+    current_user: UserModel = Depends(deps.get_current_system_admin),
+    db: AsyncSession = Depends(deps.get_db),
+):
+    """Backup-Einstellungen für einen Client laden."""
+    result = await db.execute(
+        select(ClientBackupSettings).where(ClientBackupSettings.client_id == client_id)
+    )
+    settings = result.scalar_one_or_none()
+    if not settings:
+        raise HTTPException(status_code=404, detail="No backup settings for this client")
+    return {"id": settings.id, "client_id": settings.client_id,
+            "backup_enabled": settings.backup_enabled,
+            "backup_frequency": settings.backup_frequency,
+            "backup_retention_days": settings.backup_retention_days,
+            "backup_storage_class": settings.backup_storage_class,
+            "include_recordings": settings.include_recordings,
+            "include_pv": settings.include_pv,
+            "max_storage_mb": settings.max_storage_mb,
+            "last_backup_at": settings.last_backup_at.isoformat() if settings.last_backup_at else None}
+
+
+@router.put("/backup-settings/{client_id}")
+async def update_backup_settings(
+    client_id: str,
+    data: BackupSettingsUpdate,
+    current_user: UserModel = Depends(deps.get_current_system_admin),
+    db: AsyncSession = Depends(deps.get_db),
+):
+    """Backup-Einstellungen für einen Client aktualisieren."""
+    result = await db.execute(
+        select(ClientBackupSettings).where(ClientBackupSettings.client_id == client_id)
+    )
+    settings = result.scalar_one_or_none()
+    if not settings:
+        settings = ClientBackupSettings(id=str(uuid.uuid4()), client_id=client_id)
+        db.add(settings)
+
+    if data.backup_enabled is not None:
+        settings.backup_enabled = data.backup_enabled
+    if data.backup_frequency is not None:
+        settings.backup_frequency = data.backup_frequency
+    if data.backup_retention_days is not None:
+        settings.backup_retention_days = data.backup_retention_days
+    if data.backup_storage_class is not None:
+        settings.backup_storage_class = data.backup_storage_class
+    if data.include_recordings is not None:
+        settings.include_recordings = data.include_recordings
+    if data.include_pv is not None:
+        settings.include_pv = data.include_pv
+    if data.max_storage_mb is not None:
+        settings.max_storage_mb = data.max_storage_mb
+
+    await db.commit()
+
+    await AuditService.log_action(
+        db=db, client_id=str(current_user.client_id), user_id=current_user.id,
+        action="management.backup_settings.update", table_name="client_backup_settings",
+        record_id=client_id, new_values={"field": "backup_settings", "updated_by": str(current_user.id)},
+        ip_address="internal", user_agent="technik-dashboard",
+    )
+    return {"status": "updated", "client_id": client_id}
+
+
+@router.post("/management/storage/buckets/{bucket_name}")
+async def create_bucket(
+    bucket_name: str,
+    current_user: UserModel = Depends(deps.get_current_system_admin),
+    db: AsyncSession = Depends(deps.get_db),
+):
+    """MinIO Bucket erstellen."""
+    import boto3
+    s3 = boto3.client("s3", endpoint_url="http://minio-staging:9000",
+        aws_access_key_id="minio_user", aws_secret_access_key="minio_password", region_name="us-east-1")
+    try:
+        existing = [b["Name"] for b in s3.list_buckets()["Buckets"]]
+        if bucket_name in existing:
+            return {"status": "exists", "bucket": bucket_name}
+        s3.create_bucket(Bucket=bucket_name)
+        await AuditService.log_action(db=db, client_id=str(current_user.client_id), user_id=current_user.id,
+            action="management.storage.bucket_create", table_name="storage", record_id=bucket_name,
+            ip_address="internal", user_agent="technik-dashboard")
+        return {"status": "created", "bucket": bucket_name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/management/storage/buckets/{bucket_name}")
+async def delete_bucket(
+    bucket_name: str,
+    current_user: UserModel = Depends(deps.get_current_system_admin),
+    db: AsyncSession = Depends(deps.get_db),
+):
+    """MinIO Bucket löschen (nur wenn leer)."""
+    import boto3
+    s3 = boto3.client("s3", endpoint_url="http://minio-staging:9000",
+        aws_access_key_id="minio_user", aws_secret_access_key="minio_password", region_name="us-east-1")
+    try:
+        objects = s3.list_objects_v2(Bucket=bucket_name).get("Contents", [])
+        if objects:
+            raise HTTPException(status_code=409, detail=f"Bucket not empty ({len(objects)} objects)")
+        s3.delete_bucket(Bucket=bucket_name)
+        await AuditService.log_action(db=db, client_id=str(current_user.client_id), user_id=current_user.id,
+            action="management.storage.bucket_delete", table_name="storage", record_id=bucket_name,
+            ip_address="internal", user_agent="technik-dashboard")
+        return {"status": "deleted", "bucket": bucket_name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/management/storage/buckets/{bucket_name}/objects/{path:path}")
+async def delete_object(
+    bucket_name: str,
+    path: str,
+    current_user: UserModel = Depends(deps.get_current_system_admin),
+    db: AsyncSession = Depends(deps.get_db),
+):
+    """Objekt aus MinIO Bucket löschen."""
+    import boto3
+    s3 = boto3.client("s3", endpoint_url="http://minio-staging:9000",
+        aws_access_key_id="minio_user", aws_secret_access_key="minio_password", region_name="us-east-1")
+    try:
+        s3.delete_object(Bucket=bucket_name, Key=path)
+        await AuditService.log_action(db=db, client_id=str(current_user.client_id), user_id=current_user.id,
+            action="management.storage.object_delete", table_name="storage", record_id=f"{bucket_name}/{path}",
+            ip_address="internal", user_agent="technik-dashboard")
+        return {"status": "deleted", "key": f"{bucket_name}/{path}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/management/storage/backup/list")
+async def list_backups(
+    current_user: UserModel = Depends(deps.get_current_system_admin),
+    db: AsyncSession = Depends(deps.get_db),
+):
+    """Alle Backups auflisten (CNPG + Velero)."""
+    import subprocess, json
+
+    backups = []
+
+    # CNPG ScheduledBackups
+    try:
+        result = subprocess.run(
+            ["kubectl", "get", "scheduledbackups.postgresql.cnpg.io",
+             "-n", "meeting-automation-staging", "-o", "json"],
+            capture_output=True, text=True, timeout=10
+        )
+        data = json.loads(result.stdout)
+        for item in data.get("items", []):
+            backups.append({
+                "type": "cnpg-scheduled",
+                "name": item["metadata"]["name"],
+                "cluster": item["spec"].get("cluster", {}).get("name", "?"),
+                "schedule": item["spec"].get("schedule", "?"),
+            })
+    except Exception:
+        pass
+
+    # CNPG Backups
+    try:
+        result = subprocess.run(
+            ["kubectl", "get", "backups.postgresql.cnpg.io",
+             "-n", "meeting-automation-staging", "-o", "json"],
+            capture_output=True, text=True, timeout=10
+        )
+        data = json.loads(result.stdout)
+        for item in data.get("items", []):
+            backups.append({
+                "type": "cnpg-backup",
+                "name": item["metadata"]["name"],
+                "cluster": item["spec"].get("cluster", {}).get("name", "?"),
+                "phase": item.get("status", {}).get("phase", "?"),
+            })
+    except Exception:
+        pass
+
+    # Velero Backups
+    try:
+        result = subprocess.run(
+            ["kubectl", "get", "backups.velero.io", "-n", "velero", "-o", "json"],
+            capture_output=True, text=True, timeout=10
+        )
+        data = json.loads(result.stdout)
+        for item in data.get("items", []):
+            backups.append({
+                "type": "velero",
+                "name": item["metadata"]["name"],
+                "phase": item.get("status", {}).get("phase", "?"),
+            })
+    except Exception:
+        pass
+
+    return {"backups": backups, "total": len(backups)}
+
