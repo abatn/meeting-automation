@@ -34,9 +34,9 @@
       "parameters": {
         "fromEmail": "noreply@meeting-automation.tn",
         "toEmail": "={{$json.toEmail}}",
-        "subject": "=📅 Meeting-Einladung: {{$json.body.title}}",
+        "subject": "=\ud83d\udcc5 Meeting-Einladung: {{$json.body.title}}",
         "text": "=Sie wurden zum Meeting eingeladen: {{$json.body.title}}\nDatum: {{$json.body.start_time || 'TBD'}}",
-        "html": "=<html><body style=\"font-family:sans-serif\"><h2>📅 Meeting-Einladung</h2><p>Sie wurden zum folgenden Meeting eingeladen:</p><h3>{{$json.body.title}}</h3><p><b>Datum:</b> {{$json.body.start_time || 'TBD'}}</p><p><b>Beschreibung:</b> {{$json.body.description || '-'}}</p><p><b>Ort:</b> {{$json.body.location || 'Online'}}</p><br/><a href=\"{{$json.body.meeting_link || '#'}}\" style=\"display:inline-block;padding:12px 24px;color:white;background-color:#28a745;text-decoration:none;border-radius:5px\">Am Meeting teilnehmen</a></body></html>",
+        "html": "=<html><body style=\"font-family:sans-serif\"><h2>\ud83d\udcc5 Meeting-Einladung</h2><p>Sie wurden zum folgenden Meeting eingeladen:</p><h3>{{$json.body.title}}</h3><p><b>Datum:</b> {{$json.body.start_time || 'TBD'}}</p><p><b>Beschreibung:</b> {{$json.body.description || '-'}}</p><p><b>Ort:</b> {{$json.body.location || 'Online'}}</p><br/><a href=\"{{$json.body.meeting_link || '#'}}\" style=\"display:inline-block;padding:12px 24px;color:white;background-color:#28a745;text-decoration:none;border-radius:5px\">Am Meeting teilnehmen</a></body></html>",
         "options": {}
       },
       "id": "meeting-created-send-email-node",
@@ -78,5 +78,6 @@
         ]
       ]
     }
-  }
+  },
+  "name": "meeting-created"
 }

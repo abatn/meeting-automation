@@ -36,7 +36,7 @@
       "parameters": {
         "resource": "email",
         "operation": "send",
-        "fromEmail": "no-reply@meeting.tn",
+        "fromEmail": "noreply@meeting-automation.com",
         "toEmail": "={{$json.email}}",
         "subject": "You have been invited to Meeting Automation",
         "text": "",
@@ -61,8 +61,8 @@
     },
     {
       "parameters": {
-        "respondWith": "success",
-        "responseBody": "={\"status\":\"invitation_sent\",\"email\":\"{{$json.email}}\",\"timestamp\":\"{{$now.toISOString()}}\"}"
+        "respondWith": "text",
+        "responseText": "={{JSON.stringify({\"status\":\"invitation_sent\",\"email\": $json.email})}}"
       },
       "id": "respond-webhook",
       "name": "Respond to Webhook",

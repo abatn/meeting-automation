@@ -60,6 +60,13 @@ Tests are categorized by external dependency — not all "unit tests" run with S
 - **Example**: CNPG targets failing → fix CNPG metrics exposure, NOT delete the ServiceMonitor
 - **Example**: Duplicate backend targets → fix SM config, NOT delete one SM
 
+### Docker/k3s Image Cleanup — ONLY prune unused (CRITICAL RULE 2026-07-07)
+- **FORBIDDEN**: `docker system prune`, `docker volume prune`, `docker image prune`, `k3s ctr images prune --all`
+- **Why**: These commands delete images that k3s containerd depends on → all pods ImagePullBackOff → full rebuild required
+- **CORRECT**: Only prune images/volumes NOT referenced by any running deployment
+- **Safe commands**: `journalctl --vacuum-size=100M`, `sudo find /var/log/pods -name "*.log" -mtime +2 -delete`, `k3s ctr image rm <exact-image>` for specific unused images only
+- **Deploy pattern**: build → `k3s ctr image import` → `kubectl set image` → `kubectl rollout restart`. NEVER delete during deploy.
+
 ### LiveKit Pipeline (Critical Timing)
 - **Recording → PV pipeline**: Target ≤90s end-to-end for Arabic transcriptions
 - **Current**: ~14s (testbobo), ~3m 10s (complex meetings)

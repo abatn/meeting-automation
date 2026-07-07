@@ -182,7 +182,7 @@ async def get_meeting_pdf_for_automation(
 
     try:
         s3.head_object(Bucket=get_bucket_name(), Key=pdf_key)
-
+        local_pdf_path = f"/tmp/automation_{pv.id}.pdf"
         s3.download_file(get_bucket_name(), pdf_key, local_pdf_path)
         return FileResponse(path=local_pdf_path, filename=f"Protocol_{meeting_id}.pdf")
     except Exception:
