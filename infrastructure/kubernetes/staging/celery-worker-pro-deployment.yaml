@@ -1,33 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: celery-worker-staging
+  name: celery-worker-pro-staging
   namespace: meeting-automation-staging
   labels:
-    app: celery-worker-staging
-    worker-tier: gratuit
+    app: celery-worker-pro-staging
+    worker-tier: pro
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: celery-worker-staging
+      app: celery-worker-pro-staging
   template:
     metadata:
       labels:
-        app: celery-worker-staging
-        worker-tier: gratuit
+        app: celery-worker-pro-staging
+        worker-tier: pro
     spec:
       containers:
       - name: celery-worker
         image: docker.io/library/meeting-automation-backend:v20260709182130
         imagePullPolicy: IfNotPresent
-        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_gratuit,email,maintenance"]
+        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_pro,email,maintenance"]
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "100m"
+            memory: "1500Mi"
+            cpu: "200m"
           limits:
-            memory: "1Gi"
+            memory: "3Gi"
             cpu: "500m"
         livenessProbe:
           exec:
@@ -51,13 +51,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: celery-worker-staging
+  name: celery-worker-pro-staging
   namespace: meeting-automation-staging
   labels:
-    app: celery-worker-staging
+    app: celery-worker-pro-staging
 spec:
   selector:
-    app: celery-worker-staging
+    app: celery-worker-pro-staging
   ports:
   - port: 5555
     name: stats

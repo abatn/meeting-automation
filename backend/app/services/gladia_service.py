@@ -64,6 +64,7 @@ class GladiaService:
                     "diarization": True,
                     "diarization_config": {
                         "min_speakers": min(num_room_participants, 2) if num_room_participants > 0 else 2,
+                        "max_speakers": num_room_participants + 2 if num_room_participants > 0 else 4,
                     },
                 }
                 transcribe_response = await client.post(

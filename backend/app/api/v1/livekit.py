@@ -376,6 +376,7 @@ async def livekit_webhook(request: Request):
             )
         else:
             from app.tasks.transcription_tasks import process_recording
+            from app.tasks.celery_app import get_transcription_queue
 
             async with AsyncSessionLocal() as db:
                 meeting_client_id = await _get_meeting_client_id(db, meeting_id)
@@ -397,7 +398,11 @@ async def livekit_webhook(request: Request):
                     recording.status = "uploaded"
                     await db.commit()
 
-                    process_recording.delay(recording.id, str(recording.client_id))
+                    queue = await get_transcription_queue(str(recording.client_id), db)
+                    process_recording.apply_async(
+                        args=[recording.id, str(recording.client_id)],
+                        queue=queue,
+                    )
 
                     await AuditService.log_action(
                         db,

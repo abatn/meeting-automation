@@ -64,32 +64,32 @@ const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
         color: "#000"
       }}
     >
-      <Toolbar sx={{ justifyContent: "space-between", minHeight: "64px !important" }}>
+      <Toolbar sx={{ justifyContent: "space-between", minHeight: "64px !important", overflow: "hidden" }}>
         
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, flexShrink: 1, overflow: "hidden" }}>
           {/* HAMBURGER FOR MOBILE */}
           <IconButton
             color="inherit"
             aria-label="open drawer"
             edge="start"
             onClick={onMenuClick}
-            sx={{ display: { sm: "none" } }}
+            sx={{ display: { sm: "none" }, minWidth: 0, flexShrink: 0 }}
           >
             <MenuIcon fontSize="small" />
           </IconButton>
 
           {/* BRANDING */}
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ cursor: 'pointer' }} onClick={() => navigate('/')}>
-            <Box sx={{ width: 28, height: 28, bgcolor: '#000', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ cursor: 'pointer', minWidth: 0, overflow: "hidden" }} onClick={() => navigate('/')}>
+            <Box sx={{ width: 28, height: 28, minWidth: 28, bgcolor: '#000', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <IAIcon sx={{ color: '#FFF', fontSize: 16 }} />
             </Box>
-            <Typography variant="h6" fontWeight="700" sx={{ letterSpacing: '-0.5px', fontSize: '16px' }}>
+            <Typography variant="h6" fontWeight="700" sx={{ letterSpacing: '-0.5px', fontSize: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
               {t('common.appNamePart1')}<Box component="span" sx={{ color: '#71717A' }}>{t('common.appNamePart2')}</Box>
             </Typography>
           </Stack>
         </Stack>
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
           {/* LANGUAGE SELECTOR */}
           <IconButton onClick={(e) => setAnchorElLang(e.currentTarget)} sx={{ color: "#71717A" }}>
             <TranslateIcon fontSize="small" />

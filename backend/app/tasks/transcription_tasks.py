@@ -32,7 +32,7 @@ from app.services.speaker_embedding_service import speaker_embedding_service
 from app.services.speaker_profile_service import speaker_profile_service, SpeakerProfileService
 from app.services.mistral_fusion_service import mistral_fusion_service
 from app.services.auto_enrollment_service import AutoEnrollmentService
-from app.services.speaker_name_detector import detect_self_introduction
+from app.services.speaker_name_detector import detect_self_introduction, transliterate_arabic
 from app.services.assignee_resolver import AssigneeResolver, AssigneeResolution
 from app.services.audit_service import AuditService
 import difflib
@@ -226,6 +226,88 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 room_participants=recording.room_participants or [],
             )
             PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(time.time() - stage_start)
+
+            # 1.5b ONNX SEGMENT REASSIGNMENT
+            # After speaker identification, use ONNX to re-assign individual segments
+            # This fixes cases where Gladia's diarization groups all segments under one speaker
+            await speaker_embedding_service.initialize()
+            if speaker_mappings and speaker_embedding_service.is_available:
+                try:
+                    from app.services.audio_segment_service import audio_segment_service
+                    profile_service = SpeakerProfileService(db)
+                    enrolled = await profile_service.get_profiles(client_id)
+                    profiles_with_emb = [p for p in enrolled if p.embedding is not None]
+                    
+                    if profiles_with_emb:
+                        segments_to_check = gladia_result.get("segments", [])
+                        reassigned = 0
+                        
+                        # Build name map: speaker_label -> resolved_name
+                        name_map = {m["speaker_label"]: m["resolved_name"] for m in speaker_mappings if m.get("resolved_name")}
+                        # Build reverse map: resolved_name -> speaker_label
+                        reverse_map = {v: k for k, v in name_map.items()}
+                        # Get all resolved names
+                        all_names = list(name_map.values())
+                        
+                        for seg in segments_to_check:
+                            current_label = seg.get("speaker")
+                            current_name = name_map.get(current_label, current_label)
+                            
+                            try:
+                                seg_audio = await audio_segment_service._extract_single_segment(temp_path, seg)
+                                if not seg_audio or not os.path.exists(seg_audio):
+                                    continue
+                                seg_embedding = await speaker_embedding_service.extract_embedding(seg_audio)
+                                if os.path.exists(seg_audio):
+                                    os.remove(seg_audio)
+                                if seg_embedding is None:
+                                    continue
+                                
+                                # Match against enrolled profiles
+                                best_name, best_distance, best_conf = profile_service.match_speaker_from_list(
+                                    profiles=profiles_with_emb,
+                                    embedding=seg_embedding,
+                                )
+                                
+                                if best_name and best_conf in ("high", "medium"):
+                                    if best_name != current_name:
+                                        # ONNX says this segment belongs to a different speaker
+                                        new_label = reverse_map.get(best_name, current_label)
+                                        seg["speaker"] = new_label
+                                        reassigned += 1
+                                        logger.info(
+                                            f"ONNX reassignment: '{seg.get('text', '')[:30]}...' "
+                                            f"{current_name} -> {best_name} (conf={best_conf})"
+                                        )
+                                elif not best_name or best_conf == "low":
+                                    # ONNX doesn't match any enrolled profile
+                                    # If there are other speakers, this might be one of them
+                                    if len(all_names) > 1:
+                                        other_names = [n for n in all_names if n != current_name]
+                                        if other_names:
+                                            # Use text patterns as fallback
+                                            text = seg.get("text", "")
+                                            text_latin = transliterate_arabic(text.lower())
+                                            for other in other_names:
+                                                other_lower = other.lower()
+                                                # Check if the segment mentions the other speaker (Latin or transliterated)
+                                                if other_lower in text.lower() or other_lower in text_latin:
+                                                    new_label = reverse_map.get(other, current_label)
+                                                    seg["speaker"] = new_label
+                                                    reassigned += 1
+                                                    logger.info(
+                                                        f"Text fallback: '{seg.get('text', '')[:30]}...' "
+                                                        f"{current_name} -> {other} (mentions name)"
+                                                    )
+                                                    break
+                            except Exception as e:
+                                logger.debug(f"ONNX per-segment failed: {e}")
+                                continue
+                        
+                        if reassigned > 0:
+                            logger.info(f"ONNX reassignment: {reassigned}/{len(segments_to_check)} segments reassigned")
+                except Exception as e:
+                    logger.warning(f"ONNX segment reassignment failed: {e}")
 
             # 1.6 APPLY SPEAKER NAMES TO TRANSCRIPT (Display-Kopie, Original bleibt erhalten)
             name_map = {
@@ -426,6 +508,9 @@ async def _match_speaker_to_participant(
     # 3. Text reference matching — check if other speakers mention names
     for seg in speaker_segments:
         text = seg.get("text", "").lower()
+        # Transliterate Arabic text to Latin for cross-script matching
+        text_latin = transliterate_arabic(text)
+        
         for name in participant_names:
             name_lower = name.lower()
             # Patterns: "wie X gesagt hat", "danke X", "X hat recht", "according to X"
@@ -440,6 +525,46 @@ async def _match_speaker_to_participant(
             if any(p in text for p in patterns):
                 logger.info(f"Heuristic: text reference to '{name}' in {speaker_label}")
                 return name
+            
+            # Arabic cross-reference patterns — check BOTH Arabic text AND transliterated text
+            arabic_patterns = [
+                (f"\u0634\u0643\u0631\u0627\u00a0\u0644\u0633\u064a\u062f {name}", "\u0634\u0643\u0631\u0627\u00a0\u0644\u0633\u064a\u062f X"),  # شكراً لسيد X
+                (f"\u0645\u0639\u0643\u0645 {name}", "\u0645\u0639\u0643\u0645 X"),  # معكم X (self-intro)
+                (f"\u0643\u064a\u0641 \u0645\u0627 \u0642\u0627\u0644 {name}", "كيف ما قال X"),  # كيف ما قال X
+                (f"\u0644\u0633\u064a\u062f {name}", "\u0644\u0633\u064a\u062f X"),  # لسيد X
+                (f"\u0627\u0644\u0633\u064a\u062f {name}", "\u0627\u0644\u0633\u064a\u062f X"),  # السيد X
+            ]
+            for pattern, desc in arabic_patterns:
+                if pattern in text:
+                    other_names = [n for n in participant_names if n.lower() != name_lower]
+                    if other_names:
+                        logger.info(f"Heuristic: Arabic cross-ref '{name}' ({desc}) in {speaker_label} → speaker is NOT {name}")
+                        if len(other_names) == 1:
+                            logger.info(f"Heuristic: Arabic cross-ref → matched to {other_names[0]}")
+                            return other_names[0]
+            
+            # Transliterated patterns — detect self-introductions in Arabic text
+            # If the transliterated text contains the speaker's own name parts
+            name_parts = name_lower.split()
+            for part in name_parts:
+                if len(part) >= 3 and part in text_latin:
+                    # Check if text has "سيد" (Mr.) before name → cross-reference, not self-intro
+                    has_sayyid = "\u0627\u0644\u0633\u064a\u062f" in text or "\u0633\u064a\u062f" in text
+                    
+                    if has_sayyid:
+                        # Cross-reference: speaker mentions someone with "Mr./Sir" title
+                        other_names = [n for n in participant_names if n.lower() != name_lower]
+                        if other_names:
+                            logger.info(f"Heuristic: Arabic cross-ref with title '{part}' in {speaker_label} → speaker is NOT {name}")
+                            if len(other_names) == 1:
+                                logger.info(f"Heuristic: Arabic cross-ref → matched to {other_names[0]}")
+                                return other_names[0]
+                    else:
+                        # No title prefix → likely self-introduction
+                        word_count = len(text.split())
+                        if word_count <= 5:
+                            logger.info(f"Heuristic: Short text self-introduction '{part}' in {speaker_label} → speaker IS {name}")
+                            return name
 
     # 4. Order heuristic — Speaker 0 is often the organizer/creator
     if speaker_index == 0 and len(participant_names) > 0:
@@ -486,9 +611,9 @@ async def _identify_speakers(
         logger.warning("No segments found for speaker identification")
         return []
 
-    # Build candidate list: participants + enrolled ONNX profiles
+    # Build candidate list: participants + enrolled profiles (including text-only)
     profile_service = SpeakerProfileService(db)
-    enrolled_profiles = await profile_service.get_profiles(client_id)
+    enrolled_profiles = await profile_service.get_profiles(client_id, include_text_only=True)
     profiles_with_embeddings = [p for p in enrolled_profiles if p.embedding is not None]
     profile_names = [p.resolved_name or p.name for p in enrolled_profiles if p.resolved_name or p.name]
     candidates = list(set(participant_names + profile_names))
@@ -588,13 +713,18 @@ async def _identify_speakers(
                     )
 
             # SIGNAL 2: Regex Self-Introduction
-            if text_context.strip():
+            # Skip if heuristic already matched (cross-reference detected)
+            if text_context.strip() and not heuristic_name:
                 detected_name = detect_self_introduction(text_context, candidates)
                 if detected_name:
                     signals.append({"source": "text", "name": detected_name, "score": 0.85})
                     logger.info(
                         f"Speaker {speaker_label} text signal: {detected_name} (score=0.85)"
                     )
+            elif heuristic_name:
+                logger.info(
+                    f"Speaker {speaker_label}: skipping self-introduction (heuristic already matched {heuristic_name})"
+                )
 
             # SIGNAL 3: Mistral Fusion (only if no high-confidence consensus yet)
             # Optimized threshold: skip Mistral if we have good confidence from other sources
@@ -633,8 +763,8 @@ async def _identify_speakers(
                 raw_score = name_scores[resolved_name]
                 num_sources = len(name_sources[resolved_name])
 
-                # Base confidence: proportion of total signal weight
-                confidence = raw_score / total_signal_weight if total_signal_weight > 0 else 0.0
+                # Single-signal: confidence = the signal's score (not raw/total=1.0)
+                confidence = raw_score if num_sources == 1 else raw_score / total_signal_weight if total_signal_weight > 0 else 0.0
 
                 # Bonus for multi-source consensus
                 if num_sources > 1:
@@ -670,53 +800,12 @@ async def _identify_speakers(
                 confidence = 0.0
                 method = "no_match"
 
-            # AUTO-ENROLL with user_id linking
-            if resolved_name:
-                if embedding is not None:
-                    await enrollment_service.enroll_or_update(
-                        client_id=client_id,
-                        speaker_label=speaker_label,
-                        resolved_name=resolved_name,
-                        embedding=embedding,
-                        confidence=confidence,
-                        method=method,
-                        meeting_id=meeting_id,
-                        candidates=candidates,
-                    )
-                else:
-                    # Bootstrap without embedding — will be filled on next meeting
-                    await enrollment_service.enroll_text_only(
-                        client_id=client_id,
-                        speaker_label=speaker_label,
-                        resolved_name=resolved_name,
-                        confidence=confidence,
-                        method=method,
-                        meeting_id=meeting_id,
-                        candidates=candidates,
-                    )
-
-                await AuditService.log_action(
-                    db=db,
-                    client_id=client_id,
-                    action="SPEAKER_IDENTIFIED",
-                    user_id=None,
-                    table_name="speakers",
-                    new_values={
-                        "speaker_label": speaker_label,
-                        "resolved_name": resolved_name,
-                        "confidence": confidence,
-                        "method": method,
-                        "meeting_id": meeting_id,
-                    },
-                    ip_address="internal",
-                    user_agent="celery",
-                )
-
             result = {
                 "speaker_label": speaker_label,
                 "resolved_name": resolved_name,
                 "confidence": confidence,
                 "method": method,
+                "embedding": embedding,
             }
 
             logger.info(
@@ -757,6 +846,58 @@ async def _identify_speakers(
             all_mappings.extend(batch_results)
             if i + batch_size < total_speakers:
                 await asyncio.sleep(0.1)
+
+    # EXCLUSIVITY: each name can only be assigned to ONE speaker (highest confidence wins)
+    assigned_names = {}
+    for mapping in all_mappings:
+        name = mapping.get("resolved_name")
+        if name and name != "Unknown":
+            if name in assigned_names:
+                prev = assigned_names[name]
+                if mapping.get("confidence", 0) > prev.get("confidence", 0):
+                    prev["resolved_name"] = None
+                    prev["confidence"] = 0.0
+                    prev["method"] = "exclusivity_lost"
+                    assigned_names[name] = mapping
+                else:
+                    mapping["resolved_name"] = None
+                    mapping["confidence"] = 0.0
+                    mapping["method"] = "exclusivity_lost"
+            else:
+                assigned_names[name] = mapping
+
+    # ENROLLMENT: after exclusivity, only enroll speakers with resolved names
+    enrollment_service = AutoEnrollmentService(db)
+    for mapping in all_mappings:
+        if mapping.get("resolved_name"):
+            speaker_label = mapping["speaker_label"]
+            resolved_name = mapping["resolved_name"]
+            confidence = mapping.get("confidence", 0.0)
+            method = mapping.get("method", "unknown")
+            speaker_embedding = mapping.get("embedding")
+            
+            if speaker_embedding is not None:
+                await enrollment_service.enroll_or_update(
+                    client_id=client_id, speaker_label=speaker_label,
+                    resolved_name=resolved_name, embedding=speaker_embedding,
+                    confidence=confidence, method=method,
+                    meeting_id=meeting_id, candidates=candidates,
+                )
+            else:
+                await enrollment_service.enroll_text_only(
+                    client_id=client_id, speaker_label=speaker_label,
+                    resolved_name=resolved_name, confidence=confidence,
+                    method=method, meeting_id=meeting_id, candidates=candidates,
+                )
+            
+            await AuditService.log_action(
+                db=db, client_id=client_id, action="SPEAKER_IDENTIFIED",
+                user_id=None, table_name="speakers",
+                new_values={"speaker_label": speaker_label, "resolved_name": resolved_name,
+                           "confidence": confidence, "method": method, "meeting_id": meeting_id},
+                ip_address="internal", user_agent="celery",
+            )
+            logger.info(f"Enrolled: {speaker_label} → {resolved_name} (conf={confidence:.2f}, method={method})")
 
     return all_mappings
 

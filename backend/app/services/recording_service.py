@@ -106,8 +106,13 @@ class RecordingService:
 
         # Trigger Celery Pipeline
         from app.tasks.transcription_tasks import process_recording
+        from app.tasks.celery_app import get_transcription_queue
 
-        process_recording.delay(db_recording.id, str(db_recording.client_id))
+        queue = await get_transcription_queue(str(db_recording.client_id), self.db)
+        process_recording.apply_async(
+            args=[db_recording.id, str(db_recording.client_id)],
+            queue=queue,
+        )
 
         return db_recording
 
@@ -237,8 +242,13 @@ class RecordingService:
 
         # Trigger Celery Pipeline
         from app.tasks.transcription_tasks import process_recording
+        from app.tasks.celery_app import get_transcription_queue
 
-        process_recording.delay(db_recording.id, str(db_recording.client_id))
+        queue = await get_transcription_queue(str(db_recording.client_id), self.db)
+        process_recording.apply_async(
+            args=[db_recording.id, str(db_recording.client_id)],
+            queue=queue,
+        )
 
         return db_recording
 

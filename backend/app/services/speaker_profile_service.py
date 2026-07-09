@@ -12,9 +12,9 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
-COSINE_DISTANCE_HIGH = 0.10
-COSINE_DISTANCE_MEDIUM = 0.25
-COSINE_DISTANCE_LOW = 0.40
+COSINE_DISTANCE_HIGH = 0.30
+COSINE_DISTANCE_MEDIUM = 0.50
+COSINE_DISTANCE_LOW = 0.70
 EMBEDDING_DIM = 192
 
 
@@ -27,7 +27,7 @@ class SpeakerProfileService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_profiles(self, client_id: str) -> List[Speaker]:
+    async def get_profiles(self, client_id: str, include_text_only: bool = False) -> List[Speaker]:
         """Get all speaker profiles for a client."""
         result = await self.db.execute(
             select(Speaker).where(
@@ -35,6 +35,8 @@ class SpeakerProfileService:
             )
         )
         profiles = list(result.scalars().all())
+        if include_text_only:
+            return profiles
         return [p for p in profiles if p.embedding is not None]
 
     async def get_profile_by_name(self, client_id: str, name: str) -> Optional[Speaker]:
@@ -94,7 +96,6 @@ class SpeakerProfileService:
             name=speaker_label or name,
             resolved_name=resolved_name or name,
             user_id=user_id,
-            embedding=None,
             sample_count=0,
             source=source,
             mapping_confidence=confidence,
@@ -111,8 +112,12 @@ class SpeakerProfileService:
         new_embedding: np.ndarray,
     ) -> Speaker:
         """Update a speaker profile with a new embedding (running average)."""
-        current = np.array(speaker.embedding, dtype=np.float32).flatten()
-        n = speaker.sample_count or 1
+        if speaker.embedding is None or (isinstance(speaker.embedding, (int, float)) and speaker.embedding != speaker.embedding):
+            current = new_embedding.copy()
+            n = 0
+        else:
+            current = np.array(speaker.embedding, dtype=np.float32).flatten()
+            n = speaker.sample_count or 1
 
         running_avg = (current * n + new_embedding) / (n + 1)
         running_avg = running_avg / (np.linalg.norm(running_avg) + 1e-10)

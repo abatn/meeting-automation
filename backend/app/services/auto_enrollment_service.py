@@ -9,7 +9,7 @@ from app.services.speaker_embedding_service import SpeakerEmbeddingService
 
 logger = logging.getLogger(__name__)
 
-AUTO_ENROLL_THRESHOLD = 0.70
+AUTO_ENROLL_THRESHOLD = 0.50
 
 
 class AutoEnrollmentService:
@@ -52,10 +52,11 @@ class AutoEnrollmentService:
         Returns:
             True if enrollment/update succeeded, False otherwise
         """
-        if not resolved_name or confidence < AUTO_ENROLL_THRESHOLD:
+        conf = confidence if confidence is not None else 0.0
+        if not resolved_name or conf < AUTO_ENROLL_THRESHOLD:
             logger.info(
                 f"Skipping enrollment for {speaker_label}: "
-                f"confidence {confidence:.2f} < threshold {AUTO_ENROLL_THRESHOLD}"
+                f"confidence {conf:.2f} < threshold {AUTO_ENROLL_THRESHOLD}"
             )
             return False
 
@@ -114,12 +115,13 @@ class AutoEnrollmentService:
 
         Lower threshold than full enrollment since we lack audio verification.
         """
-        TEXT_ONLY_THRESHOLD = 0.60
+        TEXT_ONLY_THRESHOLD = 0.40
 
-        if not resolved_name or confidence < TEXT_ONLY_THRESHOLD:
+        conf = confidence if confidence is not None else 0.0
+        if not resolved_name or conf < TEXT_ONLY_THRESHOLD:
             logger.info(
                 f"Skipping text-only enrollment for {speaker_label}: "
-                f"confidence {confidence:.2f} < threshold {TEXT_ONLY_THRESHOLD}"
+                f"confidence {conf:.2f} < threshold {TEXT_ONLY_THRESHOLD}"
             )
             return False
 

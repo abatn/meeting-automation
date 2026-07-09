@@ -35,6 +35,8 @@ celery_app.conf.update(
     },
     task_queues=(
         Queue('transcription', routing_key='transcription'),
+        Queue('transcription_gratuit', routing_key='transcription_gratuit'),
+        Queue('transcription_pro', routing_key='transcription_pro'),
         Queue('email', routing_key='email'),
         Queue('maintenance', routing_key='maintenance'),
     ),
@@ -55,6 +57,57 @@ celery_app.autodiscover_tasks(
         "app.tasks.storage_tasks",
     ]
 )
+
+
+async def get_transcription_queue(client_id: str, db=None) -> str:
+    """Return the Celery queue for transcription tasks based on client plan.
+    
+    GRATUIT → transcription_gratuit (1Gi workers, no LLM overhead)
+    PRO/ENTREPRISE → transcription_pro (3Gi workers, Sentinel LLM available)
+    """
+    try:
+        from app.models.client import Client
+        from sqlalchemy import select
+        
+        if db is None:
+            return "transcription_gratuit"
+        
+        result = await db.execute(select(Client.subscription_plan).where(Client.id == client_id))
+        plan = result.scalar()
+        
+        if plan and plan.value in ("pro", "entrepise"):
+            return "transcription_pro"
+        return "transcription_gratuit"
+    except Exception:
+        return "transcription_gratuit"
+
+
+def get_transcription_queue(client_id: str) -> str:
+    """Return the Celery queue for transcription tasks based on client plan.
+    
+    GRATUIT → transcription_gratuit (1Gi workers, no LLM overhead)
+    PRO/ENTREPRISE → transcription_pro (3Gi workers, Sentinel LLM available)
+    """
+    try:
+        from app.models.client import Client
+        from sqlalchemy import select
+        from app.core.database import AsyncSessionLocal
+        import asyncio
+        
+        async def _get_plan():
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(Client.subscription_plan).where(Client.id == client_id))
+                plan = result.scalar()
+                return plan
+        
+        plan = asyncio.run(_get_plan())
+        
+        if plan and plan.value in ("pro", "entrepise"):
+            return "transcription_pro"
+        return "transcription_gratuit"
+    except Exception:
+        # Fallback: if we can't determine the plan, use the default queue
+        return "transcription"
 
 # Beat Schedule for periodic tasks
 celery_app.conf.beat_schedule = {

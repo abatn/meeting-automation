@@ -142,15 +142,15 @@ class SpeakerEmbeddingService:
             window = np.hamming(frame_length)
             frame = frame * window
 
-            spectrum = np.abs(np.fft.rfft(frame, n=2 * (frame_length // 2 + 1)))
+            spectrum = np.fft.rfft(frame, n=400)
+            spectrum = np.abs(spectrum)
             spectrum = spectrum[: len(self._fbank_filters[0])]
 
             log_energy = np.log(np.dot(self._fbank_filters, spectrum) + 1e-30)
             features[i] = log_energy
 
         mean = np.mean(features, axis=0, keepdims=True)
-        std = np.std(features, axis=0, keepdims=True) + 1e-10
-        features = (features - mean) / std
+        features = features - mean
 
         return features
 
