@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: docker.io/library/meeting-automation-frontend:v20260705171000
-          imagePullPolicy: Never
+          image: docker.io/batnini/meeting-automation-frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           volumeMounts:

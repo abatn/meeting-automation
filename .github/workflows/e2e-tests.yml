@@ -23,12 +23,13 @@ jobs:
     - name: Build backend Docker image
       run: |
         cd backend
-        docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
+        docker build --build-arg SKIP_SENTINEL=true -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
 
     - name: Run E2E tests in DEV (docker-compose.e2e.yml)
       run: |
         cd backend
-        # Bring up test environment
+        # Bring up test environment — use pre-built image to avoid double build
+        BACKEND_IMAGE=${{ env.IMAGE_NAME }}:${{ github.sha }} \
         docker compose -f ../docker-compose.e2e.yml up -d
         # Wait for backend to be ready
         echo "Waiting for backend on port 8001..."
@@ -63,9 +64,22 @@ jobs:
         username: batnini
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Push Docker image
-      run: |
-        docker push ${{ env.IMAGE_NAME }}:${{ github.sha }}
+    - name: Push Docker image (multi-arch x64 + arm64)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        platforms: linux/amd64,linux/arm64
+        push: true
+        build-args: SKIP_SENTINEL=true
+        tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+    - name: Build + Push Frontend (multi-arch x64 + arm64)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: batnini/meeting-automation-frontend:${{ github.sha }}
 
   # Job 2: Deploy to Staging and run full E2E tests (only on main branch)
   deploy-staging-and-test:
@@ -78,22 +92,16 @@ jobs:
 
     - name: Check Staging Secrets
       run: |
-        # Skip staging deployment if KUBE_CONFIG_STAGING secret is not configured
+        # Fail fast if staging cluster is not configured
         if [ -z "${{ secrets.KUBE_CONFIG_STAGING }}" ]; then
-          echo "⚠️ KUBE_CONFIG_STAGING secret not set. Skipping Cloud Staging deployment."
-          echo "To enable: Set up Cloud Staging cluster and add KUBE_CONFIG_STAGING secret in GitHub repo settings."
-          exit 0
+          echo "❌ KUBE_CONFIG_STAGING secret not configured."
+          echo "Required: GitHub → Settings → Environments → staging → Secrets"
+          exit 1
         fi
 
     - name: Configure K8s context for staging
       run: |
-        # Abort early if secret is not set
-        if [ -z "${{ secrets.KUBE_CONFIG_STAGING }}" ]; then
-          echo "⚠️ KUBE_CONFIG_STAGING secret not set. Skipping staging deployment steps."
-          exit 0
-        fi
-        
-        # KUBE_CONFIG_STAGING secret contains kubeconfig for staging cluster
+        # KUBE_CONFIG_STAGING secret guaranteed by Check Staging Secrets step
         echo "${{ secrets.KUBE_CONFIG_STAGING }}" > kubeconfig-staging
         export KUBECONFIG=$(pwd)/kubeconfig-staging
         
@@ -127,21 +135,6 @@ jobs:
           --from-literal=GLADIA_API_KEY="${{ secrets.GLADIA_API_KEY_STAGING }}" \
           --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Deploy Infrastructure to Staging
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        # Apply all infrastructure manifests (order matters due to dependencies)
-        kubectl apply -f infrastructure/kubernetes/staging/postgres-secrets.yaml -n meeting-automation-staging
-        kubectl apply -f infrastructure/kubernetes/staging/postgres-statefulset.yaml -n meeting-automation-staging
-        kubectl apply -f infrastructure/kubernetes/staging/redis-secrets.yaml -n meeting-automation-staging
-        kubectl apply -f infrastructure/kubernetes/staging/redis-deployment.yaml -n meeting-automation-staging
-        kubectl apply -f infrastructure/kubernetes/staging/rabbitmq-secrets.yaml -n meeting-automation-staging
-        kubectl apply -f infrastructure/kubernetes/staging/rabbitmq-statefulset.yaml -n meeting-automation-staging
-        kubectl apply -f infrastructure/kubernetes/staging/minio-secrets.yaml -n meeting-automation-staging
-        kubectl apply -f infrastructure/kubernetes/staging/minio-statefulset.yaml -n meeting-automation-staging
-        # Wait for DB to be ready
-        kubectl wait --for=condition=ready pod/postgres-staging-0 -n meeting-automation-staging --timeout=180s
-
     - name: Deploy Backend to Staging
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
@@ -154,6 +147,14 @@ jobs:
           -n meeting-automation-staging --record
         # Wait for rollout to complete
         kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=300s
+
+    - name: Deploy Frontend to Staging
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        kubectl set image deployment/frontend \
+          frontend=batnini/meeting-automation-frontend:${{ github.sha }} \
+          -n meeting-automation-staging --record
+        kubectl rollout status deployment/frontend -n meeting-automation-staging --timeout=120s
 
     - name: Deploy Staging Ingress Routes (Traefik)
       run: |

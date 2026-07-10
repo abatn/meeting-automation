@@ -20,8 +20,8 @@ spec:
     spec:
       initContainers:
       - name: alembic-migrate
-        image: docker.io/library/meeting-automation-backend:v20260701230046
-        imagePullPolicy: IfNotPresent
+        image: docker.io/batnini/meeting-automation-backend:latest
+        imagePullPolicy: Always
         command: ["sh", "-c", "cd /app && alembic upgrade head"]
         envFrom:
         - secretRef:
@@ -39,8 +39,8 @@ spec:
           value: "false"
       containers:
       - name: backend
-        image: docker.io/library/meeting-automation-backend:v20260701230046
-        imagePullPolicy: IfNotPresent
+        image: docker.io/batnini/meeting-automation-backend:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8000
           name: http

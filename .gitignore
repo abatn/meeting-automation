@@ -60,6 +60,7 @@ Thumbs.db
 *.bin
 *.safetensors
 *.ckpt
+!backend/app/models/speaker_embeddings/*.bin
 ai-services/whisper/models/*
 ai-services/mistral/models/*
 !ai-services/*/models/.gitkeep

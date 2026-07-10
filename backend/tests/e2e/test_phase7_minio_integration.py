@@ -324,6 +324,23 @@ class TestPhase7MinIOIntegration:
         db_session.add(meeting_b)
         await db_session.commit()
         
+        # Create tenant buckets in E2E MinIO before checking isolation
+        # get_bucket_name() checks if tenant-{client_id} bucket exists in S3
+        import boto3
+        from botocore.config import Config as BotoConfig
+        from app.core.config import settings as cfg
+        s3 = boto3.client("s3", endpoint_url=cfg.S3_ENDPOINT,
+                          aws_access_key_id=cfg.S3_ACCESS_KEY,
+                          aws_secret_access_key=cfg.S3_SECRET_KEY,
+                          config=BotoConfig(signature_version="s3v4"),
+                          region_name="us-east-1")
+        for cid in [authenticated_user_a["client_id"], authenticated_user_b["client_id"]]:
+            bucket = f"tenant-{cid}"
+            try:
+                s3.head_bucket(Bucket=bucket)
+            except Exception:
+                s3.create_bucket(Bucket=bucket)
+        
         # Client B cannot access Client A's presigned URL
         # Phase 97: bucket-per-tenant — URLs contain different bucket names
         assert get_bucket_name(user_a.client_id) != get_bucket_name(user_b.client_id)

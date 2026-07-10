@@ -71,9 +71,9 @@ class TestCosineDistance:
 
     def test_cosine_distance_thresholds(self):
         """Test that thresholds are correctly named."""
-        assert COSINE_DISTANCE_HIGH == 0.10
-        assert COSINE_DISTANCE_MEDIUM == 0.25
-        assert COSINE_DISTANCE_LOW == 0.40
+        assert COSINE_DISTANCE_HIGH == 0.30
+        assert COSINE_DISTANCE_MEDIUM == 0.50
+        assert COSINE_DISTANCE_LOW == 0.70
 
     def test_confidence_levels(self):
         """Test confidence level assignment."""

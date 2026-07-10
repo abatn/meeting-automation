@@ -73,10 +73,24 @@ jobs:
     # TEMPORARY DISABLED for release: See docs/LINT_ISSUES_2026-04-05.md
     # Lint and type checks will be re-enabled after addressing 678 issues.
 
+    - name: Run Alembic migrations
+      env:
+        DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        TOTP_ENCRYPTION_KEY: ${{ secrets.TOTP_ENCRYPTION_KEY }}
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      run: |
+        cd backend
+        PYTHONPATH=. alembic upgrade head
+
     - name: Run tests with pytest
       env:
         DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
         REDIS_URL: redis://localhost:6379/0
+        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        TOTP_ENCRYPTION_KEY: ${{ secrets.TOTP_ENCRYPTION_KEY }}
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        E2E_TEST: "true"
       run: |
         cd backend
         pytest tests/ --cov=app --cov-report=xml --cov-report=html

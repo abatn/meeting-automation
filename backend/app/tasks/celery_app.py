@@ -82,16 +82,7 @@ async def get_transcription_queue(client_id: str, db=None) -> str:
         return "transcription_gratuit"
 
 
-def get_transcription_queue(client_id: str) -> str:
-    """Return the Celery queue for transcription tasks based on client plan.
-    
-    GRATUIT → transcription_gratuit (1Gi workers, no LLM overhead)
-    PRO/ENTREPRISE → transcription_pro (3Gi workers, Sentinel LLM available)
-    """
-    try:
-        from app.models.client import Client
-        from sqlalchemy import select
-        from app.core.database import AsyncSessionLocal
+# Beat Schedule for periodic tasks
         import asyncio
         
         async def _get_plan():

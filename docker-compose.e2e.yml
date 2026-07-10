@@ -113,10 +113,9 @@ services:
       - e2e-network
 
   backend:
+    image: ${BACKEND_IMAGE:-meeting-automation-backend:latest}
     build:
       context: ./backend
-      args:
-        E2E_BUILD: "true"
     container_name: meeting-automation-backend-e2e
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     extra_hosts:
@@ -138,7 +137,7 @@ services:
       - S3_SECRET_KEY=minio_password
       - ONLYOFFICE_SECRET=test_secret_onlyoffice_2026
       - ONLYOFFICE_URL=http://onlyoffice-test:80
-      - N8N_WEBHOOK_URL=http://n8n-test:5678/webhook
+      - N8N_WEBHOOK_URL=http://localhost:5678/webhook
       - SECRET_KEY=test-secret-key-for-e2e-only
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
       - GLADIA_API_KEY=${GLADIA_API_KEY:-}
@@ -146,8 +145,8 @@ services:
       - ENCRYPTION_KEY=6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=
       - TOTP_ENCRYPTION_KEY=MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=
       - INTERNAL_API_SECRET=test-internal-api-secret-key-2026
-      - LIVEKIT_URL=ws://livekit-server:7880
-      - LIVEKIT_PUBLIC_URL=ws://livekit-server:7880
+      - LIVEKIT_URL=ws://localhost:7880
+      - LIVEKIT_PUBLIC_URL=ws://localhost:7880
       - LIVEKIT_API_KEY=meeting-api-key-2026
       - LIVEKIT_API_SECRET=meeting-api-secret-2026-meeting-automation-staging
       - LIVEKIT_EGRESS_BUCKET=meeting-recordings
