@@ -6,6 +6,7 @@ from sqlalchemy import select, func
 from pydantic import BaseModel
 
 from app.api import deps
+from app.core.config import settings
 from app.models.user import User as UserModel, UserRole
 from app.models.client import Client as ClientModel, SubscriptionStatus, SubscriptionPlan
 from app.models.usage_minute import UsageMinute
@@ -694,12 +695,12 @@ async def list_buckets(
     import boto3, httpx
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get("http://minio-staging:9000/minio/health/live")
+            resp = await client.get(f"{settings.S3_ENDPOINT}/minio/health/live")
     except Exception:
         pass
 
     s3 = boto3.client("s3",
-        endpoint_url="http://minio-staging:9000",
+        endpoint_url=settings.S3_ENDPOINT,
         aws_access_key_id="minio_user",
         aws_secret_access_key="minio_password",
         region_name="us-east-1",
@@ -735,7 +736,7 @@ async def list_bucket_objects(
     """Objekte in einem Bucket auflisten."""
     import boto3
     s3 = boto3.client("s3",
-        endpoint_url="http://minio-staging:9000",
+        endpoint_url=settings.S3_ENDPOINT,
         aws_access_key_id="minio_user",
         aws_secret_access_key="minio_password",
         region_name="us-east-1",
@@ -1241,7 +1242,7 @@ async def create_bucket(
 ):
     """MinIO Bucket erstellen."""
     import boto3
-    s3 = boto3.client("s3", endpoint_url="http://minio-staging:9000",
+    s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT,
         aws_access_key_id="minio_user", aws_secret_access_key="minio_password", region_name="us-east-1")
     try:
         existing = [b["Name"] for b in s3.list_buckets()["Buckets"]]
@@ -1264,7 +1265,7 @@ async def delete_bucket(
 ):
     """MinIO Bucket löschen (nur wenn leer)."""
     import boto3
-    s3 = boto3.client("s3", endpoint_url="http://minio-staging:9000",
+    s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT,
         aws_access_key_id="minio_user", aws_secret_access_key="minio_password", region_name="us-east-1")
     try:
         objects = s3.list_objects_v2(Bucket=bucket_name).get("Contents", [])
@@ -1290,7 +1291,7 @@ async def delete_object(
 ):
     """Objekt aus MinIO Bucket löschen."""
     import boto3
-    s3 = boto3.client("s3", endpoint_url="http://minio-staging:9000",
+    s3 = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT,
         aws_access_key_id="minio_user", aws_secret_access_key="minio_password", region_name="us-east-1")
     try:
         s3.delete_object(Bucket=bucket_name, Key=path)

@@ -5,7 +5,7 @@ GRATUIT: skip Sentinel LLM -> faster pipeline, no memory overhead
 PRO/ENTREPRISE: full Sentinel summarization -> better PV quality
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -56,7 +56,7 @@ async def _create_client_and_meeting(
         title=f"Phase78 {plan.value} Test Meeting",
         status=MeetingStatus.PLANNED.value,
         start_time=datetime.utcnow(),
-        end_time=datetime.utcnow(),
+        end_time=datetime.utcnow() + timedelta(hours=1),
         creator_id=user.id,
         created_at=datetime.utcnow(),
     )
