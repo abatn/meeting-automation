@@ -84,11 +84,13 @@ async def test_p21_register_deletes_existing_team_member(client: AsyncClient, db
 @pytest.mark.asyncio
 async def test_p21_register_rejects_duplicate_email(client: AsyncClient, db_session: AsyncSession):
     """P2-1: Self-service registration should reject duplicate email in users table"""
-    # 1. Create first user
+    unique_email = f"duplicate_{uuid.uuid4().hex[:8]}@example.com"
+
+    # 1. Register first user
     response1 = await client.post(
         "/api/v1/auth/register",
         json={
-            "email": f"duplicate_{uuid.uuid4().hex[:6]}@example.com",
+            "email": unique_email,
             "password": "SecurePass123!",
             "full_name": "First User",
             "company_name": f"TestCorp1-{uuid.uuid4().hex[:6]}"
@@ -100,22 +102,10 @@ async def test_p21_register_rejects_duplicate_email(client: AsyncClient, db_sess
     response2 = await client.post(
         "/api/v1/auth/register",
         json={
-            "email": f"duplicate_{uuid.uuid4().hex[:6]}@example.com",
+            "email": unique_email,
             "password": "SecurePass123!",
             "full_name": "Second User",
             "company_name": f"TestCorp2-{uuid.uuid4().hex[:6]}"
-        }
-    )
-    assert response1.status_code == 201
-
-    # 2. Try to register with same email
-    response2 = await client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": "duplicate@example.com",
-            "password": "SecurePass123!",
-            "full_name": "Second User",
-            "company_name": "TestCorp2"
         }
     )
     assert response2.status_code == 400, "Should reject duplicate email"

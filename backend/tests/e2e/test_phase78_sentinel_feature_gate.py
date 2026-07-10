@@ -294,7 +294,7 @@ async def test_phase78_unknown_client_uses_sentinel(
             title="Phase78 NoPlan Meeting",
             status=MeetingStatus.PLANNED.value,
             start_time=datetime.utcnow(),
-            end_time=datetime.utcnow(),
+            end_time=datetime.utcnow() + timedelta(hours=1),
             creator_id=user.id,
             created_at=datetime.utcnow(),
         )

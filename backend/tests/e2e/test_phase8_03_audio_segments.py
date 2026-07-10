@@ -36,8 +36,8 @@ def _generate_test_audio_file(
 
 @pytest.fixture
 def test_audio_file():
-    """Generate a 10-second test audio file."""
-    path = _generate_test_audio_file(duration_seconds=10.0, frequency=440.0)
+    """Generate a 30-second test audio file (needs >5s per speaker for extraction)."""
+    path = _generate_test_audio_file(duration_seconds=30.0, frequency=440.0)
     yield path
     if os.path.exists(path):
         os.remove(path)
@@ -47,11 +47,11 @@ def test_audio_file():
 def sample_segments():
     """Sample Gladia diarization segments for 3 speakers."""
     return [
-        {"speaker": "Speaker 0", "text": "Hello everyone", "start": 0.0, "end": 2.5},
-        {"speaker": "Speaker 1", "text": "Hi there", "start": 2.5, "end": 4.0},
-        {"speaker": "Speaker 0", "text": "Let's start the meeting", "start": 4.0, "end": 6.5},
-        {"speaker": "Speaker 1", "text": "Sure, I agree", "start": 6.5, "end": 8.0},
-        {"speaker": "Speaker 2", "text": "I have a question", "start": 8.0, "end": 9.5},
+        {"speaker": "Speaker 0", "text": "Hello everyone", "start": 0.0, "end": 4.0},
+        {"speaker": "Speaker 1", "text": "Hi there", "start": 4.0, "end": 8.0},
+        {"speaker": "Speaker 0", "text": "Let's start the meeting", "start": 8.0, "end": 16.0},
+        {"speaker": "Speaker 1", "text": "Sure, I agree", "start": 16.0, "end": 24.0},
+        {"speaker": "Speaker 2", "text": "I have a question", "start": 24.0, "end": 29.0},
     ]
 
 
@@ -96,9 +96,10 @@ async def test_phase8_14_extract_speaker_segments(service, test_audio_file, samp
     for speaker_label, audio_path in result.items():
         assert os.path.exists(audio_path), f"Audio file for {speaker_label} should exist"
 
-        for path in result.values():
-            if os.path.exists(path):
-                os.remove(path)
+    # Cleanup after assertion
+    for path in result.values():
+        if os.path.exists(path):
+            os.remove(path)
 
 
 @pytest.mark.asyncio
@@ -140,7 +141,7 @@ async def test_phase8_16_skip_short_speaker(service, test_audio_file):
     """
     short_segments = [
         {"speaker": "Speaker 0", "text": "Hi", "start": 0.0, "end": 1.0},
-        {"speaker": "Speaker 1", "text": "Hello everyone, this is a longer segment", "start": 1.0, "end": 7.0},
+        {"speaker": "Speaker 1", "text": "Hello everyone, this is a much longer segment", "start": 1.0, "end": 8.0},
     ]
 
     result = await service.extract_speaker_segments(test_audio_file, short_segments)

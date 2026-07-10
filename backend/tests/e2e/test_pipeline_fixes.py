@@ -45,7 +45,7 @@ class TestGladiaMimeType:
     def test_mime_type_fallback(self):
         """Unknown files should fallback to audio/wav."""
         import mimetypes
-        mime_type, _ = mimetypes.guess_type("test.xyz")
+        mime_type, _ = mimetypes.guess_type("test.xyz123")
         assert mime_type is None  # Will fallback to audio/wav in code
 
 

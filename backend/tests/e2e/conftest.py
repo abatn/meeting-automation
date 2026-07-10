@@ -18,6 +18,9 @@ import uuid
 import asyncio
 from unittest.mock import AsyncMock, patch
 from enum import Enum
+
+# Ensure E2E env vars are set BEFORE app imports (settings loaded at import time)
+os.environ.setdefault("S3_ENDPOINT", "http://minio-test:9000")
 from typing import Optional, AsyncGenerator, Dict, Any, List
 
 import pytest
@@ -71,8 +74,9 @@ class EnvironmentConfig:
         elif self.env == TestEnvironment.PRODUCTION:
             return "https://meeting-automate.tn"
         else:
-            # DEV: Connect to the backend service container in docker-compose.e2e.yml
-            return "http://backend:8000"
+            # DEV: Tests run INSIDE the backend container (docker compose exec)
+            # localhost always resolves — avoids Docker DNS issues in GitHub Actions
+            return "http://localhost:8000"
 
     def _get_db_url(self) -> str:
         """Get database URL for direct DB access (bypassing API)."""
