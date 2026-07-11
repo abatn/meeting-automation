@@ -70,9 +70,9 @@ class EnvironmentConfig:
             return override_url
 
         if self.env == TestEnvironment.STAGING:
-            return "https://staging.meeting-automate.tn"
+            return "https://staging.meeting-automation.com"
         elif self.env == TestEnvironment.PRODUCTION:
-            return "https://meeting-automate.tn"
+            return "https://meeting-automation.com"
         else:
             # DEV: Tests run INSIDE the backend container (docker compose exec)
             # localhost always resolves — avoids Docker DNS issues in GitHub Actions
@@ -108,9 +108,9 @@ class EnvironmentConfig:
     def _default_test_user_email(self) -> str:
         """Get default test user email for the environment."""
         if self.env == TestEnvironment.STAGING:
-            return "e2e-tester-staging@meeting-automate.tn"
+            return "e2e-tester-staging@meeting-automation.com"
         elif self.env == TestEnvironment.PRODUCTION:
-            return "e2e-smoke-tester@meeting-automate.tn"
+            return "e2e-smoke-tester@meeting-automation.com"
         else:
             return "test@example.com"
 
