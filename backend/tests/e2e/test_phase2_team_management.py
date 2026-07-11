@@ -10,6 +10,7 @@ Tests for:
 
 Date: 2026-05-05
 """
+import os
 import pytest
 import secrets
 import uuid
@@ -78,7 +79,8 @@ async def test_p21_register_deletes_existing_team_member(client: AsyncClient, db
     user_res = await db_session.execute(user_stmt)
     new_user = user_res.scalar_one_or_none()
     assert new_user is not None, "User should exist"
-    assert new_user.status == UserStatus.PENDING.value, "User should be PENDING"
+    expected_status = UserStatus.ACTIVE.value if os.getenv("E2E_TEST") == "true" else UserStatus.PENDING.value
+    assert new_user.status == expected_status, f"User should be {expected_status}"
 
 
 @pytest.mark.asyncio
