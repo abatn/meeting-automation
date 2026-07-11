@@ -240,14 +240,18 @@ jobs:
         # Final check
         curl -f $STAGING_URL/health || (echo "Staging health check failed" && exit 1)
 
-    - name: Port-forward Staging PostgreSQL to Runner
+    - name: Port-forward + Run E2E Tests against Staging
+      shell: bash
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
+        export DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5433/meeting_db_staging"
+
+        # Start port-forward in background (same shell as tests)
         echo "Starting port-forward for postgres-staging service..."
-        # Start port-forward in background
         kubectl port-forward -n meeting-automation-staging svc/postgres-staging 5433:5432 &
         PF_PID=$!
-        echo "PF_PID=$PF_PID" >> $GITHUB_ENV
+        trap "kill $PF_PID 2>/dev/null || true" EXIT
+
         # Wait for port to be ready
         for i in {1..30}; do
           if nc -z localhost 5433; then
@@ -257,18 +261,10 @@ jobs:
           echo "Waiting for port forward..."
           sleep 1
         done
-        # Set DATABASE_URL to point to the forwarded port
-        echo "DATABASE_URL=postgresql+asyncpg://meeting_user:meeting_password@localhost:5433/meeting_db_staging" >> $GITHUB_ENV
-        # Ensure port-forward is killed on exit
-        trap "kill $PF_PID 2>/dev/null || true" EXIT
-      shell: bash
 
-    - name: Run Full E2E Tests against Staging
-      run: |
+        # Run E2E tests
         cd backend
-        # Install dependencies
         pip install -q -r requirements.txt -r requirements-dev.txt
-        # Run E2E tests with TEST_ENV=staging
         pytest tests/e2e/ \
           -v \
           --tb=short \
@@ -278,7 +274,7 @@ jobs:
           --reruns-delay 1
       env:
         TEST_ENV: staging
-        E2E_TEST: "true"  # Use provided DATABASE_URL for direct DB access
+        E2E_TEST: "true"
         E2E_TEST_USER_EMAIL: ${{ secrets.STAGING_E2E_USER_EMAIL }}
         E2E_TEST_USER_PASSWORD: ${{ secrets.STAGING_E2E_USER_PASSWORD }}
         DATABASE_URL: ${{ env.DATABASE_URL }}
