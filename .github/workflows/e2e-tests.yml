@@ -139,6 +139,15 @@ jobs:
           --from-literal=GLADIA_API_KEY="${{ secrets.GLADIA_API_KEY_STAGING }}" \
           --dry-run=client -o yaml | kubectl apply -f -
 
+    - name: Cleanup completed pods
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        echo "Cleaning up completed/failed pods to free ephemeral-storage..."
+        kubectl delete pods -n meeting-automation-staging --field-selector=status.phase=Succeeded --ignore-not-found 2>&1 || true
+        kubectl delete pods -n meeting-automation-staging --field-selector=status.phase=Failed --ignore-not-found 2>&1 || true
+        REMAINING=$(kubectl get pods -n meeting-automation-staging --no-headers 2>&1 | grep -v Running | grep -v Pending | wc -l)
+        echo "Remaining non-running pods: $REMAINING"
+
     - name: Deploy Backend to Staging
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
