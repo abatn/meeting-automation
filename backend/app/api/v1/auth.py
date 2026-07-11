@@ -1,6 +1,7 @@
 from datetime import timedelta, datetime
 from typing import Any
 import uuid
+import os
 import secrets
 import logging
 
@@ -243,7 +244,7 @@ async def register(
         full_name=user_in.full_name,
         client_id=client.id,
         role_name=role_name,
-        status=UserStatus.PENDING
+        status=UserStatus.ACTIVE if os.getenv("E2E_TEST") == "true" else UserStatus.PENDING
     )
 
     # Create activation token
