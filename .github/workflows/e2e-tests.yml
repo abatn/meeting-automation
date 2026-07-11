@@ -274,7 +274,6 @@ jobs:
           --tb=short \
           --junitxml=staging-e2e-report.xml \
           -m "e2e and not flaky" \
-          --env=staging \
           --reruns 2 \
           --reruns-delay 1
       env:
@@ -367,8 +366,7 @@ jobs:
         pytest tests/e2e/test_smoke.py \
           -v \
           --tb=short \
-          --junitxml=production-smoke-report.xml \
-          --env=production
+          --junitxml=production-smoke-report.xml
       env:
         TEST_ENV: production
         # Production credentials from GitHub Secrets (dedicated service account)
