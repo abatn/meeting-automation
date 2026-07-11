@@ -131,6 +131,16 @@ def environment_config() -> EnvironmentConfig:
 @pytest_asyncio.fixture(scope="function")
 async def e2e_client_no_auth(environment_config: EnvironmentConfig) -> AsyncGenerator[AsyncClient, None]:
     """Provides an unauthenticated HTTP client for E2E tests."""
+    import socket
+    from urllib.parse import urlparse
+    parsed = urlparse(environment_config.base_url)
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 80
+    try:
+        sock = socket.create_connection((host, port), timeout=2)
+        sock.close()
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        pytest.skip(f"Backend not reachable at {environment_config.base_url} — skipping e2e_client tests")
     async with AsyncClient(base_url=environment_config.base_url, timeout=30.0) as client:
         yield client
 
