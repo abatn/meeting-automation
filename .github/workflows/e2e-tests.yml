@@ -246,9 +246,9 @@ jobs:
         export KUBECONFIG=$(pwd)/kubeconfig-staging
         export DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5433/meeting_db_staging"
 
-        # Start port-forward in background (same shell as tests)
-        echo "Starting port-forward for postgres-staging service..."
-        kubectl port-forward -n meeting-automation-staging svc/postgres-staging 5433:5432 &
+        # Start port-forward to CNPG (meeting-db-rw), NOT legacy postgres-staging
+        echo "Starting port-forward for meeting-db-rw service..."
+        kubectl port-forward -n meeting-automation-staging svc/meeting-db-rw 5433:5432 &
         PF_PID=$!
         trap "kill $PF_PID 2>/dev/null || true" EXIT
 
@@ -277,7 +277,7 @@ jobs:
         E2E_TEST: "true"
         E2E_TEST_USER_EMAIL: ${{ secrets.STAGING_E2E_USER_EMAIL }}
         E2E_TEST_USER_PASSWORD: ${{ secrets.STAGING_E2E_USER_PASSWORD }}
-        DATABASE_URL: ${{ env.DATABASE_URL }}
+        DATABASE_URL: "postgresql+asyncpg://meeting_user:meeting_password@localhost:5433/meeting_db_staging"
         PYTHONHTTPSVERIFY: "0"
 
     - name: Check Staging E2E Pass Rate Gate (≥95%)
