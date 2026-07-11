@@ -154,9 +154,10 @@ jobs:
         # Apply backend secrets and configuration
         kubectl apply -f infrastructure/kubernetes/staging/backend-secrets.yaml -n meeting-automation-staging
         kubectl apply -f infrastructure/kubernetes/staging/backend-config.yaml -n meeting-automation-staging
-        # Set the new image tag
+        # Set the new image tag — update BOTH backend and alembic-migrate init container
         kubectl set image deployment/backend \
           backend=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          alembic-migrate=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n meeting-automation-staging --record
         # Wait for rollout to complete
         kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=300s
