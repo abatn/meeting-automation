@@ -192,7 +192,7 @@ jobs:
     - name: Ensure E2E Test User Exists in Staging
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        STAGING_URL="https://staging.meeting-automate.tn"
+        STAGING_URL="https://staging.meeting-automation.com"
         # Wait for backend to be ready (in addition to health check)
         for i in {1..30}; do
           if curl -s -f "$STAGING_URL/health" > /dev/null; then
@@ -226,7 +226,7 @@ jobs:
     - name: Wait for Staging Health Endpoint
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        STAGING_URL="https://staging.meeting-automate.tn"
+        STAGING_URL="https://staging.meeting-automation.com"
         echo "Waiting for $STAGING_URL/health to return 200..."
         for i in {1..60}; do
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL/health 2>/dev/null || echo "000")
