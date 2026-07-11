@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
       - name: celery-beat
-        image: docker.io/library/meeting-automation-backend:v20260701230046
-        imagePullPolicy: IfNotPresent
+        image: docker.io/batnini/meeting-automation-backend:latest
+        imagePullPolicy: Always
         command: ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info"]
         env:
         - name: PYTHONPATH

@@ -45,6 +45,7 @@ spec:
       name: rabbitmq-staging-storage
     spec:
       accessModes: [ "ReadWriteOnce" ]
+      storageClassName: local-path
       resources:
         requests:
           storage: 5Gi

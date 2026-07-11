@@ -19,8 +19,8 @@ spec:
     spec:
       containers:
       - name: celery-worker
-        image: docker.io/library/meeting-automation-backend:v20260709182130
-        imagePullPolicy: IfNotPresent
+        image: docker.io/batnini/meeting-automation-backend:latest
+        imagePullPolicy: Always
         command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_pro,email,maintenance"]
         resources:
           requests:

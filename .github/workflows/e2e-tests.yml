@@ -71,7 +71,9 @@ jobs:
         platforms: linux/amd64,linux/arm64
         push: true
         build-args: SKIP_SENTINEL=true
-        tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+        tags: |
+          ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          ${{ env.IMAGE_NAME }}:latest
 
     - name: Build + Push Frontend (multi-arch x64 + arm64)
       uses: docker/build-push-action@v5
@@ -79,7 +81,9 @@ jobs:
         context: ./frontend
         platforms: linux/amd64,linux/arm64
         push: true
-        tags: batnini/meeting-automation-frontend:${{ github.sha }}
+        tags: |
+          batnini/meeting-automation-frontend:${{ github.sha }}
+          batnini/meeting-automation-frontend:latest
 
   # Job 2: Deploy to Staging and run full E2E tests (only on main branch)
   deploy-staging-and-test:
@@ -155,6 +159,14 @@ jobs:
           frontend=batnini/meeting-automation-frontend:${{ github.sha }} \
           -n meeting-automation-staging --record
         kubectl rollout status deployment/frontend -n meeting-automation-staging --timeout=120s
+
+    - name: Deploy Celery Workers to Staging
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        BACKEND_IMAGE="${{ env.IMAGE_NAME }}:${{ github.sha }}"
+        kubectl set image deployment/celery-worker-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
+        kubectl set image deployment/celery-worker-pro-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
+        kubectl set image deployment/celery-beat-staging celery-beat="$BACKEND_IMAGE" -n meeting-automation-staging --record
 
     - name: Deploy Staging Ingress Routes (Traefik)
       run: |
