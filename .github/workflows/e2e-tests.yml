@@ -246,20 +246,21 @@ jobs:
         export KUBECONFIG=$(pwd)/kubeconfig-staging
         export DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5433/meeting_db_staging"
 
-        # Port-forward DB + Backend (same shell, stays alive during tests)
-        echo "Starting port-forward for meeting-db-rw + backend services..."
+        # Port-forward DB + Backend + MinIO (same shell, stays alive during tests)
+        echo "Starting port-forward for meeting-db-rw, backend, and minio services..."
         kubectl port-forward -n meeting-automation-staging svc/meeting-db-rw 5433:5432 &
         kubectl port-forward -n meeting-automation-staging svc/backend 8080:8000 &
+        kubectl port-forward -n meeting-automation-staging svc/minio-staging 9002:9000 &
         PF_PID=$!
         trap "kill $PF_PID 2>/dev/null || true" EXIT
 
         # Wait for ports to be ready
         for i in {1..30}; do
-          if nc -z localhost 5433 && nc -z localhost 8080; then
-            echo "Port forwards ready on localhost:5433 and localhost:8080"
+          if nc -z localhost 5433 && nc -z localhost 8080 && nc -z localhost 9002; then
+            echo "Port forwards ready on localhost:5433, localhost:8080, localhost:9002"
             break
           fi
-          echo "Waiting for port forwards... (5433: $(nc -z localhost 5433 2>&1 && echo ok || echo wait), 8080: $(nc -z localhost 8080 2>&1 && echo ok || echo wait))"
+          echo "Waiting for port forwards... (5433: $(nc -z localhost 5433 2>&1 && echo ok || echo wait), 8080: $(nc -z localhost 8080 2>&1 && echo ok || echo wait), 9002: $(nc -z localhost 9002 2>&1 && echo ok || echo wait))"
           sleep 1
         done
 
@@ -280,6 +281,9 @@ jobs:
         E2E_TEST_USER_PASSWORD: ${{ secrets.STAGING_E2E_USER_PASSWORD }}
         E2E_BASE_URL: "http://localhost:8080"
         DATABASE_URL: "postgresql+asyncpg://meeting_user:meeting_password@localhost:5433/meeting_db_staging"
+        S3_ENDPOINT: "http://localhost:9002"
+        S3_ACCESS_KEY: "minio_user"
+        S3_SECRET_KEY: "minio_password"
         PYTHONHTTPSVERIFY: "0"
 
     - name: Check Staging E2E Pass Rate Gate (≥95%)
