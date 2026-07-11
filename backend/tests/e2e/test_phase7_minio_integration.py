@@ -42,7 +42,7 @@ class TestPhase7MinIOIntegration:
     """Phase 7: MinIO/S3 Multi-Tenant Integration Tests"""
 
     @pytest.mark.asyncio
-    async def test_upload_recording_creates_client_id_prefix(self, db_session: AsyncSession, authenticated_user_a, mock_gladia, mock_mistral_pv, mock_sentinel, mock_n8n_transcription):
+    async def test_upload_recording_creates_client_id_prefix(self, db_session: AsyncSession, authenticated_user_a, mock_gladia, mock_mistral_pv, mock_sentinel, mock_n8n_transcription, s3_available):
         """
         Test P1-6: Recording upload creates file_key with client_id prefix
         
@@ -284,7 +284,7 @@ class TestPhase7MinIOIntegration:
         print(f"✅ API presigned download endpoint works: {recording.id}")
 
     @pytest.mark.asyncio
-    async def test_cross_tenant_isolation_upload_url(self, db_session: AsyncSession, authenticated_user_a, authenticated_user_b):
+    async def test_cross_tenant_isolation_upload_url(self, db_session: AsyncSession, authenticated_user_a, authenticated_user_b, s3_available):
         """
         Test: Client B cannot access Client A's presigned URL
         
@@ -391,7 +391,7 @@ class TestPhase7MinIOIntegration:
         print(f"   ONLYOFFICE_BACKEND_URL: {settings.ONLYOFFICE_BACKEND_URL}")
 
     @pytest.mark.asyncio
-    async def test_recording_file_key_format_validation(self, db_session: AsyncSession, authenticated_user_a, mock_gladia, mock_mistral_pv, mock_sentinel, mock_n8n_transcription):
+    async def test_recording_file_key_format_validation(self, db_session: AsyncSession, authenticated_user_a, mock_gladia, mock_mistral_pv, mock_sentinel, mock_n8n_transcription, s3_available):
         """
         Test: Recording file_key follows required format with client_id prefix
         

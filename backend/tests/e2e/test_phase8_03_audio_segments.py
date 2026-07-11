@@ -4,6 +4,7 @@ Phase 3: Audio Segment Extraction + Embedding Pipeline
 """
 import asyncio
 import os
+import shutil
 import tempfile
 import wave
 
@@ -79,6 +80,7 @@ async def test_phase8_13_group_by_speaker(service, sample_segments):
     assert len(grouped["Speaker 2"]) == 1
 
 
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg not installed")
 @pytest.mark.asyncio
 async def test_phase8_14_extract_speaker_segments(service, test_audio_file, sample_segments):
     """
@@ -132,6 +134,7 @@ async def test_phase8_15_extract_embeddings(service, test_audio_file, sample_seg
         assert not os.path.exists(path), f"Temp file {path} should be cleaned up"
 
 
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="ffmpeg not installed")
 @pytest.mark.asyncio
 async def test_phase8_16_skip_short_speaker(service, test_audio_file):
     """

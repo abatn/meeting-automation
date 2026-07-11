@@ -123,6 +123,7 @@ async def test_phase78_gratuit_skips_sentinel(
     mock_gladia,
     mock_mistral_pv,
     mock_n8n_transcription,
+    s3_available,
 ):
     """GRATUIT plan: pipeline should skip Sentinel LLM and still produce PV."""
     client, meeting = await _create_client_and_meeting(db_session, SubscriptionPlan.GRATUIT)
@@ -176,6 +177,7 @@ async def test_phase78_pro_uses_sentinel(
     mock_gladia,
     mock_mistral_pv,
     mock_n8n_transcription,
+    s3_available,
 ):
     """PRO plan: pipeline should use Sentinel LLM for summarization."""
     client, meeting = await _create_client_and_meeting(db_session, SubscriptionPlan.PRO)
@@ -221,6 +223,7 @@ async def test_phase78_entreprise_uses_sentinel(
     mock_gladia,
     mock_mistral_pv,
     mock_n8n_transcription,
+    s3_available,
 ):
     """ENTREPRISE plan: pipeline should use Sentinel LLM (same as PRO)."""
     client, meeting = await _create_client_and_meeting(db_session, SubscriptionPlan.ENTREPRISE)
@@ -259,6 +262,7 @@ async def test_phase78_unknown_client_uses_sentinel(
     mock_gladia,
     mock_mistral_pv,
     mock_n8n_transcription,
+    s3_available,
 ):
     """Client with no subscription_plan (nullable): pipeline should fallback to Sentinel."""
     # Create a Client WITHOUT subscription_plan (simulates legacy/free user)

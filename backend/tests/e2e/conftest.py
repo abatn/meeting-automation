@@ -34,6 +34,24 @@ from app.models.pv import PV
 from app.core.database import AsyncSessionLocal
 from app.core.config import settings
 
+import socket
+from urllib.parse import urlparse
+_s3_parsed = urlparse(settings.S3_ENDPOINT)
+try:
+    _s3_sock = socket.create_connection((_s3_parsed.hostname, _s3_parsed.port or 9000), timeout=2)
+    _s3_sock.close()
+    S3_AVAILABLE = True
+except Exception:
+    S3_AVAILABLE = False
+
+
+@pytest.fixture(scope="session")
+def s3_available():
+    """Session fixture: skips tests when MinIO/S3 is not reachable."""
+    if not S3_AVAILABLE:
+        pytest.skip(f"MinIO/S3 not reachable at {settings.S3_ENDPOINT}")
+    return True
+
 
 class TestEnvironment(str, Enum):
     """Supported test environments."""
