@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-test-dev
     if: github.ref == 'refs/heads/main'
-    environment: staging
+    environment: meeting-Automation
     steps:
     - uses: actions/checkout@v4
 
