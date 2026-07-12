@@ -13,6 +13,7 @@ from . import (
     audit,
     cms,
     livekit,
+    consent,
 )
 
 router = APIRouter()
@@ -30,3 +31,4 @@ router.include_router(settings.router, prefix="/settings", tags=["Settings"])
 router.include_router(audit.router, prefix="/audit", tags=["Audit Logging"])
 router.include_router(cms.router, prefix="/cms", tags=["CMS"])
 router.include_router(livekit.router, tags=["LiveKit"])
+router.include_router(consent.router, prefix="/consent", tags=["Consent"])

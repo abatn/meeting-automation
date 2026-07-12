@@ -32,6 +32,7 @@ from app.api.v1 import (
     cms,
     livekit,
     contact,
+    consent,
 )
 from app.core.websocket import manager
 import asyncio
@@ -330,6 +331,7 @@ app.include_router(webhooks_stripe.router, prefix="/api/v1/webhooks/stripe", tag
 app.include_router(cms.router, prefix="/api/v1/cms", tags=["CMS"])
 app.include_router(contact.router, prefix="/api/v1", tags=["Contact"])
 app.include_router(livekit.router, prefix="/api/v1", tags=["LiveKit"])
+app.include_router(consent.router, prefix="/api/v1/consent", tags=["Consent"])
 
 if __name__ == "__main__":
     import uvicorn
