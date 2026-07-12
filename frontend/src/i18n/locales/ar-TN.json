@@ -101,9 +101,9 @@
       "resend_success": "تم إرسال رابط التفعيل بنجاح!",
       "sending": "جاري الإرسال...",
       "back_to_login": "العودة إلى تسجيل الدخول",
-        "spam_notice": "لم تستلم البريد الإلكتروني؟ تحقق من مجلد الرسائل غير المرغوب فيها.",
-        "no_email": "لم يتم توفير البريد الإلكتروني",
-        "resend_failed": "فشل إعادة إرسال بريد التفعيل"
+      "spam_notice": "لم تستلم البريد الإلكتروني؟ تحقق من مجلد الرسائل غير المرغوب فيها.",
+      "no_email": "لم يتم توفير البريد الإلكتروني",
+      "resend_failed": "فشل إعادة إرسال بريد التفعيل"
     }
   },
   "sidebar": {
@@ -558,29 +558,29 @@
     "poll_for_insights": "سيحلل الذكاء الاصطناعي بعد انتهاء التسجيل",
     "pipeline_complete": "اكتمل المعالجة",
     "edit_pv": "تعديل المحضر",
-     "edit_online_desc": "فتح في محرر OnlyOffice",
-     "export_pdf": "تصدير PDF",
-     "export_pdf_desc": "تحميل كمستند PDF",
-     "export_word": "تصدير Word",
-     "export_word_desc": "تحميل كملف DOCX",
-     "connection_reconnecting": "جاري إعادة الاتصال…",
-     "connection_reconnecting_desc": "محاولة استعادة الاتصال",
-     "connection_poor": "جودة صوت منخفضة",
-     "connection_poor_desc": "الشبكة منخفضة الجودة",
-     "connection_lost": "فُقد الاتصال",
-     "connection_lost_desc": "إعادة الاتصال جارية",
-     "recording_continues_on_server": "التسجيل مستمر على الخادم",
-     "mic_on": "الميكروفون مفعل",
-     "mic_muted": "الميكروفون معطل",
-     "participants_audio_status": "حالة الصوت",
-     "connection_connected": "متصل",
-     "connection_connecting": "جارٍ الاتصال...",
-     "connection_disconnected": "غير متصل",
-     "mic_mute": "كتم الميكروفون",
-     "mic_unmute": "تشغيل الميكروفون",
-     "leave_meeting": "مغادرة الاجتماع",
-     "leave": "مغادرة"
-    },
+    "edit_online_desc": "فتح في محرر OnlyOffice",
+    "export_pdf": "تصدير PDF",
+    "export_pdf_desc": "تحميل كمستند PDF",
+    "export_word": "تصدير Word",
+    "export_word_desc": "تحميل كملف DOCX",
+    "connection_reconnecting": "جاري إعادة الاتصال…",
+    "connection_reconnecting_desc": "محاولة استعادة الاتصال",
+    "connection_poor": "جودة صوت منخفضة",
+    "connection_poor_desc": "الشبكة منخفضة الجودة",
+    "connection_lost": "فُقد الاتصال",
+    "connection_lost_desc": "إعادة الاتصال جارية",
+    "recording_continues_on_server": "التسجيل مستمر على الخادم",
+    "mic_on": "الميكروفون مفعل",
+    "mic_muted": "الميكروفون معطل",
+    "participants_audio_status": "حالة الصوت",
+    "connection_connected": "متصل",
+    "connection_connecting": "جارٍ الاتصال...",
+    "connection_disconnected": "غير متصل",
+    "mic_mute": "كتم الميكروفون",
+    "mic_unmute": "تشغيل الميكروفون",
+    "leave_meeting": "مغادرة الاجتماع",
+    "leave": "مغادرة"
+  },
   "archive": {
     "subtitle": "تصفح وابحث في سجل اجتماعات شركتك.",
     "date_from": "من",
@@ -592,5 +592,31 @@
   },
   "error": {
     "react_error_boundary": "حدث خطأ ما (React Error Boundary)"
+  },
+  "consent": {
+    "title": "إدارة الموافقة",
+    "required_notice": "هذه الموافقة مطلوبة لاستخدام الخدمة.",
+    "optional_notice": "هذه الموافقة اختيارية. يمكنك تخطي هذه الخطوة.",
+    "confirm": "أكوئ موافقاتي",
+    "audio_recording": {
+      "short": "التسجيل",
+      "text": "أوافق على تسجيل هذا الاجتماع الصوتي وتخزينه ومعالجته لإنشاء نص ومحضر اجتماع. يتم تخزين التسجيلات على خوادم في الاتحاد الأروبي.",
+      "checkbox": "أوافق على التسجيل الصوتي"
+    },
+    "voice_profiling": {
+      "short": "الملف الصوتي",
+      "text": "أوافق على تحليل صوتي وتخزينه للتعريف التلقائي في الاجتماعات المستقبلة (الملفات الصوتية البيومترية وفقارا للمادة 5 الفقرة 2 من القانون 2004-63). يمكن سحب هذه الموافقة في أي وقت.",
+      "checkbox": "أوافق على الملف الصوتي (اختياري)"
+    },
+    "third_party_sharing": {
+      "short": "مشاركة البيانات",
+      "text": "لقد تم إعلامي بأن البيانات (التسجيلات الصوتية والنصوص) تتم مشاركتها مع الأطراف الثالثة التالية في الاتحاد الأروبي: Gladia (فرنسا - النسخ), Mistral (فرنسا - المعالجة بالذكاء الاصطناعي), Hetzner (ألمانيا - التخزين). الأساس القانوني: المادة 47 الفقرة 3 من القانون 2004-63.",
+      "checkbox": "أكوئ مشاركة البيانات مع أطراف ثالثة"
+    },
+    "transcript_storage": {
+      "short": "التخزين",
+      "text": "أوافق على حفظ النصوص والمحاضر لمدة سنة واحده كحد أقصى. سيتم حذف التسجيلات الصوتية تلقائياً بعد 90 يوماً.",
+      "checkbox": "أوافق على الاحتفاظ بالبيانات"
+    }
   }
 }

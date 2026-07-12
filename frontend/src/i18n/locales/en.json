@@ -101,9 +101,9 @@
       "resend_success": "Activation link sent successfully!",
       "sending": "Sending...",
       "back_to_login": "Back to login",
-        "spam_notice": "Didn't receive the email? Check your spam folder.",
-        "no_email": "No email provided",
-        "resend_failed": "Failed to resend activation email"
+      "spam_notice": "Didn't receive the email? Check your spam folder.",
+      "no_email": "No email provided",
+      "resend_failed": "Failed to resend activation email"
     }
   },
   "sidebar": {
@@ -560,32 +560,32 @@
     "transcription_streaming": "Transcription streaming...",
     "insights_ready": "Insights ready",
     "insights_processing": "Processing insights...",
-     "poll_for_insights": "AI will analyze once recording completes",
-     "pipeline_complete": "Pipeline Complete",
-     "edit_pv": "Edit PV",
-     "edit_online_desc": "Open in OnlyOffice editor",
-     "export_pdf": "Export PDF",
-     "export_pdf_desc": "Download as PDF document",
-     "export_word": "Export Word",
-     "export_word_desc": "Download as DOCX file",
-     "connection_reconnecting": "Reconnecting…",
-     "connection_reconnecting_desc": "Attempting to restore connection",
-     "connection_poor": "Poor Audio Quality",
-     "connection_poor_desc": "Network degraded",
-     "connection_lost": "Connection Lost",
-     "connection_lost_desc": "Reconnecting in progress",
-     "recording_continues_on_server": "Recording continues on server",
-     "mic_on": "Mic On",
-     "mic_muted": "Mic Muted",
-     "participants_audio_status": "Audio Status",
-     "connection_connected": "Connected",
-     "connection_connecting": "Connecting...",
-     "connection_disconnected": "Disconnected",
-     "mic_mute": "Mute microphone",
-     "mic_unmute": "Unmute microphone",
-     "leave_meeting": "Leave meeting",
-     "leave": "Leave"
-    },
+    "poll_for_insights": "AI will analyze once recording completes",
+    "pipeline_complete": "Pipeline Complete",
+    "edit_pv": "Edit PV",
+    "edit_online_desc": "Open in OnlyOffice editor",
+    "export_pdf": "Export PDF",
+    "export_pdf_desc": "Download as PDF document",
+    "export_word": "Export Word",
+    "export_word_desc": "Download as DOCX file",
+    "connection_reconnecting": "Reconnecting…",
+    "connection_reconnecting_desc": "Attempting to restore connection",
+    "connection_poor": "Poor Audio Quality",
+    "connection_poor_desc": "Network degraded",
+    "connection_lost": "Connection Lost",
+    "connection_lost_desc": "Reconnecting in progress",
+    "recording_continues_on_server": "Recording continues on server",
+    "mic_on": "Mic On",
+    "mic_muted": "Mic Muted",
+    "participants_audio_status": "Audio Status",
+    "connection_connected": "Connected",
+    "connection_connecting": "Connecting...",
+    "connection_disconnected": "Disconnected",
+    "mic_mute": "Mute microphone",
+    "mic_unmute": "Unmute microphone",
+    "leave_meeting": "Leave meeting",
+    "leave": "Leave"
+  },
   "archive": {
     "subtitle": "Browse and search through your company's meeting history.",
     "date_from": "From",
@@ -616,5 +616,31 @@
   },
   "error": {
     "react_error_boundary": "Something went wrong (React Error Boundary)"
+  },
+  "consent": {
+    "title": "Consent Management",
+    "required_notice": "This consent is required to use the service.",
+    "optional_notice": "This consent is optional. You can skip this step.",
+    "confirm": "I Confirm My Consents",
+    "audio_recording": {
+      "short": "Recording",
+      "text": "I consent to the recording, storage, and processing of this meeting audio for transcription and meeting minutes (PV). Recordings are stored on EU servers (France: Gladia, Germany: MinIO).",
+      "checkbox": "I consent to audio recording"
+    },
+    "voice_profiling": {
+      "short": "Voice Profile",
+      "text": "I consent to my voice being analyzed and stored for automatic speaker identification in future meetings (biometric voice profiles per Art. 5 Nr. 2 Law 2004-63). This consent can be withdrawn at any time.",
+      "checkbox": "I consent to voice profiling (optional)"
+    },
+    "third_party_sharing": {
+      "short": "Data Sharing",
+      "text": "I acknowledge that data (audio recordings, transcripts) is shared with the following EU-based third parties: Gladia (France - transcription), Mistral (France - AI processing), Hetzner (Germany - storage). Legal basis: Art. 47 Abs. 3 Law 2004-63.",
+      "checkbox": "I acknowledge third-party data sharing"
+    },
+    "transcript_storage": {
+      "short": "Storage",
+      "text": "I consent to transcripts and meeting minutes being stored for a maximum of 1 year. Audio recordings are automatically deleted after 90 days.",
+      "checkbox": "I consent to data retention"
+    }
   }
 }

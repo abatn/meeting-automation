@@ -101,9 +101,9 @@
       "resend_success": "Lien d'activation envoyé avec succès !",
       "sending": "Envoi en cours...",
       "back_to_login": "Retour à la connexion",
-        "spam_notice": "Vous n'avez pas reçu l'email ? Vérifiez votre dossier spam.",
-        "no_email": "Aucun email fourni",
-        "resend_failed": "Échec du renvoi de l'email d'activation"
+      "spam_notice": "Vous n'avez pas reçu l'email ? Vérifiez votre dossier spam.",
+      "no_email": "Aucun email fourni",
+      "resend_failed": "Échec du renvoi de l'email d'activation"
     }
   },
   "sidebar": {
@@ -564,29 +564,29 @@
     "poll_for_insights": "L'IA analysera une fois l'enregistrement terminé",
     "pipeline_complete": "Pipeline Terminé",
     "edit_pv": "Modifier PV",
-     "edit_online_desc": "Ouvrir dans l'éditeur OnlyOffice",
-     "export_pdf": "Exporter PDF",
-     "export_pdf_desc": "Télécharger en document PDF",
-     "export_word": "Exporter Word",
-     "export_word_desc": "Télécharger en fichier DOCX",
-     "connection_reconnecting": "Reconnexion en cours…",
-     "connection_reconnecting_desc": "Tentative de restauration de la connexion",
-     "connection_poor": "Qualité Audio Faible",
-     "connection_poor_desc": "Réseau dégradé",
-     "connection_lost": "Connexion Perdue",
-     "connection_lost_desc": "Reconnexion en cours",
-     "recording_continues_on_server": "L'enregistrement continue sur le serveur",
-     "mic_on": "Micro Activé",
-     "mic_muted": "Micro Désactivé",
-     "participants_audio_status": "Statut Audio",
-     "connection_connected": "Connecté",
-     "connection_connecting": "Connexion en cours...",
-     "connection_disconnected": "Déconnecté",
-     "mic_mute": "Couper le micro",
-     "mic_unmute": "Activer le micro",
-     "leave_meeting": "Quitter la réunion",
-     "leave": "Quitter"
-    },
+    "edit_online_desc": "Ouvrir dans l'éditeur OnlyOffice",
+    "export_pdf": "Exporter PDF",
+    "export_pdf_desc": "Télécharger en document PDF",
+    "export_word": "Exporter Word",
+    "export_word_desc": "Télécharger en fichier DOCX",
+    "connection_reconnecting": "Reconnexion en cours…",
+    "connection_reconnecting_desc": "Tentative de restauration de la connexion",
+    "connection_poor": "Qualité Audio Faible",
+    "connection_poor_desc": "Réseau dégradé",
+    "connection_lost": "Connexion Perdue",
+    "connection_lost_desc": "Reconnexion en cours",
+    "recording_continues_on_server": "L'enregistrement continue sur le serveur",
+    "mic_on": "Micro Activé",
+    "mic_muted": "Micro Désactivé",
+    "participants_audio_status": "Statut Audio",
+    "connection_connected": "Connecté",
+    "connection_connecting": "Connexion en cours...",
+    "connection_disconnected": "Déconnecté",
+    "mic_mute": "Couper le micro",
+    "mic_unmute": "Activer le micro",
+    "leave_meeting": "Quitter la réunion",
+    "leave": "Quitter"
+  },
   "archive": {
     "subtitle": "Parcourez et recherchez dans l'historique des réunions de votre entreprise.",
     "date_from": "Du",
@@ -617,5 +617,31 @@
   },
   "error": {
     "react_error_boundary": "Une erreur est survenue (React Error Boundary)"
+  },
+  "consent": {
+    "title": "Gestion des consentements",
+    "required_notice": "Ce consentement est requis pour utiliser le service.",
+    "optional_notice": "Ce consentement est optionnel. Vous pouvez passer cette étape.",
+    "confirm": "Je confirme mes consentements",
+    "audio_recording": {
+      "short": "Enregistrement",
+      "text": "J'accepte que l'enregistrement audio de cette réunion soit capté, stocké et traité pour la création d'une transcription et d'un procès-verbal (PV). L'enregistrement sera stocké sur des serveurs dans l'UE.",
+      "checkbox": "J'accepte l'enregistrement audio"
+    },
+    "voice_profiling": {
+      "short": "Profil vocal",
+      "text": "J'accepte que ma voix soit analysée et stockée pour l'identification automatique dans les futures réunions (profils vocaux biométriques selon Art. 5 al. 2 Loi 2004-63). Ce consentement peut être révoqué à tout moment.",
+      "checkbox": "J'accepte le profilage vocal (optionnel)"
+    },
+    "third_party_sharing": {
+      "short": "Partage de données",
+      "text": "J'ai été informé(e) que des données (enregistrements audio, transcriptions) sont partagées avec les tiers suivants dans l'UE : Gladia (France — transcription), Mistral (France — traitement IA), Hetzner (Allemagne — stockage). Base légale : Art. 47 al. 3 Loi 2004-63.",
+      "checkbox": "J'accuse réception du partage de données"
+    },
+    "transcript_storage": {
+      "short": "Conservation",
+      "text": "J'accepte que les transcriptions et procès-verbaux soient conservés pendant 1 an maximum. Les enregistrements audio seront supprimés après 90 jours.",
+      "checkbox": "J'accepte la conservation des données"
+    }
   }
 }
