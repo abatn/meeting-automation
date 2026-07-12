@@ -26,15 +26,18 @@ spec:
           app: backend
     - podSelector:
         matchLabels:
-          app: n8n-staging
+          app: celery-worker-staging
     - podSelector:
         matchLabels:
-          app: celery-worker-staging
+          app: celery-worker-pro-staging
+    - podSelector:
+        matchLabels:
+          app: celery-beat-staging
     ports:
     - protocol: TCP
       port: 5432
 ---
-# Redis: Backend, Celery, Egress, LiveKit Server
+# Redis: Backend, Celery, Celery-Pro, Egress, LiveKit Server
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -54,6 +57,9 @@ spec:
           app: celery-worker-staging
     - podSelector:
         matchLabels:
+          app: celery-worker-pro-staging
+    - podSelector:
+        matchLabels:
           app: celery-beat-staging
     - podSelector:
         matchLabels:
@@ -65,7 +71,7 @@ spec:
     - protocol: TCP
       port: 6379
 ---
-# RabbitMQ: Only allow Backend and Celery
+# RabbitMQ: Only allow Backend, Celery, and Celery-Pro
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -85,6 +91,9 @@ spec:
           app: celery-worker-staging
     - podSelector:
         matchLabels:
+          app: celery-worker-pro-staging
+    - podSelector:
+        matchLabels:
           app: celery-beat-staging
     ports:
     - protocol: TCP
@@ -92,7 +101,7 @@ spec:
     - protocol: TCP
       port: 15672
 ---
-# MinIO: Allow Backend, Celery, Frontend, CNPG (WAL-Archiv)
+# MinIO: Allow Backend, Celery, Celery-Pro, Frontend, CNPG (WAL-Archiv)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -110,6 +119,9 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-worker-staging
+    - podSelector:
+        matchLabels:
+          app: celery-worker-pro-staging
     - podSelector:
         matchLabels:
           app: frontend
