@@ -110,6 +110,7 @@ class User(Base):
     created_meetings: Mapped[List["Meeting"]] = relationship(
         "Meeting", back_populates="creator"
     )
+    consents: Mapped[List["ConsentLog"]] = relationship("ConsentLog", back_populates="user")
 
     @property
     def department(self) -> Optional[str]:
