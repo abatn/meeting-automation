@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: meeting-automation
+  labels:
+    app: backend
+    environment: production
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+      environment: production
+  template:
+    metadata:
+      labels:
+        app: backend
+        environment: production
+    spec:
+      initContainers:
+      - name: alembic-migrate
+        image: docker.io/batnini/meeting-automation-backend:latest
+        imagePullPolicy: Always
+        command: ["sh", "-c", "cd /app && alembic upgrade head"]
+        envFrom:
+        - secretRef:
+            name: backend-secrets
+        - configMapRef:
+            name: backend-config
+        env:
+        - name: PYTHONPATH
+          value: "/app"
+        - name: DB_HOST
+          value: "meeting-db-rw"
+        - name: RUN_MIGRATIONS
+          value: "true"
+        - name: E2E_TEST
+          value: "false"
+      containers:
+      - name: backend
+        image: docker.io/batnini/meeting-automation-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        envFrom:
+        - secretRef:
+            name: backend-secrets
+        - configMapRef:
+            name: backend-config
+        # Enable debug logging in production for troubleshooting
+        env:
+        - name: DEBUG
+          value: "true"
+        - name: DB_HOST
+          value: "meeting-db-rw"
+        - name: APP_ROLE
+          value: "backend"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: meeting-automation
+  labels:
+    app: backend
+    environment: production
+spec:
+  selector:
+    app: backend
+    environment: production
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  type: ClusterIP

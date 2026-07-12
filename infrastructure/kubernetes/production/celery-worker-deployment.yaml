@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: meeting-automation
+  labels:
+    app: celery-worker
+    worker-tier: gratuit
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+        worker-tier: gratuit
+    spec:
+      containers:
+      - name: celery-worker
+        image: docker.io/batnini/meeting-automation-backend:latest
+        imagePullPolicy: Always
+        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_gratuit,email,maintenance"]
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - celery -A app.tasks.celery_app inspect ping --timeout=5
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        env:
+        - name: PYTHONPATH
+          value: "/app"
+        envFrom:
+        - secretRef:
+            name: backend-secrets
+        - configMapRef:
+            name: backend-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: celery-worker
+  namespace: meeting-automation
+  labels:
+    app: celery-worker
+spec:
+  selector:
+    app: celery-worker
+  ports:
+  - port: 5555
+    name: stats
+  type: ClusterIP

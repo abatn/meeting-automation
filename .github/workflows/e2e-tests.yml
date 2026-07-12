@@ -323,4 +323,68 @@ jobs:
           backend/staging-e2e-report.xml
           backend/coverage.xml
 
+  # Job 3: Production Deployment (manual approval via Environment Protection Rules)
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: deploy-staging-and-test
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure K8s context for production
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" > kubeconfig-prod
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+
+        CONTEXT=$(kubectl config get-contexts -o name | head -1)
+        if [ -z "$CONTEXT" ]; then
+          echo "No contexts found in kubeconfig"
+          exit 1
+        fi
+
+        echo "Using context: $CONTEXT"
+        kubectl config use-context "$CONTEXT"
+
+    - name: Deploy to Production
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        kubectl set image deployment/backend \
+          backend=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          alembic-migrate=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          -n meeting-automation --record
+        kubectl set image deployment/frontend \
+          frontend=batnini/meeting-automation-frontend:${{ github.sha }} \
+          -n meeting-automation --record
+        kubectl set image deployment/celery-worker \
+          celery=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          -n meeting-automation --record
+        kubectl set image deployment/celery-worker-pro \
+          celery=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          -n meeting-automation --record
+        kubectl rollout status deployment/backend -n meeting-automation --timeout=300s
+
+    - name: Run Production Smoke Tests
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        kubectl port-forward -n meeting-automation svc/backend 18080:8000 &
+        sleep 5
+        HEALTH=$(curl -sf http://localhost:18080/health | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+        kill %1 2>/dev/null || true
+        if [ "$HEALTH" = "healthy" ]; then
+          echo "Production smoke test PASSED"
+        else
+          echo "Production smoke test FAILED"
+          exit 1
+        fi
+
+    - name: Rollback on Failure
+      if: failure()
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        kubectl rollout undo deployment/backend -n meeting-automation
+        kubectl rollout undo deployment/frontend -n meeting-automation
+        kubectl rollout undo deployment/celery-worker -n meeting-automation
+        kubectl rollout undo deployment/celery-worker-pro -n meeting-automation
+        echo "Rolled back to previous revision"
 

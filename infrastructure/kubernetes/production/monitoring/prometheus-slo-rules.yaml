@@ -1,0 +1,83 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: meeting-automation-slo
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: meeting-automation-slo-definitions
+      interval: 30s
+      rules:
+        - record: slo:api_availability:30d
+          expr: |
+            1 - (
+              sum(increase(http_requests_total{status_code=~"5.."}[30d]))
+              / sum(increase(http_requests_total[30d]))
+            )
+
+        - record: slo:pipeline_success:7d
+          expr: |
+            1 - (
+              sum(increase(pipeline_recordings_total{status="failed"}[7d]))
+              / sum(increase(pipeline_recordings_total[7d]))
+            )
+
+        - record: slo:pipeline_latency_p95:7d
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(pipeline_stage_duration_seconds_bucket{stage="pipeline_total"}[7d])) by (le)
+            )
+
+        - record: slo:error_budget:api:30d
+          expr: (1 - slo:api_availability:30d) / 0.001
+
+        - record: slo:error_budget:pipeline:7d
+          expr: (1 - slo:pipeline_success:7d) / 0.01
+
+    - name: meeting-automation-slo-burn-alerts
+      rules:
+        - alert: SLOBurnRateHigh
+          expr: |
+            (
+              sum(rate(http_requests_total{status_code=~"5.."}[1h]))
+              / sum(rate(http_requests_total[1h]))
+            ) > (14.4 * (1 - slo:api_availability:30d))
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "API SLO burn rate critical"
+            description: "Error budget burning 14.4x faster than allowed. Budget exhausted in {{ $value }}h."
+
+        - alert: SLOBurnRateMedium
+          expr: |
+            (
+              sum(rate(http_requests_total{status_code=~"5.."}[6h]))
+              / sum(rate(http_requests_total[6h]))
+            ) > (6 * (1 - slo:api_availability:30d))
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "API SLO burn rate elevated"
+            description: "Error budget burning 6x faster than allowed."
+
+        - alert: ErrorBudgetLow
+          expr: slo:error_budget:api:30d < 0.1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "API error budget < 10% remaining"
+            description: "Only {{ $value | humanizePercentage }} of the 30-day error budget remains."
+
+        - alert: PipelineErrorBudgetLow
+          expr: slo:error_budget:pipeline:7d < 0.1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pipeline error budget < 10% remaining"
+            description: "Only {{ $value | humanizePercentage }} of the 7-day pipeline error budget remains."

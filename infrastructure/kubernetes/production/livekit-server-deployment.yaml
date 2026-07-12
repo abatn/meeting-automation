@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livekit-server
+  namespace: meeting-automation
+  labels:
+    app: livekit-server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: livekit-server
+  template:
+    metadata:
+      labels:
+        app: livekit-server
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: instance-20260329-0846
+      containers:
+      - name: livekit
+        image: livekit/livekit-server:latest
+        args: ["--config", "/etc/livekit.yaml"]
+        ports:
+        - containerPort: 7880
+          name: http
+          hostPort: 7880
+        - containerPort: 7881
+          name: tcp
+          hostPort: 7881
+        - containerPort: 3478
+          name: turn
+          hostPort: 3478
+          protocol: UDP
+        - containerPort: 50000
+          name: udp-start
+          hostPort: 50000
+          protocol: UDP
+        - containerPort: 60000
+          name: udp-end
+          hostPort: 60000
+          protocol: UDP
+        volumeMounts:
+        - name: livekit-config
+          mountPath: /etc/livekit.yaml
+          subPath: livekit.yaml
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 7880
+          initialDelaySeconds: 10
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 7880
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: livekit-config
+        configMap:
+          name: livekit-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: livekit-server
+  namespace: meeting-automation
+  labels:
+    app: livekit-server
+spec:
+  selector:
+    app: livekit-server
+  ports:
+  - port: 7880
+    targetPort: 7880
+    name: http
+  - port: 7881
+    targetPort: 7881
+    name: tcp
+  type: ClusterIP

@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: meeting-automation
+  labels:
+    app: n8n
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: n8n
+  template:
+    metadata:
+      labels:
+        app: n8n
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 0
+      containers:
+      - name: n8n
+        image: n8nio/n8n:latest
+        ports:
+        - containerPort: 5678
+          name: http
+        env:
+        - name: DB_TYPE
+          value: "postgresdb"
+        - name: DB_POSTGRESDB_HOST
+          value: "meeting-db-rw.meeting-automation.svc.cluster.local"
+        - name: DB_POSTGRESDB_PORT
+          value: "5432"
+        - name: DB_POSTGRESDB_DATABASE
+          value: "meeting_db"
+        - name: DB_POSTGRESDB_USER
+          value: "meeting_user"
+        - name: DB_POSTGRESDB_PASSWORD
+          value: "meeting_password"
+        - name: N8N_HOST
+          value: "n8n.meeting-automation.svc.cluster.local"
+        - name: N8N_PORT
+          value: "5678"
+        - name: WEBHOOK_URL
+          value: "http://n8n:5678"
+        - name: N8N_SECURE_COOKIE
+          value: "false"
+        - name: N8N_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: n8n-secrets
+              key: N8N_API_KEY
+        volumeMounts:
+        - name: n8n-storage
+          mountPath: /home/node/.n8n
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 5678
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 5678
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: n8n-storage
+        persistentVolumeClaim:
+          claimName: n8n-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: n8n-pvc
+  namespace: meeting-automation
+  labels:
+    app: n8n
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: n8n
+  namespace: meeting-automation
+  labels:
+    app: n8n
+spec:
+  selector:
+    app: n8n
+  ports:
+  - port: 5678
+    targetPort: 5678
+    name: http
+  type: ClusterIP

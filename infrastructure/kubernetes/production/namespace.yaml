@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: meeting-automation
+  labels:
+    environment: production
+    purpose: e2e-testing
+    managed-by: github-actions

@@ -1,0 +1,361 @@
+# Network Policies for Meeting Automation (ISO 27001 Compliance)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: meeting-automation
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+---
+# Postgres: Only allow Backend, n8n, Celery
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: n8n
+    - podSelector:
+        matchLabels:
+          app: celery-worker
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# Redis: Backend, Celery, Egress, LiveKit Server
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: celery-worker
+    - podSelector:
+        matchLabels:
+          app: celery-beat
+    - podSelector:
+        matchLabels:
+          app: livekit-egress
+    - podSelector:
+        matchLabels:
+          app: livekit-server
+    ports:
+    - protocol: TCP
+      port: 6379
+---
+# RabbitMQ: Only allow Backend and Celery
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rabbitmq-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: celery-worker
+    - podSelector:
+        matchLabels:
+          app: celery-beat
+    ports:
+    - protocol: TCP
+      port: 5672
+    - protocol: TCP
+      port: 15672
+---
+# MinIO: Allow Backend, Celery, Frontend, CNPG (WAL-Archiv)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: celery-worker
+    - podSelector:
+        matchLabels:
+          app: frontend
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 9000
+    - protocol: TCP
+      port: 9001
+---
+# Backend: Allow Frontend + LiveKit (webhook) + OnlyOffice (callback)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: frontend
+    - podSelector:
+        matchLabels:
+          app: livekit-server
+    - podSelector:
+        matchLabels:
+          app: onlyoffice
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# Frontend: Allow from everywhere
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 80
+---
+# OnlyOffice: Allow Backend and Frontend, egress to RabbitMQ, DNS, Backend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: onlyoffice-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: onlyoffice
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: frontend
+    ports:
+    - protocol: TCP
+      port: 80
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: rabbitmq
+    ports:
+    - protocol: TCP
+      port: 5672
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    to:
+    - namespaceSelector: {}
+  - to:
+    - podSelector:
+        matchLabels:
+          app: backend
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# n8n: Allow Backend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: n8n-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: n8n
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    ports:
+    - protocol: TCP
+      port: 5678
+---
+# LiveKit Server: Egress to Redis, Backend, DNS + Ingress from Egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: livekit-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: livekit-server
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    to:
+    - namespaceSelector: {}
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: livekit-egress
+    - podSelector:
+        matchLabels:
+          app: backend
+    ports:
+    - protocol: TCP
+      port: 7880
+    - protocol: TCP
+      port: 7881
+  - from:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 7881
+    - protocol: UDP
+      port: 3478
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# LiveKit Egress: Egress to Redis, MinIO, LiveKit, DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: livekit-egress-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: livekit-egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: minio
+    ports:
+    - protocol: TCP
+      port: 9000
+  - to:
+    - podSelector:
+        matchLabels:
+          app: livekit-server
+    ports:
+    - protocol: TCP
+      port: 7880
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    to:
+    - namespaceSelector: {}
+---
+# CNPG (meeting-db): Allow backend, n8n, celery-worker, cnpg-system
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cnpg-policy
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: postgresql
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: cnpg-system
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: n8n
+    - podSelector:
+        matchLabels:
+          app: celery-worker
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9187
+
+# CNPG MinIO Access: CNPG Pods brauchen Zugriff auf MinIO fuer WAL-Archiv
+# (Bereits in minio-policy enthalten via CNPG Label app.kubernetes.io/name=postgresql)

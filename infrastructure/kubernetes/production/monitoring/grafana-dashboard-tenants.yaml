@@ -1,0 +1,89 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-tenants
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  meeting-tenant-analytics.json: |
+    {
+      "uid": "meeting-tenant-analytics",
+      "title": "Tenant Analytics",
+      "tags": ["meeting-automation", "tenants"],
+      "timezone": "browser",
+      "refresh": "30s",
+      "time": { "from": "now-7d", "to": "now" },
+      "panels": [
+        {
+          "title": "Recordings per Tenant (24h)",
+          "type": "barchart",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            { "expr": "(sum by (client_id) (increase(pipeline_recordings_total[24h]))) or vector(0)", "legendFormat": "{{ client_id }}", "instant": true }
+          ]
+        },
+        {
+          "title": "Storage per Tenant",
+          "type": "barchart",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "fieldConfig": { "defaults": { "unit": "bytes" } },
+          "targets": [
+            { "expr": "storage_usage_bytes or vector(0)", "legendFormat": "{{ client_id }}", "instant": true }
+          ]
+        },
+        {
+          "title": "Transcriptions by Language",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+          "targets": [
+            { "expr": "(sum by (language) (increase(pipeline_transcriptions_total[7d]))) or vector(0)", "legendFormat": "{{ language }}" }
+          ]
+        },
+        {
+          "title": "PV Sections Generated",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 8 },
+          "targets": [
+            { "expr": "sum(increase(pipeline_pv_sections_total[7d])) or vector(0)", "legendFormat": "Total" }
+          ]
+        },
+        {
+          "title": "Actions Created",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 8 },
+          "targets": [
+            { "expr": "sum(increase(pipeline_actions_total[7d])) or vector(0)", "legendFormat": "Total" }
+          ]
+        },
+        {
+          "title": "Pipeline Duration per Tenant (P95)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 16, "y": 8 },
+          "fieldConfig": { "defaults": { "unit": "s" } },
+          "targets": [
+            { "expr": "(histogram_quantile(0.95, sum by (le, client_id) (rate(pipeline_stage_duration_seconds_bucket{stage=\"pipeline_total\"}[5m])))) or vector(0)", "legendFormat": "{{ client_id }}" }
+          ]
+        },
+        {
+          "title": "Tenant SLA Status",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 16, "x": 0, "y": 16 },
+          "targets": [
+            { "expr": "((1 - (sum by (client_id) (increase(pipeline_recordings_total{status=\"failed\"}[7d])) / sum by (client_id) (increase(pipeline_recordings_total[7d])))) * 100) or vector(100)", "legendFormat": "{{ client_id }}", "instant": true, "format": "table" }
+          ],
+          "transformations": [
+            { "id": "organize", "options": { "renameByName": { "client_id": "Tenant", "Value": "Success Rate (7d)" } } }
+          ]
+        },
+        {
+          "title": "Recordings Trend per Tenant",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+          "targets": [
+            { "expr": "(sum by (client_id) (increase(pipeline_recordings_total[1h]))) or vector(0)", "legendFormat": "{{ client_id }}" }
+          ]
+        }
+      ],
+      "schemaVersion": 39
+    }

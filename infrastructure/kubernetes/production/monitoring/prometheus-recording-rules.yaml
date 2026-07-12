@@ -1,0 +1,83 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: meeting-automation-recording-rules
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: meeting-automation-pipeline-computed
+      interval: 15s
+      rules:
+        - record: pipeline:success_rate:5m
+          expr: |
+            sum(rate(pipeline_recordings_total{status="completed"}[5m]))
+            / sum(rate(pipeline_recordings_total[5m])) * 100
+
+        - record: pipeline:p95_duration:5m
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(pipeline_stage_duration_seconds_bucket{stage="pipeline_total"}[5m])) by (le)
+            )
+
+        - record: pipeline:p50_duration:5m
+          expr: |
+            histogram_quantile(0.50,
+              sum(rate(pipeline_stage_duration_seconds_bucket{stage="pipeline_total"}[5m])) by (le)
+            )
+
+        - record: pipeline:p99_duration:5m
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(pipeline_stage_duration_seconds_bucket{stage="pipeline_total"}[5m])) by (le)
+            )
+
+        - record: pipeline:recording_rate_1h
+          expr: sum(increase(pipeline_recordings_total[1h]))
+
+        - record: pipeline:failure_rate:5m
+          expr: |
+            sum(rate(pipeline_failures_total[5m]))
+            / sum(rate(pipeline_recordings_total[5m])) * 100
+
+    - name: meeting-automation-http-computed
+      interval: 15s
+      rules:
+        - record: http:request_duration:p95:5m
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route)
+            )
+
+        - record: http:request_duration:p50:5m
+          expr: |
+            histogram_quantile(0.50,
+              sum(rate(http_request_duration_seconds_bucket[5m])) by (le, route)
+            )
+
+        - record: http:error_rate:5m
+          expr: |
+            sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            / sum(rate(http_requests_total[5m])) * 100
+
+        - record: http:requests_per_second:5m
+          expr: sum(rate(http_requests_total[5m])) by (route)
+
+    - name: meeting-automation-services-computed
+      interval: 15s
+      rules:
+        - record: services:availability:5m
+          expr: |
+            avg(up{namespace="meeting-automation"}) by (job) * 100
+
+        - record: pipeline:stage_bottleneck:5m
+          expr: |
+            topk(1,
+              histogram_quantile(0.95,
+                sum(rate(pipeline_stage_duration_seconds_bucket[5m])) by (le, stage)
+              )
+            )
+
+        - record: celery:queue_depth:max:5m
+          expr: max(celery_queue_depth) by (queue)
