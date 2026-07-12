@@ -29,6 +29,7 @@ import { AppDispatch } from '../../store';
 import { setCredentials } from '../../store/authSlice';
 import authService from '../../services/auth';
 import PasswordStrengthIndicator from '../../components/common/PasswordStrengthIndicator';
+import ConsentDialog from '../consent/ConsentDialog';
 
 const RegisterForm: React.FC = () => {
   const { t } = useTranslation();
@@ -47,6 +48,8 @@ const RegisterForm: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [consents, setConsents] = useState<{consent_type: string; consented: boolean; consent_version: string}[]>([]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -63,6 +66,12 @@ const RegisterForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setConsentOpen(true);
+  };
+
+  const handleConsentConfirm = async (consentData: {consent_type: string; consented: boolean; consent_version: string}[]) => {
+    setConsents(consentData);
+    setConsentOpen(false);
     setLoading(true);
 
     try {
@@ -71,10 +80,10 @@ const RegisterForm: React.FC = () => {
         password: formData.password,
         full_name: formData.full_name,
         company_name: formData.company_name,
-        plan: formData.plan
+        plan: formData.plan,
+        consents: consentData
       });
 
-      // Navigate to check email page instead of auto-login
       navigate('/check-email', { state: { email: formData.email } });
     } catch (err: any) {
       setError(err.response?.data?.detail || t('auth.register.error'));
@@ -185,6 +194,11 @@ const RegisterForm: React.FC = () => {
           </form>
         </Paper>
       </Container>
+      <ConsentDialog
+        open={consentOpen}
+        onClose={() => setConsentOpen(false)}
+        onConfirm={handleConsentConfirm}
+      />
     </Box>
   );
 };
