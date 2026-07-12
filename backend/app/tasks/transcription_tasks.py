@@ -868,7 +868,40 @@ async def _identify_speakers(
 
     # ENROLLMENT: after exclusivity, only enroll speakers with resolved names
     enrollment_service = AutoEnrollmentService(db)
+
+    # INPDP Art. 47: Check voice_profiling consent before enrollment
+    from app.models.consent import ConsentLog, ConsentType
+    from app.models.user import User as UserModel
+
     for mapping in all_mappings:
+        if mapping.get("resolved_name"):
+            speaker_label = mapping["speaker_label"]
+            resolved_name = mapping["resolved_name"]
+            confidence = mapping.get("confidence", 0.0)
+            method = mapping.get("method", "unknown")
+            speaker_embedding = mapping.get("embedding")
+
+            # Check voice_profiling consent for the target user
+            user_result = await db.execute(
+                select(UserModel).where(
+                    UserModel.client_id == client_id,
+                    UserModel.full_name == resolved_name,
+                )
+            )
+            target_user = user_result.scalar_one_or_none()
+            if target_user:
+                consent_check = await db.execute(
+                    select(ConsentLog).where(
+                        ConsentLog.user_id == target_user.id,
+                        ConsentLog.client_id == client_id,
+                        ConsentLog.consent_type == ConsentType.VOICE_PROFILING.value,
+                        ConsentLog.consented == True,
+                        ConsentLog.withdrawn_at.is_(None),
+                    )
+                )
+                if not consent_check.scalar_one_or_none():
+                    logger.info(f"INPDP: Skipping enrollment for {resolved_name} — no voice_profiling consent")
+                    continue
         if mapping.get("resolved_name"):
             speaker_label = mapping["speaker_label"]
             resolved_name = mapping["resolved_name"]

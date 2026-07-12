@@ -142,6 +142,20 @@ async def start_livekit_recording(
         if meeting.creator_id != current_user.id:
             raise HTTPException(status_code=403, detail="Only meeting creator can start recording.")
 
+        # INPDP Art. 47: Check audio_recording consent before recording
+        from app.models.consent import ConsentLog, ConsentType
+        consent_result = await db.execute(
+            select(ConsentLog).where(
+                ConsentLog.user_id == current_user.id,
+                ConsentLog.client_id == current_user.client_id,
+                ConsentLog.consent_type == ConsentType.AUDIO_RECORDING.value,
+                ConsentLog.consented == True,
+                ConsentLog.withdrawn_at.is_(None),
+            )
+        )
+        if not consent_result.scalar_one_or_none():
+            raise HTTPException(status_code=403, detail="Audio recording consent required (INPDP Art. 47)")
+
         # Phase 141: Guard gegen doppelte Recordings
         existing = await db.execute(
             select(Recording).where(Recording.meeting_id == meeting_id)
