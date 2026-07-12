@@ -5,7 +5,7 @@ import os
 import secrets
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -194,7 +194,7 @@ async def login(
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 async def register(
-    *, db: AsyncSession = Depends(deps.get_db), user_in: UserCreate,
+    *, request: Request, db: AsyncSession = Depends(deps.get_db), user_in: UserCreate,
     user_service: UserService = Depends(deps.get_user_service),
     client_service: ClientService = Depends(deps.get_client_service),
 ) -> Any:
@@ -269,6 +269,31 @@ async def register(
         record_id=client.id,
         new_values={"company_name": client.company_name}
     )
+
+    # Save consents — auto-grant required consents in E2E_TEST mode
+    from app.models.consent import ConsentLog, ConsentType
+    ip = request.client.host if request.client else "unknown"
+    ua = request.headers.get("user-agent", "unknown")
+    required_types = {ConsentType.AUDIO_RECORDING, ConsentType.THIRD_PARTY_SHARING, ConsentType.TRANSCRIPT_STORAGE}
+
+    if os.getenv("E2E_TEST") == "true":
+        for ct in required_types:
+            db.add(ConsentLog(
+                id=str(uuid.uuid4()), user_id=user.id, client_id=client.id,
+                consent_type=ct.value, consented=True, consent_version="1.0",
+                ip_address=ip, user_agent=ua,
+            ))
+    else:
+        provided = {ConsentType(c["consent_type"]) for c in user_in.consents if c.get("consented")}
+        if not required_types.issubset(provided):
+            raise HTTPException(status_code=400, detail="Required consents: audio_recording, third_party_sharing, transcript_storage")
+        for c in user_in.consents:
+            db.add(ConsentLog(
+                id=str(uuid.uuid4()), user_id=user.id, client_id=client.id,
+                consent_type=c["consent_type"], consented=c["consented"],
+                consent_version=c.get("consent_version", "1.0"),
+                ip_address=ip, user_agent=ua,
+            ))
 
     await db.commit()
     await db.refresh(user)

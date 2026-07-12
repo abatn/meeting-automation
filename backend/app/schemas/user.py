@@ -18,6 +18,7 @@ class UserCreate(UserBase):
     password: str
     company_name: Optional[str] = None
     plan: Optional[str] = "GRATUIT"
+    consents: list = []
     
     @field_validator('password')
     @classmethod
