@@ -14,7 +14,7 @@ export const useEntitlements = () => {
   // For now we use the role or a plan field if exists. 
   // Let's assume user.plan exists (we updated the registration to include it)
   
-  const plan = (user as any)?.plan || 'GRATUIT';
+  const plan = user?.plan || 'GRATUIT';
 
   const hasFeature = (feature: Feature): boolean => {
     if (user?.role === 'system_admin') return true;

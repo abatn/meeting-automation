@@ -101,9 +101,9 @@
       "resend_success": "Lien d'activation envoyé avec succès !",
       "sending": "Envoi en cours...",
       "back_to_login": "Retour à la connexion",
-      "spam_notice": "Vous n'avez pas reçu l'email ? Vérifiez votre dossier spam.",
-      "no_email": "Aucun email fourni",
-      "resend_failed": "Échec du renvoi de l'email d'activation"
+        "spam_notice": "Vous n'avez pas reçu l'email ? Vérifiez votre dossier spam.",
+        "no_email": "Aucun email fourni",
+        "resend_failed": "Échec du renvoi de l'email d'activation"
     }
   },
   "sidebar": {
@@ -453,6 +453,7 @@
       "title": "Tarifs transparents",
       "popular_badge": "POPULAIRE",
       "monthly": "mois",
+      "minutes_label": "{{count}} min / mois",
       "free_name": "Starter",
       "pro_name": "Professionnel",
       "ent_name": "Entreprise",
@@ -460,13 +461,11 @@
       "start_pro": "Commencer Pro",
       "start_enterprise": "Commencer Entreprise",
       "starter_feats": [
-        "2h de transcription / mois",
         "Réunions WebRTC LiveKit",
         "Reconnaissance vocale IA",
         "Export PDF"
       ],
       "pro_feats": [
-        "30h de transcription / mois",
         "Résumé Sentinel LLM",
         "Inscription vocale ONNX",
         "CRM Intervenants externes",
@@ -474,7 +473,6 @@
         "Collaboration OnlyOffice"
       ],
       "ent_feats": [
-        "60h de transcription / mois",
         "Tableau de bord Analytiques",
         "Auth biométrique vocale",
         "CRM Intervenants externes",
@@ -503,7 +501,7 @@
     },
     "trust": {
       "title": "ARCHITECTURE D'ENTREPRISE SÉCURISÉE",
-      "iso": "Certifié ISO 27001",
+      "iso": "Conformité ISO 27001",
       "aes": "Chiffrement AES-256",
       "gdpr": "Conforme RGPD"
     }
@@ -564,29 +562,29 @@
     "poll_for_insights": "L'IA analysera une fois l'enregistrement terminé",
     "pipeline_complete": "Pipeline Terminé",
     "edit_pv": "Modifier PV",
-    "edit_online_desc": "Ouvrir dans l'éditeur OnlyOffice",
-    "export_pdf": "Exporter PDF",
-    "export_pdf_desc": "Télécharger en document PDF",
-    "export_word": "Exporter Word",
-    "export_word_desc": "Télécharger en fichier DOCX",
-    "connection_reconnecting": "Reconnexion en cours…",
-    "connection_reconnecting_desc": "Tentative de restauration de la connexion",
-    "connection_poor": "Qualité Audio Faible",
-    "connection_poor_desc": "Réseau dégradé",
-    "connection_lost": "Connexion Perdue",
-    "connection_lost_desc": "Reconnexion en cours",
-    "recording_continues_on_server": "L'enregistrement continue sur le serveur",
-    "mic_on": "Micro Activé",
-    "mic_muted": "Micro Désactivé",
-    "participants_audio_status": "Statut Audio",
-    "connection_connected": "Connecté",
-    "connection_connecting": "Connexion en cours...",
-    "connection_disconnected": "Déconnecté",
-    "mic_mute": "Couper le micro",
-    "mic_unmute": "Activer le micro",
-    "leave_meeting": "Quitter la réunion",
-    "leave": "Quitter"
-  },
+     "edit_online_desc": "Ouvrir dans l'éditeur OnlyOffice",
+     "export_pdf": "Exporter PDF",
+     "export_pdf_desc": "Télécharger en document PDF",
+     "export_word": "Exporter Word",
+     "export_word_desc": "Télécharger en fichier DOCX",
+     "connection_reconnecting": "Reconnexion en cours…",
+     "connection_reconnecting_desc": "Tentative de restauration de la connexion",
+     "connection_poor": "Qualité Audio Faible",
+     "connection_poor_desc": "Réseau dégradé",
+     "connection_lost": "Connexion Perdue",
+     "connection_lost_desc": "Reconnexion en cours",
+     "recording_continues_on_server": "L'enregistrement continue sur le serveur",
+     "mic_on": "Micro Activé",
+     "mic_muted": "Micro Désactivé",
+     "participants_audio_status": "Statut Audio",
+     "connection_connected": "Connecté",
+     "connection_connecting": "Connexion en cours...",
+     "connection_disconnected": "Déconnecté",
+     "mic_mute": "Couper le micro",
+     "mic_unmute": "Activer le micro",
+     "leave_meeting": "Quitter la réunion",
+     "leave": "Quitter"
+    },
   "archive": {
     "subtitle": "Parcourez et recherchez dans l'historique des réunions de votre entreprise.",
     "date_from": "Du",
@@ -619,29 +617,127 @@
     "react_error_boundary": "Une erreur est survenue (React Error Boundary)"
   },
   "consent": {
-    "title": "Gestion des consentements",
-    "required_notice": "Ce consentement est requis pour utiliser le service.",
-    "optional_notice": "Ce consentement est optionnel. Vous pouvez passer cette étape.",
-    "confirm": "Je confirme mes consentements",
-    "audio_recording": {
-      "short": "Enregistrement",
-      "text": "J'accepte que l'enregistrement audio de cette réunion soit capté, stocké et traité pour la création d'une transcription et d'un procès-verbal (PV). L'enregistrement sera stocké sur des serveurs dans l'UE.",
-      "checkbox": "J'accepte l'enregistrement audio"
+    "title": "Consentement de Traitement des Données",
+    "subtitle": "Conformément à la Loi tunisienne 2004-63 (INPDP) et au RGPD, nous requérons votre consentement explicite avant de traiter les données de vos réunions.",
+    "required_note": "Les éléments marqués d'un * sont obligatoires pour utiliser le service.",
+    "step": "Étape {current} sur {total}",
+    "next": "Suivant",
+    "back": "Retour",
+    "accept_all": "Accepter et Continuer",
+    "submit": "J'accepte et je crée mon compte",
+    "withdraw": "Révoquer le consentement",
+    "withdrawn": "Consentement révoqué",
+    "c1": {
+      "title": "Enregistrement Audio & Transcription *",
+      "short": "Enregistrement audio",
+      "body": "Nous enregistrons l'audio de la réunion et le transcrivons par IA (Gladia) pour générer le procès-verbal. C'est obligatoire pour le service principal."
     },
-    "voice_profiling": {
-      "short": "Profil vocal",
-      "text": "J'accepte que ma voix soit analysée et stockée pour l'identification automatique dans les futures réunions (profils vocaux biométriques selon Art. 5 al. 2 Loi 2004-63). Ce consentement peut être révoqué à tout moment.",
-      "checkbox": "J'accepte le profilage vocal (optionnel)"
+    "c2": {
+      "title": "Inscription Biométrique Vocale",
+      "short": "Biométrie vocale",
+      "body": "Nous créons une empreinte vocale anonyme (embedding ONNX) pour reconnaître les intervenants entre les réunions. Optionnel — vous pouvez le désactiver à tout moment. Les données biométriques ne sont traitées qu'avec votre consentement explicite."
     },
-    "third_party_sharing": {
-      "short": "Partage de données",
-      "text": "J'ai été informé(e) que des données (enregistrements audio, transcriptions) sont partagées avec les tiers suivants dans l'UE : Gladia (France — transcription), Mistral (France — traitement IA), Hetzner (Allemagne — stockage). Base légale : Art. 47 al. 3 Loi 2004-63.",
-      "checkbox": "J'accuse réception du partage de données"
+    "c3": {
+      "title": "Partage avec les Sous-traitants *",
+      "short": "Partage tiers",
+      "body": "Votre audio et votre texte sont envoyés à nos sous-traitants IA Gladia (transcription) et Mistral (résumé). Requis pour le pipeline IA."
     },
-    "transcript_storage": {
-      "short": "Conservation",
-      "text": "J'accepte que les transcriptions et procès-verbaux soient conservés pendant 1 an maximum. Les enregistrements audio seront supprimés après 90 jours.",
-      "checkbox": "J'accepte la conservation des données"
+    "c4": {
+      "title": "Stockage & Rétention *",
+      "short": "Stockage sécurisé",
+      "body": "Vos données sont stockées chiffrées (AES-256) dans notre base PostgreSQL (CNPG) et notre stockage S3. Requis pour conserver vos procès-verbaux et votre historique."
+    },
+    "missing_required": "Vous devez accepter tous les consentements requis (Audio, Partage, Stockage) pour continuer.",
+    "required_badge": "Requis",
+    "optional_badge": "Optionnel"
+  },
+  "privacy": {
+    "title": "Politique de Confidentialité",
+    "last_updated": "Dernière mise à jour : 2026",
+    "footer_note": "Pour nos conditions d'utilisation, veuillez consulter les",
+    "data_controller": {
+      "title": "1. Responsable du Traitement",
+      "text": "Le responsable du traitement de vos données personnelles est MeetingAutomation, exploité par Batnini (Tunisie). Pour toute demande relative à la confidentialité, contactez-nous à privacy@meeting-automation.com."
+    },
+    "scope": {
+      "title": "2. Champ d'Application",
+      "text": "Cette politique explique comment MeetingAutomation collecte, traite, stocke et partage les données générées via notre service d'automatisation de réunions par IA, y compris les enregistrements audio, les transcriptions, les profils vocaux et les procès-verbaux générés. Elle s'applique conformément à la Loi tunisienne n° 2004-63 (INPDP) et au Règlement Général sur la Protection des Données (RGPD)."
+    },
+    "legal_basis": {
+      "title": "3. Base Juridique du Traitement",
+      "text": "Nous traitons vos données sur les bases juridiques suivantes : (a) votre consentement explicite (RGPD Art. 6(1)(a) et Art. 9(2)(a) pour les données biométriques et d'opinion) ; (b) l'exécution du contrat de service (RGPD Art. 6(1)(b)) ; et (c) notre intérêt légitime à sécuriser et améliorer le service (RGPD Art. 6(1)(f)). Conformément à la Loi tunisienne 2004-63 (INPDP), le traitement des données personnelles requiert une déclaration préalable à l'INPDP et un consentement explicite pour les données sensibles."
+    },
+    "data_collected": {
+      "title": "4. Catégories de Données Collectées",
+      "text": "Nous collectons : (a) Données de compte (nom, email, société) ; (b) Données audio des enregistrements de réunion ; (c) Transcriptions et données d'opinion (contenu, décisions, discussions) ; (d) Données biométriques vocales (embeddings ONNX, uniquement avec votre consentement) ; (e) Procès-verbaux et actions générés ; (f) Métadonnées techniques (adresse IP, appareil, journaux)."
+    },
+    "c1_audio": {
+      "title": "5. C1 — Enregistrement Audio & Transcription",
+      "text": "Nous enregistrons l'audio de la réunion et le transcrivons via Gladia AI pour générer le procès-verbal. L'audio est traité en temps réel et stocké chiffré (AES-256). Les enregistrements audio sont conservés pendant la durée de votre abonnement et supprimés à la clôture du compte ou au retrait de votre consentement C1, sous réserve d'obligations légales de conservation. Ce consentement (C1) est REQUIS pour utiliser le service principal."
+    },
+    "c2_voice": {
+      "title": "6. C2 — Profilage Biométrique Vocal (Optionnel)",
+      "text": "Avec votre opt-in explicite, nous générons un embedding vocal ONNX anonyme de 192 dimensions (empreinte vocale) pour reconnaître les intervenants de façon cohérente. Il s'agit de données biométriques au sens de l'Art. 9 du RGPD. L'embedding est stocké chiffré et N'est PAS réversible vers l'audio brut. Vous pouvez retirer le consentement C2 à tout moment depuis vos paramètres ; après retrait, les embeddings existants sont supprimés et aucun nouveau n'est créé. Ce consentement (C2) est OPTIONNEL."
+    },
+    "c3_sharing": {
+      "title": "7. C3 — Partage des Données avec les Sous-traitants",
+      "text": "Pour assurer le pipeline IA, votre audio et votre texte sont transmis aux sous-traitants : Gladia (transcription) et Mistral (résumé et génération de PV). Ces transferts peuvent impliquer un traitement hors de Tunisie (transfert vers un pays tiers). Nous nous appuyons sur des clauses contractuelles types et sur les engagements de conformité de nos sous-traitants. Ce consentement (C3) est REQUIS pour le service IA."
+    },
+    "c4_storage": {
+      "title": "8. C4 — Stockage & Rétention",
+      "text": "Vos données sont stockées chiffrées (AES-256) dans notre base PostgreSQL (CNPG) et dans un stockage objet compatible S3 (MinIO). Les sauvegardes automatisées sont conservées 30 jours. Les données de réunion sont conservées pendant la durée de l'abonnement. À la suppression du compte ou au retrait du consentement C4, les données sont purgées du stockage principal sous 30 jours et des sauvegardes sous 90 jours, sauf obligation légale contraire."
+    },
+    "data_retention": {
+      "title": "9. Durées de Conservation",
+      "text": "Enregistrements audio : durée de l'abonnement + 30 jours après clôture. Transcriptions & PV : durée de l'abonnement + 90 jours après clôture. Embeddings vocaux (C2) : supprimés immédiatement au retrait. Métadonnées de compte : 12 mois après clôture pour obligations légales/financières. Sauvegardes : 30 jours glissants."
+    },
+    "your_rights": {
+      "title": "10. Vos Droits",
+      "text": "Conformément à l'INPDP (Loi 2004-63) et au RGPD, vous disposez du droit d'accès, de rectification, d'effacement ('droit à l'oubli'), de limitation, d'opposition, de portabilité et de retrait du consentement à tout moment (C1, C2, C3, C4) sans affecter les traitements antérieurs licites. Pour exercer ces droits, écrivez à privacy@meeting-automation.com. Vous pouvez également saisir l'INPDP (Tunisie) ou votre autorité de contrôle locale."
+    },
+    "inpdp_reference": {
+      "title": "11. Référence INPDP (Loi 2004-63)",
+      "text": "MeetingAutomation traite les données personnelles conformément à la Loi tunisienne n° 2004-63 du 27 juillet 2004 relative à la protection des données personnelles, telle que modifiée, sous la supervision de l'Instance Nationale de Protection des Données Personnelles (INPDP). Articles pertinents : Art. 5 (données sensibles, y compris biométriques, requièrent un consentement explicite) ; Art. 13 (information de la personne) ; Art. 14 (droits de la personne) ; Art. 47 (sanctions en cas de traitement illicite des données). Nous détenons une déclaration auprès de l'INPDP pour le traitement des données de réunion et vocales."
+    },
+    "contact": {
+      "title": "12. Contact",
+      "text": "Délégué à la Protection des Données / Confidentialité : privacy@meeting-automation.com\nPostal : MeetingAutomation — Batnini, Tunisie\nPour toute question INPDP, contactez l'INPDP : www.inpdp.tn"
+    }
+  },
+  "terms": {
+    "title": "Conditions d'Utilisation",
+    "acceptance": {
+      "short": "1. Acceptation des Conditions",
+      "text": "En accédant ou en utilisant MeetingAutomation, vous acceptez d'être lié par ces Conditions d'Utilisation et notre Politique de Confidentialité. Si vous n'acceptez pas, n'utilisez pas le service."
+    },
+    "service_description": {
+      "short": "2. Description du Service",
+      "text": "MeetingAutomation fournit la transcription de réunions par IA, la diarisation des locuteurs, la génération de procès-verbaux et le suivi des actions. Le service traite l'audio des réunions via des sous-traitants intégrés (Gladia, Mistral)."
+    },
+    "consent": {
+      "short": "3. Consentement et Protection des Données",
+      "text": "L'utilisation du service requiert votre consentement explicite au traitement des données de réunion tel que décrit dans notre Politique de Confidentialité et requis par la Loi tunisienne 2004-63 (INPDP) et le RGPD. Les consentements C1 (Enregistrement Audio), C3 (Partage des Données avec les sous-traitants) et C4 (Stockage) sont REQUIS pour créer un compte et utiliser le service principal. Le consentement C2 (Profilage Biométrique Vocal) est OPTIONNEL et peut être activé ultérieurement. Vous pouvez retirer tout consentement à tout moment depuis vos paramètres ; le retrait d'un consentement requis désactivera la fonctionnalité associée."
+    },
+    "consent_link": "Lire notre Politique de Confidentialité complète",
+    "user_obligations": {
+      "short": "4. Obligations de l'Utilisateur",
+      "text": "Vous vous engagez à fournir des informations de compte exactes, à conserver la confidentialité de vos identifiants et à utiliser le service légalement. Vous êtes responsable de vous assurer du droit d'enregistrer les réunions et d'informer les participants lorsque la loi l'exige."
+    },
+    "intellectual_property": {
+      "short": "5. Propriété Intellectuelle",
+      "text": "Vous conservez la propriété du contenu de vos réunions. MeetingAutomation conserve tous les droits sur le logiciel, les modèles et les analyses générées. Les procès-verbaux générés vous sont fournis sous licence non exclusive pour votre usage interne."
+    },
+    "limitation_of_liability": {
+      "short": "6. Limitation de Responsabilité",
+      "text": "Le service est fourni 'en l'état'. MeetingAutomation ne saurait être tenu responsable des dommages indirects ou consécutifs découlant d'inexactitudes de transcription, d'interruptions de service ou de perte de données, dans la limite maximale autorisée par la loi."
+    },
+    "termination": {
+      "short": "7. Résiliation",
+      "text": "Nous pouvons suspendre ou résilier votre compte en cas de violation de ces conditions. Vous pouvez résilier à tout moment ; à la résiliation, vos données sont traitées selon le calendrier de conservation de notre Politique de Confidentialité."
+    },
+    "governing_law": {
+      "short": "8. Droit Applicable",
+      "text": "Ces conditions sont régies par le droit tunisien. Les litiges relèvent de la compétence exclusive des tribunaux tunisiens compétents, sans préjudice de vos droits selon le droit applicable de la consommation et de la protection des données."
     }
   }
 }

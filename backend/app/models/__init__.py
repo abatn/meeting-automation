@@ -14,3 +14,5 @@ from . import meeting_room  # noqa: F401
 from . import cms  # noqa: F401
 from . import consent  # noqa: F401
 from app.models.setting import BrandingSettings
+
+from app.models.consent import ConsentLog, ConsentType  # noqa: F401

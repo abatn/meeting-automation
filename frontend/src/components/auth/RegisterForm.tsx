@@ -29,7 +29,7 @@ import { AppDispatch } from '../../store';
 import { setCredentials } from '../../store/authSlice';
 import authService from '../../services/auth';
 import PasswordStrengthIndicator from '../../components/common/PasswordStrengthIndicator';
-import ConsentDialog from '../consent/ConsentDialog';
+import ConsentDialog, { ConsentValue } from '../consent/ConsentDialog';
 
 const RegisterForm: React.FC = () => {
   const { t } = useTranslation();
@@ -49,7 +49,7 @@ const RegisterForm: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
-  const [consents, setConsents] = useState<{consent_type: string; consented: boolean; consent_version: string}[]>([]);
+  const [pendingConsents, setPendingConsents] = useState<ConsentValue[] | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -66,14 +66,13 @@ const RegisterForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    // Phase 163: collect explicit consent before registration
     setConsentOpen(true);
   };
 
-  const handleConsentConfirm = async (consentData: {consent_type: string; consented: boolean; consent_version: string}[]) => {
-    setConsents(consentData);
+  const doRegister = async (consents: ConsentValue[]) => {
     setConsentOpen(false);
     setLoading(true);
-
     try {
       await authService.register({
         email: formData.email,
@@ -81,9 +80,10 @@ const RegisterForm: React.FC = () => {
         full_name: formData.full_name,
         company_name: formData.company_name,
         plan: formData.plan,
-        consents: consentData
+        consents,
       });
 
+      // Navigate to check email page instead of auto-login
       navigate('/check-email', { state: { email: formData.email } });
     } catch (err: any) {
       setError(err.response?.data?.detail || t('auth.register.error'));
@@ -197,7 +197,7 @@ const RegisterForm: React.FC = () => {
       <ConsentDialog
         open={consentOpen}
         onClose={() => setConsentOpen(false)}
-        onConfirm={handleConsentConfirm}
+        onSubmit={(consents) => doRegister(consents)}
       />
     </Box>
   );

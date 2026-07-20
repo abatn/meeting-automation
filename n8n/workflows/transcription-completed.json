@@ -87,7 +87,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "noreply@meeting-automation.tn",
+        "fromEmail": "noreply@meeting-automation.com",
         "toEmail": "={{$node[\"Get Meeting Details\"].json.attendees.join(',')}}",
         "subject": "=Meeting Minutes: {{$node[\"Get Meeting Details\"].json.title}}",
         "text": "=Dear participants,\n\nPlease find attached the minutes for the meeting: {{$node[\"Get Meeting Details\"].json.title}}.\n\nBest regards,\nYour Meeting Assistant",
@@ -103,7 +103,7 @@
       ],
       "credentials": {
         "smtp": {
-          "id": "Z4QPw36ZE0HkHiHP",
+          "id": "VJcH9L41G0TRyOok",
           "name": "SMTP account"
         }
       },

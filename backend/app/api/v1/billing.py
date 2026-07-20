@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api import deps
 from app.models.user import User as UserModel, UserRole
 from app.models.facture import Facture as FactureModel
+from app.models.client import SubscriptionPlan
 from app.schemas.billing import (
     Facture,
     UsageMinute,
@@ -156,6 +157,8 @@ async def switch_plan(
     Switch subscription plan (upgrade/downgrade). DG only.
     """
     service = BillingService(db)
+    if request.plan not in [p.value for p in SubscriptionPlan]:
+        raise HTTPException(status_code=400, detail=f"Invalid plan: {request.plan}")
     try:
         result = await service.switch_plan(
             client_id=current_user.client_id,

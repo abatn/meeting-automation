@@ -1,5 +1,6 @@
 import logging
 import boto3
+from typing import Optional
 from app.core.config import settings, get_bucket_name
 from app.models.client import SubscriptionPlan
 
@@ -32,9 +33,12 @@ def get_storage_usage_bytes(client_id: str) -> int:
     return total
 
 
-def get_storage_quota(subscription_plan: SubscriptionPlan) -> int:
-    """Gibt das Speicherlimit in Bytes für einen Plan zurück."""
-    return STORAGE_QUOTAS.get(subscription_plan, STORAGE_QUOTAS[SubscriptionPlan.GRATUIT])
+def get_storage_quota(subscription_plan: Optional[SubscriptionPlan]) -> int:
+    """Gibt das Speicherlimit in Bytes für einen Plan zurück.
+
+    None (interne/Dev-Tenants ohne Plan) wird wie ENTREPRISE behandelt (voller Zugriff, 50 GB).
+    """
+    return STORAGE_QUOTAS.get(subscription_plan, STORAGE_QUOTAS[SubscriptionPlan.ENTREPRISE])
 
 
 def check_storage_quota(client_id: str, subscription_plan: SubscriptionPlan, additional_bytes: int = 0) -> dict:

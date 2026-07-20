@@ -1,11 +1,11 @@
 from datetime import timedelta, datetime
 from typing import Any
 import uuid
-import os
 import secrets
 import logging
+import os
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +18,7 @@ from app.api import deps
 from app.models.user import User as UserModel, Role as RoleModel, UserStatus, ActivationToken
 from app.models.client import Client, SubscriptionStatus, SubscriptionPlan
 from app.models.team import TeamMember
+from app.models.consent import ConsentLog, ConsentType
 from app.schemas.user import User, UserCreate, Token, ActivationConfirm
 from app.services.auth_service import AuthService
 from app.services.audit_service import AuditService
@@ -194,7 +195,7 @@ async def login(
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 async def register(
-    *, request: Request, db: AsyncSession = Depends(deps.get_db), user_in: UserCreate,
+    *, db: AsyncSession = Depends(deps.get_db), user_in: UserCreate,
     user_service: UserService = Depends(deps.get_user_service),
     client_service: ClientService = Depends(deps.get_client_service),
 ) -> Any:
@@ -244,11 +245,75 @@ async def register(
         full_name=user_in.full_name,
         client_id=client.id,
         role_name=role_name,
-        status=UserStatus.ACTIVE if os.getenv("E2E_TEST") == "true" else UserStatus.PENDING
+        status=UserStatus.PENDING
     )
 
     # Create activation token
     activation_token = await user_service.create_activation_token(user.id)
+
+    # Phase 163 — Consent Management (INPDP Art.47 / Art.5 + GDPR)
+    # Record explicit consent decisions collected in the registration form.
+    # In E2E tests we auto-grant all four consents so existing test users pass.
+    _e2e = os.getenv("E2E_TEST", "").lower() == "true"
+    if _e2e:
+        grants = [
+            (t, True) for t in
+            (ConsentType.C1_AUDIO, ConsentType.C2_VOICE, ConsentType.C3_SHARING, ConsentType.C4_STORAGE)
+        ]
+    else:
+        if not user_in.consents:
+            raise HTTPException(
+                status_code=400,
+                detail="Consent decisions are required to create an account.",
+            )
+        grants = [(ConsentType(g.consent_type.value), g.consented) for g in user_in.consents]
+        # Required consents: C1 (AUDIO), C3 (SHARING), C4 (STORAGE)
+        granted = {t: c for t, c in grants}
+        missing_required = [
+            t.name for t in (ConsentType.C1_AUDIO, ConsentType.C3_SHARING, ConsentType.C4_STORAGE)
+            if not granted.get(t, False)
+        ]
+        if missing_required:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Required consent(s) not granted: {', '.join(missing_required)}.",
+            )
+
+    ip_address = None
+    user_agent = None
+    # ConsentLog rows (append-only; never DELETE)
+    for ctype, consented in grants:
+        existing = (
+            await db.execute(
+                select(ConsentLog).where(
+                    ConsentLog.user_id == user.id,
+                    ConsentLog.consent_type == ctype,
+                )
+            )
+        ).scalar_one_or_none()
+        if existing:
+            existing.consented = consented
+            existing.withdrawn_at = None
+        else:
+            db.add(
+                ConsentLog(
+                    id=str(uuid.uuid4()),
+                    user_id=user.id,
+                    client_id=client.id,
+                    consent_type=ctype,
+                    consented=consented,
+                    consent_version="1.0",
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                )
+            )
+        await AuditService.log_action(
+            db=db, client_id=client.id,
+            action="CONSENT_GRANTED" if consented else "CONSENT_DENIED",
+            user_id=user.id, table_name="consent_logs", record_id=user.id,
+            new_values={"consent_type": ctype.value, "consented": consented},
+            ip_address=ip_address or "internal", user_agent=user_agent or "api",
+        )
 
     # Audit log
     await AuditService.log_action(
@@ -269,31 +334,6 @@ async def register(
         record_id=client.id,
         new_values={"company_name": client.company_name}
     )
-
-    # Save consents — auto-grant required consents in E2E_TEST mode
-    from app.models.consent import ConsentLog, ConsentType
-    ip = request.client.host if request.client else "unknown"
-    ua = request.headers.get("user-agent", "unknown")
-    required_types = {ConsentType.AUDIO_RECORDING, ConsentType.THIRD_PARTY_SHARING, ConsentType.TRANSCRIPT_STORAGE}
-
-    if os.getenv("E2E_TEST") == "true":
-        for ct in required_types:
-            db.add(ConsentLog(
-                id=str(uuid.uuid4()), user_id=user.id, client_id=client.id,
-                consent_type=ct.value, consented=True, consent_version="1.0",
-                ip_address=ip, user_agent=ua,
-            ))
-    else:
-        provided = {ConsentType(c["consent_type"]) for c in user_in.consents if c.get("consented")}
-        if not required_types.issubset(provided):
-            raise HTTPException(status_code=400, detail="Required consents: audio_recording, third_party_sharing, transcript_storage")
-        for c in user_in.consents:
-            db.add(ConsentLog(
-                id=str(uuid.uuid4()), user_id=user.id, client_id=client.id,
-                consent_type=c["consent_type"], consented=c["consented"],
-                consent_version=c.get("consent_version", "1.0"),
-                ip_address=ip, user_agent=ua,
-            ))
 
     await db.commit()
     await db.refresh(user)
@@ -323,18 +363,47 @@ async def register(
 @router.get("/me", response_model=User)
 async def read_user_me(
     current_user: UserModel = Depends(deps.get_current_user),
+    db: AsyncSession = Depends(deps.get_db),
 ) -> Any:
-    return current_user
+    # Plan explizit laden (kein Lazy-Load der client-Relationship im async Kontext)
+    from app.models.client import Client
+    from sqlalchemy import select
+
+    plan = None
+    if current_user.client_id:
+        result = await db.execute(
+            select(Client.subscription_plan).where(Client.id == current_user.client_id)
+        )
+        client_plan = result.scalar_one_or_none()
+        if client_plan is not None:
+            plan = client_plan.value
+
+    user_data = User.model_validate(current_user)
+    user_data.subscription_plan = plan
+    return user_data
 
 
 @router.get("/validate")
 async def validate_token(
     current_user: UserModel = Depends(deps.get_current_user),
+    db: AsyncSession = Depends(deps.get_db),
 ) -> Any:
     """
     Validate the current JWT token and return user details.
     Used for initial App load to prevent redirect loops.
     """
+    from app.models.client import Client
+    from sqlalchemy import select
+
+    plan = None
+    if current_user.client_id:
+        result = await db.execute(
+            select(Client.subscription_plan).where(Client.id == current_user.client_id)
+        )
+        client_plan = result.scalar_one_or_none()
+        if client_plan is not None:
+            plan = client_plan.value
+
     return {
         "authenticated": True,
         "user": {
@@ -342,6 +411,7 @@ async def validate_token(
             "email": current_user.email,
             "full_name": current_user.full_name,
             "role": current_user.role,
+            "subscription_plan": plan,
         },
     }
 

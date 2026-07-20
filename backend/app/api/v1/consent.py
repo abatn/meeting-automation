@@ -1,154 +1,177 @@
-import uuid
-from typing import List, Any
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Request, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+"""Consent management API (Phase 163 — INPDP Art.47 / Art.5 + GDPR).
 
-from app.api.deps import get_db, get_current_user
-from app.models.user import User
-from app.models.consent import ConsentLog, ConsentType
-from app.schemas.consent import ConsentGrant, ConsentResponse, ConsentStatusResponse
+Endpoints:
+  POST /consent/grant   — record consent decisions (used at registration & in settings)
+  GET  /consent/status  — current user's consent state
+  POST /consent/withdraw — withdraw a previously granted consent
+"""
+import uuid
+import logging
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.api import deps
+from app.models.user import User as UserModel
+from app.models.consent import ConsentLog, ConsentType as ConsentTypeModel
+from app.schemas.consent import (
+    ConsentRequest,
+    ConsentWithdrawRequest,
+    ConsentStatusResponse,
+    ConsentRecord,
+)
 from app.services.audit_service import AuditService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
+async def grant_consents(
+    db: AsyncSession,
+    user_id: str,
+    client_id: str,
+    consents: list,
+    consent_version: str,
+    ip_address: str | None,
+    user_agent: str | None,
+) -> None:
+    """Insert consent log rows. Idempotent per (user, type): updates if exists."""
+    for grant in consents:
+        ctype = ConsentTypeModel(grant.consent_type.value)
+        existing = (
+            await db.execute(
+                select(ConsentLog).where(
+                    ConsentLog.user_id == user_id,
+                    ConsentLog.consent_type == ctype,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            existing.consented = grant.consented
+            existing.consent_version = consent_version
+            existing.withdrawn_at = None if grant.consented else existing.created_at
+            existing.ip_address = ip_address
+            existing.user_agent = user_agent
+        else:
+            db.add(
+                ConsentLog(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    client_id=client_id,
+                    consent_type=ctype,
+                    consented=grant.consented,
+                    consent_version=consent_version,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    withdrawn_at=None,
+                )
+            )
+
+        await AuditService.log_action(
+            db=db,
+            client_id=client_id,
+            action="CONSENT_GRANTED" if grant.consented else "CONSENT_DENIED",
+            user_id=user_id,
+            table_name="consent_logs",
+            record_id=user_id,
+            new_values={"consent_type": ctype.value, "consented": grant.consented},
+            ip_address=ip_address or "internal",
+            user_agent=user_agent or "api",
+        )
+
+
+@router.post("/grant", status_code=status.HTTP_200_OK)
+async def grant(
+    payload: ConsentRequest,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> dict:
+    """Record the user's consent decisions."""
+    if not payload.consents:
+        raise HTTPException(
+            status_code=400, detail="No consent entries provided."
+        )
+
+    await grant_consents(
+        db,
+        user_id=current_user.id,
+        client_id=current_user.client_id,
+        consents=payload.consents,
+        consent_version=payload.consent_version,
+        ip_address=payload.ip_address,
+        user_agent=payload.user_agent,
+    )
+    await db.commit()
+    return {"status": "ok", "granted": [c.consent_type.value for c in payload.consents]}
+
+
 @router.get("/status", response_model=ConsentStatusResponse)
-async def get_consent_status(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    result = await db.execute(
-        select(ConsentLog).where(
-            ConsentLog.user_id == current_user.id,
-            ConsentLog.client_id == current_user.client_id,
-            ConsentLog.withdrawn_at.is_(None),
+async def status_endpoint(
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> ConsentStatusResponse:
+    """Return the current user's consent state."""
+    result = (
+        await db.execute(
+            select(ConsentLog).where(ConsentLog.user_id == current_user.id)
         )
     )
-    records = {r.consent_type: r.consented for r in result.scalars().all()}
-    return ConsentStatusResponse(
-        audio_recording=records.get("audio_recording", False),
-        voice_profiling=records.get("voice_profiling", False),
-        third_party_sharing=records.get("third_party_sharing", False),
-        transcript_storage=records.get("transcript_storage", False),
-    )
+    rows = result.scalars().all()
+
+    records = [ConsentRecord.model_validate(r) for r in rows]
+
+    required_values = {
+        ConsentTypeModel.C1_AUDIO.value,
+        ConsentTypeModel.C3_SHARING.value,
+        ConsentTypeModel.C4_STORAGE.value,
+    }
+    granted_values = {
+        (r.consent_type.value if hasattr(r.consent_type, "value") else r.consent_type)
+        for r in rows
+        if r.consented
+    }
+    all_required = required_values.issubset(granted_values)
+
+    return ConsentStatusResponse(consents=records, all_required_granted=all_required)
 
 
-@router.post("/grant", response_model=List[ConsentResponse])
-async def grant_consent(
-    consents: List[ConsentGrant],
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    results = []
-    ip = request.client.host if request.client else "unknown"
-    ua = request.headers.get("user-agent", "unknown")
-
-    for consent in consents:
-        existing = await db.execute(
+@router.post("/withdraw", status_code=status.HTTP_200_OK)
+async def withdraw(
+    payload: ConsentWithdrawRequest,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: UserModel = Depends(deps.get_current_user),
+) -> dict:
+    """Withdraw a previously granted consent (never DELETE — set withdrawn_at)."""
+    ctype = ConsentTypeModel(payload.consent_type.value)
+    row = (
+        await db.execute(
             select(ConsentLog).where(
                 ConsentLog.user_id == current_user.id,
-                ConsentLog.client_id == current_user.client_id,
-                ConsentLog.consent_type == consent.consent_type,
+                ConsentLog.consent_type == ctype,
             )
         )
-        existing_record = existing.scalar_one_or_none()
+    ).scalar_one_or_none()
 
-        if existing_record:
-            existing_record.consented = consent.consented
-            existing_record.consent_version = consent.consent_version
-            existing_record.ip_address = ip
-            existing_record.user_agent = ua
-            existing_record.timestamp = datetime.now(timezone.utc)
-            existing_record.withdrawn_at = None if consent.consented else datetime.now(timezone.utc)
-            record = existing_record
-        else:
-            record = ConsentLog(
-                id=str(uuid.uuid4()),
-                user_id=current_user.id,
-                client_id=current_user.client_id,
-                consent_type=consent.consent_type,
-                consented=consent.consented,
-                consent_version=consent.consent_version,
-                ip_address=ip,
-                user_agent=ua,
-                withdrawn_at=None if consent.consented else datetime.now(timezone.utc),
-            )
-            db.add(record)
+    if not row:
+        raise HTTPException(status_code=404, detail="Consent record not found.")
 
-        results.append(record)
-        await AuditService.log_action(
-            db, client_id=current_user.client_id,
-            action="CONSENT_GRANTED" if consent.consented else "CONSENT_WITHDRAWN",
-            user_id=current_user.id,
-            table_name="consent_logs",
-            record_id=record.id,
-            new_values={"consent_type": consent.consent_type, "consented": consent.consented},
-            ip_address=ip,
-            user_agent=ua,
-        )
-
-    await db.commit()
-    for r in results:
-        await db.refresh(r)
-    return results
-
-
-@router.post("/withdraw", response_model=ConsentResponse)
-async def withdraw_consent(
-    consent_type: str,
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    valid_types = [ct.value for ct in ConsentType]
-    if consent_type not in valid_types:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid consent type: {consent_type}. Valid: {valid_types}")
-
-    result = await db.execute(
-        select(ConsentLog).where(
-            ConsentLog.user_id == current_user.id,
-            ConsentLog.client_id == current_user.client_id,
-            ConsentLog.consent_type == consent_type,
-            ConsentLog.withdrawn_at.is_(None),
-        )
-    )
-    record = result.scalar_one_or_none()
-    if not record:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Active consent not found")
-
-    record.consented = False
-    record.withdrawn_at = datetime.now(timezone.utc)
-    ip = request.client.host if request.client else "unknown"
-    ua = request.headers.get("user-agent", "unknown")
-    record.ip_address = ip
-    record.user_agent = ua
+    row.consented = False
+    row.withdrawn_at = datetime.now(timezone.utc)
 
     await AuditService.log_action(
-        db, client_id=current_user.client_id,
+        db=db,
+        client_id=current_user.client_id,
         action="CONSENT_WITHDRAWN",
         user_id=current_user.id,
         table_name="consent_logs",
-        record_id=record.id,
-        new_values={"consent_type": consent_type, "withdrawn": True},
-        ip_address=ip,
-        user_agent=ua,
+        record_id=current_user.id,
+        new_values={"consent_type": ctype.value},
+        ip_address="internal",
+        user_agent="api",
     )
     await db.commit()
-    await db.refresh(record)
-    return record
-
-
-@router.get("/history", response_model=List[ConsentResponse])
-async def get_consent_history(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    result = await db.execute(
-        select(ConsentLog)
-        .where(ConsentLog.user_id == current_user.id, ConsentLog.client_id == current_user.client_id)
-        .order_by(ConsentLog.timestamp.desc())
-    )
-    return result.scalars().all()
+    return {"status": "withdrawn", "consent_type": ctype.value}

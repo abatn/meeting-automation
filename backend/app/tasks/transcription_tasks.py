@@ -24,6 +24,7 @@ from app.models.transcription import Transcription
 from app.models.user import User
 from app.models.meeting import Meeting, MeetingStatus
 from app.models.client import Client, SubscriptionPlan
+from app.models.consent import ConsentLog, ConsentType
 from sqlalchemy.orm import selectinload
 from app.services.gladia_service import gladia_service
 from app.services.pv_service import PVService
@@ -867,70 +868,54 @@ async def _identify_speakers(
                 assigned_names[name] = mapping
 
     # ENROLLMENT: after exclusivity, only enroll speakers with resolved names
+    # Phase 163: C2 (VOICE) consent gate — biometric enrollment only if granted
+    voice_consent = (
+        await db.execute(
+            select(ConsentLog).where(
+                ConsentLog.client_id == client_id,
+                ConsentLog.consent_type == ConsentType.C2_VOICE,
+                ConsentLog.consented == True,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if voice_consent is None:
+        logger.info(
+            f"ENROLLMENT skipped for client={client_id}: C2_VOICE consent not granted "
+            "(biometric enrollment disabled per INPDP Art.5)."
+        )
+
     enrollment_service = AutoEnrollmentService(db)
+    if voice_consent is not None:
+        for mapping in all_mappings:
+            if mapping.get("resolved_name"):
+                speaker_label = mapping["speaker_label"]
+                resolved_name = mapping["resolved_name"]
+                confidence = mapping.get("confidence", 0.0)
+                method = mapping.get("method", "unknown")
+                speaker_embedding = mapping.get("embedding")
 
-    # INPDP Art. 47: Check voice_profiling consent before enrollment
-    from app.models.consent import ConsentLog, ConsentType
-    from app.models.user import User as UserModel
-
-    for mapping in all_mappings:
-        if mapping.get("resolved_name"):
-            speaker_label = mapping["speaker_label"]
-            resolved_name = mapping["resolved_name"]
-            confidence = mapping.get("confidence", 0.0)
-            method = mapping.get("method", "unknown")
-            speaker_embedding = mapping.get("embedding")
-
-            # Check voice_profiling consent for the target user
-            user_result = await db.execute(
-                select(UserModel).where(
-                    UserModel.client_id == client_id,
-                    UserModel.full_name == resolved_name,
-                )
-            )
-            target_user = user_result.scalar_one_or_none()
-            if target_user:
-                consent_check = await db.execute(
-                    select(ConsentLog).where(
-                        ConsentLog.user_id == target_user.id,
-                        ConsentLog.client_id == client_id,
-                        ConsentLog.consent_type == ConsentType.VOICE_PROFILING.value,
-                        ConsentLog.consented == True,
-                        ConsentLog.withdrawn_at.is_(None),
+                if speaker_embedding is not None:
+                    await enrollment_service.enroll_or_update(
+                        client_id=client_id, speaker_label=speaker_label,
+                        resolved_name=resolved_name, embedding=speaker_embedding,
+                        confidence=confidence, method=method,
+                        meeting_id=meeting_id, candidates=candidates,
                     )
+                else:
+                    await enrollment_service.enroll_text_only(
+                        client_id=client_id, speaker_label=speaker_label,
+                        resolved_name=resolved_name, confidence=confidence,
+                        method=method, meeting_id=meeting_id, candidates=candidates,
+                    )
+
+                await AuditService.log_action(
+                    db=db, client_id=client_id, action="SPEAKER_IDENTIFIED",
+                    user_id=None, table_name="speakers",
+                    new_values={"speaker_label": speaker_label, "resolved_name": resolved_name,
+                               "confidence": confidence, "method": method, "meeting_id": meeting_id},
+                    ip_address="internal", user_agent="celery",
                 )
-                if not consent_check.scalar_one_or_none():
-                    logger.info(f"INPDP: Skipping enrollment for {resolved_name} — no voice_profiling consent")
-                    continue
-        if mapping.get("resolved_name"):
-            speaker_label = mapping["speaker_label"]
-            resolved_name = mapping["resolved_name"]
-            confidence = mapping.get("confidence", 0.0)
-            method = mapping.get("method", "unknown")
-            speaker_embedding = mapping.get("embedding")
-            
-            if speaker_embedding is not None:
-                await enrollment_service.enroll_or_update(
-                    client_id=client_id, speaker_label=speaker_label,
-                    resolved_name=resolved_name, embedding=speaker_embedding,
-                    confidence=confidence, method=method,
-                    meeting_id=meeting_id, candidates=candidates,
-                )
-            else:
-                await enrollment_service.enroll_text_only(
-                    client_id=client_id, speaker_label=speaker_label,
-                    resolved_name=resolved_name, confidence=confidence,
-                    method=method, meeting_id=meeting_id, candidates=candidates,
-                )
-            
-            await AuditService.log_action(
-                db=db, client_id=client_id, action="SPEAKER_IDENTIFIED",
-                user_id=None, table_name="speakers",
-                new_values={"speaker_label": speaker_label, "resolved_name": resolved_name,
-                           "confidence": confidence, "method": method, "meeting_id": meeting_id},
-                ip_address="internal", user_agent="celery",
-            )
-            logger.info(f"Enrolled: {speaker_label} → {resolved_name} (conf={confidence:.2f}, method={method})")
+                logger.info(f"Enrolled: {speaker_label} → {resolved_name} (conf={confidence:.2f}, method={method})")
 
     return all_mappings
 

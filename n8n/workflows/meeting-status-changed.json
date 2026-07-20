@@ -30,7 +30,7 @@
       "parameters": {
         "resource": "email",
         "operation": "send",
-        "fromEmail": "no-reply@meeting.tn",
+        "fromEmail": "no-reply@meeting-automation.com",
         "toEmail": "={{$json.toEmail}}",
         "subject": "={{$json.subject}}",
         "text": "",
@@ -45,7 +45,7 @@
       "position": [680, 300],
       "credentials": {
         "smtp": {
-          "id": "Z4QPw36ZE0HkHiHP",
+          "id": "VJcH9L41G0TRyOok",
           "name": "SMTP Account"
         }
       }

@@ -7,11 +7,12 @@ import httpx
 import boto3
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 
 from app.models.recording import Recording
 from app.models.meeting import Meeting
 from app.models.client import Client
+from app.models.consent import ConsentLog, ConsentType
 from app.core.config import settings, get_bucket_name
 from app.services.storage_quota import check_storage_quota
 
@@ -34,7 +35,7 @@ class RecordingService:
         )
 
     async def upload_recording(
-        self, meeting_id: str, client_id: str, file: UploadFile, recording_id: Optional[str] = None
+        self, meeting_id: str, client_id: str, file: UploadFile, recording_id: Optional[str] = None, user_id: Optional[str] = None
     ) -> Recording:
         """Audio zu Minio/S3 hochladen und DB aktualisieren/erstellen
 
@@ -59,6 +60,25 @@ class RecordingService:
 
         # S3 Upload — Bucket automatisch erstellen falls nicht vorhanden
         bucket = get_bucket_name(client_id)
+
+        # Phase 163: C1 (AUDIO) consent required before persisting any recording
+        # to S3 storage (INPDP Art.47 — explicit consent before processing).
+        consent_row = (
+            await self.db.execute(
+                select(ConsentLog).where(
+                    ConsentLog.client_id == client_id,
+                    ConsentLog.user_id == user_id,
+                    ConsentLog.consent_type == ConsentType.C1_AUDIO,
+                    ConsentLog.consented == True,  # noqa: E712
+                )
+            )
+        ).scalar_one_or_none()
+        if consent_row is None:
+            raise HTTPException(
+                status_code=403,
+                detail="Consent C1_AUDIO is required before uploading a recording.",
+            )
+
         try:
             self.s3_client.head_bucket(Bucket=bucket)
         except Exception:

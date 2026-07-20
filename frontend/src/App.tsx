@@ -27,9 +27,10 @@ import ClientDetails from "./pages/admin/ClientDetails";
 import TechnikDashboard from "./pages/admin/TechnikDashboard";
 import BillingPanel from "./pages/billing/BillingPanel";
 import LandingPage from "./pages/LandingPage";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
 import ActivationPage from "./pages/ActivationPage";
 import CheckEmailPage from "./pages/CheckEmailPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import TermsPage from "./pages/TermsPage";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -138,9 +139,10 @@ function App() {
            <Route path="/login" element={<LoginForm />} />
            <Route path="/register" element={<RegisterForm />} />
            <Route path="/check-email" element={<CheckEmailPage />} />
-          <Route path="/activate" element={<ActivationPage />} />
-          <Route path="/privacy" element={<PrivacyPolicy />} />
-          <Route path="/" element={<LandingPage />} />
+            <Route path="/activate" element={<ActivationPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/" element={<LandingPage />} />
            <Route path="*" element={<Navigate to="/" replace />} />
          </Routes>
        </Box>

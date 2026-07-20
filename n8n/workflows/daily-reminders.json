@@ -79,7 +79,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "escalations@meeting-automation.tn",
+        "fromEmail": "escalations@meeting-automation.com",
         "toEmail": "={{$json[\"manager_email\"]}}",
         "subject": "=Action Item Escalation: {{$json[\"title\"]}}",
         "options": {}
@@ -95,7 +95,7 @@
       "webhookId": "1597089c-831c-4648-80b6-fde71abdf1b3",
       "credentials": {
         "smtp": {
-          "id": "Z4QPw36ZE0HkHiHP",
+          "id": "VJcH9L41G0TRyOok",
           "name": "SMTP account"
         }
       }

@@ -275,10 +275,10 @@ class BillingService:
         if not client:
             raise ValueError("Client not found")
 
-        if not client.stripe_subscription_id:
-            raise ValueError("No active Stripe subscription. Use checkout to subscribe first.")
-
-        if client.subscription_plan and client.subscription_plan.value == new_plan:
+        # Bei echter Stripe-Verbindung: Doppel-Switch verhindern (Stripe würde
+        # sonst unnötig belastet). Für den Admin-Fallback (kein Stripe-Sub) ist
+        # Idempotenz erlaubt — der Switch bleibt einfach ein Mock-Switch.
+        if client.stripe_subscription_id and client.subscription_plan and client.subscription_plan.value == new_plan:
             raise ValueError(f"Already on {new_plan} plan")
 
         new_price_id = settings.STRIPE_PRICE_ID_PRO if new_plan == "PRO" else settings.STRIPE_PRICE_ID_ENTREPRISE
@@ -533,5 +533,6 @@ class BillingService:
             "alert_level": alert_level,
             "alert_message": alert_message,
             "plan": client.subscription_plan.value if client.subscription_plan else "GRATUIT",
+            "stripe_subscription_id": client.stripe_subscription_id,
             "can_create_meeting": usage_percent < 100 or (not client.subscription_plan or client.subscription_plan.value == "GRATUIT")
         }

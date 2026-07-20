@@ -4,7 +4,7 @@ import {
   CircularProgress, Table, TableBody, TableCell, 
   TableContainer, TableHead, TableRow, Chip,
   Card, CardContent, CardActions, IconButton, useTheme, alpha,
-  Alert, AlertTitle
+  Alert, AlertTitle, Snackbar
 } from '@mui/material';
 import { 
   CheckCircle as ActiveIcon, 
@@ -13,8 +13,11 @@ import {
   BusinessCenter as EnterpriseIcon
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
+import { useSelector } from 'react-redux';
 import api from '../../services/api';
 import UsageProgressBar from '../../components/common/UsageProgressBar';
+import { useEntitlements } from '../../hooks/useEntitlements';
+import { RootState } from '../../store';
 
 // Interface for CMS pricing plans
 interface PricingPlan {
@@ -27,19 +30,22 @@ interface PricingPlan {
   is_popular: boolean;
 }
 
-// Fallback prices if CMS API fails
+// Fallback prices if CMS API fails (TND, siehe PHASE 167 TND-Entscheid)
 const FALLBACK_PRICES: Record<string, number> = {
-  PRO: 99,
-  ENTREPRISE: 499
+  PRO: 199,
+  ENTREPRISE: 399
 };
 
 const BillingPanel: React.FC = () => {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
+  const { plan } = useEntitlements();
+  const user = useSelector((state: RootState) => state.auth.user);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [usage, setUsage] = useState<any>(null);
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Get price from CMS or fallback
   const getPrice = (planCode: string): number => {
@@ -68,7 +74,25 @@ const BillingPanel: React.FC = () => {
   }, []);
 
   const handleUpgrade = async (plan: string) => {
+    setErrorMsg(null);
     try {
+      // Fallback für Stripe-lose Kunden (Test/Staging/Manuell): Plan direkt über
+      // /billing/switch-plan setzen (kein Stripe-Checkout). Greift immer, wenn KEIN
+      // stripe_subscription_id gesetzt ist — unabhängig vom Ladestatus von `usage`,
+      // damit ein noch nicht geladenes usage-Objekt nicht fälschlich zum Stripe-Checkout
+      // führt. Echte Stripe-Kunden (mit stripe_subscription_id) werden weiter über
+      // /billing/checkout geleitet.
+      if (!usage?.stripe_subscription_id) {
+        await api.post('/billing/switch-plan', { plan });
+        // Dashboard-Daten neu laden → neuer Plan erscheint sofort
+        const [invoicesRes, usageRes] = await Promise.all([
+          api.get('/billing/invoices'),
+          api.get('/billing/usage-status'),
+        ]);
+        setInvoices(invoicesRes.data);
+        setUsage(usageRes.data);
+        return;
+      }
       const response = await api.post('/billing/checkout', {
         plan,
         success_url: window.location.origin + '/billing?success=true',
@@ -77,8 +101,14 @@ const BillingPanel: React.FC = () => {
       if (response.data.checkout_url) {
         window.location.href = response.data.checkout_url;
       }
-    } catch (error) {
-      console.error('Failed to initiate checkout', error);
+    } catch (error: any) {
+      console.error('Failed to initiate upgrade', error);
+      const detail = error?.response?.data?.detail;
+      setErrorMsg(
+        typeof detail === 'string'
+          ? detail
+          : `Upgrade auf ${plan} fehlgeschlagen. Bitte erneut versuchen.`
+      );
     }
   };
 
@@ -151,7 +181,7 @@ const BillingPanel: React.FC = () => {
                     <Typography variant="h6" fontWeight="700">{t('billing.proPlan')}</Typography>
                   </Box>
                   <Typography variant="h3" fontWeight="800" sx={{ mb: 3 }}>
-                    ${getPrice('PRO')}<Typography component="span" variant="subtitle1" color="text.secondary">/mo</Typography>
+                    {getPrice('PRO')} TND<Typography component="span" variant="subtitle1" color="text.secondary">/mo</Typography>
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>• {t('billing.unlimitedMeetings')}</Typography>
                   <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>• {t('billing.proHours')}</Typography>
@@ -171,7 +201,7 @@ const BillingPanel: React.FC = () => {
                     <Typography variant="h6" fontWeight="700">{t('billing.enterprisePlan')}</Typography>
                   </Box>
                   <Typography variant="h3" fontWeight="800" sx={{ mb: 3 }}>
-                    ${getPrice('ENTREPRISE')}<Typography component="span" variant="subtitle1" color="text.secondary">/mo</Typography>
+                    {getPrice('ENTREPRISE')} TND<Typography component="span" variant="subtitle1" color="text.secondary">/mo</Typography>
                   </Typography>
                   <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>• {t('billing.dedicatedSupport')}</Typography>
                   <Typography variant="body2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>• {t('billing.entHours')}</Typography>
@@ -238,6 +268,17 @@ const BillingPanel: React.FC = () => {
           </TableContainer>
         </Grid>
       </Grid>
+
+      <Snackbar
+        open={!!errorMsg}
+        autoHideDuration={6000}
+        onClose={() => setErrorMsg(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={() => setErrorMsg(null)} variant="filled">
+          {errorMsg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

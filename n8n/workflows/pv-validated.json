@@ -91,7 +91,7 @@
     },
     {
       "parameters": {
-        "fromEmail": "no-reply@meeting.tn",
+        "fromEmail": "no-reply@meeting-automation.com",
         "toEmail": "={{$node[\"Get Meeting Details\"].json.attendees.join(',')}}",
         "subject": "=✅ Protokoll freigegeben: {{$node[\"Get Meeting Details\"].json.title}}",
         "text": "",
@@ -110,7 +110,7 @@
       ],
       "credentials": {
         "smtp": {
-          "id": "Z4QPw36ZE0HkHiHP",
+          "id": "VJcH9L41G0TRyOok",
           "name": "SMTP account"
         }
       }

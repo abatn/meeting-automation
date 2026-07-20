@@ -23,6 +23,7 @@ from app.models.action import Action
 from app.models.audit_log import AuditLog
 from app.models.team import TeamMember
 from app.models.meeting_room import MeetingRoom
+from app.models.consent import ConsentLog, ConsentType
 
 # this is the Alembic Config object, which provides access to the values within the .ini file in use.
 config = context.config

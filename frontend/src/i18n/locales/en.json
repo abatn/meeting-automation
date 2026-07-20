@@ -101,9 +101,9 @@
       "resend_success": "Activation link sent successfully!",
       "sending": "Sending...",
       "back_to_login": "Back to login",
-      "spam_notice": "Didn't receive the email? Check your spam folder.",
-      "no_email": "No email provided",
-      "resend_failed": "Failed to resend activation email"
+        "spam_notice": "Didn't receive the email? Check your spam folder.",
+        "no_email": "No email provided",
+        "resend_failed": "Failed to resend activation email"
     }
   },
   "sidebar": {
@@ -452,6 +452,7 @@
       "title": "Transparent Pricing",
       "popular_badge": "POPULAR",
       "monthly": "mo",
+      "minutes_label": "{{count}} min / month",
       "free_name": "Starter",
       "pro_name": "Pro",
       "ent_name": "Enterprise",
@@ -459,13 +460,11 @@
       "start_pro": "Start Pro",
       "start_enterprise": "Start Enterprise",
       "starter_feats": [
-        "2h Transcription / mo",
         "LiveKit WebRTC Meetings",
         "AI Speaker Recognition",
         "PDF Document Export"
       ],
       "pro_feats": [
-        "30h Transcription / mo",
         "Sentinel LLM Summarization",
         "ONNX Voice Enrollment",
         "External Speaker CRM",
@@ -473,7 +472,6 @@
         "OnlyOffice Collaboration"
       ],
       "ent_feats": [
-        "60h Transcription / mo",
         "Meeting Analytics Dashboard",
         "Voice Biometric Auth",
         "External Speaker CRM",
@@ -502,7 +500,7 @@
     },
     "trust": {
       "title": "TRUSTED ENTERPRISE ARCHITECTURE",
-      "iso": "ISO 27001 Certified",
+      "iso": "ISO 27001 Compliance",
       "aes": "AES-256 Encryption",
       "gdpr": "GDPR Compliant"
     }
@@ -560,32 +558,32 @@
     "transcription_streaming": "Transcription streaming...",
     "insights_ready": "Insights ready",
     "insights_processing": "Processing insights...",
-    "poll_for_insights": "AI will analyze once recording completes",
-    "pipeline_complete": "Pipeline Complete",
-    "edit_pv": "Edit PV",
-    "edit_online_desc": "Open in OnlyOffice editor",
-    "export_pdf": "Export PDF",
-    "export_pdf_desc": "Download as PDF document",
-    "export_word": "Export Word",
-    "export_word_desc": "Download as DOCX file",
-    "connection_reconnecting": "Reconnecting…",
-    "connection_reconnecting_desc": "Attempting to restore connection",
-    "connection_poor": "Poor Audio Quality",
-    "connection_poor_desc": "Network degraded",
-    "connection_lost": "Connection Lost",
-    "connection_lost_desc": "Reconnecting in progress",
-    "recording_continues_on_server": "Recording continues on server",
-    "mic_on": "Mic On",
-    "mic_muted": "Mic Muted",
-    "participants_audio_status": "Audio Status",
-    "connection_connected": "Connected",
-    "connection_connecting": "Connecting...",
-    "connection_disconnected": "Disconnected",
-    "mic_mute": "Mute microphone",
-    "mic_unmute": "Unmute microphone",
-    "leave_meeting": "Leave meeting",
-    "leave": "Leave"
-  },
+     "poll_for_insights": "AI will analyze once recording completes",
+     "pipeline_complete": "Pipeline Complete",
+     "edit_pv": "Edit PV",
+     "edit_online_desc": "Open in OnlyOffice editor",
+     "export_pdf": "Export PDF",
+     "export_pdf_desc": "Download as PDF document",
+     "export_word": "Export Word",
+     "export_word_desc": "Download as DOCX file",
+     "connection_reconnecting": "Reconnecting…",
+     "connection_reconnecting_desc": "Attempting to restore connection",
+     "connection_poor": "Poor Audio Quality",
+     "connection_poor_desc": "Network degraded",
+     "connection_lost": "Connection Lost",
+     "connection_lost_desc": "Reconnecting in progress",
+     "recording_continues_on_server": "Recording continues on server",
+     "mic_on": "Mic On",
+     "mic_muted": "Mic Muted",
+     "participants_audio_status": "Audio Status",
+     "connection_connected": "Connected",
+     "connection_connecting": "Connecting...",
+     "connection_disconnected": "Disconnected",
+     "mic_mute": "Mute microphone",
+     "mic_unmute": "Unmute microphone",
+     "leave_meeting": "Leave meeting",
+     "leave": "Leave"
+    },
   "archive": {
     "subtitle": "Browse and search through your company's meeting history.",
     "date_from": "From",
@@ -618,29 +616,127 @@
     "react_error_boundary": "Something went wrong (React Error Boundary)"
   },
   "consent": {
-    "title": "Consent Management",
-    "required_notice": "This consent is required to use the service.",
-    "optional_notice": "This consent is optional. You can skip this step.",
-    "confirm": "I Confirm My Consents",
-    "audio_recording": {
-      "short": "Recording",
-      "text": "I consent to the recording, storage, and processing of this meeting audio for transcription and meeting minutes (PV). Recordings are stored on EU servers (France: Gladia, Germany: MinIO).",
-      "checkbox": "I consent to audio recording"
+    "title": "Data Processing Consent",
+    "subtitle": "In accordance with Tunisian Law 2004-63 (INPDP) and GDPR, we need your explicit consent before processing your meeting data.",
+    "required_note": "Items marked with * are required to use the service.",
+    "step": "Step {current} of {total}",
+    "next": "Next",
+    "back": "Back",
+    "accept_all": "Accept & Continue",
+    "submit": "I agree and create my account",
+    "withdraw": "Withdraw consent",
+    "withdrawn": "Consent withdrawn",
+    "c1": {
+      "title": "Audio Recording & Transcription *",
+      "short": "Audio recording",
+      "body": "We record the meeting audio and transcribe it with AI (Gladia) to generate minutes. This is required to provide the core service."
     },
-    "voice_profiling": {
-      "short": "Voice Profile",
-      "text": "I consent to my voice being analyzed and stored for automatic speaker identification in future meetings (biometric voice profiles per Art. 5 Nr. 2 Law 2004-63). This consent can be withdrawn at any time.",
-      "checkbox": "I consent to voice profiling (optional)"
+    "c2": {
+      "title": "Voice Biometric Enrollment",
+      "short": "Voice biometrics",
+      "body": "We create an anonymous voiceprint (ONNX embedding) to recognize speakers across meetings. Optional — you can disable it anytime. Biometric data is processed only with your explicit consent."
     },
-    "third_party_sharing": {
-      "short": "Data Sharing",
-      "text": "I acknowledge that data (audio recordings, transcripts) is shared with the following EU-based third parties: Gladia (France - transcription), Mistral (France - AI processing), Hetzner (Germany - storage). Legal basis: Art. 47 Abs. 3 Law 2004-63.",
-      "checkbox": "I acknowledge third-party data sharing"
+    "c3": {
+      "title": "Sharing with Sub-processors *",
+      "short": "Third-party sharing",
+      "body": "Your audio and text are sent to our AI sub-processors Gladia (transcription) and Mistral (summarization). Required for the AI pipeline."
     },
-    "transcript_storage": {
-      "short": "Storage",
-      "text": "I consent to transcripts and meeting minutes being stored for a maximum of 1 year. Audio recordings are automatically deleted after 90 days.",
-      "checkbox": "I consent to data retention"
+    "c4": {
+      "title": "Storage & Retention *",
+      "short": "Secure storage",
+      "body": "Your data is stored encrypted (AES-256) in our PostgreSQL database (CNPG) and S3 storage. Required to keep your minutes and history."
+    },
+    "missing_required": "You must accept all required consents (Audio, Sharing, Storage) to continue.",
+    "required_badge": "Required",
+    "optional_badge": "Optional"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "last_updated": "Last updated: 2026",
+    "footer_note": "For our terms of service, please see the",
+    "data_controller": {
+      "title": "1. Data Controller",
+      "text": "The data controller responsible for the processing of your personal data is MeetingAutomation, operated by Batnini (Tunisia). For any privacy-related request, contact us at privacy@meeting-automation.com."
+    },
+    "scope": {
+      "title": "2. Scope of this Policy",
+      "text": "This policy explains how MeetingAutomation collects, processes, stores, and shares data generated through our AI meeting automation service, including audio recordings, transcriptions, voice profiles, and generated minutes (Procès-Verbal). It applies in accordance with the Tunisian Data Protection Law (Loi n° 2004-63, INPDP) and the EU General Data Protection Regulation (GDPR)."
+    },
+    "legal_basis": {
+      "title": "3. Legal Basis for Processing",
+      "text": "We process your data on the following legal bases: (a) your explicit consent (GDPR Art. 6(1)(a) and Art. 9(2)(a) for biometric and opinion data); (b) the performance of a contract to provide the service (GDPR Art. 6(1)(b)); and (c) our legitimate interest in securing and improving the service (GDPR Art. 6(1)(f)). Under the Tunisian Law 2004-63 (INPDP), processing of personal data requires prior declaration to the INPDP and explicit consent for sensitive data."
+    },
+    "data_collected": {
+      "title": "4. Categories of Data Collected",
+      "text": "We collect: (a) Account data (name, email, company); (b) Audio data from meeting recordings; (c) Transcripts and opinion data (meeting content, decisions, discussions); (d) Biometric voice data (ONNX voiceprint embeddings, only with your consent); (e) Generated minutes and action items; (f) Technical metadata (IP address, device, usage logs)."
+    },
+    "c1_audio": {
+      "title": "5. C1 — Audio Recording & Transcription",
+      "text": "We record meeting audio and transcribe it using Gladia AI to generate minutes. Audio is processed in real time and stored encrypted (AES-256). Audio recordings are retained for the duration of your subscription and deleted upon account closure or upon your withdrawal of C1 consent, subject to legal retention obligations. This consent (C1) is REQUIRED to use the core service."
+    },
+    "c2_voice": {
+      "title": "6. C2 — Voice Biometric Profiling (Optional)",
+      "text": "With your explicit opt-in, we generate an anonymous 192-dimensional ONNX voice embedding (voiceprint) to recognize speakers consistently across meetings. This is biometric data under GDPR Art. 9. The embedding is stored encrypted and is NOT reversible to raw audio. You may withdraw C2 consent at any time from your account settings; upon withdrawal, existing embeddings are deleted and no new ones are created. This consent (C2) is OPTIONAL."
+    },
+    "c3_sharing": {
+      "title": "7. C3 — Data Sharing with Sub-processors",
+      "text": "To deliver the AI pipeline, your audio and text are transmitted to sub-processors: Gladia (speech-to-text transcription) and Mistral (AI summarization and minutes generation). These transfers may involve processing outside Tunisia (third-country transfer). We rely on standard contractual clauses and our sub-processors' compliance commitments. This consent (C3) is REQUIRED for the AI service."
+    },
+    "c4_storage": {
+      "title": "8. C4 — Storage & Retention",
+      "text": "Your data is stored encrypted (AES-256) in our PostgreSQL database (CNPG) and in S3-compatible object storage (MinIO). Automated backups are retained for 30 days. Meeting data is retained for the lifetime of your subscription. Upon account deletion or withdrawal of C4 consent, data is purged from primary storage within 30 days and from backups within 90 days, except where law requires longer retention."
+    },
+    "data_retention": {
+      "title": "9. Retention Periods",
+      "text": "Audio recordings: duration of subscription + 30 days after closure. Transcripts & minutes: duration of subscription + 90 days after closure. Voice embeddings (C2): deleted immediately upon withdrawal. Account metadata: 12 months after closure for legal/financial obligations. Backups: 30 days rolling."
+    },
+    "your_rights": {
+      "title": "10. Your Rights",
+      "text": "Under INPDP (Loi 2004-63) and GDPR, you have the right to: access your data, rectify inaccuracies, erase your data ('right to be forgotten'), restrict processing, object to processing, data portability, and withdraw consent at any time (C1, C2, C3, C4) without affecting prior lawful processing. To exercise these rights, email privacy@meeting-automation.com. You may also lodge a complaint with the INPDP (Tunisia) or your local supervisory authority."
+    },
+    "inpdp_reference": {
+      "title": "11. INPDP Reference (Loi 2004-63)",
+      "text": "MeetingAutomation processes personal data in compliance with the Tunisian Law n° 2004-63 of 27 July 2004 on the Protection of Personal Data, as amended, supervised by the Instance Nationale de Protection des Données Personnelles (INPDP). Relevant articles: Art. 5 (sensitive data including biometric and health-related data requires explicit consent); Art. 13 (data subject information); Art. 14 (rights of the data subject); Art. 47 (penalties for unlawful processing of personal data). We hold a declaration with the INPDP for the processing of meeting and voice data."
+    },
+    "contact": {
+      "title": "12. Contact",
+      "text": "Data Protection Officer / Privacy: privacy@meeting-automation.com\nPostal: MeetingAutomation — Batnini, Tunisia\nFor INPDP-related inquiries, contact the INPDP: www.inpdp.tn"
+    }
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "acceptance": {
+      "short": "1. Acceptance of Terms",
+      "text": "By accessing or using MeetingAutomation, you agree to be bound by these Terms of Service and our Privacy Policy. If you do not agree, do not use the service."
+    },
+    "service_description": {
+      "short": "2. Description of Service",
+      "text": "MeetingAutomation provides AI-powered meeting transcription, speaker diarization, minutes (Procès-Verbal) generation, and action-item tracking. The service processes meeting audio via integrated sub-processors (Gladia, Mistral)."
+    },
+    "consent": {
+      "short": "3. Consent and Data Protection",
+      "text": "Use of the service requires your explicit consent to the processing of meeting data as described in our Privacy Policy and required by the Tunisian Law 2004-63 (INPDP) and GDPR. Consent C1 (Audio Recording), C3 (Data Sharing with sub-processors) and C4 (Storage) are REQUIRED to create an account and use the core service. Consent C2 (Voice Biometric Profiling) is OPTIONAL and may be enabled later. You may withdraw any consent at any time from your account settings; withdrawal of a required consent will disable the related functionality."
+    },
+    "consent_link": "Read our full Privacy Policy",
+    "user_obligations": {
+      "short": "4. User Obligations",
+      "text": "You agree to provide accurate account information, keep credentials confidential, and use the service lawfully. You are responsible for ensuring you have the right to record meetings and inform participants where required by law."
+    },
+    "intellectual_property": {
+      "short": "5. Intellectual Property",
+      "text": "You retain ownership of your meeting content. MeetingAutomation retains all rights to the software, models, and generated insights. Generated minutes are provided to you under a non-exclusive license for your internal use."
+    },
+    "limitation_of_liability": {
+      "short": "6. Limitation of Liability",
+      "text": "The service is provided 'as is'. MeetingAutomation is not liable for indirect or consequential damages arising from transcription inaccuracies, service interruptions, or data loss, to the maximum extent permitted by law."
+    },
+    "termination": {
+      "short": "7. Termination",
+      "text": "We may suspend or terminate your account for breach of these terms. You may terminate at any time; upon termination, your data is handled according to the retention schedule in our Privacy Policy."
+    },
+    "governing_law": {
+      "short": "8. Governing Law",
+      "text": "These terms are governed by the laws of Tunisia. Disputes are subject to the exclusive jurisdiction of the competent Tunisian courts, without prejudice to your rights under applicable consumer and data-protection law."
     }
   }
 }
