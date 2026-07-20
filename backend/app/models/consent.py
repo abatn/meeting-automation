@@ -15,8 +15,8 @@ import enum
 from typing import Optional
 from datetime import datetime
 
-from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, Enum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import String, Boolean, ForeignKey, DateTime, Enum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.core.database import Base
@@ -58,6 +58,8 @@ class ConsentLog(Base):
     withdrawn_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+    user = relationship("User", back_populates="consents")
 
     def __repr__(self) -> str:
         return (

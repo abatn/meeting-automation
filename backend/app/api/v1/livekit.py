@@ -148,7 +148,7 @@ async def start_livekit_recording(
             select(ConsentLog).where(
                 ConsentLog.user_id == current_user.id,
                 ConsentLog.client_id == current_user.client_id,
-                ConsentLog.consent_type == ConsentType.AUDIO_RECORDING.value,
+                ConsentLog.consent_type == ConsentType.C1_AUDIO.value,
                 ConsentLog.consented == True,
                 ConsentLog.withdrawn_at.is_(None),
             )
