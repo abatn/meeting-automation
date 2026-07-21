@@ -239,13 +239,14 @@ async def register(
         role_name = user_in.role or "participant"
 
     # Create user
+    _e2e = os.getenv("E2E_TEST", "").lower() == "true"
     user = await user_service.create_user(
         email=user_in.email,
         password=user_in.password,
         full_name=user_in.full_name,
         client_id=client.id,
         role_name=role_name,
-        status=UserStatus.PENDING
+        status=UserStatus.ACTIVE if _e2e else UserStatus.PENDING
     )
 
     # Create activation token
@@ -254,7 +255,6 @@ async def register(
     # Phase 163 — Consent Management (INPDP Art.47 / Art.5 + GDPR)
     # Record explicit consent decisions collected in the registration form.
     # In E2E tests we auto-grant all four consents so existing test users pass.
-    _e2e = os.getenv("E2E_TEST", "").lower() == "true"
     if _e2e:
         grants = [
             (t, True) for t in

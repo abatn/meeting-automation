@@ -81,7 +81,8 @@ class TestPhase7MinIOIntegration:
         recording = await service.upload_recording(
             meeting_id=meeting.id,
             client_id=authenticated_user_a["client_id"],
-            file=mock_file
+            file=mock_file,
+            user_id=authenticated_user_a["user"].id
         )
         
         # Assert: file_key follows new format (bucket-per-tenant, no client_id in key)
@@ -432,7 +433,8 @@ class TestPhase7MinIOIntegration:
         recording = await service.upload_recording(
             meeting_id=meeting.id,
             client_id=authenticated_user_a["client_id"],
-            file=mock_file
+            file=mock_file,
+            user_id=authenticated_user_a["user"].id
         )
         
         # Validate format — bucket-per-tenant, key = recordings/meeting_id/uuid_filename
@@ -614,6 +616,7 @@ async def authenticated_user_a(db_session: AsyncSession):
     from jose import jwt
     from app.core.config import settings, get_bucket_name
     from app.models.client import Client, SubscriptionStatus
+    from app.models.consent import ConsentLog, ConsentType
 
     client_a = Client(
         id=str(uuid.uuid4()),
@@ -632,6 +635,17 @@ async def authenticated_user_a(db_session: AsyncSession):
         status=UserStatus.ACTIVE.value,
     )
     db_session.add(user_a)
+    await db_session.flush()
+
+    for ctype in (ConsentType.C1_AUDIO, ConsentType.C2_VOICE, ConsentType.C3_SHARING, ConsentType.C4_STORAGE):
+        db_session.add(ConsentLog(
+            id=str(uuid.uuid4()),
+            user_id=user_a.id,
+            client_id=client_a.id,
+            consent_type=ctype,
+            consented=True,
+            consent_version="1.0",
+        ))
     await db_session.commit()
 
     token = jwt.encode(

@@ -877,7 +877,7 @@ async def _identify_speakers(
                 ConsentLog.consented == True,  # noqa: E712
             )
         )
-    ).scalar_one_or_none()
+    ).scalars().first()
     if voice_consent is None:
         logger.info(
             f"ENROLLMENT skipped for client={client_id}: C2_VOICE consent not granted "

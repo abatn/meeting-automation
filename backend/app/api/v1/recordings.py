@@ -47,7 +47,7 @@ async def upload_recording(
 
     service = RecordingService(db)
     try:
-        recording = await service.upload_recording(meeting_id, current_user.client_id, file, recording_id)
+        recording = await service.upload_recording(meeting_id, current_user.client_id, file, recording_id, user_id=current_user.id)
     except StorageQuotaExceededError as e:
         raise HTTPException(status_code=413, detail=str(e))
 

@@ -28,6 +28,7 @@ from app.models.setting import BrandingSettings as BrandingSettingsModel
 from app.models.team import TeamMember as TeamModel
 from app.models.meeting_room import MeetingRoom as MeetingRoomModel
 from app.models.facture import Facture as FactureModel
+from app.models.consent import ConsentLog, ConsentType
 from app.models.usage_minute import UsageMinute as UsageMinuteModel
 
 # Event loop policy (fixes pytest-asyncio DeprecationWarning)
@@ -148,6 +149,29 @@ async def db_session() -> Generator:
                 roles=[dg_role] if dg_role else []
             )
             session.add(dg_user)
+
+        # Seed ConsentLog for E2E seed users so recording/livekit gates pass
+        if os.getenv("E2E_TEST", "").lower() == "true":
+            import uuid
+            from datetime import datetime, timezone
+            for seed_user in [test_user, dg_user]:
+                for ctype in (ConsentType.C1_AUDIO, ConsentType.C2_VOICE, ConsentType.C3_SHARING, ConsentType.C4_STORAGE):
+                    existing = await session.execute(
+                        select(ConsentLog).where(
+                            ConsentLog.user_id == seed_user.id,
+                            ConsentLog.consent_type == ctype,
+                        )
+                    )
+                    if not existing.scalar_one_or_none():
+                        session.add(ConsentLog(
+                            id=str(uuid.uuid4()),
+                            user_id=seed_user.id,
+                            client_id="test-client-id",
+                            consent_type=ctype,
+                            consented=True,
+                            consent_version="1.0",
+                            created_at=datetime.now(timezone.utc),
+                        ))
 
         await session.commit()
 
