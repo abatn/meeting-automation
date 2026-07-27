@@ -61,22 +61,21 @@ class RecordingService:
         # S3 Upload — Bucket automatisch erstellen falls nicht vorhanden
         bucket = get_bucket_name(client_id)
 
-        # Phase 163: C1 (AUDIO) consent required before persisting any recording
-        # to S3 storage (INPDP Art.47 — explicit consent before processing).
+        # Phase 163/185: C1 (AUDIO) consent — SOFT gate (firm-level, DG covers team)
         consent_row = (
             await self.db.execute(
                 select(ConsentLog).where(
                     ConsentLog.client_id == client_id,
-                    ConsentLog.user_id == user_id,
                     ConsentLog.consent_type == ConsentType.C1_AUDIO,
                     ConsentLog.consented == True,  # noqa: E712
+                    ConsentLog.withdrawn_at.is_(None),
                 )
             )
-        ).scalar_one_or_none()
+        ).scalars().first()
         if consent_row is None:
-            raise HTTPException(
-                status_code=403,
-                detail="Consent C1_AUDIO is required before uploading a recording.",
+            logger.warning(
+                "C1_AUDIO consent not found for client=%s — proceeding anyway (soft gate).",
+                client_id,
             )
 
         try:

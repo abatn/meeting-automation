@@ -868,13 +868,14 @@ async def _identify_speakers(
                 assigned_names[name] = mapping
 
     # ENROLLMENT: after exclusivity, only enroll speakers with resolved names
-    # Phase 163: C2 (VOICE) consent gate — biometric enrollment only if granted
+    # Phase 163/185: C2 (VOICE) consent gate — biometric enrollment only if granted
     voice_consent = (
         await db.execute(
             select(ConsentLog).where(
                 ConsentLog.client_id == client_id,
                 ConsentLog.consent_type == ConsentType.C2_VOICE,
                 ConsentLog.consented == True,  # noqa: E712
+                ConsentLog.withdrawn_at.is_(None),
             )
         )
     ).scalars().first()
