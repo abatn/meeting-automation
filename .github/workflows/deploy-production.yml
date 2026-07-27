@@ -1,0 +1,86 @@
+name: Deploy Production
+
+on:
+  workflow_run:
+    workflows: ["Docker Build & Push"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Copy manifests to Contabo
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: 169.58.83.32
+        username: root
+        key: ${{ secrets.CONTABO_SSH_KEY }}
+        source: "infrastructure/kubernetes/production/"
+        target: "/root/production-manifests"
+        strip_components: 3
+
+    - name: Deploy to Contabo Production
+      uses: appleboy/ssh-action@v1
+      with:
+        host: 169.58.83.32
+        username: root
+        key: ${{ secrets.CONTABO_SSH_KEY }}
+        script: |
+          set -e
+          echo "=== Deploying Production ==="
+          
+          # Ensure Docker Hub credentials
+          if ! docker pull docker.io/batnini/meeting-automation-backend:latest 2>/dev/null; then
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          fi
+          
+          # Pull latest images
+          echo "=== Pulling images ==="
+          docker pull docker.io/batnini/meeting-automation-backend:latest
+          docker pull docker.io/batnini/meeting-automation-frontend:latest || echo "Frontend image not available"
+          
+          # Import to containerd
+          echo "=== Importing to containerd ==="
+          docker save docker.io/batnini/meeting-automation-backend:latest | k3s ctr images import -
+          docker save docker.io/batnini/meeting-automation-frontend:latest | k3s ctr images import - 2>/dev/null || true
+          
+          # Apply manifests
+          echo "=== Applying manifests ==="
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          cd /root/production-manifests
+          
+          kubectl apply -f namespace.yaml
+          kubectl apply -f backend-secrets.yaml -f postgres-secrets.yaml -f redis-secrets.yaml -f minio-secrets.yaml -f rabbitmq-secrets.yaml -f livekit-secrets.yaml -f n8n-secrets.yaml
+          kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml
+          kubectl apply -f redis-deployment.yaml -f rabbitmq-statefulset.yaml -f minio-statefulset.yaml
+          kubectl apply -f cnpg-cluster.yaml
+          kubectl apply -f backend-deployment.yaml -f frontend-deployment.yaml -f onlyoffice-deployment.yaml -f n8n-deployment.yaml
+          kubectl apply -f celery-worker-deployment.yaml -f celery-worker-pro-deployment.yaml -f celery-beat-deployment.yaml
+          kubectl apply -f livekit-server-deployment.yaml -f livekit-egress-deployment.yaml
+          kubectl apply -f network-policies.yaml
+          kubectl apply -f ingress-prod.yaml
+          
+          # Rollout restart
+          echo "=== Rolling out deployments ==="
+          kubectl rollout restart deployment/backend -n meeting-automation
+          kubectl rollout restart deployment/frontend -n meeting-automation
+          kubectl rollout restart deployment/celery-worker -n meeting-automation
+          kubectl rollout restart deployment/celery-worker-pro -n meeting-automation
+          kubectl rollout restart deployment/celery-beat -n meeting-automation
+          
+          # Wait for rollout
+          echo "=== Waiting for rollout ==="
+          kubectl rollout status deployment/backend -n meeting-automation --timeout=180s || true
+          kubectl rollout status deployment/frontend -n meeting-automation --timeout=180s || true
+          
+          echo "=== Deployment complete ==="
+          kubectl get pods -n meeting-automation

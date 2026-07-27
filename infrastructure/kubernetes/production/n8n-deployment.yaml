@@ -36,7 +36,7 @@ spec:
         - name: DB_POSTGRESDB_USER
           value: "meeting_user"
         - name: DB_POSTGRESDB_PASSWORD
-          value: "meeting_password"
+          value: "ODUzYvZ1hxrcZauvvl1k6s5wH8r8I"
         - name: N8N_HOST
           value: "n8n.meeting-automation.svc.cluster.local"
         - name: N8N_PORT

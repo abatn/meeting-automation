@@ -19,8 +19,6 @@ spec:
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
-      nodeSelector:
-        kubernetes.io/hostname: instance-20260329-0846
       containers:
       - name: livekit
         image: livekit/livekit-server:latest

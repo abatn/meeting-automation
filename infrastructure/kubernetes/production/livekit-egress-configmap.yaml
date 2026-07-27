@@ -9,11 +9,11 @@ data:
     insecure: true
     redis:
       address: redis.meeting-automation.svc.cluster.local:6379
-      password: redis_password
+      password: flgyEhZKHVyMBge1QkdKtA
       db: 0
     s3:
       access_key: minio_user
-      secret: minio_password
+      secret: 3Bsd1nsvjsnkCzcPvB96ew
       endpoint: http://minio:9000
       bucket: meeting-recordings
       region: us-east-1

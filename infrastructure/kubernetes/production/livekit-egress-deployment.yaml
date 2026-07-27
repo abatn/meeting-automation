@@ -17,8 +17,6 @@ spec:
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
-      nodeSelector:
-        kubernetes.io/hostname: instance-20260329-0846
       containers:
       - name: egress
         image: livekit/egress:latest
@@ -26,9 +24,9 @@ spec:
         - name: EGRESS_CONFIG_FILE
           value: /etc/livekit-egress/config.yaml
         - name: LIVEKIT_API_KEY
-          value: "meeting-api-key"
+          value: "prod-9a4ac9f989143b65"
         - name: LIVEKIT_API_SECRET
-          value: "meeting-api-secret-2026-minimum-32-chars!"
+          value: "prod-8f8b7b429f01180c89e03a1b30eeec4be871c0fa184c823a"
         - name: LIVEKIT_WS_URL
           value: "ws://livekit-server:7880"
         ports:

@@ -9,7 +9,7 @@ metadata:
   name: meeting-db
   namespace: meeting-automation
 spec:
-  instances: 2
+  instances: 3
   primaryUpdateStrategy: unsupervised
   
   postgresql:
@@ -29,7 +29,7 @@ spec:
   
   storage:
     size: 10Gi
-    storageClass: longhorn
+    storageClass: local-path
   
   backup:
     barmanObjectStore:
@@ -42,7 +42,7 @@ spec:
         secretAccessKey:
           name: minio-secrets
           key: MINIO_SECRET_KEY
-    retentionPolicy: "30d"
+    retentionPolicy: "90d"
   
   monitoring:
     enablePodMonitor: false

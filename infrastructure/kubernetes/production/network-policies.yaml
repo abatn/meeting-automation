@@ -9,6 +9,29 @@ spec:
   policyTypes:
   - Ingress
 ---
+# Allow ingress from nginx-ingress controller to all services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-nginx
+  namespace: meeting-automation
+spec:
+  podSelector: {}
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 5678
+    - protocol: TCP
+      port: 7880
+    - protocol: TCP
+      port: 8000
+---
 # Postgres: Only allow Backend, n8n, Celery
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

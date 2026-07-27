@@ -25,7 +25,7 @@ spec:
         - name: JWT_ENABLED
           value: "true"
         - name: JWT_SECRET
-          value: "prod-onlyoffice-secret-jwt-key-2026"
+          value: "tHjRho7Mrgicb9g09trClzCPt9X5OI48ZIfGWILLnkQ"
         - name: JWT_HEADER
           value: "Authorization"
         - name: ALLOW_PRIVATE_IP_ADDRESS

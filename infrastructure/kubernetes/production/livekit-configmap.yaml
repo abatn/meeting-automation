@@ -17,14 +17,14 @@ data:
       tcp_fallback_rtt_threshold: 0
     redis:
       address: redis.meeting-automation.svc.cluster.local:6379
-      password: redis_password
+      password: flgyEhZKHVyMBge1QkdKtA
       db: 0
     keys:
-      meeting-api-key: meeting-api-secret-2026-minimum-32-chars!
+      prod-9a4ac9f989143b65: prod-8f8b7b429f01180c89e03a1b30eeec4be871c0fa184c823a
     turn:
       enabled: true
       udp_port: 3478
     webhook:
-      api_key: meeting-api-key
+      api_key: prod-9a4ac9f989143b65
       urls:
         - http://backend.meeting-automation.svc.cluster.local:8000/api/v1/livekit/webhooks

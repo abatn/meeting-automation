@@ -38,10 +38,10 @@ spec:
         livenessProbe:
           exec:
             command:
-            - /bin/sh
+            - bash
             - -c
-            - celery -A app.tasks.celery_app inspect ping --timeout=5
+            - pgrep -f "celery.*beat" || exit 1
           initialDelaySeconds: 30
           periodSeconds: 30
-          timeoutSeconds: 10
+          timeoutSeconds: 5
           failureThreshold: 3

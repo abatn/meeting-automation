@@ -72,10 +72,9 @@ spec:
             name: backend-secrets
         - configMapRef:
             name: backend-config
-        # Enable debug logging in production for troubleshooting
         env:
         - name: DEBUG
-          value: "true"
+          value: "false"
         - name: DB_HOST
           value: "meeting-db-rw"
         - name: APP_ROLE

@@ -4,7 +4,7 @@ metadata:
   name: postgres-backup-pvc
   namespace: meeting-automation
 spec:
-  storageClassName: longhorn
+  storageClassName: local-path
   accessModes:
     - ReadWriteOnce
   resources:
@@ -38,7 +38,7 @@ spec:
             - |
               TIMESTAMP=$(date +%Y%m%d-%H%M%S)
               echo "[$(date)] Starting backup: $TIMESTAMP"
-              pg_dump -h 10.43.101.189 -U meeting_user meeting_db | gzip > /backup/meeting_db_${TIMESTAMP}.sql.gz
+              pg_dump -h meeting-db-rw.meeting-automation.svc.cluster.local -U meeting_user meeting_db | gzip > /backup/meeting_db_${TIMESTAMP}.sql.gz
               SIZE=$(ls -lh /backup/meeting_db_${TIMESTAMP}.sql.gz | awk '{print $5}')
               echo "[$(date)] Backup complete: ${SIZE}"
               # Keep only last 7 backups
