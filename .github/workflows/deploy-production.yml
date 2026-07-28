@@ -59,7 +59,11 @@ jobs:
           cd /root/production-manifests
           
           kubectl apply -f namespace.yaml
-          kubectl apply -f backend-secrets.yaml -f postgres-secrets.yaml -f redis-secrets.yaml -f minio-secrets.yaml -f rabbitmq-secrets.yaml -f livekit-secrets.yaml -f n8n-secrets.yaml
+          # Secrets: Only apply if they don't exist (manual update required for changes)
+          for secret in backend-secrets postgres-secrets redis-secrets minio-secrets rabbitmq-secrets livekit-secrets n8n-secrets; do
+            kubectl get secret "$secret" -n meeting-automation >/dev/null 2>&1 || \
+              kubectl apply -f "${secret}.yaml" -n meeting-automation
+          done
           kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml
           kubectl apply -f redis-deployment.yaml -f rabbitmq-statefulset.yaml -f minio-statefulset.yaml
           kubectl apply -f cnpg-cluster.yaml

@@ -15,6 +15,16 @@ spec:
       labels:
         app: onlyoffice
     spec:
+      initContainers:
+      - name: init-oo-config
+        image: onlyoffice/documentserver:latest
+        command: ['sh', '-c', 'cp /config-source/local.json /emptydir-writable/local.json && cp /config-source/ds-docservice.conf /emptydir-writable/ds-docservice.conf && chmod 644 /emptydir-writable/local.json /emptydir-writable/ds-docservice.conf']
+        volumeMounts:
+        - name: configmap-source
+          mountPath: /config-source
+          readOnly: true
+        - name: onlyoffice-config-writable
+          mountPath: /emptydir-writable
       containers:
       - name: onlyoffice
         image: onlyoffice/documentserver:latest
@@ -30,6 +40,8 @@ spec:
           value: "Authorization"
         - name: ALLOW_PRIVATE_IP_ADDRESS
           value: "true"
+        - name: SECURE_LINK_SECRET
+          value: "prod-onlyoffice-secure-link-2026"
         resources:
           requests:
             memory: "512Mi"
@@ -53,6 +65,19 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
+        volumeMounts:
+        - name: onlyoffice-config-writable
+          mountPath: /etc/onlyoffice/documentserver/local.json
+          subPath: local.json
+        - name: onlyoffice-config-writable
+          mountPath: /etc/onlyoffice/documentserver/nginx/includes/ds-docservice.conf
+          subPath: ds-docservice.conf
+      volumes:
+      - name: configmap-source
+        configMap:
+          name: onlyoffice-custom-config
+      - name: onlyoffice-config-writable
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
