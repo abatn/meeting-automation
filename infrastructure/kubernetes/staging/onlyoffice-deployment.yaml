@@ -7,6 +7,7 @@ metadata:
     app: onlyoffice-staging
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: onlyoffice-staging
@@ -34,9 +35,11 @@ spec:
           requests:
             memory: "512Mi"
             cpu: "200m"
+            ephemeral-storage: "200Mi"
           limits:
             memory: "2Gi"
             cpu: "1"
+            ephemeral-storage: "1Gi"
         livenessProbe:
           httpGet:
             path: /healthcheck

@@ -38,20 +38,21 @@ jobs:
           set -e
           echo "=== Deploying Production ==="
           
-          # Ensure Docker Hub credentials
-          if ! docker pull docker.io/batnini/meeting-automation-backend:latest 2>/dev/null; then
-            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-          fi
-          
-          # Pull latest images
-          echo "=== Pulling images ==="
-          docker pull docker.io/batnini/meeting-automation-backend:latest
-          docker pull docker.io/batnini/meeting-automation-frontend:latest || echo "Frontend image not available"
-          
-          # Import to containerd
-          echo "=== Importing to containerd ==="
-          docker save docker.io/batnini/meeting-automation-backend:latest | k3s ctr images import -
-          docker save docker.io/batnini/meeting-automation-frontend:latest | k3s ctr images import - 2>/dev/null || true
+          # Pull images directly to k3s containerd (no Docker middleware)
+          echo "=== Pulling images to k3s containerd ==="
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | k3s ctr images registry login docker.io --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin 2>/dev/null || true
+          k3s ctr images pull docker.io/batnini/meeting-automation-backend:latest || {
+            echo "Direct pull failed, falling back to docker save"
+            docker pull docker.io/batnini/meeting-automation-backend:latest
+            docker save docker.io/batnini/meeting-automation-backend:latest | k3s ctr images import -
+            docker image rm docker.io/batnini/meeting-automation-backend:latest 2>/dev/null || true
+          }
+          k3s ctr images pull docker.io/batnini/meeting-automation-frontend:latest || {
+            echo "Frontend direct pull failed, trying fallback"
+            docker pull docker.io/batnini/meeting-automation-frontend:latest || echo "Frontend image not available"
+            docker save docker.io/batnini/meeting-automation-frontend:latest | k3s ctr images import - 2>/dev/null || true
+            docker image rm docker.io/batnini/meeting-automation-frontend:latest 2>/dev/null || true
+          }
           
           # Apply manifests
           echo "=== Applying manifests ==="

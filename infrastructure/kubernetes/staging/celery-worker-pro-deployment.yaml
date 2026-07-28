@@ -8,6 +8,7 @@ metadata:
     worker-tier: pro
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: celery-worker-pro-staging
@@ -26,9 +27,11 @@ spec:
           requests:
             memory: "1500Mi"
             cpu: "200m"
+            ephemeral-storage: "500Mi"
           limits:
             memory: "3Gi"
             cpu: "500m"
+            ephemeral-storage: "2Gi"
         livenessProbe:
           exec:
             command:

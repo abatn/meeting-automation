@@ -53,11 +53,14 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-worker
+    - podSelector:
+        matchLabels:
+          app: celery-worker-pro
     ports:
     - protocol: TCP
       port: 5432
 ---
-# Redis: Backend, Celery, Egress, LiveKit Server
+# Redis: Backend, Celery, Celery-Pro, Egress, LiveKit Server
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -84,11 +87,14 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-server
+    - podSelector:
+        matchLabels:
+          app: celery-worker-pro
     ports:
     - protocol: TCP
       port: 6379
 ---
-# RabbitMQ: Only allow Backend and Celery
+# RabbitMQ: Only allow Backend, Celery, Celery-Pro
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -109,13 +115,16 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-beat
+    - podSelector:
+        matchLabels:
+          app: celery-worker-pro
     ports:
     - protocol: TCP
       port: 5672
     - protocol: TCP
       port: 15672
 ---
-# MinIO: Allow Backend, Celery, Frontend, CNPG (WAL-Archiv)
+# MinIO: Allow Backend, Celery, Celery-Pro, Frontend, CNPG (WAL-Archiv)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -139,6 +148,9 @@ spec:
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: postgresql
+    - podSelector:
+        matchLabels:
+          app: celery-worker-pro
     ports:
     - protocol: TCP
       port: 9000
@@ -372,6 +384,9 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-worker
+    - podSelector:
+        matchLabels:
+          app: celery-worker-pro
     ports:
     - protocol: TCP
       port: 5432

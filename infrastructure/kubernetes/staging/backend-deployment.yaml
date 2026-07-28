@@ -8,6 +8,7 @@ metadata:
     environment: staging
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: backend
@@ -64,9 +65,11 @@ spec:
           requests:
             memory: "256Mi"
             cpu: "100m"
+            ephemeral-storage: "200Mi"
           limits:
             memory: "1Gi"
             cpu: "500m"
+            ephemeral-storage: "1Gi"
         envFrom:
         - secretRef:
             name: backend-secrets-staging

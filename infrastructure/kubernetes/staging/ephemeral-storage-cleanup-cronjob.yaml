@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: node-cleanup
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-cleanup
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["nodes/proxy"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-cleanup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-cleanup
+subjects:
+- kind: ServiceAccount
+  name: node-cleanup
+  namespace: kube-system
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: node-ephemeral-storage-cleanup
+  namespace: kube-system
+  labels:
+    app: node-cleanup
+    purpose: ephemeral-storage-defense
+spec:
+  schedule: "0 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 600
+      template:
+        spec:
+          serviceAccountName: node-cleanup
+          restartPolicy: Never
+          containers:
+          - name: cleanup
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+              echo "[$TIMESTAMP] === Node Ephemeral Storage Cleanup ==="
+
+              NODE_NAME=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
+              echo "[$TIMESTAMP] Target node: $NODE_NAME"
+
+              # --- Phase 1: Clean all terminal-state pods ---
+              echo "[$TIMESTAMP] Phase 1: Cleaning terminal-state pods..."
+              DELETED=0
+              for ns in $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}'); do
+                case "$ns" in kube-system|kube-public) continue ;; esac
+
+                for pod in $(kubectl get pods -n "$ns" --no-headers 2>/dev/null | \
+                  awk '$4 ~ /^(Error|Evicted|ContainerStatusUnknown|CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerConfigError|RunContainerError|Init:Error|Init:ContainerStatusUnknown|Init:ErrImagePull|Unknown|Completed|DeadlineExceeded)$/ {print $2}'); do
+                  kubectl delete pod "$pod" -n "$ns" --grace-period=0 --force 2>/dev/null && DELETED=$((DELETED+1)) || true
+                done
+              done
+              echo "[$TIMESTAMP] Phase 1: Deleted $DELETED pods"
+
+              # --- Phase 2: Clean old ReplicaSets (0 replicas, >2h old) ---
+              echo "[$TIMESTAMP] Phase 2: Cleaning old ReplicaSets..."
+              RS_DELETED=0
+              for ns in $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}'); do
+                case "$ns" in kube-system|kube-public) continue ;; esac
+
+                for rs in $(kubectl get rs -n "$ns" --no-headers 2>/dev/null | awk '$2 == "0" && $3 == "0" {print $1}'); do
+                  age=$(kubectl get rs "$rs" -n "$ns" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null)
+                  if [ -n "$age" ]; then
+                    created=$(date -d "$age" +%s 2>/dev/null || echo 0)
+                    now=$(date +%s)
+                    diff=$((now - created))
+                    if [ "$diff" -gt 7200 ]; then
+                      kubectl delete rs "$rs" -n "$ns" 2>/dev/null && RS_DELETED=$((RS_DELETED+1)) || true
+                    fi
+                  fi
+                done
+              done
+              echo "[$TIMESTAMP] Phase 2: Deleted $RS_DELETED ReplicaSets"
+
+              # --- Phase 3: Clean old Jobs (>6h) ---
+              echo "[$TIMESTAMP] Phase 3: Cleaning old Jobs..."
+              JOB_DELETED=0
+              for ns in $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}'); do
+                case "$ns" in kube-system|kube-public) continue ;; esac
+
+                for job in $(kubectl get jobs -n "$ns" --no-headers 2>/dev/null | awk '{print $1}'); do
+                  succeeded=$(kubectl get job "$job" -n "$ns" -o jsonpath='{.status.succeeded}' 2>/dev/null || echo "0")
+                  failed=$(kubectl get job "$job" -n "$ns" -o jsonpath='{.status.failed}' 2>/dev/null || echo "0")
+                  if [ "$succeeded" = "1" ] || [ "$failed" = "1" ]; then
+                    age=$(kubectl get job "$job" -n "$ns" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null)
+                    if [ -n "$age" ]; then
+                      created=$(date -d "$age" +%s 2>/dev/null || echo 0)
+                      now=$(date +%s)
+                      diff=$((now - created))
+                      if [ "$diff" -gt 21600 ]; then
+                        kubectl delete job "$job" -n "$ns" 2>/dev/null && JOB_DELETED=$((JOB_DELETED+1)) || true
+                      fi
+                    fi
+                  fi
+                done
+              done
+              echo "[$TIMESTAMP] Phase 3: Deleted $JOB_DELETED Jobs"
+
+              # --- Phase 4: Summary ---
+              TOTAL_PODS=$(kubectl get pods --all-namespaces --no-headers 2>/dev/null | wc -l)
+              TOTAL_RS=$(kubectl get rs --all-namespaces --no-headers 2>/dev/null | wc -l)
+              TOTAL_JOBS=$(kubectl get jobs --all-namespaces --no-headers 2>/dev/null | wc -l)
+              echo "[$TIMESTAMP] === Summary ==="
+              echo "[$TIMESTAMP] Pods: $TOTAL_PODS, ReplicaSets: $TOTAL_RS, Jobs: $TOTAL_JOBS"
+              echo "[$TIMESTAMP] Deleted: $DELETED pods, $RS_DELETED RS, $JOB_DELETED jobs"
+              echo "[$TIMESTAMP] === Cleanup complete ==="
