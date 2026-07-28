@@ -138,6 +138,26 @@ jobs:
           --from-literal=GLADIA_API_KEY="${{ secrets.GLADIA_API_KEY_STAGING }}" \
           --dry-run=client -o yaml | kubectl apply -f -
 
+    - name: Ensure Docker Hub Pull Secret
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        # Create Docker Hub pull secret so k3s can pull images from Docker Hub
+        kubectl create secret docker-registry dockerhub-pull-secret \
+          --namespace meeting-automation-staging \
+          --docker-server=https://index.docker.io/v1/ \
+          --docker-username=batnini \
+          --docker-password="${{ secrets.DOCKERHUB_TOKEN }}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        # Patch all deployments to use the pull secret
+        for deploy in $(kubectl get deploy -n meeting-automation-staging -o name 2>/dev/null); do
+          HAS_SECRET=$(kubectl get "$deploy" -n meeting-automation-staging -o jsonpath='{.spec.template.spec.imagePullSecrets[?(@.name=="dockerhub-pull-secret")].name}' 2>/dev/null)
+          if [ -z "$HAS_SECRET" ]; then
+            kubectl patch "$deploy" -n meeting-automation-staging --type=json \
+              -p='[{"op":"add","path":"/spec/template/spec/imagePullSecrets","value":[{"name":"dockerhub-pull-secret"}]}]' 2>&1 || true
+          fi
+        done
+        echo "✅ Docker Hub pull secret ready"
+
     - name: Cleanup completed pods
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
@@ -159,7 +179,7 @@ jobs:
           alembic-migrate=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n meeting-automation-staging --record
         # Wait for rollout to complete
-        kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=300s
+        kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=600s
 
     - name: Deploy Frontend to Staging
       run: |
@@ -176,6 +196,9 @@ jobs:
         kubectl set image deployment/celery-worker-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
         kubectl set image deployment/celery-worker-pro-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
         kubectl set image deployment/celery-beat-staging celery-beat="$BACKEND_IMAGE" -n meeting-automation-staging --record
+        kubectl rollout status deployment/celery-worker-staging -n meeting-automation-staging --timeout=300s
+        kubectl rollout status deployment/celery-worker-pro-staging -n meeting-automation-staging --timeout=300s
+        kubectl rollout status deployment/celery-beat-staging -n meeting-automation-staging --timeout=120s
 
     - name: Validate required AI API keys
       run: |
