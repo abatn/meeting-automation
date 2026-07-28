@@ -1,34 +1,44 @@
 version: '3.8'
 
+# ============================================================
+# PRODUCTION — Contabo VPS (meeting-automation.com)
+# ============================================================
+# Uses pre-built Docker Hub images (no build: directives).
+# Deploy with: docker compose -f docker-compose.prod.yml --env-file .env.production pull && up -d
+# ============================================================
+
 services:
+  # ── Data Stores ────────────────────────────────────────────
   postgres:
     image: postgres:15-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    networks:
+      - meeting-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: '0.5'
+          memory: 2G
+          cpus: '1.0'
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    networks:
+      - meeting-net
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
@@ -37,48 +47,209 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
           cpus: '0.5'
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
+    restart: unless-stopped
+    hostname: rabbitmq
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+      RABBITMQ_ERLANG_COOKIE: "meeting-production-2026"
+      RABBITMQ_NODENAME: rabbit@localhost
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - meeting-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 60s
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: '0.5'
+          memory: 2G
+          cpus: '1.0'
 
   minio:
     image: minio/minio:latest
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     volumes:
       - minio_data:/data
+    networks:
+      - meeting-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+
+  # ── LiveKit (host networking for WebRTC UDP) ────────────────
+  livekit-server:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    network_mode: host
+    command: --config /etc/livekit.yaml --bind 0.0.0.0
+    volumes:
+      - ./livekit-host.yaml:/etc/livekit.yaml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7880"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  livekit-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    networks:
+      - meeting-net
+    volumes:
+      - livekit-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  livekit-egress:
+    image: livekit/egress:latest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - EGRESS_CONFIG_FILE=/etc/livekit-egress/config.yaml
+      - LIVEKIT_WS_URL=ws://localhost:7880
+    volumes:
+      - ./livekit-egress.yaml:/etc/livekit-egress/config.yaml:ro
+    depends_on:
+      livekit-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # ── Application ────────────────────────────────────────────
+  backend:
+    image: ${DOCKERHUB_USERNAME}/meeting-automation-backend:latest
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      - APP_ROLE=backend
+      - PYTHONPATH=/app
+    ports:
+      - "127.0.0.1:8000:8000"
+    networks:
+      - meeting-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+
+  celery-worker:
+    image: ${DOCKERHUB_USERNAME}/meeting-automation-backend:latest
+    restart: unless-stopped
+    command: >
+      celery -A app.tasks.celery_app worker
+      --loglevel=info
+      --queues=transcription,email,maintenance
+      --concurrency=4
+      --max-tasks-per-child=5
+    env_file: .env.production
+    environment:
+      - PYTHONPATH=/app
+    networks:
+      - meeting-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+
+  celery-beat:
+    image: ${DOCKERHUB_USERNAME}/meeting-automation-backend:latest
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    env_file: .env.production
+    environment:
+      - PYTHONPATH=/app
+    networks:
+      - meeting-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: '0.5'
 
+  # ── n8n Automation ─────────────────────────────────────────
   n8n:
     image: n8nio/n8n:latest
+    restart: unless-stopped
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_USER}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_SECURE_COOKIE=false
+      - N8N_RUNNERS_ENABLED=false
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
@@ -86,94 +257,109 @@ services:
       - DB_POSTGRESDB_USER=${POSTGRES_USER}
       - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
       - GENERIC_TIMEZONE=Africa/Tunis
-    ports:
-      - "5678:5678"
+      - WEBHOOK_URL=https://${PUBLIC_DOMAIN}
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./n8n/workflows:/workflows
+      - ./n8n/workflows:/home/node/.n8n/workflows:ro
+    networks:
+      - meeting-net
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     deploy:
       resources:
         limits:
           memory: 1G
           cpus: '0.5'
 
-  backend:
-    build: ./backend
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-      - REDIS_URL=redis://default:${REDIS_PASSWORD}@redis:6379/0
-      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
-      - S3_ENDPOINT=http://minio:9000
-      - S3_ACCESS_KEY=${MINIO_ROOT_USER}
-      - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD}
-      - PYTHONPATH=/app
-      - N8N_WEBHOOK_URL=http://n8n:5678/webhook
+  # ── Reverse Proxy (TLS + Routing) ──────────────────────────
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./backend:/app
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certbot/conf:/etc/letsencrypt:ro
+      - ./nginx/certbot/www:/var/www/certbot:ro
+    networks:
+      - meeting-net
     depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-      - minio
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '0.5'
-
-  celery-worker:
-    build: ./backend
-    command: celery -A app.tasks.celery_app worker --loglevel=info
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-      - REDIS_URL=redis://default:${REDIS_PASSWORD}@redis:6379/0
-      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
-    volumes:
-      - ./backend:/app
-    depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: '1.0'
-
-  celery-beat:
-    build: ./backend
-    command: celery -A app.tasks.celery_app beat --loglevel=info
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
-      - REDIS_URL=redis://default:${REDIS_PASSWORD}@redis:6379/0
-      - CELERY_BROKER_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672/
-    volumes:
-      - ./backend:/app
-    depends_on:
-      - postgres
-      - redis
-      - rabbitmq
-    deploy:
-      resources:
-        limits:
-          memory: 512M
+          memory: 256M
           cpus: '0.5'
 
   frontend:
-    build: ./frontend
-    ports:
-      - "80:80"
+    image: ${DOCKERHUB_USERNAME}/meeting-automation-frontend:latest
+    restart: unless-stopped
+    networks:
+      - meeting-net
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # ── Monitoring ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - meeting-net
     deploy:
       resources:
         limits:
           memory: 512M
           cpus: '0.5'
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - meeting-net
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  loki:
+    image: grafana/loki:latest
+    restart: unless-stopped
+    networks:
+      - meeting-net
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+networks:
+  meeting-net:
+    driver: bridge
 
 volumes:
   postgres_data:
@@ -181,3 +367,6 @@ volumes:
   rabbitmq_data:
   minio_data:
   n8n_data:
+  livekit-redis-data:
+  prometheus_data:
+  grafana_data:
