@@ -80,6 +80,9 @@ gha-creds-*.json
 *.gguf
 backend/celerybeat-schedule
 
+# Kubernetes production secrets (REAL values, never commit)
+infrastructure/kubernetes/production/*-secrets.yaml
+
 # Temp files
 tmp/
 .continue/
@@ -119,3 +122,5 @@ CONTINUE_SETUP_PROMPT.md
 ONLYOFFICE_STRUCTURE_CHECK_PROMPT.md
 git_workflow.txt
 Mailtrap_Credetional.txt
+AGENT_PROMPT.md
+CORRECTION_PROMPT.md
