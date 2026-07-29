@@ -10,7 +10,7 @@ from starlette.requests import Request
 from app.main import app
 from app.core.database import Base, get_db
 from app.core.config import settings
-from app.core.security import get_password_hash
+from app.core.security import get_password_hash, verify_password
 from sqlalchemy.pool import NullPool
 import os
 
@@ -114,6 +114,7 @@ async def db_session() -> Generator:
             select(UserModel).where(UserModel.id == "test-user-id")
         )
         test_user = test_user_result.scalar_one_or_none()
+        _test_pw = os.getenv("E2E_TEST_USER_PASSWORD", "TestPassword123!")
         if not test_user:
             dg_role_result = await session.execute(
                 select(RoleModel).where(RoleModel.name == "dg")
@@ -123,17 +124,20 @@ async def db_session() -> Generator:
                 id="test-user-id",
                 client_id="test-client-id",
                 email="test@example.com",
-                hashed_password=get_password_hash("TestPassword123!"),
+                hashed_password=get_password_hash(_test_pw),
                 status=UserStatus.ACTIVE.value,
                 is_superuser=True,
                 roles=[dg_role] if dg_role else []
             )
             session.add(test_user)
+        elif not verify_password(_test_pw, test_user.hashed_password):
+            test_user.hashed_password = get_password_hash(_test_pw)
 
         dg_user_result = await session.execute(
             select(UserModel).where(UserModel.email == "dg@meeting.tn")
         )
         dg_user = dg_user_result.scalar_one_or_none()
+        _dg_pw = os.getenv("E2E_TEST_USER_PASSWORD", "Password123!")
         if not dg_user:
             dg_role_result = await session.execute(
                 select(RoleModel).where(RoleModel.name == "dg")
@@ -143,12 +147,14 @@ async def db_session() -> Generator:
                 id="dg-test-user-id",
                 client_id="test-client-id",
                 email="dg@meeting.tn",
-                hashed_password=get_password_hash("Password123!"),
+                hashed_password=get_password_hash(_dg_pw),
                 status=UserStatus.ACTIVE.value,
                 is_superuser=True,
                 roles=[dg_role] if dg_role else []
             )
             session.add(dg_user)
+        elif not verify_password(_dg_pw, dg_user.hashed_password):
+            dg_user.hashed_password = get_password_hash(_dg_pw)
 
         # Seed ConsentLog for E2E seed users so recording/livekit gates pass
         if os.getenv("E2E_TEST", "").lower() == "true":
