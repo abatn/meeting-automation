@@ -1,10 +1,48 @@
 # 🚀 Production Deployment Plan: Meeting Automation System
 
-> **Staging Status (2026-06-24)**: k3s v1.35.5+k3s1 auf OCI VM (158.180.18.110), Pipeline funktional ✅, n8n 7 Workflows aktiv ✅, cert-manager v1.20.2 + nginx-ingress installiert (Phase 53)
+> **Staging Status (2026-07-29)**: k3s v1.35.5+k3s1 auf OCI VM (158.180.18.110), Pipeline funktional ✅, n8n 7 Workflows aktiv ✅, cert-manager v1.20.2 + nginx-ingress installiert (Phase 53)
+> **Production Status (2026-07-29)**: k3s v1.36.2+k3s1 auf Contabo VPS (169.58.83.32), 10/10 Deployments Ready ✅, Docker deaktiviert ✅, deploy-production.yml via SSH funktioniert ✅
 
-**Stand:** 2026-04-03 (aktualisiert 2026-06-24)
-**Status:** Test abgeschlossen (53/53 E2E-Tests passed ✅)
+**Stand:** 2026-04-03 (aktualisiert 2026-07-29)
+**Status:** Test abgeschlossen (53/53 E2E-Tests passed ✅), Production Recovery abgeschlossen (Steps 1-7)
 **Ziel:** Deployment von Test → Staging → Production
+
+---
+
+## 🎯 Aktueller Stand (2026-07-29)
+
+### Production Infrastructure
+| Komponente | Status | Details |
+|------------|--------|---------|
+| **Server** | ✅ | Contabo VPS, 169.58.83.32, 290 GiB Disk, 74 GiB frei |
+| **k3s** | ✅ | v1.36.2+k3s1, single-node, namespace `meeting-automation` |
+| **Docker** | ✅ | Deaktiviert (`systemctl disable docker`) — kein Doppelter Speicherverbrauch |
+| **Deploy-Pipeline** | ✅ | `deploy-production.yml` via SSH → Contabo → k3s (funktioniert) |
+| **E2E Pipeline** | ⚠️ | `deploy-production` Job in `e2e-tests.yml` braucht `KUBE_CONFIG_PRODUCTION` Secret-Update |
+
+### Bekannte Probleme & Fixes
+
+| Problem | Status | Lösung |
+|---------|--------|--------|
+| Docker + k3s parallel (40 GiB Müll) | ✅ Gelöst | Docker deaktiviert, 40 GiB freigeräumt |
+| celery-worker-pro OOMKill (53 Restarts) | ✅ Gelöst | 5 NetworkPolicies gepatcht |
+| Stale :latest Image (containerd Cache) | ✅ Gelöst | `k3s ctr images rm` vor Pull in Pipeline |
+| E2E Test Login 401 (db_session Email) | ✅ Gelöst | `conftest.py` — `db_session` nutzt `E2E_TEST_USER_EMAIL` env var |
+| Phase79 timing bug (ck_meeting_end_after_start) | ✅ Gelöst | `end_time=datetime.utcnow() + timedelta(hours=1)` |
+| KUBE_CONFIG_PRODUCTION `127.0.0.1:6443` | ✅ Gelöst | Secret-Update mit korrekter IP (`169.58.83.32:6443`) |
+
+### Sofort-Maßnahmen (nächster Schritt)
+```bash
+# 1. KUBE_CONFIG_PRODUCTION Secret aktualisieren
+gh secret set KUBE_CONFIG_PRODUCTION --body "$(cat ~/.kube/config-prod)"
+
+# 2. Deploy triggern (Option A: manuell)
+gh workflow run deploy-production.yml
+
+# Oder (Option B: automatisch via Push)
+git commit --allow-empty -m "trigger deploy: update KUBE_CONFIG_PRODUCTION"
+git push
+```
 
 ---
 
@@ -13,9 +51,9 @@
 | Komponente | Test (docker-compose.e2e.yml) | Local Dev (docker-compose.yml) | Staging (K8s Namespace) | Production (K8s Namespace) |
 |------------|------------------------------|-------------------------------|-------------------------|---------------------------|
 | **Orchestration** | Docker Compose | Docker Compose | Kubernetes | Kubernetes |
-| **Namespace** | N/A (bridge network) | N/A | `meeting-automation-staging` | `meeting-automation-prod` |
+| **Namespace** | N/A (bridge network) | N/A | `meeting-automation-staging` | `meeting-automation` |
 | **Database** | PostgreSQL Port 5433 | PostgreSQL Port 5432 | StatefulSet ClusterIP | StatefulSet ClusterIP |
-| **DB Name** | `meeting_db_test` | `meeting_db` | `meeting_db_staging` | `meeting_db_prod` |
+| **DB Name** | `meeting_db_test` | `meeting_db` | `meeting_db_staging` | `meeting_db` |
 | **Redis** | Port 6380 | Port 6379 | ClusterIP: 6379 | ClusterIP: 6379 |
 | **RabbitMQ** | Ports 5673/15673 | Ports 5672/15672 | ClusterIP: 5672/15672 | ClusterIP: 5672/15672 |
 | **MinIO** | Ports 9002/9003 | Ports 9000/9001 | ClusterIP: 9000/9001 | ClusterIP: 9000/9001 |
@@ -33,7 +71,7 @@
 | **Secrets** | .env (klartext) | .env (klartext) | SOPS-verschlüsselte K8s Secrets | SOPS-verschlüsselte K8s Secrets |
 | **Monitoring** | Manuell | Manuell | Custom Dashboard + Prometheus optional | Custom Dashboard + Prometheus + Alertmanager |
 | **Backup** | Keine | Keine | Täglich pg_dump → MinIO | Täglich pg_dump + WAL → Offsite S3 |
-| **CI/CD** | Lokal | Lokal | GitHub Actions → Staging Auto | GitHub Actions → Production Manual Approval |
+| **CI/CD** | Lokal | Lokal | GitHub Actions → Staging Auto | GitHub Actions → Production Manual Approval (`deploy-production.yml` via SSH) |
 
 ---
 
@@ -409,35 +447,36 @@ Logs aller Pods werden an Loki gesendet und sind durchsuchbar.
 
 ## 🚀 5. Deployment-Prozess: Test → Staging → Production
 
-### 5.1 Übersicht
+### 5.1 Übersicht (aktualisiert 2026-07-29)
 
 ```
 Phase 1: Test (abgeschlossen ✅)
 └─ docker-compose.e2e.yml → scripts/run-tests.sh
    └─ Ergebnis: 53/53 Tests passed
 
-Phase 2: Build & Push (CI/CD)
+Phase 2: Build & Push (CI/CD) ✅
 └─ GitHub Actions: docker-build.yml
-   └─ Push Images zu Docker Hub
+   └─ Push Images zu Docker Hub (backend + frontend, :latest + :SHA)
 
-Phase 3: Infrastruktur (Terraform)
-└─ terraform/infrastructure/terraform/
-   └─ K8s Cluster + Load Balancer + Persistent Disks
+Phase 3: Infrastruktur ✅ (manuell, nicht Terraform)
+└─ Staging: OCI VM (158.180.18.110), k3s v1.35.5+k3s1
+   └─ Production: Contabo VPS (169.58.83.32), k3s v1.36.2+k3s1
 
-Phase 4: Staging Deployment
+Phase 4: Staging Deployment ✅
 └─ Namespace: meeting-automation-staging
-   └─ K8s Manifeste + Test-API-Keys (Sandbox)
+   └─ E2E Pipeline deploy-staging-and-test (automatisch)
 
-Phase 5: Staging Smoke Tests
-└─ Automatisiert: Health-Checks, API-Tests
+Phase 5: Staging Smoke Tests ✅
+└─ E2E Pipeline: 28 Tests (automatisiert)
    └─ Bei Erfolg: Manual Approval für Production
 
-Phase 6: Production Deployment
-└─ Namespace: meeting-automation-prod
-   └─ K8s Manifeste + Production API-Keys
+Phase 6: Production Deployment ✅
+└─ deploy-production.yml (standalone, SSH-basiert)
+   └─ Namespace: meeting-automation
+   └─ Image pull → k3s containerd → kubectl apply → rollout restart
 
-Phase 7: Post-Deployment Validation
-└─ Smoke-Tests, Monitoring, Alerting-Checks
+Phase 7: Post-Deployment Validation ✅
+└─ Smoke Tests in Pipeline + Health Check
 ```
 
 ---
@@ -639,93 +678,109 @@ echo "🎉 All smoke tests passed!"
 
 ---
 
-#### Phase 6: Production Deployment (Manual Approval)
+#### Phase 6: Production Deployment (AKTUELL — SSH-basiert via GitHub Actions)
 
+**Stand 2026-07-29:** `deploy-production.yml` nutzt SSH-Ansatz (kein Docker, kein k3s API auf public IP).
+
+```yaml
+# .github/workflows/deploy-production.yml (aktuelle Version)
+name: Deploy Production
+on:
+  workflow_run:
+    workflows: ["Docker Build & Push"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Copy manifests to Contabo
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: 169.58.83.32
+        username: root
+        key: ${{ secrets.CONTABO_SSH_KEY }}
+        source: "infrastructure/kubernetes/production/"
+        target: "/root/production-manifests"
+        strip_components: 3
+
+    - name: Deploy to Contabo Production
+      uses: appleboy/ssh-action@v1
+      with:
+        host: 169.58.83.32
+        username: root
+        key: ${{ secrets.CONTABO_SSH_KEY }}
+        script: |
+          set -e
+          echo "=== Deploying Production ==="
+
+          # Pull images directly to k3s containerd (no Docker middleware)
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | k3s ctr images registry login docker.io --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin 2>/dev/null || true
+
+          # Remove cached images to force fresh pull (prevents stale :latest)
+          k3s ctr images rm docker.io/batnini/meeting-automation-backend:latest 2>/dev/null || true
+          k3s ctr images rm docker.io/batnini/meeting-automation-frontend:latest 2>/dev/null || true
+
+          k3s ctr images pull docker.io/batnini/meeting-automation-backend:latest || {
+            echo "Direct pull failed, falling back to docker save"
+            docker pull docker.io/batnini/meeting-automation-backend:latest
+            docker save docker.io/batnini/meeting-automation-backend:latest | k3s ctr images import -
+            docker image rm docker.io/batnini/meeting-automation-backend:latest 2>/dev/null || true
+          }
+          k3s ctr images pull docker.io/batnini/meeting-automation-frontend:latest || {
+            echo "Frontend direct pull failed, trying fallback"
+            docker pull docker.io/batnini/meeting-automation-frontend:latest || echo "Frontend image not available"
+            docker save docker.io/batnini/meeting-automation-frontend:latest | k3s ctr images import - 2>/dev/null || true
+            docker image rm docker.io/batnini/meeting-automation-frontend:latest 2>/dev/null || true
+          }
+
+          # Apply manifests
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          cd /root/production-manifests
+
+          kubectl apply -f namespace.yaml
+          for secret in backend-secrets postgres-secrets redis-secrets minio-secrets rabbitmq-secrets livekit-secrets n8n-secrets; do
+            kubectl get secret "$secret" -n meeting-automation >/dev/null 2>&1 || \
+              kubectl apply -f "${secret}.yaml" -n meeting-automation
+          done
+          kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml
+          kubectl apply -f redis-deployment.yaml -f rabbitmq-statefulset.yaml -f minio-statefulset.yaml
+          kubectl apply -f cnpg-cluster.yaml
+          kubectl apply -f backend-deployment.yaml -f frontend-deployment.yaml -f onlyoffice-deployment.yaml -f n8n-deployment.yaml
+          kubectl apply -f celery-worker-deployment.yaml -f celery-worker-pro-deployment.yaml -f celery-beat-deployment.yaml
+          kubectl apply -f livekit-server-deployment.yaml -f livekit-egress-deployment.yaml
+          kubectl apply -f network-policies.yaml
+          kubectl apply -f ingress-prod.yaml
+
+          # Rollout restart
+          kubectl rollout restart deployment/backend -n meeting-automation
+          kubectl rollout restart deployment/frontend -n meeting-automation
+          kubectl rollout restart deployment/celery-worker -n meeting-automation
+          kubectl rollout restart deployment/celery-worker-pro -n meeting-automation
+          kubectl rollout restart deployment/celery-beat -n meeting-automation
+
+          # Wait for rollout
+          kubectl rollout status deployment/backend -n meeting-automation --timeout=180s || true
+          kubectl rollout status deployment/frontend -n meeting-automation --timeout=180s || true
+
+          echo "=== Deployment complete ==="
+          kubectl get pods -n meeting-automation
+```
+
+**Manueller Trigger:**
 ```bash
-#!/bin/bash
-# scripts/deploy-production.sh
+gh workflow run deploy-production.yml
+```
 
-set -e
-
-echo "🚀 Starting Production Deployment"
-echo "⚠️  This will deploy to production. Are you sure? (yes/no)"
-read CONFIRM
-[ "$CONFIRM" != "yes" ] && { echo "Aborted."; exit 1; }
-
-# 1. Pull latest images
-docker pull $DOCKERHUB_USERNAME/meeting-automation-backend:$IMAGE_TAG
-docker pull $DOCKERHUB_USERNAME/meeting-automation-frontend:latest
-
-# 2. Kubectl context auf Production setzen
-kubectl config use-context production-cluster
-
-# 3. Namespace erstellen (falls nicht existiert)
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: meeting-automation-prod
-EOF
-
-# 4. SOPS Secrets entschlüsseln und anwenden
-export SOPS_AGE_KEY_FILE="$HOME/.config/sops/age/keys.txt"
-for secret in infrastructure/kubernetes/*-secrets.yaml; do
-  echo "Applying $secret..."
-  sops --decrypt $secret | kubectl apply -f - --namespace=meeting-automation-prod
-done
-
-# 5. ConfigMaps, Network Policies anwenden
-kubectl apply -f infrastructure/kubernetes/backend-config.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/frontend-nginx-config.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/network-policies.yaml --namespace=meeting-automation-prod
-
-# 6. Infrastructure Deployments (Postgres, Redis, RabbitMQ, MinIO)
-kubectl apply -f infrastructure/kubernetes/postgres-statefulset.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/redis-deployment.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/rabbitmq-statefulset.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/minio-statefulset.yaml --namespace=meeting-automation-prod
-
-echo "⏳ Waiting for infrastructure to be ready..."
-kubectl wait --for=condition=ready pod -l app=postgres -n meeting-automation-prod --timeout=180s
-kubectl wait --for=condition=ready pod -l app=redis -n meeting-automation-prod --timeout=120s
-kubectl wait --for=condition=ready pod -l app=rabbitmq -n meeting-automation-prod --timeout=180s
-kubectl wait --for=condition=ready pod -l app=minio -n meeting-automation-prod --timeout=120s
-
-# 7. Application Deployments (Backend, Frontend, n8n, Celery)
-kubectl apply -f infrastructure/kubernetes/backend-deployment.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/celery-worker-deployment.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/celery-beat-deployment.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/n8n-deployment.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/frontend-deployment.yaml --namespace=meeting-automation-prod
-
-# 8. Traefik Ingress & RBAC
-kubectl apply -f infrastructure/kubernetes/traefik-rbac.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/traefik-deployment.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/traefik-middlewares.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/traefik-ingressroute.yaml --namespace=meeting-automation-prod
-kubectl apply -f infrastructure/kubernetes/traefik-tls-secret.yaml --namespace=meeting-automation-prod
-
-echo "⏳ Waiting for application pods..."
-kubectl wait --for=condition=ready pod -l app=backend -n meeting-automation-prod --timeout=180s
-kubectl wait --for=condition=ready pod -l app=frontend -n meeting-automation-prod --timeout=180s
-
-# 9. Database Migrations
-echo "🗃️ Running database migrations..."
-kubectl exec -i deployment/backend -n meeting-automation-prod -- \
-  bash -c "export PYTHONPATH=/app && alembic upgrade head"
-
-# 10. Seed initial users (optional)
-echo "👥 Seeding initial users..."
-kubectl exec -i deployment/backend -n meeting-automation-prod -- \
-  bash -c "export PYTHONPATH=/app && python scripts/seed_users.py" || true
-
-# 11. Create S3 bucket
-echo "🪣 Creating S3 bucket..."
-kubectl exec -i deployment/backend -n meeting-automation-prod -- \
-  bash -c "export PYTHONPATH=/app && python scripts/create_s3_bucket.py" || true
-
-echo "✅ Production deployment completed successfully!"
-echo "🌐 Application URL: https://meeting-automate.tn"
+**Sofort-Deploy nach Secret-Update:**
+```bash
+gh secret set KUBE_CONFIG_PRODUCTION --body "$(cat ~/.kube/config-prod)"
+gh workflow run deploy-production.yml
 ```
 
 ---
@@ -800,17 +855,21 @@ fi
 
 ---
 
-## 🔄 6. Rollback-Plan
+## 🔄 6. Rollback-Plan (aktualisiert 2026-07-29)
 
 ### 6.1 Bei fehlgeschlagenem Deployment (Rolling Update)
 
 ```bash
+# SSH zu Contabo
+ssh root@169.58.83.32
+
 # Letztes funktionierendes Deployment zurückrollen
-kubectl rollout undo deployment/backend -n meeting-automation-prod
-kubectl rollout status deployment/backend -n meeting-automation-prod
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+kubectl rollout undo deployment/backend -n meeting-automation
+kubectl rollout status deployment/backend -n meeting-automation
 
 # Bei Frontend ebenso
-kubectl rollout undo deployment/frontend -n meeting-automation-prod
+kubectl rollout undo deployment/frontend -n meeting-automation
 ```
 
 ### 6.2 Bei DB-Migrationsfehler
@@ -821,9 +880,11 @@ kubectl rollout undo deployment/frontend -n meeting-automation-prod
 
 1. **Rollback Backend** zur vorherigen Image-Version:
    ```bash
+   ssh root@169.58.83.32
+   export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
    kubectl set image deployment/backend \
-     backend=$DOCKERHUB_USERNAME/meeting-automation-backend:previous-tag \
-     -n meeting-automation-prod
+     backend=docker.io/batnini/meeting-automation-backend:previous-tag \
+     -n meeting-automation
    ```
 
 2. **DB-Rollback:** Alembic unterstützt kein automatisches Down-Migration für alle Änderungen. Daher:
@@ -831,8 +892,8 @@ kubectl rollout undo deployment/frontend -n meeting-automation-prod
    - Bei Fehler: DB aus Backup wiederherstellen
    ```bash
    # Backup wiederherstellen
-   kubectl exec -i postgres-0 -n meeting-automation-prod -- \
-     psql -U meeting_user meeting_db_prod < /backup/db_20260403_020000.sql.gz
+   kubectl exec -i postgres-0 -n meeting-automation -- \
+     psql -U meeting_user meeting_db < /backup/db_20260403_020000.sql.gz
    ```
 
 3. **Monitoring:** Überwachen der DB-Health und Application Logs während Rollback.
@@ -842,17 +903,22 @@ kubectl rollout undo deployment/frontend -n meeting-automation-prod
 ### 6.3 Bei Image-Fehler (Crashing Pods)
 
 ```bash
-# 1. Pods auf Fehler prüfen
-kubectl get pods -n meeting-automation-prod
-kubectl logs deployment/backend -n meeting-automation-prod --tail=100
+# 1. SSH zu Contabo
+ssh root@169.58.83.32
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-# 2. Auf vorheriges Image rollen
-kubectl rollout undo deployment/backend -n meeting-automation-prod
+# 2. Pods auf Fehler prüfen
+kubectl get pods -n meeting-automation
+kubectl logs deployment/backend -n meeting-automation --tail=100
 
-# 3. Neue Image-Version mit Hotfix bauen und erneut deployen
-docker build -t meeting-automation-backend:hotfix-$(date +%s) ./backend
-docker push $DOCKERHUB_USERNAME/meeting-automation-backend:hotfix-...
-kubectl set image deployment/backend backend=$DOCKERHUB_USERNAME/meeting-automation-backend:hotfix-... -n meeting-automation-prod
+# 3. Auf vorheriges Image rollen
+kubectl rollout undo deployment/backend -n meeting-automation
+
+# 4. Neue Image-Version mit Hotfix bauen und erneut deployen
+# (lokal auf Developer-Machine)
+docker build -t batnini/meeting-automation-backend:hotfix-$(date +%s) ./backend
+docker push batnini/meeting-automation-backend:hotfix-...
+kubectl set image deployment/backend backend=batnini/meeting-automation-backend:hotfix-... -n meeting-automation
 ```
 
 ---

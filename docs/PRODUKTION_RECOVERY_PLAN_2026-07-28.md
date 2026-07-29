@@ -226,6 +226,64 @@ sudo find /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/ 
 systemctl is-active docker  # inactive = gut
 ```
 
+## Step 7: KUBE_CONFIG_PRODUCTION Secret Fix (2026-07-29)
+
+### Problem
+E2E Pipeline `deploy-production` Job in `e2e-tests.yml` (Job 3) schlägt fehl mit:
+```
+Get "https://127.0.0.1:6443/api?timeout=32s": dial tcp 127.0.0.1:6443: connect: connection refused
+```
+
+**Root Cause:** GitHub Secret `KUBE_CONFIG_PRODUCTION` enthält kubeconfig mit `server: https://127.0.0.1:6443`. Dies funktioniert nur auf dem Contabo-Server selbst, nicht vom GitHub Actions Runner aus.
+
+**Zwei Deploy-Pipelines mit unterschiedlichen Ansätzen:**
+
+| Pipeline | Methode | Status |
+|----------|---------|--------|
+| `deploy-production.yml` (standalone) | SSH → Contabo → `kubectl` lokal | ✅ Funktioniert |
+| `e2e-tests.yml` (Job 3) | Kubeconfig direkt von GitHub Runner | ❌ `127.0.0.1:6443` → connection refused |
+
+### Immediate Fix
+```bash
+gh secret set KUBE_CONFIG_PRODUCTION --body "$(cat ~/.kube/config-prod)"
+```
+
+Das ändert `server: https://127.0.0.1:6443` → `server: https://169.58.83.32:6443`
+
+### Verifikation (2026-07-29)
+| Check | Ergebnis |
+|-------|----------|
+| SSH → Contabo | ✅ Getestet |
+| k3s läuft | ✅ v1.36.2+k3s1, 22 Pods Running |
+| Port 6443 offen | ✅ UFW: `6443/tcp ALLOW Anywhere` |
+| k3s API auf allen Interfaces | ✅ `ss -tlnp`: `*:6443` |
+| Lokale kubeconfig | ✅ `~/.kube/config-prod` → `https://169.58.83.32:6443` |
+| GitHub Secrets | ✅ `CONTABO_SSH_KEY`, `DOCKERHUB_TOKEN`, `KUBE_CONFIG_PRODUCTION` |
+| Docker Images | ✅ Letzter Build `30422978073` → `build-and-push: success` |
+| `deploy-production.yml` | ✅ Letzter Run `30423387946` → `success` |
+
+### Manueller Deploy (nach Secret-Update)
+Der `deploy-production.yml` (standalone) funktioniert bereits. Nach dem Secret-Update kann die E2E Pipeline ebenfalls deployen.
+
+**Option A:** Secret updaten + `deploy-production.yml` manuell triggern
+```bash
+gh secret set KUBE_CONFIG_PRODUCTION --body "$(cat ~/.kube/config-prod)"
+gh workflow run deploy-production.yml
+```
+
+**Option B:** Secret updaten + Push auslösen (E2E Pipeline deploy-production Job)
+```bash
+gh secret set KUBE_CONFIG_PRODUCTION --body "$(cat ~/.kube/config-prod)"
+git commit --allow-empty -m "trigger deploy: update KUBE_CONFIG_PRODUCTION"
+git push
+```
+
+### Langfristig professionelle Lösung
+`e2e-tests.yml` deploy-production Job auf SSH-Ansatz umstellen (wie `deploy-production.yml`):
+- Kein k3s API auf public IP nötig
+- Konsistenter Ansatz in beiden Pipelines
+- `KUBE_CONFIG_PRODUCTION` Secret wird überflüssig
+
 ## Dateien geändert
 - `.github/workflows/deploy-production.yml` (Pipeline-Fix: Docker als Mittelsmann eliminieren + Stale :latest Image Prevention)
 - `infrastructure/kubernetes/production/backend-deployment.yaml` (revisionHistoryLimit: 3)
