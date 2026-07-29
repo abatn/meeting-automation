@@ -15,7 +15,7 @@ import {
   Memory as ChipIcon, Menu as MenuIcon,
   Mail as MailIcon, Phone as PhoneIcon
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import cmsService from '../services/cms';
@@ -41,10 +41,10 @@ const LandingPage: React.FC = () => {
   const [contactSending, setContactSending] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
-  const [pricingPlans, setPricingPlans] = useState<Record<string, number>>({
-    GRATUIT: 0,
-    PRO: 99,
-    ENTREPRISE: 499,
+  const [pricingPlans, setPricingPlans] = useState<Record<string, { price: number; minutes: number | null }>>({
+    GRATUIT: { price: 0, minutes: 120 },
+    PRO: { price: 199, minutes: 1800 },
+    ENTREPRISE: { price: 399, minutes: 3600 },
   });
 
   const handleOpenLangMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorElLang(event.currentTarget);
@@ -84,13 +84,20 @@ const LandingPage: React.FC = () => {
     const fetchPricing = async () => {
       try {
         const plans = await cmsService.getPricing(i18n.language);
-        const priceMap: Record<string, number> = { GRATUIT: 0 };
+        const planMap: Record<string, { price: number; minutes: number | null }> = {
+          GRATUIT: { price: 0, minutes: 120 },
+          PRO: { price: 199, minutes: 1800 },
+          ENTREPRISE: { price: 399, minutes: 3600 },
+        };
         plans.forEach((plan: any) => {
-          if (plan.plan_code && plan.price_monthly !== undefined) {
-            priceMap[plan.plan_code] = plan.price_monthly;
+          if (plan.plan_code) {
+            planMap[plan.plan_code] = {
+              price: plan.price_monthly ?? planMap[plan.plan_code]?.price ?? 0,
+              minutes: plan.minutes_included ?? null,
+            };
           }
         });
-        setPricingPlans(priceMap);
+        setPricingPlans(planMap);
       } catch (err) {
         console.warn('Failed to fetch CMS pricing, using defaults');
       }
@@ -393,18 +400,25 @@ const LandingPage: React.FC = () => {
           <Typography variant="h2" fontWeight="800" textAlign="center" sx={{ mb: { xs: 6, md: 10 }, fontSize: { xs: '2rem', md: '3rem' } }}>{t('landing.pricing.title')}</Typography>
           <Grid container spacing={4} justifyContent="center">
             {[
-              { nameKey: 'landing.pricing.free_name', price: String(pricingPlans.GRATUIT || 0), featsKey: 'landing.pricing.starter_feats', h: false },
-              { nameKey: 'landing.pricing.pro_name', price: String(pricingPlans.PRO || 99), featsKey: 'landing.pricing.pro_feats', h: true },
-              { nameKey: 'landing.pricing.ent_name', price: String(pricingPlans.ENTREPRISE || 499), featsKey: 'landing.pricing.ent_feats', h: false }
-            ].map((p, i) => (
+              { nameKey: 'landing.pricing.free_name', planCode: 'GRATUIT', featsKey: 'landing.pricing.starter_feats', h: false },
+              { nameKey: 'landing.pricing.pro_name', planCode: 'PRO', featsKey: 'landing.pricing.pro_feats', h: true },
+              { nameKey: 'landing.pricing.ent_name', planCode: 'ENTREPRISE', featsKey: 'landing.pricing.ent_feats', h: false }
+            ].map((p, i) => {
+              const plan = pricingPlans[p.planCode] || { price: 0, minutes: null };
+              return (
               <Grid item xs={12} md={4} key={i}>
                 <Box className="glass-card" sx={{ p: { xs: 4, md: 6 }, border: p.h ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(255,255,255,0.05)', position: 'relative' }}>
                   {p.h && <Chip label={t('landing.pricing.popular_badge')} size="small" sx={{ position: 'absolute', top: 20, right: 20, bgcolor: '#FFF', color: '#000', fontWeight: 900, borderRadius: '4px' }} />}
                   <Typography variant="h6" fontWeight="800" sx={{ mb: 1, color: p.h ? '#FFF' : '#71717A' }}>{t(p.nameKey)}</Typography>
-                  <Stack direction="row" alignItems="baseline" sx={{ gap: 1, mb: 4 }}>
-                    <Typography variant="h3" fontWeight="800">${p.price}</Typography>
+                  <Stack direction="row" alignItems="baseline" sx={{ gap: 1, mb: 1 }}>
+                    <Typography variant="h3" fontWeight={800}>{plan.price} TND</Typography>
                     <Typography variant="body2" sx={{ color: '#71717A' }}>/{t('landing.pricing.monthly')}</Typography>
                   </Stack>
+                  {plan.minutes != null && (
+                    <Typography variant="body2" sx={{ color: '#A1A1AA', mb: 4, fontWeight: 600 }}>
+                      {t('landing.pricing.minutes_label', { count: plan.minutes })}
+                    </Typography>
+                  )}
                   <Stack sx={{ gap: 2, mb: 6, flexGrow: 1 }}>
                     {(t(p.featsKey, { returnObjects: true }) as string[]).map((feat, j) => (
                       <Stack direction="row" sx={{ gap: 1.5 }} key={j} alignItems="center">
@@ -416,7 +430,8 @@ const LandingPage: React.FC = () => {
                   <Button fullWidth variant={p.h ? "contained" : "outlined"} sx={{ py: 2, borderRadius: '12px', fontWeight: 800, bgcolor: p.h ? '#FFF' : 'transparent', color: p.h ? '#000' : '#FFF', border: p.h ? 'none' : '1px solid rgba(255,255,255,0.2)' }} onClick={() => navigate('/register')}>{[t('landing.pricing.start_free'), t('landing.pricing.start_pro'), t('landing.pricing.start_enterprise')][i]}</Button>
                 </Box>
               </Grid>
-            ))}
+              );
+            })}
           </Grid>
         </Container>
       </Box>
@@ -430,8 +445,8 @@ const LandingPage: React.FC = () => {
               <Typography variant="body2" sx={{ color: '#52525B' }}>{t('landing.footer.copyright')}</Typography>
             </Box>
             <Stack direction="row" sx={{ gap: 4 }}>
-              <MuiLink href="/privacy" sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem', '&:hover': { color: '#A1A1AA' } }}>{t('landing.footer.privacy')}</MuiLink>
-              <MuiLink href="/terms" sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem', '&:hover': { color: '#A1A1AA' } }}>{t('landing.footer.terms')}</MuiLink>
+              <MuiLink component={RouterLink} to="/privacy" sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem', '&:hover': { color: '#A1A1AA' } }}>{t('landing.footer.privacy')}</MuiLink>
+              <MuiLink component={RouterLink} to="/terms" sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem', '&:hover': { color: '#A1A1AA' } }}>{t('landing.footer.terms')}</MuiLink>
               <MuiLink component="button" onClick={() => setContactOpen(true)} sx={{ color: '#71717A', textDecoration: 'none', fontSize: '0.9rem', background: 'none', border: 'none', cursor: 'pointer', '&:hover': { color: '#A1A1AA' } }}>{t('landing.footer.contact')}</MuiLink>
             </Stack>
           </Stack>
