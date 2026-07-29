@@ -39,8 +39,13 @@ jobs:
           echo "=== Deploying Production ==="
           
           # Pull images directly to k3s containerd (no Docker middleware)
-          echo "=== Pulling images to k3s containerd ==="
+          echo "=== Pulling fresh images to k3s containerd ==="
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | k3s ctr images registry login docker.io --username "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin 2>/dev/null || true
+
+          # Remove cached images to force fresh pull (prevents stale :latest)
+          k3s ctr images rm docker.io/batnini/meeting-automation-backend:latest 2>/dev/null || true
+          k3s ctr images rm docker.io/batnini/meeting-automation-frontend:latest 2>/dev/null || true
+
           k3s ctr images pull docker.io/batnini/meeting-automation-backend:latest || {
             echo "Direct pull failed, falling back to docker save"
             docker pull docker.io/batnini/meeting-automation-backend:latest

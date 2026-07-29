@@ -14,6 +14,7 @@
 | Step 3: Pipeline fixen | ✅ `deploy-production.yml` aktualisiert | Kein Docker-Mittelsmann mehr |
 | Step 4: Ephemeral-Storage Limits | ⏸ NICHT angewandt (217 GiB frei, nicht nötig) | — |
 | Step 5: CronJobs | ⏸ Noch nicht deployt | — |
+| Step 6: Stale :latest Image Fix | ✅ `deploy-production.yml` + manueller Fix | Frontend läuft frisches Image |
 
 ### Aktueller Zustand nach Recovery
 ```
@@ -166,6 +167,38 @@ kubectl apply -f infrastructure/kubernetes/production/ephemeral-storage-cleanup-
 - **Revert**: `kubectl delete cronjob pod-garbage-collector -n kube-system`
 - **Risiko**: Gering — CronJobs bereinigen nur tote Pods
 
+### Step 6: Stale :latest Image Fix (containerd Cache-Problem)
+
+**Problem:** `k3s ctr images pull ... :latest` prüft nicht, ob das remote-Image neuer ist als das lokale. containerd gibt einfach das gecachte Image zurück. Pod läuft altes Frontend.
+
+**Symptom:** Image SHA im Pod (`27b0dc35bccff...`) ≠ neuestes Docker Hub Image (`650fc983ec3c...`)
+
+**Root Cause:** `kubectl rollout restart` löst Neustart aus, aber containerd verwendet das gecachte `:latest` Image. Kein Re-Pull von Registry.
+
+**Fix (deploy-production.yml):** Alte Images VOR dem Pull aus containerd löschen:
+```bash
+k3s ctr images rm docker.io/batnini/meeting-automation-backend:latest 2>/dev/null || true
+k3s ctr images rm docker.io/batnini/meeting-automation-frontend:latest 2>/dev/null || true
+```
+
+**Manueller Sofort-Fix (Produktion):**
+```bash
+# Docker tempär starten (Docker Hub Auth vorhanden)
+systemctl start docker
+docker pull docker.io/batnini/meeting-automation-frontend:latest
+docker save docker.io/batnini/meeting-automation-frontend:latest | k3s ctr images import -
+docker image rm docker.io/batnini/meeting-automation-frontend:latest
+systemctl stop docker
+
+# Rollout neu starten
+kubectl rollout restart deployment/frontend -n meeting-automation
+```
+
+**Hinweis:** `k3s ctr images pull` auf Produktion scheitert ohne Docker Hub Auth. Der CI-Pipeline hat die Secrets, manuelles SSH nicht. Fallback: Docker tempär starten, pull+save+import.
+
+- **Revert**: Alten deploy-production.yml aus Git wiederherstellen
+- **Risiko**: Niedrig — verhindert nur stale Images, kein Break wenn Registry down
+
 ## Rollback-Strategie
 
 | Scenario | Aktion |
@@ -194,7 +227,7 @@ systemctl is-active docker  # inactive = gut
 ```
 
 ## Dateien geändert
-- `.github/workflows/deploy-production.yml` (Pipeline-Fix: Docker als Mittelsmann eliminieren)
+- `.github/workflows/deploy-production.yml` (Pipeline-Fix: Docker als Mittelsmann eliminieren + Stale :latest Image Prevention)
 - `infrastructure/kubernetes/production/backend-deployment.yaml` (revisionHistoryLimit: 3)
 - `infrastructure/kubernetes/production/celery-worker-deployment.yaml` (revisionHistoryLimit: 3)
 - `infrastructure/kubernetes/production/celery-worker-pro-deployment.yaml` (revisionHistoryLimit: 3)
@@ -206,4 +239,5 @@ systemctl is-active docker  # inactive = gut
 - `infrastructure/kubernetes/production/redis-deployment.yaml` (revisionHistoryLimit: 3)
 - `infrastructure/kubernetes/production/n8n-deployment.yaml` (revisionHistoryLimit: 3)
 - `infrastructure/kubernetes/production/network-policies.yaml` (celery-worker-pro zu 5 Policies hinzugefügt)
+- `backend/tests/conftest.py` (E2E Passwort-Sync aus E2E_TEST_USER_PASSWORD env var)
 - `docs/PRODUKTION_RECOVERY_PLAN_2026-07-28.md` (diese Datei)
