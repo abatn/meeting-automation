@@ -115,6 +115,7 @@ async def db_session() -> Generator:
         )
         test_user = test_user_result.scalar_one_or_none()
         _test_pw = os.getenv("E2E_TEST_USER_PASSWORD", "TestPassword123!")
+        _test_email = os.getenv("E2E_TEST_USER_EMAIL", "test@example.com")
         if not test_user:
             dg_role_result = await session.execute(
                 select(RoleModel).where(RoleModel.name == "dg")
@@ -123,15 +124,21 @@ async def db_session() -> Generator:
             test_user = UserModel(
                 id="test-user-id",
                 client_id="test-client-id",
-                email="test@example.com",
+                email=_test_email,
                 hashed_password=get_password_hash(_test_pw),
                 status=UserStatus.ACTIVE.value,
                 is_superuser=True,
                 roles=[dg_role] if dg_role else []
             )
             session.add(test_user)
-        elif not verify_password(_test_pw, test_user.hashed_password):
-            test_user.hashed_password = get_password_hash(_test_pw)
+        else:
+            updated = False
+            if test_user.email != _test_email:
+                test_user.email = _test_email
+                updated = True
+            if not verify_password(_test_pw, test_user.hashed_password):
+                test_user.hashed_password = get_password_hash(_test_pw)
+                updated = True
 
         dg_user_result = await session.execute(
             select(UserModel).where(UserModel.email == "dg@meeting.tn")
