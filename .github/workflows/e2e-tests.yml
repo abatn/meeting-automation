@@ -380,10 +380,10 @@ jobs:
           frontend=batnini/meeting-automation-frontend:${{ github.sha }} \
           -n meeting-automation --record
         kubectl set image deployment/celery-worker \
-          celery=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          celery-worker=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n meeting-automation --record
         kubectl set image deployment/celery-worker-pro \
-          celery=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          celery-worker=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n meeting-automation --record
         kubectl rollout status deployment/backend -n meeting-automation --timeout=300s
 
