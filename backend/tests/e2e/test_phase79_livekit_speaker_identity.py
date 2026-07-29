@@ -2,7 +2,7 @@
 E2E Tests for Phase 79: LiveKit Identity Speaker Identification + ONNX Business Features.
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -62,7 +62,7 @@ async def _setup(db_session, plan):
         title="Phase79 Test Meeting",
         status=MeetingStatus.PLANNED.value,
         start_time=datetime.utcnow(),
-        end_time=datetime.utcnow(),
+        end_time=datetime.utcnow() + timedelta(hours=1),
         creator_id=user.id,
         created_at=datetime.utcnow(),
     )
