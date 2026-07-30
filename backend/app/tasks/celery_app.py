@@ -75,7 +75,7 @@ async def get_transcription_queue(client_id: str, db=None) -> str:
         result = await db.execute(select(Client.subscription_plan).where(Client.id == client_id))
         plan = result.scalar()
         
-        if plan and plan.value in ("pro", "entrepise"):
+        if plan and plan.value in ("PRO", "ENTREPRISE"):
             return "transcription_pro"
         return "transcription_gratuit"
     except Exception:
@@ -93,7 +93,7 @@ async def get_transcription_queue(client_id: str, db=None) -> str:
         
         plan = asyncio.run(_get_plan())
         
-        if plan and plan.value in ("pro", "entrepise"):
+        if plan and plan.value in ("PRO", "ENTREPRISE"):
             return "transcription_pro"
         return "transcription_gratuit"
     except Exception:
