@@ -283,7 +283,7 @@ Danach:
 
 **Symptom:** Test-Meeting "test test" blieb bei `Recording: uploaded` stecken. Pipeline (Transkription → PV → Actions) wurde nie gestartet. Recording-Datei existierte in MinIO, aber `process_recording` Celery-Task wurde nie ausgeführt.
 
-**Ursache:** `cnpg-policy` NetworkPolicy erlaubte `celery-worker-pro-staging` keinen Zugriff auf CNPG PostgreSQL (Port 5432). Zusammen mit `default-deny-all` wurde jeder Traffic blockiert, der nicht explizit erlaubt war. Der GRATUIT Worker (`celery-worker-staging`) funktionierte weil er in der Policy stand. Der PRO Worker fehlte.
+**Ursache:** `cnpg-policy` NetworkPolicy erlaubte `celery-worker-pro-staging` UND `celery-beat-staging` keinen Zugriff auf CNPG PostgreSQL (Port 5432). Zusammen mit `default-deny-all` wurde jeder Traffic blockiert, der nicht explizit erlaubt war. Der GRATUIT Worker (`celery-worker-staging`) funktionierte weil er in der Policy stand. PRO Worker und Celery-Beat fehlten.
 
 **Beweis (2026-08-01):**
 - LiveKit Server sendete `egress_ended` Webhook an Backend ✅
@@ -292,7 +292,9 @@ Danach:
 - PRO Worker empfing Task (`process_recording[eb0ceab8...] received`) ✅
 - PRO Worker konnte DB NICHT erreichen (`pg_isready: no response`) ❌
 - GRATUIT Worker konnte DB erreichen (`pg_isready: accepting connections`) ✅
+- Celery-Beat konnte DB NICHT erreichen (`pg_isready: no response`) ❌
 - `cnpg-policy` hatte `celery-worker-staging` aber NICHT `celery-worker-pro-staging` ❌
+- `cnpg-policy` hatte NICHT `celery-beat-staging` ❌
 
 **Root Cause Chain:**
 ```
@@ -300,42 +302,56 @@ default-deny-all NetworkPolicy
     ↓
 cnpg-policy erlaubt 5432 nur für: backend, n8n, celery-worker-staging
     ↓
-celery-worker-pro-staging IST NICHT in der Erlaubnis-Liste
+celery-worker-pro-staging UND celery-beat-staging fehlen
     ↓
 PRO Worker → 10.43.52.37:5432 = BLOCKIERT
+    ↓
+Celery-Beat → 10.43.52.37:5432 = BLOCKIERT
     ↓
 process_recording Task kann DB nicht erreichen
     ↓
 Recording bleibt "uploaded"
     ↓
 Keine Transkription, kein PV, keine Actions
+    ↓
+Periodic Tasks (check_storage_quotas, daily_reminder) fehlgeschlagen
 ```
 
 **Lösung (Live + Repo):**
 
-Live-Cluster (kubectl patch):
+Live-Cluster (kubectl patch — 2 Patches):
 ```bash
+# Fix 1: celery-worker-pro-staging
 kubectl patch networkpolicy cnpg-policy -n meeting-automation-staging \
   --type='json' \
   -p='[{"op":"add","path":"/spec/ingress/0/from/-","value":{"podSelector":{"matchLabels":{"app":"celery-worker-pro-staging"}}}}]'
+
+# Fix 2: celery-beat-staging
+kubectl patch networkpolicy cnpg-policy -n meeting-automation-staging \
+  --type='json' \
+  -p='[{"op":"add","path":"/spec/ingress/0/from/-","value":{"podSelector":{"matchLabels":{"app":"celery-beat-staging"}}}}]'
 ```
 
 Repo-Datei (`infrastructure/kubernetes/staging/network-policies.yaml`):
 ```yaml
-# cnpg-policy: Neuer podSelector
+# cnpg-policy: Neue podSelector
     - podSelector:
         matchLabels:
           app: celery-worker-pro-staging
+    - podSelector:
+        matchLabels:
+          app: celery-beat-staging
 ```
 
-**Änderung:** 1 Datei (Repo) + 1 kubectl patch (Live)
+**Änderung:** 1 Datei (Repo) + 2 kubectl patches (Live)
 | Datei | Änderung |
 |-------|----------|
-| `infrastructure/kubernetes/staging/network-policies.yaml` | `app: celery-worker-pro-staging` zu cnpg-policy hinzugefügt |
-| Live Cluster | kubectl patch auf cnpg-policy |
+| `infrastructure/kubernetes/staging/network-policies.yaml` | `app: celery-worker-pro-staging` + `app: celery-beat-staging` zu cnpg-policy hinzugefügt |
+| Live Cluster | 2x kubectl patch auf cnpg-policy |
 
 **Verifikation:**
 - `pg_isready` von PRO Worker → `accepting connections` ✅
+- `pg_isready` von Celery-Beat → `accepting connections` ✅
 - `process_recording` Task manuell gestartet → Recording Status wechselte zu `completed` ✅
 - Transkription: `completed` ✅
 - PV: `draft` (wird generiert)
@@ -347,7 +363,7 @@ Repo-Datei (`infrastructure/kubernetes/staging/network-policies.yaml`):
 | N1 | **Jeder Pod der DB braucht MUSS in `cnpg-policy` stehen** — `default-deny-all` blockiert alles was nicht explizit erlaubt ist. Bei neuen Deployments (z.B. `celery-worker-pro-staging`) IMMER prüfen ob alle NetworkPolicies aktualisiert werden müssen. |
 | N2 | **Celery Workers brauchen DB-Zugriff für `process_recording`** — Ohne DB-Verbindung kann der Task den Recording-Status nicht aktualisieren und die Pipeline nicht starten. |
 | N3 | **`postgres-policy` ≠ `cnpg-policy`** — `postgres-policy` trifft den alten Pod `app: postgres-staging` (existiert nicht mehr). `cnpg-policy` trifft den aktuellen CNPG-Pod `app.kubernetes.io/name: postgresql`. Nur `cnpg-policy` ist relevant. |
-| N4 | **Celery-Beat braucht ebenfalls DB-Zugriff** — `check_storage_quotas`, `daily_reminder_task` und `cleanup_old_data_task` lesen/quottieren Daten aus der DB. `celery-beat-staging` fehlt ebenfalls in `cnpg-policy` (offener Punkt). |
+| N4 | **Celery-Beat braucht ebenfalls DB-Zugriff** — `check_storage_quotas`, `daily_reminder_task` und `cleanup_old_data_task` lesen/quottieren Daten aus der DB. `celery-beat-staging` fehlte ebenfalls in `cnpg-policy` und wurde im selben Fix behoben. |
 | N5 | **Webhook-Dedup (Redis SETNX) verhindert Duplikate** — Wenn der Webhook bereits empfangen wurde (Dedup Key=1), wird er nicht erneut verarbeitet. Bei Pipeline-Fehlern muss der Task manuell neu gestartet werden. |
 
 ---
