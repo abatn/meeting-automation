@@ -64,22 +64,22 @@ jobs:
         username: batnini
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Push Docker image (arm64 only — all k3s nodes are ARM64)
+    - name: Push Docker image (amd64+arm64 — staging=ARM64, production=AMD64)
       uses: docker/build-push-action@v5
       with:
         context: ./backend
-        platforms: linux/arm64
+        platforms: linux/amd64,linux/arm64
         push: true
         build-args: SKIP_SENTINEL=true
         tags: |
           ${{ env.IMAGE_NAME }}:${{ github.sha }}
           ${{ env.IMAGE_NAME }}:latest
 
-    - name: Build + Push Frontend (arm64 only)
+    - name: Build + Push Frontend (amd64+arm64)
       uses: docker/build-push-action@v5
       with:
         context: ./frontend
-        platforms: linux/arm64
+        platforms: linux/amd64,linux/arm64
         push: true
         tags: |
           batnini/meeting-automation-frontend:${{ github.sha }}
