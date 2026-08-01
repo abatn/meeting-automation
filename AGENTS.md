@@ -175,6 +175,12 @@ docker logs meeting-automation-celery-worker-1 | grep TIMING
 
 ## Architecture Notes
 
+### Infrastructure
+- **Staging (OCI)**: 158.180.18.110 — ARM64 (aarch64)
+- **Production (Contabo)**: 169.58.83.32 — AMD64 (x86_64)
+- **Docker images**: Must be multi-arch `linux/amd64,linux/arm64`
+- **CRITICAL**: Do NOT assume both servers are the same architecture!
+
 ### Authentication
 - **JWT** in httpOnly cookies (prevents XSS token theft)
 - **X-Client-ID** header validated against JWT (multi-tenant defense)
