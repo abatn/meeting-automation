@@ -353,12 +353,11 @@ jobs:
           backend/staging-e2e-report.xml
           backend/coverage.xml
 
-  # Job 3: Production Deployment (manual approval via Environment Protection Rules)
+  # Job 3: Production Deployment (automatic after staging E2E pass)
   deploy-production:
     runs-on: ubuntu-latest
     needs: deploy-staging-and-test
     if: github.ref == 'refs/heads/main'
-    environment: production
     steps:
     - uses: actions/checkout@v4
 
