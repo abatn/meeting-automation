@@ -30,7 +30,7 @@ def upgrade():
     ).fetchone()
 
     if not check:
-        op.execute(sa.text("""
+        conn.execute(sa.text("""
             INSERT INTO clients (
                 id, company_name, subscription_plan, subscription_status,
                 subscription_start_date, billing_cycle, minutes_included, minutes_used,
@@ -51,7 +51,7 @@ def upgrade():
     if not check_user:
         # Password: Abdelka15121978! (bcrypt hash)
         hashed = "$2b$12$LJ3m4ys3Iz2kfKFRwO0oZOz8VQxKjGZvM3vK2cN9yR1xQ4wE6t8Ae"
-        op.execute(sa.text("""
+        conn.execute(sa.text("""
             INSERT INTO users (
                 id, email, hashed_password, full_name,
                 is_superuser, is_mfa_enabled, client_id, status, created_at
@@ -63,6 +63,7 @@ def upgrade():
 
 
 def downgrade():
+    conn = op.get_bind()
     # Remove seeded data
-    op.execute(sa.text("DELETE FROM users WHERE email = :email"), {"email": "tidogspot151278@gmail.com"})
-    op.execute(sa.text("DELETE FROM clients WHERE id = :id"), {"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"})
+    conn.execute(sa.text("DELETE FROM users WHERE email = :email"), {"email": "tidogspot151278@gmail.com"})
+    conn.execute(sa.text("DELETE FROM clients WHERE id = :id"), {"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"})

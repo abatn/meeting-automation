@@ -79,9 +79,9 @@ def test_c6_default_plan_config_fallback():
     assert DEFAULT_PLAN_CONFIG["GRATUIT"]["minutes"] == 15
     assert DEFAULT_PLAN_CONFIG["GRATUIT"]["price"] == 0.0
     assert DEFAULT_PLAN_CONFIG["PRO"]["minutes"] == 1800
-    assert DEFAULT_PLAN_CONFIG["PRO"]["price"] == 99.0
+    assert DEFAULT_PLAN_CONFIG["PRO"]["price"] == 199.0
     assert DEFAULT_PLAN_CONFIG["ENTREPRISE"]["minutes"] == 3600
-    assert DEFAULT_PLAN_CONFIG["ENTREPRISE"]["price"] == 499.0
+    assert DEFAULT_PLAN_CONFIG["ENTREPRISE"]["price"] == 399.0
 
 
 def test_c7_handle_stripe_webhook_uses_cms():
