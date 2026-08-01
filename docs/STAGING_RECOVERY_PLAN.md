@@ -224,6 +224,61 @@ sed -i 's/kind-meeting-staging/staging-cluster/g' \
 
 ---
 
+### Problem 8: Docker Multi-Arch Build — QEMU fehlt (CI/CD) — 2026-08-01
+
+**Symptom:** Docker Hub `:latest` für `batnini/meeting-automation-backend` und `batnini/meeting-automation-frontend` hat NUR `arm64` + Attestation-Manifest. Contabo Produktion (AMD64/x86_64) kann `:latest` nicht pullen → `ImagePullBackOff` (`no match for platform`).
+
+**Ursache:** `.github/workflows/docker-build.yml` fehlt `docker/setup-qemu-action@v3` vor `docker/setup-buildx-action@v3`. Ohne QEMU kann der GitHub Actions Runner (AMD64) nicht für ARM64 cross-compilieren. Die `platforms: linux/amd64,linux/arm64` Konfiguration schlägt bei arm64 fehl — Buildx überspringt fehlgeschlagene Plattformen SILENTLY (kein Fehler, Run zeigt "success").
+
+**Beweis (2026-08-01):**
+- `grep -c 'qemu' .github/workflows/docker-build.yml` → `0` (exit code 1)
+- `docker manifest inspect batnini/meeting-automation-backend:latest` → arm64 + unknown/unknown (attestation), KEIN amd64
+- `docker manifest inspect batnini/meeting-automation-frontend:latest` → gleiches Ergebnis
+- GitHub Actions Buildx Builder Plattformen: `linux/amd64, linux/amd64/v2, linux/amd64/v3, linux/amd64/v4, linux/386` — KEIN arm64
+- Alle 5 letzten Runs zeigen `completed/success` — trotzdem falsche Images
+- k3s Staging: `imagePullPolicy: Always` → pullt von Docker Hub → arm64 passt (OCI = ARM64)
+- k3s Produktion: `imagePullPolicy: Always` → pullt von Docker Hub → arm64 passt NICHT (Contabo = AMD64)
+
+**Kontext aus `.loop.md`:**
+- Phase 163 C10: "DiskPressure evicted Pods + GC'd unser `:latest` Image aus dem k3s-Store"
+- Phase 163 K2: "`imagePullPolicy: Always` + lokale Images = ImagePullBackOff → `IfNotPresent`"
+- Staging (OCI) funktioniert weil ARM64 + arm64-Image = Match
+- Produktion (Contabo) ist kaputt weil AMD64 + arm64-Image = Mismatch
+
+**Lösung (Commit `ce509141`):**
+
+In `.github/workflows/docker-build.yml`, zwischen Checkout und Buildx einfügen:
+```yaml
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v3
+```
+
+Danach:
+- amd64: Nativ auf GitHub Actions Runner gebaut
+- arm64: Via QEMU emuliert
+- Docker Hub `:latest` hat BEIDE Plattformen
+- Contabo (AMD64) kann pullen → kein ImagePullBackOff
+
+**Änderung:** 1 Datei, 3 Zeilen hinzugefügt
+| Datei | Änderung |
+|-------|----------|
+| `.github/workflows/docker-build.yml` | `docker/setup-qemu-action@v3` vor `docker/setup-buildx-action@v3` |
+
+**Verifikation:**
+- GitHub Actions Workflow getriggert (push + workflow_dispatch) — Run `30713556529` + `30713565150`
+- Nach Build: `docker manifest inspect` prüfen ob amd64 + arm64 vorhanden
+- Contabo Pods: automatischer Pull bei `imagePullPolicy: Always`
+
+**HARTE LESSONS:**
+| # | Regel |
+|---|-------|
+| D1 | **QEMU MUSS VOR Buildx registriert werden** — `docker/setup-buildx-action@v3` erstellt Builder nur mit Host-Plattform. Ohne QEMU keine Cross-Compilation. |
+| D2 | **Buildx überspringt fehlgeschlagene Plattformen SILENTLY** — Run zeigt "success" trotz fehlender Plattform. Immer `docker manifest inspect` nach dem Build prüfen. |
+| D3 | **`imagePullPolicy: Always` + Docker Hub = Single-Source-of-Truth** — Wenn Docker Hub nur arm64 hat, sind alle AMD64-Cluster kaputt. Multi-arch ist Pflicht. |
+| D4 | **Lokale Builds überschreiben CI-Builds** — Images die lokal auf dem ARM64-Staging-Server gebaut und gepusht wurden, haben `:latest` überschrieben. Immer über CI pushen. |
+
+---
+
 ## Vollständige Recovery-Prozedur (von Null)
 
 ### Voraussetzungen prüfen
