@@ -82,7 +82,9 @@ jobs:
         file: ./backend/Dockerfile
         platforms: linux/arm64
         push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/meeting-automation-backend:latest
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/meeting-automation-backend:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/meeting-automation-backend:${{ github.sha }}
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         
@@ -93,6 +95,8 @@ jobs:
         file: ./frontend/Dockerfile
         platforms: linux/arm64
         push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/meeting-automation-frontend:latest
+        tags: |
+          ${{ secrets.DOCKERHUB_USERNAME }}/meeting-automation-frontend:latest
+          ${{ secrets.DOCKERHUB_USERNAME }}/meeting-automation-frontend:${{ github.sha }}
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

@@ -383,7 +383,7 @@ jobs:
           alembic-migrate=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n meeting-automation --record
         kubectl set image deployment/frontend \
-          frontend=batnini/meeting-automation-frontend:latest \
+          frontend=batnini/meeting-automation-frontend:${{ github.sha }} \
           -n meeting-automation --record
         kubectl set image deployment/celery-worker \
           celery-worker=${{ env.IMAGE_NAME }}:${{ github.sha }} \
