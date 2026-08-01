@@ -30,6 +30,7 @@
 | E2E Test Login 401 (db_session Email) | ✅ Gelöst | `conftest.py` — `db_session` nutzt `E2E_TEST_USER_EMAIL` env var |
 | Phase79 timing bug (ck_meeting_end_after_start) | ✅ Gelöst | `end_time=datetime.utcnow() + timedelta(hours=1)` |
 | KUBE_CONFIG_PRODUCTION `127.0.0.1:6443` | ✅ Gelöst | Secret-Update mit korrekter IP (`169.58.83.32:6443`) |
+| **Production TLS fehlt komplett** | 🔴 Offen | Siehe Abschnitt **§10: Production TLS/cert-manager Plan** unten — identisch zum erfolgreichen Staging-Fix (Phase 183) |
 
 ### Sofort-Maßnahmen (nächster Schritt)
 ```bash
@@ -1127,6 +1128,196 @@ Bei Problemen: Logs prüfen mit `kubectl logs -f deployment/backend -n meeting-a
 - CI/CD: `.github/workflows/`
 - Dockerfiles: `backend/Dockerfile`, `frontend/Dockerfile`
 - E2E Tests: `tests/e2e/`
+
+---
+
+## 🔒 10. Production TLS/cert-manager Plan
+
+> **Stand:** 2026-08-01
+> **Vorbild:** Staging (Phase 183) — cert-manager + Let's Encrypt HTTP-01 + nginx-ingress — funktioniert seit 2026-07-31 stabil
+
+### 10.1 Aktueller Zustand Production
+
+| Komponente | Status | Details |
+|------------|--------|---------|
+| Domain | ✅ | `meeting-automate.tn` → `169.58.83.32` (Contabo) |
+| nginx-ingress | ⚠️ | Installiert, aber NICHT hostNetwork (NodePort-Modus) |
+| cert-manager | ❌ **FEHLT** | Nicht installiert |
+| ClusterIssuer | ❌ **FEHLT** | Let's Encrypt ACME nicht konfiguriert |
+| TLS Secret | ❌ **FEHLT** | Kein Zertifikat vorhanden |
+| n8n NodePort 31678 | ❌ | Nicht offen (kein TLS = Passwort im Klartext) |
+| HTTP → HTTPS Redirect | ❌ | Kein Redirect (alles plain HTTP) |
+
+### 10.2 Warum identisch zu Staging funktioniert
+
+Staging hatte dasselbe Problem (Phase 183): cert-manager fehlte → kein TLS → Browser-Warnung. Die Lösung war:
+
+1. cert-manager per Helm installieren
+2. ClusterIssuer `letsencrypt-prod` erstellen (ACME HTTP-01)
+3. Ingress-Annotation `cert-manager.io/cluster-issuer: letsencrypt-prod` hinzufügen
+4. TLS Secret Name im Ingress angeben
+5. cert-manager stellt automatisch Zertifikat aus
+
+**Dauer:** ~10 Minuten. **Ergebnis:** Gültiges Let's Encrypt Zertifikat (90 Tage Auto-Renew).
+
+### 10.3 Schritt-für-Schritt Plan (Production)
+
+**Voraussetzung:** SSH zu Contabo (`ssh root@169.58.83.32`), `KUBECONFIG=/etc/rancher/k3s/k3s.yaml`
+
+#### Schritt 1: cert-manager installieren
+
+```bash
+# CRDs installieren
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.15.0/cert-manager.crds.yaml
+
+# cert-manager per Helm
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --version v1.15.0
+
+# Verifizieren (3/3 Pods Running)
+kubectl get pods -n cert-manager
+```
+
+#### Schritt 2: ClusterIssuer erstellen
+
+```yaml
+# cert-manager-issuer-prod.yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@meeting-automate.tn
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+```
+
+```bash
+kubectl apply -f cert-manager-issuer-prod.yaml
+```
+
+#### Schritt 3: Ingress annotieren + TLS Secret
+
+In `infrastructure/kubernetes/production/ingress-prod.yaml`:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: meeting-prod
+  namespace: meeting-automation
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod  # ← NEU
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+spec:
+  ingressClassName: nginx
+  tls:                                    # ← NEU
+  - hosts:
+    - meeting-automate.tn
+    secretName: prod-tls                  # ← NEU (cert-manager erstellt dieses Secret automatisch)
+  rules:
+  - host: meeting-automate.tn
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 8000
+      # ... (weitere Pfade wie /rtc, /doc, /n8n)
+```
+
+```bash
+kubectl apply -f ingress-prod.yaml
+```
+
+#### Schritt 4: Zertifikat ausstellen lassen
+
+```bash
+# cert-manager erkennt die Annotation und startet ACME Challenge
+# Warten (1-3 Minuten)
+kubectl get certificate -n meeting-automation -w
+
+# Verifizieren
+kubectl describe certificate prod-tls -n meeting-automation
+# Expected: "Certificate is up to date" + "Ready: True"
+```
+
+#### Schritt 5: HTTP → HTTPS Redirect
+
+In der Ingress-Annotation hinzufügen:
+
+```yaml
+nginx.ingress.kubernetes.io/ssl-redirect: "true"
+nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+```
+
+#### Schritt 6: n8n hinter Ingress + TLS (optional)
+
+Falls n8n auch über Domain erreichbar sein soll (statt NodePort):
+
+```yaml
+# In ingress-prod.yaml additional paths:
+      - path: /n8n
+        pathType: Prefix
+        backend:
+          service:
+            name: n8n
+            port:
+              number: 5678
+```
+
+**ACHTUNG:** n8n braucht `N8N_PATH=/n8n/` wenn es unter Subpath läuft (siehe Staging-Analyse). Ohne NodePort reicht der Ingress.
+
+### 10.4 Verifikation nach TLS-Setup
+
+| # | Check | Erwartung | Befehl |
+|---|-------|-----------|--------|
+| 1 | HTTP Redirect | `301/308 → HTTPS` | `curl -I http://meeting-automate.tn` |
+| 2 | HTTPS Status | `200` | `curl -k https://meeting-automate.tn` |
+| 3 | TLS Zertifikat | Let's Encrypt (NICHT self-signed) | `openssl s_client -connect meeting-automate.tn:443 < /dev/null 2>/dev/null | openssl x509 -noout -issuer` |
+| 4 | Certificate Resource | `READY=True` | `kubectl get certificate -n meeting-automation` |
+| 5 | n8n (falls Ingress) | Login-Seite unter HTTPS | `curl -k https://meeting-automate.tn/n8n/` |
+| 6 | HSTS Header | `max-age=31536000` | `curl -kI https://meeting-automate.tn | grep -i strict` |
+
+### 10.5 Bekannte Risiken (aus Staging gelernt)
+
+| # | Risiko | Lösung (bewiesen auf Staging) |
+|---|--------|-------------------------------|
+| R1 | `default-deny-all` blockiert ACME Solver-Pod | NetworkPolicy `acme-solver-allow-ingress` erstellen (Label `acme.cert-manager.io/http01-solver=true`, Port 8089/30172) |
+| R2 | Ingress `/n8n` zeigt weiße Seite | n8n NodePort 31678 ODER `N8N_PATH=/n8n/` setzen |
+| R3 | cert-manager erstellt Solver-Pod in falschem Namespace | Certificate-Objekt MUSS im selben Namespace wie Ingress sein |
+| R4 | Auto-Renewal scheitert (DNS-Problem) | HTTP-01 funktioniert OHNE DNS-Änderung — nur Port 80 muss offen sein |
+
+### 10.6 n8n Zugang nach TLS
+
+| Option | URL | TLS | Auth |
+|--------|-----|-----|------|
+| **A: Ingress Subpath** | `https://meeting-automate.tn/n8n/` | ✅ Let's Encrypt | n8n Owner-Account |
+| **B: NodePort** | `http://169.58.83.32:31678` | ❌ Klartext | n8n Owner-Account |
+| **C: Separater Ingress** | `https://n8n.meeting-automate.tn` | ✅ Eigene DNS + Cert | n8n Owner-Account |
+
+**Empfehlung:** Option A (Ingress Subpath) — sicherster Weg, kein zusätzlicher Port, TLS included.
 
 ---
 

@@ -1,0 +1,95 @@
+{
+  "id": "customer-activated",
+  "name": "Customer Activated Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "customer-activated",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "customer-activated-webhook-id"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nif (!body || !body.email || !body.full_name) {\n  throw new Error('Missing required fields: email and full_name are required');\n}\nreturn {\n  json: {\n    event: body.event || 'customer_activated',\n    email: body.email,\n    full_name: body.full_name,\n    company_name: body.company_name || 'Meeting Automation',\n    login_url: 'https://staging.meeting-automation.com/login'\n  }\n};"
+      },
+      "id": "validate-payload",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "noreply@meeting-automation.com",
+        "toEmail": "={{$json.email}}",
+        "subject": "Ihr Abo wurde aktiviert - Meeting Automation",
+        "text": "",
+        "html": "=<html><body style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\"><div style=\"background: #22c55e; color: white; padding: 20px; text-align: center;\"><h1>Ihr Abo wurde aktiviert!</h1></div><div style=\"padding: 20px;\"><h2>Hallo {{$json.full_name}},</h2><p>Wir freuen uns, Ihnen mitzuteilen, dass Ihr Abo bei <strong>{{$json.company_name}}</strong> erfolgreich aktiviert wurde.</p><p>Sie können sich jetzt einloggen und die App nutzen:</p><div style=\"margin: 30px 0; text-align: center;\"><a href=\"{{$json.login_url}}\" style=\"background: #22c55e; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block;\">Jetzt einloggen</a></div><p style=\"font-size: 12px; color: #888;\">Meeting Automation Team</p></div></body></html>",
+        "options": {},
+        "continueOnFail": true
+      },
+      "id": "send-email-customer",
+      "name": "Send Email to Customer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [650, 300],
+      "credentials": {
+        "smtp": {
+          "id": "1",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseText": "={{JSON.stringify({\"status\":\"customer_notified\", \"email\": $json.email})}}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nreturn {\n  json: {\n    status: 'error',\n    error_message: error?.message || error?.error || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 450]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Validate Payload", "type": "main", "index": 0}]]
+    },
+    "Validate Payload": {
+      "main": [[{"node": "Send Email to Customer", "type": "main", "index": 0}]]
+    },
+    "Send Email to Customer": {
+      "main": [
+        [{"node": "Respond to Webhook", "type": "main", "index": 0}],
+        [{"node": "Error Handler", "type": "error", "index": 0}]
+      ]
+    },
+    "Respond to Webhook": {"main": [[]]},
+    "Error Handler": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    }
+  },
+  "active": true,
+  "settings": {}
+}

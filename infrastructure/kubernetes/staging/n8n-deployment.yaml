@@ -51,6 +51,11 @@ spec:
             secretKeyRef:
               name: n8n-secrets
               key: N8N_API_KEY
+        - name: N8N_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: n8n-secrets
+              key: N8N_ENCRYPTION_KEY
         volumeMounts:
         - name: n8n-staging-storage
           mountPath: /home/node/.n8n

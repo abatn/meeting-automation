@@ -53,14 +53,16 @@ class Settings(BaseSettings):
     WHATSAPP_TOKEN: str = ""
 
     # n8n
-    N8N_WEBHOOK_URL: str = "http://n8n:5678/webhook"
-    N8N_WEBHOOK_USER_INVITED: str = "http://n8n:5678/webhook/user-invited"
-    N8N_WEBHOOK_MEETING_CREATED: str = "http://n8n:5678/webhook/meeting-created"
-    N8N_WEBHOOK_MEETING_STATUS_CHANGED: str = "http://n8n:5678/webhook/meeting-status-changed"
-    N8N_WEBHOOK_PV_VALIDATED: str = "http://n8n:5678/webhook/pv-validated"
+    N8N_WEBHOOK_URL: str = "http://n8n-staging:5678/webhook"
+    N8N_WEBHOOK_USER_INVITED: str = "http://n8n-staging:5678/webhook/user-invited"
+    N8N_WEBHOOK_MEETING_CREATED: str = "http://n8n-staging:5678/webhook/meeting-created"
+    N8N_WEBHOOK_MEETING_STATUS_CHANGED: str = "http://n8n-staging:5678/webhook/meeting-status-changed"
+    N8N_WEBHOOK_PV_VALIDATED: str = "http://n8n-staging:5678/webhook/pv-validated"
     N8N_WEBHOOK_AUDIO_UPLOADED: str = ""
     N8N_WEBHOOK_DAILY_REMINDER: str = ""
-    N8N_WEBHOOK_TRANSCRIPTION_COMPLETED: str = "http://n8n:5678/webhook/transcription-completed"
+    N8N_WEBHOOK_TRANSCRIPTION_COMPLETED: str = "http://n8n-staging:5678/webhook/transcription-completed"
+    N8N_WEBHOOK_ADMIN_NEW_TENANT: str = "http://n8n-staging:5678/webhook/admin-new-tenant"
+    N8N_WEBHOOK_CUSTOMER_ACTIVATED: str = "http://n8n-staging:5678/webhook/customer-activated"
 
     # Security
     INTERNAL_API_SECRET: str = "super-secret-automation-key-2026"

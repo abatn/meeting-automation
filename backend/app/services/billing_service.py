@@ -22,9 +22,9 @@ stripe.api_key = settings.STRIPE_API_KEY
 
 # Fallback values if CMS pricing_plans not found
 DEFAULT_PLAN_CONFIG = {
-    "GRATUIT": {"minutes": 120, "price": 0.0},
-    "PRO": {"minutes": 1800, "price": 99.0},
-    "ENTREPRISE": {"minutes": 3600, "price": 499.0}
+    "GRATUIT": {"minutes": 15, "price": 0.0},
+    "PRO": {"minutes": 1800, "price": 199.0},
+    "ENTREPRISE": {"minutes": 3600, "price": 399.0}
 }
 
 
@@ -455,10 +455,6 @@ class BillingService:
         minutes_included = client.minutes_included or 0
         minutes_used = client.minutes_used or 0
 
-        # GRATUIT plan: no limit enforcement (free tier)
-        if not client.subscription_plan or client.subscription_plan.value == "GRATUIT":
-            return {"allowed": True, "usage_percent": 0, "remaining": 999999, "reason": "GRATUIT plan"}
-
         if minutes_included <= 0:
             return {"allowed": True, "usage_percent": 0, "remaining": 999999, "reason": "No limit set"}
 
@@ -534,5 +530,5 @@ class BillingService:
             "alert_message": alert_message,
             "plan": client.subscription_plan.value if client.subscription_plan else "GRATUIT",
             "stripe_subscription_id": client.stripe_subscription_id,
-            "can_create_meeting": usage_percent < 100 or (not client.subscription_plan or client.subscription_plan.value == "GRATUIT")
+            "can_create_meeting": usage_percent < 100
         }

@@ -113,7 +113,20 @@ async def update_client_status(
     db.add(client)
     await db.commit()
     await db.refresh(client)
-    
+
+    # Phase 188: Send activation email to customer when PENDING → ACTIVE
+    if old_status == SubscriptionStatus.PENDING and status_update.status == SubscriptionStatus.ACTIVE:
+        from app.tasks.email_tasks import send_customer_activated_email
+        users_stmt = select(UserModel).where(UserModel.client_id == client_id)
+        users_result = await db.execute(users_stmt)
+        users = users_result.scalars().all()
+        for u in users:
+            send_customer_activated_email.delay(
+                email=u.email,
+                full_name=u.full_name or "Kunde",
+                company_name=client.company_name
+            )
+
     # Log to Audit Trail
     await AuditService.log_action(
         db=db,

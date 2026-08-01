@@ -1,0 +1,68 @@
+# Allow ingress-nginx to reach cert-manager ACME HTTP-01 solver pods
+# This policy overrides default-deny-all for the solver pods specifically
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: acme-solver-allow-ingress
+  namespace: meeting-automation-staging
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow from ingress-nginx controller (HTTP-01 validation traffic)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8089
+  # Allow from cert-manager namespace (webhook + leader election)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: cert-manager
+    ports:
+    - protocol: TCP
+      port: 8089
+  # Allow from anywhere on port 8089 (Let's Encrypt validation can come from external IPs via NodePort)
+  - from:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 8089
+---
+# Also allow ingress-nginx to reach ALL pods on port 80 (HTTP)
+# This ensures ACME challenge traffic can reach solver via the ingress controller
+# even if the solver listens on a non-standard port
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-nginx-allow
+  namespace: meeting-automation-staging
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 8089
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 5678
+    - protocol: TCP
+      port: 7880
+    - protocol: TCP
+      port: 7881

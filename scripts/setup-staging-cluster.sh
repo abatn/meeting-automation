@@ -187,6 +187,7 @@ if [ "${SKIP_INFRASTRUCTURE}" = false ]; then
         "backend-secrets.yaml"
         "backend-config.yaml"
         "celery-worker-deployment.yaml"
+        "celery-worker-pro-deployment.yaml"
         "celery-beat-deployment.yaml"
         "backend-deployment.yaml"
         # Ingress

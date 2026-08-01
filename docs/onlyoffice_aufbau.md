@@ -143,31 +143,49 @@ Browser → config endpoint → Backend generiert DOCX + upload S3
 | O11 | **ConfigMap via `subPath` ist read-only** — OnlyOffice-Entry-Point schreibt JWT in `local.json`. emptyDir + initContainer ist der korrekte Ansatz. |
 | O12 | **`kubectl exec` Output muss bereinigt werden** — `Defaulted container...` wird in Dateien geschrieben → JSON parse error. |
 | O13 | **Hardcoding ist verboten (Regel N8)** — `SECURE_LINK_SECRET` als Deployment-Env-Var ist erlaubt (deployment-spezifische Config). |
+| O14 | **Entry-Point überschreibt GESAMTE `local.json` bei jedem Start** — ConfigMap mit `externalHost` allein reicht NICHT. Das YAML MUSS `initContainer` + `volumes` + `volumeMounts` haben, **wenn** custom `local.json`/`ds-docservice.conf` aus der ConfigMap gemountet werden sollen. Ohne Mounts benutzt der Pod die Default-Konfiguration (kein `externalHost`). Für den reinen Editor-Betrieb reicht die Default-Konfiguration aus — `externalHost` ist nur für HTTPS-Cache-URLs nötig. |
+| O15 | **`ds-docservice.conf` darf NIEMALS leer sein** — 0 Bytes → DocService startet nicht (`spawn error`) → nginx kann nicht routen → Healthcheck 404. Beim Aktualisieren der ConfigMap IMMER beide Dateien angeben: `local.json` UND `ds-docservice.conf`. NIEMALS `--from-literal=ds-docservice.conf=""` verwenden. |
+| O16 | **`kubectl create configmap` mit `--from-literal` überschreibt ALLE fehlenden Keys** — wenn du `--from-file=local.json=...` ohne `--from-file=ds-docservice.conf=...` angibst, wird `ds-docservice.conf` GELÖSCHT. IMMER beide Dateien angeben. |
+| O17 | **postStart-Hook mit `sed` ist fragil** — `echo`-Output kann in `local.json` landen → JSON parse error. Besser: ConfigMap korrekt lassen + initContainer + volumes im YAML (kein postStart-Hook nötig). |
+
+## KRITISCHE REGELN für ConfigMap-Updates
+
+1. **IMMER beide Dateien angeben** beim `kubectl create configmap`:
+   ```bash
+   kubectl create configmap onlyoffice-custom-config \
+     --from-file=local.json=/tmp/local.json \
+     --from-file=ds-docservice.conf=/tmp/ds-docservice.conf \
+     -n meeting-automation-staging --dry-run=client -o yaml | kubectl apply -f -
+   ```
+2. **NIEMALS `--from-literal`** verwenden (kann leere Dateien erzeugen)
+3. **ConfigMap NIEMALS einzelne Keys patchen** — IMMER komplett ersetzen
+4. **`ds-docservice.conf` aus Container-Image extrahieren** falls verloren:
+   ```bash
+   docker run --rm --entrypoint cat onlyoffice/documentserver:latest /etc/onlyoffice/documentserver/nginx/includes/ds-docservice.conf > /tmp/ds-docservice.conf
+   ```
+5. **Staging-YAML MUSS `initContainer` + `volumes` + `volumeMounts` haben** (wie Production-YAML)
 
 ## Deploy-Checkliste
 
 ```bash
-# 1. ConfigMap neu erstellen
-kubectl create configmap onlyoffice-custom-config \
-  --from-file=local.json=/pfad/zu/local.json \
-  --from-file=ds-docservice.conf=/pfad/zu/ds-docservice.conf \
-  -n meeting-automation-staging --dry-run=client -o yaml | kubectl apply -f -
+# 1. ConfigMap prüfen (beide Dateien müssen korrekt sein)
+kubectl get configmap onlyoffice-custom-config -n meeting-automation-staging -o jsonpath='{.data.local\.json}' | wc -c   # ~895 Bytes
+kubectl get configmap onlyoffice-custom-config -n meeting-automation-staging -o jsonpath='{.data.ds-docservice\.conf}' | wc -c   # ~3579 Bytes
 
-# 2. Deployment anwenden
+# 2. Staging-YAML prüfen (muss initContainer + volumes haben)
+grep -c 'initContainers' infrastructure/kubernetes/staging/onlyoffice-deployment.yaml   # muss >0 sein
+
+# 3. Deployment anwenden
 kubectl apply -f infrastructure/kubernetes/staging/onlyoffice-deployment.yaml
 
-# 3. Pod neustarten
-kubectl rollout restart deployment/onlyoffice-staging -n meeting-automation-staging
+# 4. Warten bis ready (erster Boot: ~60s für Font-Generierung)
+kubectl rollout status deployment/onlyoffice-staging -n meeting-automation-staging --timeout=180s
 
-# 4. Verifizieren
-kubectl exec -n meeting-automation-staging $(kubectl get pods -n meeting-automation-staging -l app=onlyoffice-staging -o name | head -1) -- python3 -c "
-import json
-with open('/etc/onlyoffice/documentserver/local.json') as f:
-    d = json.load(f)
-print('externalHost:', d['storage']['externalHost'])
-print('secretString:', d['storage']['fs']['secretString'])
-"
+# 5. Verifizieren
+OO_POD=$(kubectl get pods -n meeting-automation-staging -l app=onlyoffice-staging --field-selector=status.phase=Running --no-headers -o custom-columns=NM:.metadata.name | head -1)
+kubectl exec $OO_POD -n meeting-automation-staging -- grep 'externalHost' /etc/onlyoffice/documentserver/local.json
+kubectl exec $OO_POD -n meeting-automation-staging -- curl -sS --max-time 5 http://localhost:8000/healthcheck   # muss 'true' liefern
 
-# 5. Editor testen
-curl -sk -o /dev/null -w 'HTTP %{http_code}' 'https://staging.meeting-automation.com/editor/{pv_id}?lang=ar'
+# 6. Editor testen (API)
+curl -sS -b cookie.txt 'https://staging.meeting-automation.com/api/v1/pv/{pv_id}/onlyoffice/config?language=fr' | python3 -c "import sys,json; print(json.load(sys.stdin)['document']['title'])"
 ```

@@ -7,6 +7,8 @@ metadata:
     app: livekit-egress
 spec:
   replicas: 1
+  strategy:
+    type: Recreate  # hostNetwork requires Recreate (no two pods can bind same ports)
   revisionHistoryLimit: 3
   selector:
     matchLabels:

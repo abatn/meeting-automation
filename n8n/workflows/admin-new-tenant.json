@@ -1,0 +1,95 @@
+{
+  "id": "admin-new-tenant",
+  "name": "Admin New Tenant Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin-new-tenant",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "admin-new-tenant-webhook-id"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body;\nif (!body || !body.company_name || !body.plan || !body.email) {\n  throw new Error('Missing required fields: company_name, plan, and email are required');\n}\nreturn {\n  json: {\n    event: body.event || 'admin_new_tenant',\n    client_id: body.client_id || 'unknown',\n    company_name: body.company_name,\n    plan: body.plan,\n    email: body.email,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "validate-payload",
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "resource": "email",
+        "operation": "send",
+        "fromEmail": "noreply@meeting-automation.com",
+        "toEmail": "admin@meeting.tn",
+        "subject": "=Neuer Kunde: {{$json.company_name}} ({{$json.plan}}) wartet auf Aktivierung",
+        "text": "",
+        "html": "=<html><body style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\"><div style=\"background: #f59e0b; color: white; padding: 20px; text-align: center;\"><h1>Neuer Kunde wartet auf Aktivierung</h1></div><div style=\"padding: 20px;\"><h2>Details:</h2><table style=\"width: 100%; border-collapse: collapse;\"><tr><td style=\"padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;\">Unternehmen:</td><td style=\"padding: 8px; border-bottom: 1px solid #eee;\">{{$json.company_name}}</td></tr><tr><td style=\"padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;\">Plan:</td><td style=\"padding: 8px; border-bottom: 1px solid #eee;\">{{$json.plan}}</td></tr><tr><td style=\"padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;\">Email:</td><td style=\"padding: 8px; border-bottom: 1px solid #eee;\">{{$json.email}}</td></tr><tr><td style=\"padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;\">Client ID:</td><td style=\"padding: 8px; border-bottom: 1px solid #eee;\">{{$json.client_id}}</td></tr><tr><td style=\"padding: 8px; border-bottom: 1px solid #eee; font-weight: bold;\">Zeitpunkt:</td><td style=\"padding: 8px; border-bottom: 1px solid #eee;\">{{$json.timestamp}}</td></tr></table><div style=\"margin: 30px 0; text-align: center;\"><a href=\"https://staging.meeting-automation.com/admin\" style=\"background: #f59e0b; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block;\">Im Admin-Dashboard aktivieren</a></div></div></body></html>",
+        "options": {},
+        "continueOnFail": true
+      },
+      "id": "send-email-admin",
+      "name": "Send Email to Admin",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [650, 300],
+      "credentials": {
+        "smtp": {
+          "id": "1",
+          "name": "SMTP Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseText": "={{JSON.stringify({\"status\":\"admin_notified\", \"company_name\": $json.company_name})}}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const error = $input.first().json;\nreturn {\n  json: {\n    status: 'error',\n    error_message: error?.message || error?.error || 'Unknown error',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 450]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Validate Payload", "type": "main", "index": 0}]]
+    },
+    "Validate Payload": {
+      "main": [[{"node": "Send Email to Admin", "type": "main", "index": 0}]]
+    },
+    "Send Email to Admin": {
+      "main": [
+        [{"node": "Respond to Webhook", "type": "main", "index": 0}],
+        [{"node": "Error Handler", "type": "error", "index": 0}]
+      ]
+    },
+    "Respond to Webhook": {"main": [[]]},
+    "Error Handler": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    }
+  },
+  "active": true,
+  "settings": {}
+}

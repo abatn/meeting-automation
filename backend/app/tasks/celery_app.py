@@ -25,6 +25,8 @@ celery_app.conf.update(
     task_soft_time_limit=540,               # 9min soft warning
     result_expires=3600,                    # Clean up results after 1h
     # Queue isolation
+    task_default_queue="maintenance",          # Unrouted tasks → maintenance (both workers listen)
+    task_create_missing_queues=False,          # Don't auto-create queues without consumers
     task_routes={
         'process_recording': {'queue': 'transcription'},
         'process_feedback_resolution': {'queue': 'transcription'},
@@ -32,6 +34,7 @@ celery_app.conf.update(
         'daily_reminder_task': {'queue': 'email'},
         'send_invitation_email': {'queue': 'email'},
         'cleanup_old_data_task': {'queue': 'maintenance'},
+        'check_storage_quotas': {'queue': 'maintenance'},
     },
     task_queues=(
         Queue('transcription', routing_key='transcription'),
@@ -75,30 +78,14 @@ async def get_transcription_queue(client_id: str, db=None) -> str:
         result = await db.execute(select(Client.subscription_plan).where(Client.id == client_id))
         plan = result.scalar()
         
-        if plan and plan.value in ("PRO", "ENTREPRISE"):
+        plan_str = plan.value if hasattr(plan, "value") else str(plan)
+        if plan_str in ("PRO", "ENTREPRISE"):
             return "transcription_pro"
         return "transcription_gratuit"
     except Exception:
         return "transcription_gratuit"
 
 
-# Beat Schedule for periodic tasks
-        import asyncio
-        
-        async def _get_plan():
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(select(Client.subscription_plan).where(Client.id == client_id))
-                plan = result.scalar()
-                return plan
-        
-        plan = asyncio.run(_get_plan())
-        
-        if plan and plan.value in ("PRO", "ENTREPRISE"):
-            return "transcription_pro"
-        return "transcription_gratuit"
-    except Exception:
-        # Fallback: if we can't determine the plan, use the default queue
-        return "transcription"
 
 # Beat Schedule for periodic tasks
 celery_app.conf.beat_schedule = {

@@ -166,3 +166,90 @@ async def _send_invitation_email(client_id: str, email: str, full_name: str, com
 def send_invitation_email(self, client_id: str, email: str, full_name: str, company_name: str, activation_link: str):
     """Celery task to send invitation email (Multi-Tenant compliant with client_id)"""
     _run_async(_send_invitation_email(client_id, email, full_name, company_name, activation_link))
+
+
+# Phase 188: Manual Tenant Activation
+async def _send_admin_new_tenant_notification(client_id: str, company_name: str, plan: str, email: str):
+    """Notify admin via n8n webhook when a new tenant registers."""
+    try:
+        payload = {
+            "event": "admin_new_tenant",
+            "client_id": client_id,
+            "company_name": company_name,
+            "plan": plan,
+            "email": email,
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                settings.N8N_WEBHOOK_ADMIN_NEW_TENANT,
+                json=payload,
+                timeout=10.0
+            )
+            response.raise_for_status()
+            logger.info(f"Admin notification sent for new tenant: {company_name} ({plan})")
+            await _log_email_audit(client_id, email, "SUCCESS_ADMIN_N8N")
+    except Exception as e:
+        logger.error(f"Failed to send admin new tenant notification: {e}")
+        await _log_email_audit(client_id, email, "FAILED_ADMIN", str(e))
+
+
+@celery_app.task(name="send_admin_new_tenant_notification", bind=True, max_retries=3)
+def send_admin_new_tenant_notification(self, client_id: str, company_name: str, plan: str, email: str):
+    """Celery task to notify admin about new tenant registration."""
+    _run_async(_send_admin_new_tenant_notification(client_id, company_name, plan, email))
+
+
+async def _send_customer_activated_email(email: str, full_name: str, company_name: str):
+    """Notify customer that their subscription has been activated."""
+    login_url = f"{settings.FRONTEND_URL}/login"
+    html_body = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #22c55e; color: white; padding: 20px; text-align: center;">
+            <h1>Ihr Abo wurde aktiviert!</h1>
+        </div>
+        <div style="padding: 20px;">
+            <h2>Hallo {full_name},</h2>
+            <p>Wir freuen uns, Ihnen mitzuteilen, dass Ihr Abo bei <strong>{company_name}</strong> erfolgreich aktiviert wurde.</p>
+            <p>Sie können sich jetzt einloggen und die App nutzen:</p>
+            <div style="margin: 30px 0; text-align: center;">
+                <a href="{login_url}" style="background: #22c55e; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                    Jetzt einloggen
+                </a>
+            </div>
+            <p style="font-size: 12px; color: #888;">Meeting Automation Team</p>
+        </div>
+    </body>
+    </html>
+    """
+    subject = "Ihr Abo wurde aktiviert - Meeting Automation"
+    smtp_success = await asyncio.get_event_loop().run_in_executor(
+        None, _send_via_smtp, email, subject, html_body
+    )
+    if smtp_success:
+        logger.info(f"Customer activation email sent via SMTP to {email}")
+        return
+    # Fallback to n8n
+    try:
+        payload = {
+            "event": "customer_activated",
+            "email": email,
+            "full_name": full_name,
+            "company_name": company_name,
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                settings.N8N_WEBHOOK_CUSTOMER_ACTIVATED,
+                json=payload,
+                timeout=10.0
+            )
+            response.raise_for_status()
+            logger.info(f"Customer activation email sent via n8n to {email}")
+    except Exception as e:
+        logger.error(f"Failed to send customer activation email: {e}")
+
+
+@celery_app.task(name="send_customer_activated_email", bind=True, max_retries=3)
+def send_customer_activated_email(self, email: str, full_name: str, company_name: str):
+    """Celery task to notify customer about subscription activation."""
+    _run_async(_send_customer_activated_email(email, full_name, company_name))

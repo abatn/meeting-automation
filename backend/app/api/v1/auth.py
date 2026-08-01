@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime  # Phase 188
 from typing import Any
 import uuid
 import secrets
@@ -26,7 +26,7 @@ from app.services.client_service import ClientService
 from app.services.user_service import UserService
 from app.utils.rate_limit import create_rate_limiter
 from app.utils.password_validation import validate_password
-from app.tasks.email_tasks import send_invitation_email
+from app.tasks.email_tasks import send_invitation_email, send_admin_new_tenant_notification
 from datetime import timezone
 
 logger = logging.getLogger(__name__)
@@ -157,6 +157,16 @@ async def login(
     elif user.status != UserStatus.ACTIVE.value:
         raise HTTPException(status_code=400, detail="Inactive user")
 
+    # Phase 188: Manual Tenant Activation — Client subscription_status Check
+    client_stmt = select(Client).where(Client.id == user.client_id)
+    client_result = await db.execute(client_stmt)
+    client = client_result.scalar_one_or_none()
+    if client and client.subscription_status != SubscriptionStatus.ACTIVE:
+        raise HTTPException(
+            status_code=403,
+            detail="Ihr Abo wartet auf Aktivierung. Bitte kontaktieren Sie den Administrator."
+        )
+
     # Generate token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(
@@ -228,9 +238,13 @@ async def register(
             detail="A company with this name already exists.",
         )
     
+    # Phase 188: E2E bypass — Client sofort ACTIVE in Tests
+    _e2e = os.getenv("E2E_TEST", "").lower() == "true"
+    client_status = SubscriptionStatus.ACTIVE if _e2e else SubscriptionStatus.PENDING
     client = await client_service.create_client(
         company_name=company_name,
-        plan=SubscriptionPlan[user_in.plan] if hasattr(SubscriptionPlan, user_in.plan) else SubscriptionPlan.GRATUIT
+        plan=SubscriptionPlan[user_in.plan] if hasattr(SubscriptionPlan, user_in.plan) else SubscriptionPlan.GRATUIT,
+        status=client_status
     )
 
     # Determine role (first user = dg, otherwise participant)
@@ -239,7 +253,6 @@ async def register(
         role_name = user_in.role or "participant"
 
     # Create user
-    _e2e = os.getenv("E2E_TEST", "").lower() == "true"
     user = await user_service.create_user(
         email=user_in.email,
         password=user_in.password,
@@ -266,7 +279,7 @@ async def register(
                 status_code=400,
                 detail="Consent decisions are required to create an account.",
             )
-        grants = [(ConsentType(g.consent_type.value), g.consented) for g in user_in.consents]
+        grants = [(ConsentType(g["consent_type"] if isinstance(g, dict) else g.consent_type.value), g["consented"] if isinstance(g, dict) else g.consented) for g in user_in.consents]
         # Required consents: C1 (AUDIO), C3 (SHARING), C4 (STORAGE)
         granted = {t: c for t, c in grants}
         missing_required = [
@@ -347,6 +360,15 @@ async def register(
         company_name=client.company_name,
         activation_link=activation_link
     )
+
+    # Phase 188: Notify admin about new tenant (via n8n webhook)
+    if not _e2e:
+        send_admin_new_tenant_notification.delay(
+            client_id=client.id,
+            company_name=client.company_name,
+            plan=user_in.plan or "GRATUIT",
+            email=user.email
+        )
 
     return User(
         id=user.id,

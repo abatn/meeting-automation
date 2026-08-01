@@ -67,7 +67,7 @@ def test_c5_default_plan_minutes_fallback():
     from app.services.client_service import DEFAULT_PLAN_MINUTES
     from app.models.client import SubscriptionPlan
     
-    assert DEFAULT_PLAN_MINUTES[SubscriptionPlan.GRATUIT] == 120
+    assert DEFAULT_PLAN_MINUTES[SubscriptionPlan.GRATUIT] == 15
     assert DEFAULT_PLAN_MINUTES[SubscriptionPlan.PRO] == 1800
     assert DEFAULT_PLAN_MINUTES[SubscriptionPlan.ENTREPRISE] == 3600
 
@@ -76,7 +76,7 @@ def test_c6_default_plan_config_fallback():
     """C6: DEFAULT_PLAN_CONFIG fallback exists in BillingService"""
     from app.services.billing_service import DEFAULT_PLAN_CONFIG
     
-    assert DEFAULT_PLAN_CONFIG["GRATUIT"]["minutes"] == 120
+    assert DEFAULT_PLAN_CONFIG["GRATUIT"]["minutes"] == 15
     assert DEFAULT_PLAN_CONFIG["GRATUIT"]["price"] == 0.0
     assert DEFAULT_PLAN_CONFIG["PRO"]["minutes"] == 1800
     assert DEFAULT_PLAN_CONFIG["PRO"]["price"] == 99.0

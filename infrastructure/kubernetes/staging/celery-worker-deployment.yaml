@@ -22,14 +22,14 @@ spec:
       - name: celery-worker
         image: docker.io/batnini/meeting-automation-backend:latest
         imagePullPolicy: Always
-        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_gratuit,email,maintenance"]
+        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription,transcription_gratuit,email,maintenance"]
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "100m"
+            memory: "1500Mi"
+            cpu: "200m"
             ephemeral-storage: "200Mi"
           limits:
-            memory: "1Gi"
+            memory: "3Gi"
             cpu: "500m"
             ephemeral-storage: "1Gi"
         livenessProbe:

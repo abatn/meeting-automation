@@ -107,3 +107,69 @@ Status: "gelöst + deployed" mit Dokumentation:
 - KEINE Image-Prunes (`docker system prune`, `k3s ctr images prune --all`).
 - KEINE Hardcodierung (IP/CIDR/Domain) — nur Settings-Variablen + Label-basierte NP.
 - KEINE Löschung von Fehler-Reporting (Löschen ist verboten).
+
+---
+
+## Nachtrag: Session 2026-07-30 — Neue Probleme + Fixes
+
+### Was passiert ist
+
+Während der Pipeline-Tests (E2E Recording → PV) wurde OnlyOffice erneut getestet. Folgende neue Probleme gefunden:
+
+### Problem A: Gladia API Key abgelaufen (401 Unauthorized)
+- **Symptom:** Alle Recordings failed in <1s
+- **Beweis:** `audit_logs.new_values` → `Client error '401 Unauthorized' for url 'https://api.gladia.io/v2/upload'`
+- **Fix:** Neuer Key `sk_gladia_3b160f9c77f74f49bd5fa388630caa6b` in K8s Secret `backend-secrets-staging` + `.env`
+- **Ergebnis:** Pipeline completed in 47s ✅
+
+### Problem B: FREE Worker Crash-Loop (Liveness Probe)
+- **Symptom:** Celery Worker alle ~90s restarted, Queues stauen sich (45+ Messages)
+- **Beweis:** `kubectl describe pod` → `Liveness probe failed: celery inspect ping timed out`
+- **Fix:** Queue-Flush (`rabbitmqctl purge_queue`) + Disk-Cleanup (94%→90%)
+- **Ergebnis:** Workers stabil, 0 Restarts ✅
+
+### Problem C: ConfigMap `onlyoffice-custom-config` korrumpiert
+- **Symptom:** OnlyOffice DocService crasht → `Cannot parse config file: SyntaxError: JSON5: invalid character 'e' at 1:1`
+- **Ursache 1:** `ds-docservice.conf` wurde auf 0 Bytes geleert durch `--from-literal=ds-docservice.conf=""`
+- **Ursache 2:** `local.json` wurde durch postStart-Hook `echo`-Output korrumpiert
+- **Fix:** ConfigMap mit korrekten Dateien wiederhergestellt:
+  - `local.json` (895 Bytes) aus `docs/onlyoffice_aufbau.md`
+  - `ds-docservice.conf` (3579 Bytes) aus Container-Image via `docker run --rm --entrypoint cat`
+- **Ergebnis:** OnlyOffice healthcheck `true`, 0 Restarts ✅
+
+### Problem D: Staging-YAML ohne ConfigMount
+- **Symptom:** `storage.externalHost` fehlt im laufenden Pod (ConfigMap korrekt, aber nicht gemountet)
+- **Status:** Staging-YAML hat kein `initContainer`/`volumes`/`volumeMounts` (im Gegensatz zum Production-YAML)
+- **Auswirkung:** OnlyOffice funktioniert trotzdem (Browser-Test bestätigt) — `externalHost` ist nur für HTTPS-Cache-URLs nötig, nicht für den Editor selbst
+- **Offen:** Sollte für Production-Deploy nachgeholt werden (siehe Lesson O14 in `docs/onlyoffice_aufbau.md`)
+
+### Neue Lessons (→ docs/onlyoffice_aufbau.md)
+
+| Lesson | Regel |
+|--------|-------|
+| O14 | Entry-Point überschreibt GESAMTE `local.json`. Staging-YAML MUSS initContainer + volumes haben (für Production). |
+| O15 | `ds-docservice.conf` darf NIEMALS leer sein (0 Bytes → DocService crash). |
+| O16 | `kubectl create configmap` ohne `--from-file=ds-docservice.conf` löscht den Key. |
+| O17 | postStart-Hook mit `sed` ist fragil — echo-Output kann in JSON landen. |
+
+### Geänderte Dateien (diese Session)
+
+| Datei | Änderung |
+|-------|----------|
+| `docs/onlyoffice_aufbau.md` | Lessons O14-O17 + kritische Regeln für ConfigMap-Updates + aktualisierte Deploy-Checkliste |
+| `ONLYOFFICE_DOWNLOAD_FAILED_PLAN.md` | Dieser Nachtrag |
+| K8s Secret `backend-secrets-staging` | Neuer Gladia API Key |
+| K8s ConfigMap `onlyoffice-custom-config` | Korrekte `local.json` + `ds-docservice.conf` wiederhergestellt |
+
+### Verifikation (2026-07-30, bestanden)
+
+| Check | Ergebnis |
+|-------|----------|
+| Login tido tado | ✅ HTTP 200, JWT 249 chars |
+| GET /api/v1/pv/{pv_id} | ✅ PV + Content + 5 Actions |
+| GET /api/v1/pv/{pv_id}/onlyoffice/config | ✅ Editor-Config (docx, fr, user=tido tado, JWT-Token) |
+| OnlyOffice healthcheck | ✅ `true` |
+| DOCX fetch (intern) | ✅ HTTP 200, 37KB |
+| /web-apps via Ingress | ✅ HTTP 200 |
+| E2E Pipeline (Login→Meeting→Recording→PV) | ✅ Completed in 47s |
+| Multi-Tenancy (dg→tido PV) | ✅ "PV not found" (korrekt) |

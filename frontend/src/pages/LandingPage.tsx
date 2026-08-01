@@ -42,7 +42,7 @@ const LandingPage: React.FC = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
   const [pricingPlans, setPricingPlans] = useState<Record<string, { price: number; minutes: number | null }>>({
-    GRATUIT: { price: 0, minutes: 120 },
+    GRATUIT: { price: 0, minutes: 15 },
     PRO: { price: 199, minutes: 1800 },
     ENTREPRISE: { price: 399, minutes: 3600 },
   });
@@ -85,7 +85,7 @@ const LandingPage: React.FC = () => {
       try {
         const plans = await cmsService.getPricing(i18n.language);
         const planMap: Record<string, { price: number; minutes: number | null }> = {
-          GRATUIT: { price: 0, minutes: 120 },
+          GRATUIT: { price: 0, minutes: 15 },
           PRO: { price: 199, minutes: 1800 },
           ENTREPRISE: { price: 399, minutes: 3600 },
         };
@@ -427,7 +427,7 @@ const LandingPage: React.FC = () => {
                       </Stack>
                     ))}
                   </Stack>
-                  <Button fullWidth variant={p.h ? "contained" : "outlined"} sx={{ py: 2, borderRadius: '12px', fontWeight: 800, bgcolor: p.h ? '#FFF' : 'transparent', color: p.h ? '#000' : '#FFF', border: p.h ? 'none' : '1px solid rgba(255,255,255,0.2)' }} onClick={() => navigate('/register')}>{[t('landing.pricing.start_free'), t('landing.pricing.start_pro'), t('landing.pricing.start_enterprise')][i]}</Button>
+                  <Button fullWidth variant={p.h ? "contained" : "outlined"} sx={{ py: 2, borderRadius: '12px', fontWeight: 800, bgcolor: p.h ? '#FFF' : 'transparent', color: p.h ? '#000' : '#FFF', border: p.h ? 'none' : '1px solid rgba(255,255,255,0.2)' }} onClick={() => navigate(`/register?plan=${p.planCode}`)}>{[t('landing.pricing.start_free'), t('landing.pricing.start_pro'), t('landing.pricing.start_enterprise')][i]}</Button>
                 </Box>
               </Grid>
               );

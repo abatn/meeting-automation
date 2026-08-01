@@ -738,3 +738,263 @@ Verifiziert: `/doc/` → OnlyOffice Socket.IO (HTTP 400 `Transport unknown` stat
   nicht den Editor neu bauen.
 - **O1/O2 WIDERLEGT** — `document.url` wird vom Backend (Document-Server) geladen, nicht vom Browser.
   Interne `ONLYOFFICE_BACKEND_URL` korrekt; PUBLIC_BACKEND_URL war falscher Ansatz (→ ECONNREFUSED).
+
+---
+
+# Phase 187: celery-worker-pro-staging Missing nach k3s Reinstall (2026-07-31)
+
+## Status: 🔴 OFFEN — PRO/ENTREPRISE Queue-Routing defekt
+
+## Problem
+
+| Symptom | Beweis |
+|---------|--------|
+| `celery-worker-pro-staging` Deployment existiert nicht in k3s | `kubectl get deploy -n meeting-automation-staging` → kein `celery-worker-pro-staging` |
+| PRO/ENTREPRISE Recordings landen in `transcription_pro` Queue mit 0 Consumers | `kubectl exec rabbitmq-staging-0 -- rabbitmqctl list_queues name messages consumers` → `transcription_pro` hat Messages aber 0 Consumers |
+| GRATUIT Worker läuft (2x) aber konsumiert NUR `transcription_gratuit` + `transcription` | Worker-Logs: Queues `transcription`, `transcription_gratuit`, `email`, `maintenance` |
+| Sentinel LLM wird nie getriggert (braucht PRO Worker) | Kein `Sentinel` oder `TIMING` Log-Eintrag |
+
+## Root Cause
+
+**`setup-kubernetes-staging.sh` hat `celery-worker-pro-deployment.yaml` NICHT in der MANIFESTS-Liste.**
+
+Das Script deployt nur:
+- `celery-worker-deployment.yaml` (GRATUIT) ✅
+- `celery-beat-deployment.yaml` ✅
+- **FEHLT:** `celery-worker-pro-deployment.yaml` ❌
+
+Nach k3s Reinstall + `bash setup-kubernetes-staging.sh` wurde PRO Worker nie erstellt.
+
+## Auswirkung
+
+| Tenant | Queue | Worker vorhanden? | Pipeline funktional? |
+|--------|-------|-------------------|---------------------|
+| GRATUIT | `transcription_gratuit` | ✅ celery-worker-staging (2x) | ✅ Ja (Fallback, kein LLM) |
+| PRO | `transcription_pro` | ❌ FEHLT | ❌ Nein — Recording hängt auf `transcribing` |
+| ENTREPRISE | `transcription_pro` | ❌ FEHLT | ❌ Nein — Recording hängt auf `transcribing` |
+
+## Plan
+
+### Schritt 1: Script fixen (1 Zeile)
+
+**Datei:** `scripts/setup-staging-cluster.sh`
+**Änderung:** `celery-worker-pro-deployment.yaml` zur MANIFESTS-Liste hinzufügen
+
+```bash
+# VORHER (MANIFESTS-Liste):
+MANIFESTS=(
+    ...
+    "celery-worker-deployment.yaml"
+    "celery-beat-deployment.yaml"
+    "backend-deployment.yaml"
+    ...
+)
+
+# NACHHER:
+MANIFESTS=(
+    ...
+    "celery-worker-deployment.yaml"
+    "celery-worker-pro-deployment.yaml"    # ← NEU
+    "celery-beat-deployment.yaml"
+    "backend-deployment.yaml"
+    ...
+)
+```
+
+### Schritt 2: NetworkPolicies prüfen (K23)
+
+`celery-worker-pro-staging` braucht `podSelector` in:
+- `rabbitmq-policy` (From)
+- `redis-policy` (From)
+- `postgres-policy` (From)
+- `minio-policy` (From)
+- `cnpg-policy` (From)
+
+Beweis: Phase 171 hat genau daran versagt (226 Restarts, Connection refused).
+
+### Schritt 3: Image + Import + Deploy
+
+```bash
+# Image muss bereits existieren (SKIP_SENTINEL=false)
+# Nur Deploy:
+kubectl apply -f infrastructure/kubernetes/staging/celery-worker-pro-deployment.yaml -n meeting-automation-staging
+```
+
+### Schritt 4: Verifikation
+
+```bash
+# 1. Pod Status
+kubectl get pods -n meeting-automation-staging | grep celery-worker-pro
+# Erwartung: 1/1 Running, 0 Restarts
+
+# 2. Worker Ready
+kubectl logs deployment/celery-worker-pro-staging -n meeting-automation-staging --tail=5 | grep ready
+# Erwartung: celery@celery-worker-pro-staging-... ready.
+
+# 3. Queue Consumers
+kubectl exec rabbitmq-staging-0 -n meeting-automation-staging -- rabbitmqctl list_queues name messages consumers | grep transcription_pro
+# Erwartung: transcription_pro    X    1 (oder 2)
+
+# 4. Sentinel Init (bei erstem PRO Recording)
+kubectl logs deployment/celery-worker-pro-staging -n meeting-automation-staging | grep -i sentinel
+# Erwartung: Sentinel (Qwen-1.5B) initialized successfully
+```
+
+## Zusammenhang mit docker-compose
+
+| Umgebung | Config-Datei | celery-worker? | celery-worker-pro? |
+|----------|-------------|----------------|--------------------|
+| Lokales Staging | `docker-compose.yml` | ✅ Service definiert | ❌ Nicht separat (eine Queue reicht lokal) |
+| E2E Tests | `docker-compose.e2e.yml` | ❌ Fehlt (nicht nötig, E2E_TEST=true = eager mode) | ❌ Fehlt |
+| k3s Staging | `setup-kubernetes-staging.sh` + YAMLs | ✅ `celery-worker-deployment.yaml` | ❌ **FEHLT im Script** |
+
+## HARTE LESSON
+
+- **K24 — `setup-kubernetes-staging.sh` MUSS ALLE Worker-Tiers in der MANIFESTS-Liste haben**: Das Script war ursprünglich für ein-Tier-Setup gebaut (Phase 159 fügte PRO Worker hinzu, aber vergaß das Script zu updaten). Jeder neue Worker-Tier MUSS in die MANIFESTS-Liste eingetragen werden.
+- **K25 — k3s Reinstall verliert ALLE Deployments**: PVCs bleiben (local-path), aber Deployments/Services/Secrets/ConfigMaps gehen verloren. Nach jedem k3s Reinstall MUSS `setup-kubernetes-staging.sh` komplett durchlaufen — und das Script muss ALLES enthalten.
+
+## Offene Punkte
+
+| # | Punkt | Status |
+|---|-------|--------|
+| 1 | `setup-kubernetes-staging.sh` fixen (1 Zeile) | ⏳ Offen |
+| 2 | NetworkPolicies für PRO Worker prüfen/ergänzen | ⏳ Offen |
+| 3 | PRO Worker in k3s deployen | ⏳ Offen |
+| 4 | E2E Pipeline-Test (PRO Recording → Sentinel → PV) | ⏳ Offen |
+| 5 | GRATUIT Queue-Routing Test (15-Min-Limit) | ⏳ Offen |
+
+---
+
+# Phase 188: Manual Tenant Activation (2026-07-31)
+
+## Status: ✅ ABGESCHLOSSEN — 8/8 E2E Tests bestanden, Backend + Frontend deployed
+
+## Problem
+Kunde wählt auf Landing Page ein Abo (GRATUIT/PRO/ENTREPRISE), registriert sich, und kann sofort einloggen. Es gibt keinen Admin-Approval-Prozess. Jeder neue Tenant ist sofort aktiv — ohne Vertragsklärung, Zahlung oder Admin-Freigabe.
+
+## Ziel
+Manueller Aktivierungs-Flow: Kunde registriert sich → aktiviert Account per Email → **kann sich aber NICHT einloggen** → ruft Admin an → Admin aktiviert Client im Dashboard → Kunde kann die App nutzen.
+
+## User Journey
+```
+Kunde → Landing Page → /register?plan=PRO → Formular
+  → Backend: Client(PENDING) + User(PENDING)
+  → Email #1: "Aktivieren Sie Ihren Account" (Aktivierungs-Link)
+  → Kunde klickt Link → setzt Passwort → User wird ACTIVE
+  
+  ABER: Kunde kann sich NOCH NICHT einloggen!
+  → Login gibt HTTP 403: "Bitte kontaktieren Sie den Administrator"
+  
+  → Kunde ruft Admin an → erklärt Abo + Zahlung
+  → Admin aktiviert Client im Dashboard (/admin/clients)
+  → Email #2 an Kunde via n8n: "Ihr Abo wurde aktiviert"
+  → Kunde kann sich jetzt einloggen und die App nutzen
+```
+
+## Technische Analyse (10/10 verifiziert gegen echten Code)
+
+| # | Claim | Code-Beweis | Verifiziert |
+|---|-------|-------------|-------------|
+| 1 | `create_client()` Default `status=ACTIVE` | `client_service.py:43` | ✅ |
+| 2 | Login prüft nur `user.status`, NICHT `client.subscription_status` | `auth.py:194` | ✅ |
+| 3 | `PATCH /admin/clients/{id}/status` existiert | `admin.py:100` | ✅ |
+| 4 | `adminService.updateClientStatus()` existiert | `adminService.ts:41` | ✅ |
+| 5 | ClientList Activate-Button funktioniert mit PENDING | `ClientList.tsx:48,108` | ✅ |
+| 6 | AdminDashboard PENDING-KPI existiert | `AdminDashboard.tsx:108` | ✅ |
+| 7 | Landing Page übergibt keinen Plan-Parameter | `LandingPage.tsx:430` | ✅ |
+| 8 | n8n Webhook Pattern funktioniert (SMTP + n8n) | `email_tasks.py:150` | ✅ |
+| 9 | E2E Bypass (`_e2e`) existiert | `auth.py:303` | ✅ |
+| 10 | `SubscriptionStatus.PENDING` Enum existiert | `client.py:24` | ✅ |
+
+## Was BEREITS existiert (NICHT ändern)
+
+| Komponente | Beweis |
+|------------|--------|
+| ClientList "Activate" Button | `ClientList.tsx:48-56` — toggelt ACTIVE/DISABLED, PENDING→ACTIVE funktioniert |
+| AdminDashboard "Pending Clients" KPI | `AdminDashboard.tsx:108` — `stats.status_distribution['PENDING']` |
+| ClientDetails Status-Chip (gelb) | `ClientDetails.tsx:68` — PENDING=warning, ACTIVE=success |
+| `PATCH /admin/clients/{id}/status` Endpoint | `admin.py:100` — akzeptiert jeden SubscriptionStatus + Audit-Log |
+| `adminService.updateClientStatus()` | `adminService.ts:41` — `api.patch(/admin/clients/${id}/status, {status})` |
+| `SubscriptionStatus.PENDING` Enum | `client.py:24` |
+| n8n Webhook `user-invited` (SMTP + n8n Fallback) | `email_tasks.py:150-158` |
+| CheckEmailPage (Aktivierungs-Link + Resend) | `CheckEmailPage.tsx` |
+| ConsentDialog | Bleibt wie ist |
+| Stripe Webhook (setzt ACTIVE nach Bezahlung) | Bleibt korrekt |
+
+## Schritt-für-Schritt Plan (5 Dateien, ~55 Zeilen)
+
+| # | Datei | Zeile | Änderung | Zeilen |
+|---|-------|-------|----------|--------|
+| 1 | `backend/app/services/client_service.py` | 43 | Default `status=SubscriptionStatus.ACTIVE` → `SubscriptionStatus.PENDING` | 1 |
+| 2 | `backend/app/api/v1/auth.py` | ~196 | Login-Gate: Nach User-Status-Check prüfen `client.subscription_status != ACTIVE` → HTTP 403 | 5 |
+| 3 | `backend/app/api/v1/auth.py` | ~345 | Admin-Notification: `send_admin_new_tenant_notification.delay(client_id, company_name, plan, email)` | 3 |
+| 4 | `backend/app/tasks/email_tasks.py` | neu | Neuer Celery Task: `send_admin_new_tenant_notification` → n8n Webhook `admin-new-tenant` → Email an Admin | 30 |
+| 5 | `backend/app/core/config.py` | ~63 | `N8N_WEBHOOK_ADMIN_NEW_TENANT = "http://n8n:5678/webhook/admin-new-tenant"` | 1 |
+| 6 | `backend/app/api/v1/admin.py` | ~110 | In `update_client_status`: wenn PENDING→ACTIVE, `send_customer_activated_email.delay(email, name)` triggern | 10 |
+| 7 | `backend/app/tasks/email_tasks.py` | neu | Neuer Celery Task: `send_customer_activated_email` → n8n Webhook `customer-activated` → Email an Kunde | 30 |
+| 8 | `backend/app/core/config.py` | ~63 | `N8N_WEBHOOK_CUSTOMER_ACTIVATED = "http://n8n:5678/webhook/customer-activated"` | 1 |
+| 9 | `frontend/src/pages/LandingPage.tsx` | 430 | Pricing-Buttons: `navigate('/register?plan=GRATUIT')` / `?plan=PRO` / `?plan=ENTREPRISE` | 3 |
+| 10 | `backend/app/api/v1/auth.py` | ~305 | E2E Bypass: `client_status = SubscriptionStatus.ACTIVE if _e2e else SubscriptionStatus.PENDING` | 2 |
+
+## n8n Workflows (2 neue)
+
+### Workflow 1: `admin-new-tenant`
+```
+Trigger: Webhook POST /webhook/admin-new-tenant
+Body: { company_name, plan, email, client_id }
+Action: SendGrid/SMTP → admin@meeting.tn
+Subject: "Neuer Kunde: {company_name} ({plan}) wartet auf Aktivierung"
+Body: Link zu /admin/clients/{client_id}
+```
+
+### Workflow 2: `customer-activated`
+```
+Trigger: Webhook POST /webhook/customer-activated
+Body: { email, full_name, company_name }
+Action: SendGrid/SMTP → {email}
+Subject: "Ihr Abo wurde aktiviert"
+Body: "Sie können sich jetzt einloggen: {login_url}"
+```
+
+## Login-Gate (Schritt 2 — KRITISCH)
+```python
+# auth.py login endpoint — NACH user.status Check (~Zeile 196)
+from app.models.client import Client, SubscriptionStatus
+client_result = await db.execute(select(Client).where(Client.id == user.client_id))
+client = client_result.scalar_one_or_none()
+if client and client.subscription_status != SubscriptionStatus.ACTIVE:
+    raise HTTPException(
+        status_code=403,
+        detail="Ihr Abo wartet auf Aktivierung. Bitte kontaktieren Sie den Administrator."
+    )
+```
+
+## Betroffene Tests
+
+| Test | Problem | Lösung |
+|------|---------|--------|
+| `test_auth.py` | Registration erwartet Client=ACTIVE | `E2E_TEST=true` Bypass |
+| `conftest.py` Fixtures | Clients mit ACTIVE | Fixtures bleiben (Test-Clients sind aktiv) |
+| 365 E2E Tests | Erwarten funktionierenden Login | `E2E_TEST=true` → Client=ACTIVE |
+
+## Zusammenfassung
+
+| Aspekt | Detail |
+|--------|--------|
+| Dateien geändert | 5 (client_service.py, auth.py, email_tasks.py, config.py, admin.py, LandingPage.tsx) |
+| Neue Dateien | 0 |
+| Neue n8n Workflows | 2 (admin-new-tenant, customer-activated) |
+| Bestehende Tests | 365 — unverändert (E2E Bypass) |
+| Enum-Änderungen | 0 (PENDING existiert bereits) |
+| DB-Migration | 0 (Schema unverändert) |
+| Frontend-Änderungen | 1 Datei (LandingPage.tsx — 3 Zeilen) |
+| Gesamt Zeilen Code | ~55 Zeilen |
+
+## Offene Fragen
+
+| # | Frage | Antwort (Stand 2026-07-31) |
+|---|-------|---------------------------|
+| 1 | Welche Pläne brauchen Admin-Aktivierung? | **ALLE** (GRATUIT, PRO, ENTREPRISE) |
+| 2 | Wer ist der Admin? | **system_admin** Rolle (Dashboard: /admin) |
+| 3 | Wie wird Admin benachrichtigt? | **n8n Webhook → Email** an admin@meeting.tn |
+| 4 | Login-Gate oder Banner? | **Login-Gate** — Kunde kann sich erst einloggen NACH Admin-Aktivierung |

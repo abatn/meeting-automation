@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Fallback values if CMS pricing_plans not found
 DEFAULT_PLAN_MINUTES = {
-    SubscriptionPlan.GRATUIT: 120,    # 2 hours (matches Teams Free limit)
+    SubscriptionPlan.GRATUIT: 15,    # 15 minutes (matches Teams Free limit)
     SubscriptionPlan.PRO: 1800,       # 30 hours (matches Microsoft Teams Pro)
     SubscriptionPlan.ENTREPRISE: 3600  # 60 hours (2x Teams Enterprise)
 }
@@ -40,7 +40,7 @@ class ClientService:
         self,
         company_name: str,
         plan: SubscriptionPlan = SubscriptionPlan.GRATUIT,
-        status: SubscriptionStatus = SubscriptionStatus.ACTIVE
+        status: SubscriptionStatus = SubscriptionStatus.PENDING
     ) -> Client:
         """Create a new client (tenant)."""
         # Get minutes from CMS pricing_plans or use default

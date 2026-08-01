@@ -121,7 +121,7 @@ async def ensure_pricing_plans_exist():
                 "plan_code": "GRATUIT",
                 "price_monthly": 0,
                 "price_yearly": 0,
-                "minutes_included": 120,
+                "minutes_included": 15,
                 "features": [
                     {"en": "Basic Transcription", "fr": "Transcription de base"},
                     {"en": "1 PV per meeting", "fr": "1 PV par réunion"},

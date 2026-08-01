@@ -796,4 +796,10 @@ kubectl rollout restart deployment/backend ...
 - Keine manuellen `kubectl create` Schritte mehr nötig
 - Port-Forwards werden alle korrekt beendet
 - Production Deploy aktualisiert alle Deployments (inkl. celery-beat)
+
+### Commit
+
+| Commit | Inhalt | pushed? |
+|--------|--------|---------|
+| `ff410384` | Pipeline + 3 YAMLs (frontend-nginx-config, onlyoffice-custom-config, sentinel-models-claim) | JA |
 ```

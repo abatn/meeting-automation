@@ -257,7 +257,7 @@ Stelle sicher, dass folgende Secrets in GitHub existieren:
 ```bash
 # API Keys (aus deiner lokalen .env)
 MISTRAL_API_KEY_STAGING=f0w0biJU2uurFRXXvXo3zQmOW1zap1VU
-GLADIA_API_KEY_STAGING=0caddff8-895b-4e18-8acd-40aa8756fa6a
+GLADIA_API_KEY_STAGING=sk_gladia_3b160f9c77f74f49bd5fa388630caa6b
 
 # E2E Test User
 STAGING_E2E_USER_EMAIL=e2e-tester@staging.meeting.tn
