@@ -200,7 +200,7 @@ async def get_revenue_statistics(
         price_stmt = select(PricingPlan.price_monthly).where(PricingPlan.plan_code == plan_code, PricingPlan.is_active == True)
         price_result = await db.execute(price_stmt)
         price_row = price_result.scalar_one_or_none()
-        prices[plan_code] = price_row if price_row else (99 if plan_code == "PRO" else 499)
+        prices[plan_code] = price_row if price_row else (199 if plan_code == "PRO" else 399)
     
     # 4. Calculate Estimated Monthly Revenue (only ACTIVE clients)
     revenue = 0

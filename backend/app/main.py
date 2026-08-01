@@ -121,6 +121,7 @@ async def ensure_pricing_plans_exist():
                 "plan_code": "GRATUIT",
                 "price_monthly": 0,
                 "price_yearly": 0,
+                "currency": "TND",
                 "minutes_included": 15,
                 "features": [
                     {"en": "Basic Transcription", "fr": "Transcription de base"},
@@ -135,8 +136,9 @@ async def ensure_pricing_plans_exist():
                 "id": str(_uuid.uuid4()),
                 "name": {"en": "Pro", "fr": "Pro"},
                 "plan_code": "PRO",
-                "price_monthly": 99,
-                "price_yearly": 990,
+                "price_monthly": 199,
+                "price_yearly": 1990,
+                "currency": "TND",
                 "minutes_included": 1800,
                 "features": [
                     {"en": "Sentinel LLM Summarization", "fr": "Résumé par Sentinel LLM"},
@@ -152,8 +154,9 @@ async def ensure_pricing_plans_exist():
                 "id": str(_uuid.uuid4()),
                 "name": {"en": "Enterprise", "fr": "Entreprise"},
                 "plan_code": "ENTREPRISE",
-                "price_monthly": 499,
-                "price_yearly": 4990,
+                "price_monthly": 399,
+                "price_yearly": 3990,
+                "currency": "TND",
                 "minutes_included": 3600,
                 "features": [
                     {"en": "Everything in Pro", "fr": "Tout dans Pro"},

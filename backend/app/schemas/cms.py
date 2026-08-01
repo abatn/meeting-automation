@@ -71,6 +71,7 @@ class PricingPlanBase(BaseModel):
     plan_code: Optional[str] = None
     price_monthly: int
     price_yearly: Optional[int] = None
+    currency: Optional[str] = "TND"
     # minutes_included for this plan
     minutes_included: Optional[int] = None
     features: list
@@ -89,6 +90,7 @@ class PricingPlanUpdate(BaseModel):
     plan_code: Optional[str] = None
     price_monthly: Optional[int] = None
     price_yearly: Optional[int] = None
+    currency: Optional[str] = None
     minutes_included: Optional[int] = None
     features: Optional[list] = None
     stripe_price_id: Optional[str] = None

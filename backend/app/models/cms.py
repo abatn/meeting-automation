@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import Column, String, Integer, Boolean, Text, JSON, DateTime, func
+from sqlalchemy import Column, String, Integer, Boolean, Text, JSON, DateTime, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from app.core.database import Base
@@ -47,6 +47,7 @@ class PricingPlan(Base):
     plan_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, index=True)
     price_monthly: Mapped[int] = mapped_column(Integer)
     price_yearly: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True, server_default=text("'TND'"), default="TND")
     # minutes_included for this plan (replaces hardcoded values)
     minutes_included: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     features: Mapped[list] = mapped_column(JSON)
