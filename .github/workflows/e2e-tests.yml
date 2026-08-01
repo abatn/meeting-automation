@@ -167,12 +167,17 @@ jobs:
         REMAINING=$(kubectl get pods -n meeting-automation-staging --no-headers 2>&1 | grep -v Running | grep -v Pending | wc -l)
         echo "Remaining non-running pods: $REMAINING"
 
+    - name: Deploy All Staging Resources (idempotent)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        # Apply ALL staging YAMLs — idempotent (create or update)
+        # Includes: secrets, configmaps, PVCs, deployments, services, network policies, cronjobs
+        kubectl apply -f infrastructure/kubernetes/staging/ -n meeting-automation-staging
+        echo "✅ All staging resources applied"
+
     - name: Deploy Backend to Staging
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        # Apply backend secrets and configuration
-        kubectl apply -f infrastructure/kubernetes/staging/backend-secrets.yaml -n meeting-automation-staging
-        kubectl apply -f infrastructure/kubernetes/staging/backend-config.yaml -n meeting-automation-staging
         # Set the new image tag — update BOTH backend and alembic-migrate init container
         kubectl set image deployment/backend \
           backend=${{ env.IMAGE_NAME }}:${{ github.sha }} \
@@ -272,10 +277,12 @@ jobs:
         # Port-forward DB + Backend + MinIO (same shell, stays alive during tests)
         echo "Starting port-forward for meeting-db-rw, backend, and minio services..."
         kubectl port-forward -n meeting-automation-staging svc/meeting-db-rw 5433:5432 &
+        PF_PID_DB=$!
         kubectl port-forward -n meeting-automation-staging svc/backend 8080:8000 &
+        PF_PID_BACKEND=$!
         kubectl port-forward -n meeting-automation-staging svc/minio-staging 9002:9000 &
-        PF_PID=$!
-        trap "kill $PF_PID 2>/dev/null || true" EXIT
+        PF_PID_MINIO=$!
+        trap "kill $PF_PID_DB $PF_PID_BACKEND $PF_PID_MINIO 2>/dev/null || true" EXIT
 
         # Wait for ports to be ready
         for i in {1..30}; do
@@ -385,7 +392,14 @@ jobs:
         kubectl set image deployment/celery-worker-pro \
           celery-worker=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n meeting-automation --record
+        kubectl set image deployment/celery-beat \
+          celery-beat=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          -n meeting-automation --record
         kubectl rollout status deployment/backend -n meeting-automation --timeout=300s
+        kubectl rollout status deployment/frontend -n meeting-automation --timeout=120s
+        kubectl rollout status deployment/celery-worker -n meeting-automation --timeout=300s
+        kubectl rollout status deployment/celery-worker-pro -n meeting-automation --timeout=300s
+        kubectl rollout status deployment/celery-beat -n meeting-automation --timeout=120s
 
     - name: Run Production Smoke Tests
       run: |
@@ -409,5 +423,6 @@ jobs:
         kubectl rollout undo deployment/frontend -n meeting-automation
         kubectl rollout undo deployment/celery-worker -n meeting-automation
         kubectl rollout undo deployment/celery-worker-pro -n meeting-automation
+        kubectl rollout undo deployment/celery-beat -n meeting-automation
         echo "Rolled back to previous revision"
 
