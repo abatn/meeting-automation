@@ -18,6 +18,38 @@ spec:
         app: celery-worker-pro
         worker-tier: pro
     spec:
+      initContainers:
+      - name: sentinel-download
+        image: busybox:latest
+        command:
+        - sh
+        - -c
+        - |
+          MODEL=/models/qwen2.5-1.5b-instruct-q4_k_m.gguf
+          if [ -f "$MODEL" ]; then
+            SIZE=$(wc -c < "$MODEL")
+            if [ "$SIZE" -gt 900000000 ] && [ "$SIZE" -lt 1500000000 ]; then
+              echo "Model already cached (${SIZE} bytes). Skipping download."
+              exit 0
+            fi
+            echo "Model size ${SIZE} out of range. Re-downloading."
+            rm -f "$MODEL"
+          fi
+          echo "Downloading model from MinIO..."
+          wget -q --timeout=30 --tries=3 \
+            -O "${MODEL}.tmp" \
+            "http://minio:9000/sentinel-models/qwen2.5-1.5b-instruct-q4_k_m.gguf"
+          SIZE=$(wc -c < "${MODEL}.tmp")
+          if [ "$SIZE" -lt 900000000 ] || [ "$SIZE" -gt 1500000000 ]; then
+            echo "ERROR: Downloaded model size ${SIZE} out of range. Removing."
+            rm -f "${MODEL}.tmp"
+            exit 1
+          fi
+          mv "${MODEL}.tmp" "$MODEL"
+          echo "Model downloaded successfully (${SIZE} bytes)."
+        volumeMounts:
+        - name: sentinel-models
+          mountPath: /models
       containers:
       - name: celery-worker
         image: docker.io/batnini/meeting-automation-backend:latest
@@ -25,11 +57,13 @@ spec:
         command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_pro,email,maintenance"]
         resources:
           requests:
-            memory: "1500Mi"
+            memory: "2Gi"
             cpu: "200m"
+            ephemeral-storage: "500Mi"
           limits:
-            memory: "3Gi"
-            cpu: "500m"
+            memory: "6Gi"
+            cpu: "1"
+            ephemeral-storage: "2Gi"
         livenessProbe:
           exec:
             command:
@@ -48,6 +82,13 @@ spec:
             name: backend-secrets
         - configMapRef:
             name: backend-config
+        volumeMounts:
+        - name: sentinel-models
+          mountPath: /app/models
+      volumes:
+      - name: sentinel-models
+        persistentVolumeClaim:
+          claimName: sentinel-models-claim
 ---
 apiVersion: v1
 kind: Service
