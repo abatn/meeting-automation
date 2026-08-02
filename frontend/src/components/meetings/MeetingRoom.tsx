@@ -1452,7 +1452,7 @@ onError={(error) => {
                 variant="contained"
                 fullWidth
                 disableElevation
-                disabled={!(recordingStatus === "completed" && pvId)}
+                disabled={!pvId}
                 onClick={handleEditMenuOpen}
                 startIcon={<EditIcon sx={{ fontSize: 16 }} />}
                 sx={{
@@ -1512,7 +1512,7 @@ onError={(error) => {
                 variant="contained"
                 fullWidth
                 disableElevation
-                disabled={!(recordingStatus === "completed" && pvId) || isValidated || isApproving}
+                disabled={!pvId || isValidated || isApproving}
                 onClick={handleValidatePv}
                 startIcon={
                   isApproving ? <CircularProgress size={16} color="inherit" /> :

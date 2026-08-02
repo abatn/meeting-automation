@@ -162,7 +162,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
             variant="outlined" 
             size="medium" 
             startIcon={<EditIcon />} 
-            disabled={!pvId || !originalTranscript}
+            disabled={!pvId}
             sx={{ borderRadius: 2, textTransform: "none", color: "text.primary", borderColor: "divider", bgcolor: "background.paper", "&:hover": { bgcolor: "action.hover" } }}
             onClick={() => {
               if (pvId) window.open(`/editor/${pvId}?lang=${exportLanguage}`, '_blank');
@@ -174,7 +174,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
           <DocumentExportMenu 
             pvId={pvId || ""} 
             language={exportLanguage} 
-            disabled={!pvId || !originalTranscript}
+            disabled={!pvId}
             variant="outlined"
           />
         </Stack>
@@ -285,7 +285,7 @@ const PVValidator: React.FC<PVValidatorProps> = ({ exportLanguage, onLanguageCha
           disableElevation
           startIcon={isApproving ? <CircularProgress size={16} color="inherit" /> : isValidated ? <CheckIcon /> : <ApproveIcon />}
           onClick={handleApprove}
-          disabled={!pvId || !originalTranscript || isValidated || isApproving}
+          disabled={!pvId || isValidated || isApproving}
           sx={{ 
             bgcolor: isValidated ? "#10B981" : "#3B82F6", 
             color: "#FFF", 
