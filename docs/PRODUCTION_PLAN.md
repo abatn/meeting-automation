@@ -102,18 +102,45 @@ spec:
 
 ### Storage: Longhorn (CNCF, open source) statt EBS
 
-```bash
-# Longhorn — Open Source Block Storage für Kubernetes
-# Bietet: Replikation, Snapshots, Backups, iSCSI/NFS
-helm repo add longhorn https://charts.longhorn.io
-helm upgrade --install longhorn longhorn/longhorn \
-  --namespace longhorn-system --create-namespace
+**Status**: ⏳ NOCH NICHT INSTALLIERT auf Contabo Production (2026-08-02)
 
-# Als Default StorageClass setzen
-kubectl annotate storageclass longhorn storageclass.kubernetes.io/is-default-class=true
+**CI/CD Impact**: Die `deploy-production` Pipeline wird fehlschlagen solange Longhorn nicht installiert ist:
+- `kubectl apply -f longhorn-cleanup-cronjob.yaml -n longhorn-system` → Error: namespace not found
+- **Das ist beabsichtigt** — dient als Qualitäts-Tor für Production Readiness
+
+**Installations-Schritte für Contabo:**
+```bash
+# 1. Longhorn installieren
+helm repo add longhorn https://charts.longhorn.io
+helm repo update
+helm upgrade --install longhorn longhorn/longhorn \
+  --namespace longhorn-system --create-namespace \
+  --set defaultSettings.defaultReplicaCount=2 \
+  --set defaultSettings.defaultDataLocality="best-effort"
+
+# 2. Als Default StorageClass setzen
+kubectl annotate storageclass longhorn storageclass.kubernetes.io/is-default-class=true --overwrite
+
+# 3. StorageClass überprüfen
+kubectl get storageclass
+# Erwartet: longhorn (default) ✅
+
+# 4. PVCs für StatefulSets migrieren
+# PostgreSQL, MinIO, RabbitMQ: local-path → longhorn
+# ACHTUNG: Daten-Backup vor Migration!
+
+# 5. Longhorn Dashboard (optional)
+kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
+# Dashboard: http://localhost:8080
 ```
 
-Alternativ: **Rook/Ceph** (CNCF) für fortgeschrittene Storage-Anforderungen.
+**Was Longhorn bringt:**
+- Persistent Storage mit Replikation (≥2 Nodes)
+- Snapshots & Backups
+- Storage-Monitoring (Grafana Integration)
+- CSI-Standard (CNCF graduated)
+
+**Wann installiert?** Vor Production Go-Live. Die Pipeline wird erst成功 nach der Installation.
 
 ### Image Registry: Docker Hub (kostenlos) oder Harbor (CNCF)
 
