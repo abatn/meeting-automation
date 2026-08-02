@@ -171,9 +171,22 @@ jobs:
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
         # Apply ALL staging YAMLs — idempotent (create or update)
-        # Includes: secrets, configmaps, PVCs, deployments, services, network policies, cronjobs
+        # Includes: secrets, configmaps, PVCs, deployments, services, network policies
+        # NOTE: CronJobs with hardcoded namespace: kube-system are excluded here
+        # and applied separately in the next step to avoid namespace conflicts
         kubectl apply -f infrastructure/kubernetes/staging/ -n meeting-automation-staging
         echo "✅ All staging resources applied"
+
+    - name: Deploy System CronJobs (kube-system + longhorn-system)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        # Apply CronJobs that require non-app namespaces (hardcoded in YAML)
+        # These are cluster-level cleanup jobs, moved from staging/ to system/
+        # to avoid namespace conflicts with kubectl apply -f .../staging/ -n meeting-automation-staging
+        kubectl apply -f infrastructure/kubernetes/system/ephemeral-storage-cleanup-cronjob.yaml -n kube-system
+        kubectl apply -f infrastructure/kubernetes/system/pod-garbage-collector-cronjob.yaml -n kube-system
+        kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system
+        echo "✅ System CronJobs applied (kube-system + longhorn-system)"
 
     - name: Deploy Backend to Staging
       run: |

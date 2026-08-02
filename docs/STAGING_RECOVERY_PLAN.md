@@ -368,6 +368,91 @@ Repo-Datei (`infrastructure/kubernetes/staging/network-policies.yaml`):
 
 ---
 
+### Problem 10: K8s TLS Zertifikat fehlt öffentliche IP (OCI Staging) — 2026-08-02
+
+**Symptom:** E2E-Tests schlagen fehl mit: `tls: failed to verify certificate: x509: certificate is valid for 10.0.0.191, 10.43.0.1, 127.0.0.1, ::1, not 158.180.18.110`
+
+**Ursache:** k3s API-Server Zertifikat wurde generiert OHNE die öffentliche IP `158.180.18.110` in den Subject Alternative Names (SANs). Die CI/CD Pipeline (GitHub Actions) verbindet sich via `KUBE_CONFIG_STAGING` Secret mit `https://158.180.18.110:6443`, aber das Zertifikat kennt diese IP nicht.
+
+**Beweis (2026-08-02):**
+```bash
+# OpenSSL Zertifikat-Check:
+$ echo | openssl s_client -connect 158.180.18.110:6443 2>/dev/null | openssl x509 -noout -text
+X509v3 Subject Alternative Name:
+    DNS: instance-20260329-0846
+    IP: 10.0.0.191, 10.43.0.1, 127.0.0.1, 0:0:0:0:0:0:0:1
+# 158.180.18.110 FEHLT!
+```
+
+**Vergleich mit Produktion (Contabo):**
+```bash
+# Produktion — KORREKT:
+$ echo | openssl s_client -connect 169.58.83.32:6443 2>/dev/null | openssl x509 -noout -text
+X509v3 Subject Alternative Name:
+    DNS: contabo-prod, DNS: meeting-automation.com
+    IP: 169.58.83.32, 10.43.0.1, 127.0.0.1
+# 169.58.83.32 ENTHALTEN ✅
+```
+
+**Impact:**
+- ❌ Alle E2E-Deployments (Staging) schlagen fehl (seit 2026-08-01)
+- ✅ Frontend CI (Lint + Type-Check + Build) funktioniert weiterhin
+- ✅ Production Deploy ist nicht betroffen (anderer kubeconfig)
+
+**Lösung (manuell auf OCI Staging Server):**
+```bash
+# 1. SSH auf OCI Staging
+ssh opc@158.180.18.110
+
+# 2. k3s stoppen
+sudo systemctl stop k3s
+
+# 3. Alte Zertifikate löschen
+sudo rm -rf /var/lib/rancher/k3s/server/tls/
+
+# 4. k3s config.yaml mit tls-san erstellen
+sudo mkdir -p /etc/rancher/k3s
+sudo tee /etc/rancher/k3s/config.yaml <<EOF
+tls-san:
+  - 158.180.18.110
+  - kubernetes
+  - kubernetes.default
+  - kubernetes.default.svc
+  - kubernetes.default.svc.cluster.local
+  - localhost
+  - 127.0.0.1
+  - 10.43.0.1
+EOF
+
+# 5. k3s neu starten
+sudo systemctl daemon-reload
+sudo systemctl start k3s
+
+# 6. Verifizieren
+sudo kubectl get nodes
+openssl s_client -connect 158.180.18.110:6443 2>/dev/null | openssl x509 -noout -text | grep -A1 "Subject Alternative"
+
+# 7. Neues kubeconfig exportieren
+sudo cat /etc/rancher/k3s/k3s.yaml | sed "s/127.0.0.1/158.180.18.110/g" > /tmp/kubeconfig-staging-new.yaml
+cat /tmp/kubeconfig-staging-new.yaml
+```
+
+**Nach der Reparatur:**
+1. GitHub Secret `KUBE_CONFIG_STAGING` mit neuem kubeconfig aktualisieren
+2. E2E-Pipeline neu triggern (workflow_dispatch)
+
+**Änderung:** 0 Dateien (Infra-Fix, kein Code)
+
+**HARTE LESSONS:**
+| # | Regel |
+|---|-------|
+| T1 | **k3s `--tls-san` MUSS bei der ersten Installation gesetzt werden** — Ohne `tls-san` generiert k3s Zertifikate nur mit internen IPs. Öffentliche IPs müssen explizit via `config.yaml` oder `--tls-san` Flag angegeben werden. |
+| T2 | **Produktion wurde korrekt konfiguriert** — Contabo (`169.58.83.32`) hat die öffentliche IP im Zertifikat. OCI Staging wurde ohne `--tls-san` gestartet. |
+| T3 | **E2E-Tests testen NICHT den Code, sondern die Infra** — Wenn der E2E-Deploy-Step fehlschlägt, liegt es oft an Infra-Problemen (NetworkPolicy, TLS, Secrets), nicht am Code. |
+| T4 | **`openssl s_client` ist der beste TLS-Diagnostic-Tool** — `openssl s_client -connect IP:6443 | openssl x509 -noout -text | grep SAN` zeigt sofort ob eine IP im Zertifikat fehlt. |
+
+---
+
 ## Vollständige Recovery-Prozedur (von Null)
 
 ### Voraussetzungen prüfen

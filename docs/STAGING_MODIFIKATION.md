@@ -803,3 +803,61 @@ kubectl rollout restart deployment/backend ...
 |--------|--------|---------|
 | `ff410384` | Pipeline + 3 YAMLs (frontend-nginx-config, onlyoffice-custom-config, sentinel-models-claim) | JA |
 ```
+
+---
+
+## Phase 187: CronJob Namespace-Mismatch Fix (2026-08-02)
+
+**Status:** ✅ ANALYSIERT + FIX IMPLEMENTIERT
+**Betroffen:** E2E Pipeline `deploy-staging-and-test` Job
+
+### Problem
+
+E2E-Deploy-Step schlägt fehl mit:
+```
+Error: the namespace from the provided object "kube-system" does not match 
+the namespace "meeting-automation-staging". You must pass '--namespace=kube-system'
+```
+
+### Root Cause
+
+| # | Fakt | Beweis |
+|---|------|--------|
+| 1 | CronJob-Dateien haben `namespace: kube-system` hardcoded | `ephemeral-storage-cleanup-cronjob.yaml` Z.5,30,36 + `pod-garbage-collector-cronjob.yaml` Z.5,30,36 |
+| 2 | `kubectl apply -f .../staging/ -n meeting-automation-staging` wendet ALLE Dateien an | `e2e-tests.yml` Z.175 |
+| 3 | CronJobs wurden in Commit `b3dfad55` IN `staging/` verschoben | `git log --follow` |
+| 4 | `kubectl apply` Step wurde in Commit `ff410384` zur CI/CD hinzugefügt | `git log -S` |
+
+### Fix
+
+1. **CronJob-Dateien verschoben** von `staging/` nach `system/`:
+   - `ephemeral-storage-cleanup-cronjob.yaml` → `infrastructure/kubernetes/system/` (namespace: kube-system)
+   - `pod-garbage-collector-cronjob.yaml` → `infrastructure/kubernetes/system/` (namespace: kube-system)
+   - `longhorn-cleanup-cronjob.yaml` → `infrastructure/kubernetes/system/` (namespace: longhorn-system)
+
+2. **Separater Step** in `e2e-tests.yml` nach "Deploy All Staging Resources":
+
+```yaml
+- name: Deploy System CronJobs (kube-system + longhorn-system)
+  run: |
+    export KUBECONFIG=$(pwd)/kubeconfig-staging
+    kubectl apply -f infrastructure/kubernetes/system/ephemeral-storage-cleanup-cronjob.yaml -n kube-system
+    kubectl apply -f infrastructure/kubernetes/system/pod-garbage-collector-cronjob.yaml -n kube-system
+    kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system
+    echo "✅ System CronJobs applied (kube-system + longhorn-system)"
+```
+
+### Erwartetes Ergebnis
+
+- Pipeline wendet App-Ressourcen mit `-n meeting-automation-staging` an ✅
+- CronJobs werden separat mit `-n kube-system` angewendet ✅
+- Kein Namespace-Konflikt mehr ✅
+- Staging wird wieder korrekt deployed ✅
+
+### HARTE LESSONS
+
+| # | Regel |
+|---|-------|
+| CJ1 | **System-Ressourcen (CronJobs) dürfen NICHT im App-Verzeichnis liegen wenn CI/CD `kubectl apply -f .../app-dir/ -n app-namespace` macht** |
+| CJ2 | **Bei `kubectl apply -f <dir>/ -n <ns>` werden ALLE Dateien mit demselben Namespace angewendet** — hardcodierte `namespace:` konfliktiert damit |
+| CJ3 | **Commit `b3dfad55` hat CronJobs versehentlich in `staging/` verschoben** — davor separat verwaltet |
