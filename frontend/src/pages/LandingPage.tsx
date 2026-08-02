@@ -261,6 +261,11 @@ const LandingPage: React.FC = () => {
               ))}
             </Grid>
             <ListItem disablePadding sx={{ mb: 2 }}>
+              <Button fullWidth onClick={() => { setVideoOpen(true); setMobileMenuOpen(false); }} sx={{ justifyContent: isRtl ? 'flex-end' : 'flex-start', color: '#A1A1AA', fontSize: '1.1rem', py: 1.5, textTransform: 'none' }}>
+                {t('landing.hero.cta_secondary')}
+              </Button>
+            </ListItem>
+            <ListItem disablePadding sx={{ mb: 2 }}>
               <Button fullWidth onClick={() => navigate('/login')} sx={{ justifyContent: isRtl ? 'flex-end' : 'flex-start', color: '#FFF', fontSize: '1.1rem', py: 1.5, textTransform: 'none' }}>
                 {t('landing.nav.login')}
               </Button>
