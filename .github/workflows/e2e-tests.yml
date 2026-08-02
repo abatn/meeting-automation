@@ -413,6 +413,16 @@ jobs:
         kubectl rollout status deployment/celery-worker-pro -n meeting-automation --timeout=300s
         kubectl rollout status deployment/celery-beat -n meeting-automation --timeout=120s
 
+    - name: Deploy System CronJobs to Production (kube-system + longhorn-system)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        # Apply CronJobs that require non-app namespaces (hardcoded in YAML)
+        # These are cluster-level cleanup jobs, separate from app-level resources
+        kubectl apply -f infrastructure/kubernetes/system/ephemeral-storage-cleanup-cronjob.yaml -n kube-system
+        kubectl apply -f infrastructure/kubernetes/system/pod-garbage-collector-cronjob.yaml -n kube-system
+        kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system
+        echo "✅ Production System CronJobs applied (kube-system + longhorn-system)"
+
     - name: Run Production Smoke Tests
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-prod
