@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Box, Container, Typography, Button, Grid, Stack,
   AppBar, Toolbar, Link as MuiLink, Divider,
@@ -37,6 +37,16 @@ const LandingPage: React.FC = () => {
   const [anchorElLang, setAnchorElLang] = useState<null | HTMLElement>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  const handleVideoClose = () => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+    setVideoOpen(false);
+  };
   const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
   const [contactSending, setContactSending] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -292,7 +302,7 @@ const LandingPage: React.FC = () => {
                 <motion.div variants={fadeIn}>
                   <Stack direction={{ xs: 'column', sm: 'row' }} sx={{ gap: 2 }}>
                     <Button variant="contained" size="large" sx={{ bgcolor: '#FFF', color: '#000', borderRadius: '12px', py: { xs: 2, md: 2.5 }, px: 4, fontWeight: 800, textTransform: 'none', fontSize: '1.1rem' }} onClick={() => navigate('/register')}>{t('landing.hero.cta_primary')}</Button>
-                    <Button variant="outlined" size="large" sx={{ color: '#FFF', borderColor: 'rgba(255,255,255,0.2)', borderRadius: '12px', py: { xs: 2, md: 2.5 }, px: 4, fontWeight: 700, textTransform: 'none', fontSize: '1.1rem' }}>{t('landing.hero.cta_secondary')}</Button>
+                    <Button variant="outlined" size="large" sx={{ color: '#FFF', borderColor: 'rgba(255,255,255,0.2)', borderRadius: '12px', py: { xs: 2, md: 2.5 }, px: 4, fontWeight: 700, textTransform: 'none', fontSize: '1.1rem' }} onClick={() => setVideoOpen(true)}>{t('landing.hero.cta_secondary')}</Button>
                   </Stack>
                 </motion.div>
               </motion.div>
@@ -452,6 +462,28 @@ const LandingPage: React.FC = () => {
           </Stack>
         </Container>
       </Box>
+      {/* --- VIDEO MODAL --- */}
+      <Dialog
+        open={videoOpen}
+        onClose={handleVideoClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: '#000', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', overflow: 'hidden' } }}
+      >
+        <Box sx={{ position: 'relative', pt: '56.25%' /* 16:9 aspect ratio */ }}>
+          <video
+            ref={videoRef}
+            controls
+            autoPlay
+            muted
+            playsInline
+            onEnded={handleVideoClose}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'contain' }}
+            src="/assets/landing/meeting_automation.MP4"
+          />
+        </Box>
+      </Dialog>
+
       {/* --- CONTACT MODAL --- */}
       <Dialog 
         open={contactOpen} 
