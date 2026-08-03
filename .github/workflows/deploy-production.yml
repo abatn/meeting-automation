@@ -79,6 +79,21 @@ jobs:
           kubectl apply -f network-policies.yaml
           kubectl apply -f ingress-prod.yaml
           
+          # Deploy System CronJobs (kube-system + longhorn-system)
+          echo "=== Deploying System CronJobs ==="
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+          
+          # longhorn-cleanup CronJob (only if longhorn-system namespace exists)
+          if kubectl get namespace longhorn-system &>/dev/null; then
+            echo "longhorn-system namespace found — applying longhorn-cleanup CronJob"
+            kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system || {
+              echo "Warning: longhorn-cleanup CronJob failed (namespace may not have Longhorn installed yet)"
+            }
+          else
+            echo "longhorn-system namespace not found — skipping longhorn-cleanup CronJob"
+            echo "To enable: install Longhorn first, then re-run this deployment"
+          fi
+          
           # Rollout restart
           echo "=== Rolling out deployments ==="
           kubectl rollout restart deployment/backend -n meeting-automation
