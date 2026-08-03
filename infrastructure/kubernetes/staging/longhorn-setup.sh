@@ -19,7 +19,13 @@ set -euo pipefail
 # Configuration
 LONGHORN_VERSION="1.12.0"
 LONGHORN_NAMESPACE="longhorn-system"
-NODE_IP="${NODE_IP:-10.0.0.191}"  # OCI Staging node IP
+
+# Dynamic node IP detection (no hardcoded IPs!)
+NODE_IP="${NODE_IP:-$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')}
+if [ -z "${NODE_IP}" ]; then
+    echo "❌ ERROR: Could not detect node IP"
+    exit 1
+fi
 
 echo "============================================="
 echo "Longhorn Setup for OCI Staging"
@@ -91,8 +97,51 @@ echo "  DaemonSet:"
 kubectl get daemonset -n "${LONGHORN_NAMESPACE}" longhorn-csi-plugin
 echo ""
 
-# Step 6: Apply cleanup CronJob
-echo "[6/6] Applying longhorn-cleanup CronJob..."
+# Step 6: Apply metrics-server EndpointSlice (dynamic node IP)
+echo "[6/8] Applying metrics-server EndpointSlice with dynamic node IP (${NODE_IP})..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENDPOINTSLICE_SCRIPT="${SCRIPT_DIR}/apply-metrics-endpointslice.sh"
+if [ -f "${ENDPOINTSLICE_SCRIPT}" ]; then
+    bash "${ENDPOINTSLICE_SCRIPT}"
+    echo "  ✅ metrics-server EndpointSlice applied"
+else
+    echo "  ⚠️  ${ENDPOINTSLICE_SCRIPT} not found — applying manually"
+    kubectl apply -f - <<EOF
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: metrics-server-nodeport
+  namespace: kube-system
+  labels:
+    kubernetes.io/service-name: metrics-server
+addressType: IPv4
+ports:
+- name: https
+  port: 4443
+  protocol: TCP
+endpoints:
+- addresses:
+  - ${NODE_IP}
+  conditions:
+    ready: true
+EOF
+    echo "  ✅ metrics-server EndpointSlice applied"
+fi
+echo ""
+
+# Step 7: Apply metrics-server patch
+echo "[7/8] Applying metrics-server patch..."
+METRICS_PATCH="${SCRIPT_DIR}/metrics-server-patch.yaml"
+if [ -f "${METRICS_PATCH}" ]; then
+    kubectl apply -f "${METRICS_PATCH}"
+    echo "  ✅ metrics-server patch applied"
+else
+    echo "  ⚠️  ${METRICS_PATCH} not found — skipping"
+fi
+echo ""
+
+# Step 8: Apply cleanup CronJob
+echo "[8/8] Applying longhorn-cleanup CronJob..."
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLEANUP_YAML="${SCRIPT_DIR}/../system/longhorn-cleanup-cronjob.yaml"
 if [ -f "${CLEANUP_YAML}" ]; then

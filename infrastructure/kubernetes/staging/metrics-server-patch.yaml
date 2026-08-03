@@ -4,8 +4,8 @@
 #
 # Usage: kubectl apply -f infrastructure/kubernetes/staging/metrics-server-patch.yaml -n kube-system
 #
-# Known limitation: EndpointSlice has hardcoded node IP (10.0.0.191).
-# If OCI reassigns VNIC IP, update the EndpointSlice address.
+# NOTE: EndpointSlice is NOT in this file — it must be created dynamically
+# because the node IP can change. Use apply-metrics-endpointslice.sh.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -58,27 +58,6 @@ spec:
     port: 4443
     targetPort: 4443
     protocol: TCP
----
-# EndpointSlice: manually created because hostNetwork pods don't get
-# auto-discovered endpoints (pod IP = node IP, not cluster IP)
-# KNOWN LIMITATION: Hardcoded node IP — update if OCI reassigns VNIC
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
-metadata:
-  name: metrics-server-nodeport
-  namespace: kube-system
-  labels:
-    kubernetes.io/service-name: metrics-server
-addressType: IPv4
-ports:
-- name: https
-  port: 4443
-  protocol: TCP
-endpoints:
-- addresses:
-  - 10.0.0.191
-  conditions:
-    ready: true
 ---
 # APIService: insecureSkipTLSVerify=true (consistent with k3s built-in)
 apiVersion: apiregistration.k8s.io/v1

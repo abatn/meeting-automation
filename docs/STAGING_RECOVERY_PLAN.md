@@ -536,8 +536,8 @@ the namespace "meeting-automation-staging"
 | # | Problem | Nächster Schritt |
 |---|---------|-----------------|
 | 1 | Production hat kein `longhorn-system` Namespace | Longhorn auf Contabo installieren ODER CronJob skippen |
-| 2 | Hardcoded Node-IP `10.0.0.191` in EndpointSlice | Bekanntes Limit — bei IP-Änderung manuell anpassen |
-| 3 | Metrics-Server Patch live-only (nicht in Git) | `metrics-server-patch.yaml` exists ✅ — CI/CD muss es deployen |
+| 2 | ~~Hardcoded Node-IP `10.0.0.191` in EndpointSlice~~ | ✅ GELÖST — `apply-metrics-endpointslice.sh` erkennt Node-IP dynamisch via `kubectl get nodes` |
+| 3 | ~~Metrics-Server Patch live-only (nicht in Git)~~ | ✅ GELÖST — `metrics-server-patch.yaml` + `apply-metrics-endpointslice.sh` + `longhorn-setup.sh` in Git |
 
 ---
 
