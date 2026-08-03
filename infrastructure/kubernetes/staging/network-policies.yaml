@@ -9,7 +9,7 @@ spec:
   policyTypes:
   - Ingress
 ---
-# Postgres: Only allow Backend, n8n, Celery
+# Postgres: Only allow Backend, n8n, Celery, Prometheus
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -33,11 +33,17 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-beat-staging
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
     ports:
     - protocol: TCP
       port: 5432
 ---
-# Redis: Backend, Celery, Celery-Pro, Egress, LiveKit Server
+# Redis: Backend, Celery, Celery-Pro, Egress, LiveKit Server, Prometheus
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -67,11 +73,17 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-server-staging
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
     ports:
     - protocol: TCP
       port: 6379
 ---
-# RabbitMQ: Only allow Backend, Celery, and Celery-Pro
+# RabbitMQ: Only allow Backend, Celery, Celery-Pro, Prometheus
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -95,13 +107,19 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-beat-staging
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
     ports:
     - protocol: TCP
       port: 5672
     - protocol: TCP
       port: 15672
 ---
-# MinIO: Allow Backend, Celery, Celery-Pro, Frontend, CNPG (WAL-Archiv)
+# MinIO: Allow Backend, Celery, Celery-Pro, Frontend, CNPG (WAL-Archiv), Prometheus
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -128,13 +146,19 @@ spec:
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: postgresql
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
     ports:
     - protocol: TCP
       port: 9000
     - protocol: TCP
       port: 9001
 ---
-# Backend: Allow Frontend + LiveKit (webhook) + OnlyOffice (callback) + n8n (Get Meeting Details/PDF)
+# Backend: Allow Frontend + LiveKit (webhook) + OnlyOffice (callback) + n8n (Get Meeting Details/PDF) + Prometheus
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -158,6 +182,12 @@ spec:
     - podSelector:
         matchLabels:
           app: n8n-staging
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
     ports:
     - protocol: TCP
       port: 8000
@@ -340,7 +370,7 @@ spec:
     to:
     - namespaceSelector: {}
 ---
-# CNPG (meeting-db): Allow backend, n8n, celery-worker, celery-worker-pro, celery-beat, cnpg-system
+# CNPG (meeting-db): Allow backend, n8n, celery-worker, celery-worker-pro, celery-beat, cnpg-system, Prometheus
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -370,6 +400,12 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-beat-staging
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
     ports:
     - protocol: TCP
       port: 5432
