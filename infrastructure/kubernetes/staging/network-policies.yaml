@@ -134,7 +134,7 @@ spec:
     - protocol: TCP
       port: 9001
 ---
-# Backend: Allow Frontend + LiveKit (webhook) + OnlyOffice (callback)
+# Backend: Allow Frontend + LiveKit (webhook) + OnlyOffice (callback) + n8n (Get Meeting Details/PDF)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -155,6 +155,9 @@ spec:
     - podSelector:
         matchLabels:
           app: onlyoffice-staging
+    - podSelector:
+        matchLabels:
+          app: n8n-staging
     ports:
     - protocol: TCP
       port: 8000

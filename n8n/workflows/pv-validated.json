@@ -35,7 +35,7 @@
     },
     {
       "parameters": {
-        "url": "=http://backend.meeting-automation-staging.svc.cluster.local:8000/api/v1/reports/automation/meeting/{{$json.meeting_id}}",
+        "url": "=http://backend.meeting-automation-staging.svc.cluster.local:8000/api/v1/reports/automation/meeting/{{$json.meeting_id}}?client_id={{ $json.client_id }}",
         "method": "GET",
         "sendHeaders": true,
         "headerParameters": {
@@ -59,7 +59,7 @@
     },
     {
       "parameters": {
-        "url": "=http://backend.meeting-automation-staging.svc.cluster.local:8000/api/v1/reports/automation/pdf/{{$node[\"Get Meeting Details\"].json.id}}",
+        "url": "=http://backend.meeting-automation-staging.svc.cluster.local:8000/api/v1/reports/automation/pdf/{{$node[\"Get Meeting Details\"].json.id}}?client_id={{ $node[\"Normalize Payload\"].json.client_id }}",
         "method": "GET",
         "sendHeaders": true,
         "headerParameters": {
