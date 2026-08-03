@@ -4,7 +4,7 @@ metadata:
   name: postgres-backup-pvc
   namespace: meeting-automation-staging
 spec:
-  storageClassName: longhorn
+  storageClassName: local-path
   accessModes:
     - ReadWriteOnce
   resources:

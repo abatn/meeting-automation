@@ -32,15 +32,6 @@ spec:
             memory: "3Gi"
             cpu: "500m"
             ephemeral-storage: "1Gi"
-        startupProbe:
-          exec:
-            command:
-            - /bin/sh
-            - -c
-            - celery -A app.tasks.celery_app inspect ping --timeout=5
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          failureThreshold: 30
         livenessProbe:
           exec:
             command:
