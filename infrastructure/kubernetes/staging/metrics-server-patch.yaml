@@ -1,0 +1,97 @@
+# Metrics-Server Patch for OCI Staging
+# Phase 189: OCI VNIC blocks pod→node traffic on port 10250
+# Fix: hostNetwork=true + secure-port=4443 + EndpointSlice
+#
+# Usage: kubectl apply -f infrastructure/kubernetes/staging/metrics-server-patch.yaml -n kube-system
+#
+# Known limitation: EndpointSlice has hardcoded node IP (10.0.0.191).
+# If OCI reassigns VNIC IP, update the EndpointSlice address.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-server
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      hostNetwork: true
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: metrics-server
+        args:
+        - --cert-dir=/tmp
+        - --secure-port=4443
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        - --tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305
+        ports:
+        - name: https
+          containerPort: 4443
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: 4443
+            scheme: HTTPS
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 4443
+            scheme: HTTPS
+          initialDelaySeconds: 10
+          periodSeconds: 10
+---
+# Service: port 4443 (matches --secure-port)
+apiVersion: v1
+kind: Service
+metadata:
+  name: metrics-server
+  namespace: kube-system
+spec:
+  ports:
+  - name: https
+    port: 4443
+    targetPort: 4443
+    protocol: TCP
+---
+# EndpointSlice: manually created because hostNetwork pods don't get
+# auto-discovered endpoints (pod IP = node IP, not cluster IP)
+# KNOWN LIMITATION: Hardcoded node IP — update if OCI reassigns VNIC
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: metrics-server-nodeport
+  namespace: kube-system
+  labels:
+    kubernetes.io/service-name: metrics-server
+addressType: IPv4
+ports:
+- name: https
+  port: 4443
+  protocol: TCP
+endpoints:
+- addresses:
+  - 10.0.0.191
+  conditions:
+    ready: true
+---
+# APIService: insecureSkipTLSVerify=true (consistent with k3s built-in)
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.metrics.k8s.io
+spec:
+  service:
+    name: metrics-server
+    namespace: kube-system
+    port: 4443
+  group: metrics.k8s.io
+  version: v1beta1
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 100
+  versionPriority: 100
