@@ -18,7 +18,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Copy manifests to Contabo
+    - name: Copy production manifests to Contabo
       uses: appleboy/scp-action@v0.1.7
       with:
         host: 169.58.83.32
@@ -26,6 +26,16 @@ jobs:
         key: ${{ secrets.CONTABO_SSH_KEY }}
         source: "infrastructure/kubernetes/production/"
         target: "/root/production-manifests"
+        strip_components: 3
+
+    - name: Copy system manifests to Contabo
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: 169.58.83.32
+        username: root
+        key: ${{ secrets.CONTABO_SSH_KEY }}
+        source: "infrastructure/kubernetes/system/"
+        target: "/root/production-manifests/system"
         strip_components: 3
 
     - name: Deploy to Contabo Production
@@ -86,7 +96,7 @@ jobs:
           # longhorn-cleanup CronJob (only if longhorn-system namespace exists)
           if kubectl get namespace longhorn-system &>/dev/null; then
             echo "longhorn-system namespace found — applying longhorn-cleanup CronJob"
-            kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system || {
+            kubectl apply -f /root/production-manifests/system/longhorn-cleanup-cronjob.yaml -n longhorn-system || {
               echo "Warning: longhorn-cleanup CronJob failed (namespace may not have Longhorn installed yet)"
             }
           else
