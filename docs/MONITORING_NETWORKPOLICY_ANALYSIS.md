@@ -1,7 +1,7 @@
 # Monitoring NetworkPolicy Analyse
 
 **Erstellt:** 2026-08-03  
-**Status:** ANALYSE (keine Implementierung)  
+**Status:** IMPLEMENTIERT (Commit `cd9eb9ec`)  
 **Kontext:** Prometheus kann 13 von 15 Targets nicht scrapen
 
 ---
@@ -78,18 +78,18 @@ Pod-IP ist nicht erreichbar → "no route to host"
 
 ## 3. Lösungsplan
 
-### Schritte 1-6: Backend-Policies erweitern (sicher)
+### Schritte 1-6: Backend-Policies erweitern (IMPLEMENTIERT)
 
 | # | Policy | Datei | Änderung |
 |---|--------|-------|----------|
-| 1 | backend-policy | network-policies.yaml | `app.kubernetes.io/name: prometheus` hinzufügen |
-| 2 | cnpg-policy | network-policies.yaml | `app.kubernetes.io/name: prometheus` hinzufügen |
-| 3 | redis-policy | network-policies.yaml | `app.kubernetes.io/name: prometheus` hinzufügen |
-| 4 | rabbitmq-policy | network-policies.yaml | `app.kubernetes.io/name: prometheus` hinzufügen |
-| 5 | minio-policy | network-policies.yaml | `app.kubernetes.io/name: prometheus` hinzufügen |
-| 6 | postgres-policy | network-policies.yaml | `app.kubernetes.io/name: prometheus` hinzufügen |
+| 1 | backend-policy | network-policies.yaml | `namespaceSelector + podSelector` für Prometheus |
+| 2 | cnpg-policy | network-policies.yaml | `namespaceSelector + podSelector` für Prometheus |
+| 3 | redis-policy | network-policies.yaml | `namespaceSelector + podSelector` für Prometheus |
+| 4 | rabbitmq-policy | network-policies.yaml | `namespaceSelector + podSelector` für Prometheus |
+| 5 | minio-policy | network-policies.yaml | `namespaceSelector + podSelector` für Prometheus |
+| 6 | postgres-policy | network-policies.yaml | `namespaceSelector + podSelector` für Prometheus |
 
-**Erwartetes Ergebnis:** Backend-Target wechselt von DOWN auf UP.
+**Ergebnis:** ✅ Alle 6 Policies angewendet (Commit `cd9eb9ec`).
 
 ### Schritte 7-8: Monitoring-Services (unsicher)
 
@@ -125,10 +125,21 @@ Pod-IP ist nicht erreichbar → "no route to host"
 
 ## 6. Zusammenfassung
 
-| Teil | Sicherheit | Empfehlung |
-|------|------------|------------|
-| Backend "connection refused" fixen | **80%** | ✅ Implementieren (Schritte 1-6) |
-| Monitoring "no route to host" fixen | **30%** | ⏸️ Separat analysieren |
-| Egress-Policy für Prometheus | **50%** | ❌ Nicht nötig |
+| Teil | Status | Ergebnis |
+|------|--------|----------|
+| Backend "connection refused" fixen | ✅ IMPLEMENTIERT | 6 Policies mit `namespaceSelector + podSelector` |
+| Monitoring "no route to host" fixen | ⏸️ Offen | Separat analysieren |
+| Egress-Policy für Prometheus | ❌ Nicht nötig | Kein default-deny in monitoring |
 
-**Nächster Schritt:** Schritte 1-6 implementieren (nur backend fixen).
+## 7. HARTE LESSONS
+
+| # | Regel |
+|---|-------|
+| M5 | **NetworkPolicy `podSelector` ist namespace-scoped** — Kann nur Pods im selben Namespace matchen. Für Cross-Namespace: `namespaceSelector` + `podSelector` in einem `from`-Eintrag kombinieren. |
+| M6 | **Immer prüfen ob der Target-Pod im selben Namespace ist** — Prometheus (monitoring) → Backend (meeting-automation-staging) = Cross-Namespace. |
+
+**Commits:**
+| Hash | Beschreibung |
+|------|-------------|
+| `d95e5830` | docs: Phase 195 — Analyse |
+| `cd9eb9ec` | fix: namespaceSelector für Cross-Namespace NetworkPolicy |
