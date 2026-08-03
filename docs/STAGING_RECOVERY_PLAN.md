@@ -535,7 +535,7 @@ the namespace "meeting-automation-staging"
 **Noch offen:**
 | # | Problem | Nächster Schritt |
 |---|---------|-----------------|
-| 1 | Production hat kein `longhorn-system` Namespace | Longhorn auf Contabo installieren ODER CronJob skippen |
+| 1 | ~~Production hat kein `longhorn-system` Namespace~~ | ✅ GELÖST — Pipeline prüft ob `longhorn-system` existiert, skippt graceful wenn nicht (Commit `c568651e` + `09880019`) |
 | 2 | ~~Hardcoded Node-IP `10.0.0.191` in EndpointSlice~~ | ✅ GELÖST — `apply-metrics-endpointslice.sh` erkennt Node-IP dynamisch via `kubectl get nodes` |
 | 3 | ~~Metrics-Server Patch live-only (nicht in Git)~~ | ✅ GELÖST — `metrics-server-patch.yaml` + `apply-metrics-endpointslice.sh` + `longhorn-setup.sh` in Git |
 
