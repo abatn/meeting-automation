@@ -453,6 +453,94 @@ cat /tmp/kubeconfig-staging-new.yaml
 
 ---
 
+### Problem 11: CronJob Namespace-Mismatch in CI/CD Pipeline — 2026-08-02
+
+**Symptom:** E2E-Pipeline `deploy-staging-and-test` scheiterte mit:
+```
+Error: the namespace from the provided object "kube-system" does not match
+the namespace "meeting-automation-staging"
+```
+
+**Root Cause:** CronJob-Dateien (`ephemeral-storage-cleanup`, `pod-garbage-collector`, `longhorn-cleanup`) mit hardcoded `namespace: kube-system` lagen in `infrastructure/kubernetes/staging/`. CI/CD `kubectl apply -f .../staging/ -n meeting-automation-staging` wandte ALLE Dateien mit `-n meeting-automation-staging` an → Namespace-Konflikt.
+
+**Fix:** CronJob-Dateien nach `infrastructure/kubernetes/system/` verschoben + separater CI/CD-Step in `e2e-tests.yml`.
+
+**Änderung:** `.github/workflows/e2e-tests.yml` (neuer Step "Deploy System CronJobs")
+
+---
+
+### Problem 12: Longhorn nicht installiert auf OCI Staging — 2026-08-02
+
+**Symptom:** `longhorn-cleanup` CronJob scheiterte mit `namespaces "longhorn-system" not found`.
+
+**Root Cause:** Longhorn war nie auf OCI Staging installiert. Alle 5 letzten Pipeline-Runs fehlgeschlagen.
+
+**Fix:** Longhorn v1.12.0 via Helm installiert (`createDefaultDiskLabeledNodes=true`, `defaultReplicaCount=1`, `defaultClass=false`). 8 HARTE LESSONS (LH1-LH8) dokumentiert in `.loop.md` Phase 188.
+
+**Änderung:** `.loop.md` (Dokumentation) + `infrastructure/kubernetes/staging/longhorn-setup.sh` (Setup-Script)
+
+---
+
+### Problem 13: Metrics-Server auf OCI Staging funktionierte nicht — 2026-08-02
+
+**Symptom:** `kubectl top nodes` → `error: Metrics API not available`. APIService in Phase 188 gelöscht (um Namespace-Deletion zu entblocken).
+
+**Root Cause:** OCI VNIC Security List blockiert Pod→Node Traffic auf Port 10250. `hostNetwork=true` + Port 4443 (nicht 10250, belegt von kubelet) + EndpointSlice + APIService-Recreation.
+
+**Fix:** `metrics-server-patch.yaml` in Git + 5 HARTE LESSONS (MS1-MS5) in `.loop.md` Phase 189.
+
+**Änderung:** `infrastructure/kubernetes/staging/metrics-server-patch.yaml` (NEU) + `.loop.md`
+
+---
+
+### Problem 14: Dual Default StorageClass auf OCI Staging — 2026-08-03
+
+**Symptom:** `local-path` und `longhorn` hatten beide `storageclass.kubernetes.io/is-default-class=true`. PVCs ohne explizite `storageClassName` → Ambiguität.
+
+**Root Cause:** Helm-Chart `defaultClass=true` setzt eigene Default, entfernt nicht existierende Defaults.
+
+**Fix:** `kubectl patch storageclass local-path -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'`. Longhorn-Helm-Befehl in `.loop.md` Phase 188 auf `defaultClass=false` aktualisiert. 2 HARTE LESSONS (SC1-SC2) in `.loop.md` Phase 189a.
+
+**Änderung:** `.loop.md` (Dokumentation)
+
+---
+
+## Zusammenfassung Phase 187-189a (2026-08-02/03)
+
+| Phase | Problem | Lösung | Status |
+|-------|---------|--------|--------|
+| 187 | CronJob Namespace-Mismatch | CronJobs nach `system/` verschoben | ✅ IMPLEMENTIERT |
+| 188 | Longhorn nicht installiert | Helm v1.12.0 + 8 HARTE LESSONS | ✅ IMPLEMENTIERT |
+| 189 | Metrics-Server kaputt | hostNetwork + Port 4443 + EndpointSlice | ✅ IMPLEMENTIERT |
+| 189a | Dual Default StorageClass | `local-path` Default entfernt | ✅ IMPLEMENTIERT |
+
+**Pipeline-Ergebnis (Run 30771585262):**
+| Job | Status |
+|-----|--------|
+| `build-and-test-dev` | ✅ success (291+ E2E Tests) |
+| `deploy-staging-and-test` | ✅ success |
+| `deploy-production` | ❌ failure (`longhorn-system` Namespace fehlt auf Contabo) |
+
+**Commits:**
+| Hash | Beschreibung |
+|------|-------------|
+| `8587c7f1` | fix(ci): CronJob Namespace-Mismatch in e2e-tests.yml |
+| `380c9644` | docs: add Phase 188 — Longhorn repair on OCI Staging |
+| `38607fa2` | docs: add Phase 189 — metrics-server repair |
+| `e5a4c23f` | fix(k8s): add metrics-server-patch.yaml |
+| `7d1d0bf7` | docs: add Phase 189a — fix dual default StorageClass |
+| `2df83b6e` | docs: update Phase 188 Helm command — defaultClass=false |
+| `8117092d` | feat(k8s): add longhorn-setup.sh |
+
+**Noch offen:**
+| # | Problem | Nächster Schritt |
+|---|---------|-----------------|
+| 1 | Production hat kein `longhorn-system` Namespace | Longhorn auf Contabo installieren ODER CronJob skippen |
+| 2 | Hardcoded Node-IP `10.0.0.191` in EndpointSlice | Bekanntes Limit — bei IP-Änderung manuell anpassen |
+| 3 | Metrics-Server Patch live-only (nicht in Git) | `metrics-server-patch.yaml` exists ✅ — CI/CD muss es deployen |
+
+---
+
 ## Vollständige Recovery-Prozedur (von Null)
 
 ### Voraussetzungen prüfen
