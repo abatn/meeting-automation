@@ -502,13 +502,13 @@ const LandingPage: React.FC = () => {
           <Typography variant="body2" sx={{ color: '#A1A1AA', mb: 4 }}>{t('landing.contact.subtitle')}</Typography>
           
           <Stack spacing={3} sx={{ mb: 4 }}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ cursor: 'pointer', '&:hover .MuiAvatar-root': { bgcolor: 'rgba(255,255,255,0.12)' } }} onClick={() => copyToClipboard('mohamedlarbinakti@gmail.com')}>
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ cursor: 'pointer', '&:hover .MuiAvatar-root': { bgcolor: 'rgba(255,255,255,0.12)' } }} onClick={() => copyToClipboard('contact@zedintek.com')}>
               <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.06)', color: '#FFF', width: 40, height: 40, transition: 'bgcolor 0.2s' }}>
                 <MailIcon sx={{ fontSize: 20 }} />
               </Avatar>
               <Box>
                 <Typography variant="caption" sx={{ color: '#71717A', display: 'block' }}>{t('landing.contact.email_label')}</Typography>
-                <Typography variant="body2" sx={{ color: '#FFF', fontSize: '0.95rem' }}>mohamedlarbinakti@gmail.com</Typography>
+                <Typography variant="body2" sx={{ color: '#FFF', fontSize: '0.95rem' }}>contact@zedintek.com</Typography>
               </Box>
             </Stack>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ cursor: 'pointer', '&:hover .MuiAvatar-root': { bgcolor: 'rgba(255,255,255,0.12)' } }} onClick={() => copyToClipboard('+21652369325')}>

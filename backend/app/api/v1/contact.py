@@ -11,7 +11,7 @@ from app.core.config import settings
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-CONTACT_EMAIL = "mohamedlarbinakti@gmail.com"
+CONTACT_EMAIL = "contact@zedintek.com"
 
 
 class ContactRequest(BaseModel):
