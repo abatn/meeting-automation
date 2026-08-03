@@ -131,7 +131,7 @@ echo ""
 
 # Step 7: Apply metrics-server patch
 echo "[7/8] Applying metrics-server patch..."
-METRICS_PATCH="${SCRIPT_DIR}/metrics-server-patch.yaml"
+METRICS_PATCH="$(dirname "$SCRIPT_DIR")/system/metrics-server-patch.yaml"
 if [ -f "${METRICS_PATCH}" ]; then
     kubectl apply -f "${METRICS_PATCH}"
     echo "  ✅ metrics-server patch applied"

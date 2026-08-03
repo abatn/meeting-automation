@@ -200,8 +200,8 @@ jobs:
         export KUBECONFIG=$(pwd)/kubeconfig-staging
         # Apply ALL staging YAMLs — idempotent (create or update)
         # Includes: secrets, configmaps, PVCs, deployments, services, network policies
-        # NOTE: CronJobs with hardcoded namespace: kube-system are excluded here
-        # and applied separately in the next step to avoid namespace conflicts
+        # NOTE: Resources with hardcoded namespace: kube-system (CronJobs, metrics-server)
+        # are excluded from staging/ and applied separately in 'Deploy System CronJobs'
         kubectl apply -f infrastructure/kubernetes/staging/ -n meeting-automation-staging
         echo "✅ All staging resources applied"
 
@@ -234,7 +234,9 @@ jobs:
         kubectl apply -f infrastructure/kubernetes/system/ephemeral-storage-cleanup-cronjob.yaml -n kube-system
         kubectl apply -f infrastructure/kubernetes/system/pod-garbage-collector-cronjob.yaml -n kube-system
         kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system
-        echo "✅ System CronJobs applied (kube-system + longhorn-system)"
+        # Metrics-server patch (hostNetwork + port 4443 for OCI VNIC workaround)
+        kubectl apply -f infrastructure/kubernetes/system/metrics-server-patch.yaml -n kube-system
+        echo "✅ System CronJobs + metrics-server applied (kube-system + longhorn-system)"
 
     - name: Deploy Backend to Staging
       run: |
