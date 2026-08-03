@@ -167,6 +167,34 @@ jobs:
         REMAINING=$(kubectl get pods -n meeting-automation-staging --no-headers 2>&1 | grep -v Running | grep -v Pending | wc -l)
         echo "Remaining non-running pods: $REMAINING"
 
+    - name: Fix immutable PVCs if storageClass mismatch
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        # PVCs are immutable after creation — kubectl apply cannot change storageClassName.
+        # If the YAML storageClass differs from the live PVC, we must delete first.
+        # Using --ignore-not-found makes this safe on fresh clusters (no-op).
+        # Using storageClass check prevents unnecessary data loss on correct PVCs.
+        echo "🔍 Checking PVC storageClasses for immutable field mismatches..."
+        NEEDS_REAPPLY=false
+        for pvc in postgres-backup-pvc postgres-data-postgres-staging-0; do
+          SC=$(kubectl get pvc "$pvc" -n meeting-automation-staging \
+            -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "none")
+          if [ "$SC" = "none" ]; then
+            echo "  ✅ PVC $pvc does not exist — will be created by apply"
+          elif [ "$SC" != "local-path" ]; then
+            echo "  ⚠️  PVC $pvc has wrong storageClass: $SC (expected: local-path) — deleting..."
+            kubectl delete pvc "$pvc" -n meeting-automation-staging --ignore-not-found
+            NEEDS_REAPPLY=true
+          else
+            echo "  ✅ PVC $pvc already correct (local-path) — skipping"
+          fi
+        done
+        if [ "$NEEDS_REAPPLY" = "true" ]; then
+          echo "⏳ Waiting 5s for PVC cleanup..."
+          sleep 5
+        fi
+        echo "✅ Immutable PVC check complete"
+
     - name: Deploy All Staging Resources (idempotent)
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
