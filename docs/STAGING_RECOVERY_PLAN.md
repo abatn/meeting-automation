@@ -538,6 +538,7 @@ the namespace "meeting-automation-staging"
 | 1 | ~~Production hat kein `longhorn-system` Namespace~~ | ✅ GELÖST — Pipeline prüft ob `longhorn-system` existiert, skippt graceful wenn nicht (Commit `c568651e` + `09880019`) |
 | 2 | ~~Hardcoded Node-IP `10.0.0.191` in EndpointSlice~~ | ✅ GELÖST — `apply-metrics-endpointslice.sh` erkennt Node-IP dynamisch via `kubectl get nodes` |
 | 3 | ~~Metrics-Server Patch live-only (nicht in Git)~~ | ✅ GELÖST — `metrics-server-patch.yaml` + `apply-metrics-endpointslice.sh` + `longhorn-setup.sh` in Git |
+| 4 | Prometheus 13/15 Targets DOWN | ⏸️ ANALYSE — `docs/MONITORING_NETWORKPOLICY_ANALYSIS.md` (Schritte 1-6 geplant, 80% sicher) |
 
 ---
 
