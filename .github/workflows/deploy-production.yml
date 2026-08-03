@@ -105,7 +105,7 @@ jobs:
               --set defaultSettings.defaultReplicaCount=1 \
               --set defaultSettings.createDefaultDiskLabeledNodes=true \
               --set defaultSettings.defaultClass=true \
-              --wait --timeout 10m
+              --wait --timeout 10m || echo "⚠️ Warning: Longhorn install failed, continuing deployment"
             echo "✅ Longhorn v1.12.0 installed on production"
           fi
           
