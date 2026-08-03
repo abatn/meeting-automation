@@ -75,8 +75,8 @@
       "company_name": "Company Name",
       "plan": "Plan",
       "plan_free": "Free",
-      "plan_pro": "Pro ($99/m)",
-      "plan_enterprise": "Enterprise ($499/m)",
+      "plan_pro": "Pro (199 TND/m)",
+      "plan_enterprise": "Enterprise (399 TND/m)",
       "submit": "Create my account",
       "has_account": "Already have an account?",
       "error": "An error occurred during registration."

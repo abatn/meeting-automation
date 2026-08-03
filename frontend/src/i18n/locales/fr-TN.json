@@ -75,8 +75,8 @@
       "company_name": "Nom de l'entreprise",
       "plan": "Plan",
       "plan_free": "Gratuit",
-      "plan_pro": "Pro (99$/m)",
-      "plan_enterprise": "Entreprise (499$/m)",
+      "plan_pro": "Pro (199 TND/m)",
+      "plan_enterprise": "Entreprise (399 TND/m)",
       "submit": "Créer mon compte",
       "has_account": "Déjà un compte ?",
       "error": "Une erreur est survenue lors de l'inscription."
