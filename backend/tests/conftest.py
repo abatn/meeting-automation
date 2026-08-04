@@ -144,10 +144,9 @@ async def db_session() -> Generator:
             select(UserModel).where(UserModel.email == "dg@meeting.tn")
         )
         dg_user = dg_user_result.scalar_one_or_none()
-        # NUR überschreiben wenn E2E_TEST=true UND Secret gesetzt
-        # Sonst: Password123! aus seed_users.py respektieren
-        _is_e2e_env = os.getenv("E2E_TEST", "").lower() == "true"
-        _dg_pw = os.getenv("E2E_TEST_USER_PASSWORD", "Password123!") if _is_e2e_env else "Password123!"
+        # dg@meeting.tn: Hash NICHT überschreiben!
+        # Grund: Hash kommt aus seed_users.py und ist korrekt für Password123!
+        # conftest.py darf nur erstellen (wenn nicht vorhanden), NICHT überschreiben.
         if not dg_user:
             dg_role_result = await session.execute(
                 select(RoleModel).where(RoleModel.name == "dg")
@@ -157,15 +156,13 @@ async def db_session() -> Generator:
                 id="dg-test-user-id",
                 client_id="test-client-id",
                 email="dg@meeting.tn",
-                hashed_password=get_password_hash(_dg_pw),
+                hashed_password=get_password_hash("Password123!"),
                 status=UserStatus.ACTIVE.value,
                 is_superuser=True,
                 roles=[dg_role] if dg_role else []
             )
             session.add(dg_user)
-        elif _is_e2e_env and not verify_password(_dg_pw, dg_user.hashed_password):
-            # NUR überschreiben wenn E2E_TEST=true (verhindert Hash-Überschreibung auf Staging/Prod)
-            dg_user.hashed_password = get_password_hash(_dg_pw)
+        # KEIN elif — Hash wird NICHT überschrieben (Phase 202 Fix)
 
         # Seed ConsentLog for E2E seed users so recording/livekit gates pass
         if os.getenv("E2E_TEST", "").lower() == "true":
