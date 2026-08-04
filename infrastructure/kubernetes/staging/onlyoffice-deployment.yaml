@@ -18,7 +18,8 @@ spec:
     spec:
       initContainers:
       - name: init-oo-config
-        image: onlyoffice/documentserver:latest
+        image: onlyoffice/documentserver:9.4.0
+        imagePullPolicy: Always
         command: ['sh', '-c', 'cp /config-source/local.json /emptydir-writable/local.json && cp /config-source/ds-docservice.conf /emptydir-writable/ds-docservice.conf && chmod 644 /emptydir-writable/local.json /emptydir-writable/ds-docservice.conf']
         volumeMounts:
         - name: configmap-source
@@ -28,7 +29,8 @@ spec:
           mountPath: /emptydir-writable
       containers:
       - name: onlyoffice
-        image: onlyoffice/documentserver:latest
+        image: onlyoffice/documentserver:9.4.0
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
           name: http
@@ -43,6 +45,8 @@ spec:
           value: "true"
         - name: SECURE_LINK_SECRET
           value: "gy3MA8R33ojtIGfXYq37"
+        - name: SERVER_NAME
+          value: "staging.meeting-automation.com"
         resources:
           requests:
             memory: "512Mi"

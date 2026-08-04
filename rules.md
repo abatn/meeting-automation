@@ -16,3 +16,6 @@ rules.md
 - **`rm` ist blockiert** — nur `sudo rm` verwenden
 - **`git` ist verboten** — nur mit Erlaubnis
 - **dont make mistake ** - 100% solution
+##
+-**modifikation ist ohne untersuchung und planung verboten ** manuel ist doppelt verboten ***
+

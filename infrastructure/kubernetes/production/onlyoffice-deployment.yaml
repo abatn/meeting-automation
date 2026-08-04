@@ -19,6 +19,7 @@ spec:
       initContainers:
       - name: init-oo-config
         image: onlyoffice/documentserver:latest
+        imagePullPolicy: Always
         command: ['sh', '-c', 'cp /config-source/local.json /emptydir-writable/local.json && cp /config-source/ds-docservice.conf /emptydir-writable/ds-docservice.conf && chmod 644 /emptydir-writable/local.json /emptydir-writable/ds-docservice.conf']
         volumeMounts:
         - name: configmap-source
@@ -29,6 +30,7 @@ spec:
       containers:
       - name: onlyoffice
         image: onlyoffice/documentserver:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
           name: http
@@ -43,6 +45,8 @@ spec:
           value: "true"
         - name: SECURE_LINK_SECRET
           value: "prod-onlyoffice-secure-link-2026"
+        - name: SERVER_NAME
+          value: "meeting-automation.com"
         resources:
           requests:
             memory: "512Mi"

@@ -49,7 +49,7 @@ data:
       alias /var/www/onlyoffice/documentserver/$2$3;
     }
 
-    location ~* ^(\/cache\/files.*)$ {
+    location ~* ^(\/cache\/files.*)(\/.*) {
       alias /var/lib/onlyoffice/documentserver/App_Data$1;
       add_header Content-Disposition "attachment; filename*=UTF-8''$arg_filename";
 
