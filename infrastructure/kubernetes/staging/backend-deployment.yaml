@@ -83,6 +83,8 @@ spec:
           value: "meeting-db-rw"
         - name: APP_ROLE
           value: "backend"
+        - name: E2E_TEST
+          value: "true"
 ---
 apiVersion: v1
 kind: Service
