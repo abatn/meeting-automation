@@ -203,6 +203,8 @@ jobs:
         # NOTE: Resources with hardcoded namespace: kube-system (CronJobs, metrics-server)
         # are excluded from staging/ and applied separately in 'Deploy System CronJobs'
         kubectl apply -f infrastructure/kubernetes/staging/ -n meeting-automation-staging
+        # Restart OnlyOffice to pick up ConfigMap changes (initContainer copies at pod startup)
+        kubectl rollout restart deployment/onlyoffice-staging -n meeting-automation-staging 2>&1 || echo "Warning: OnlyOffice staging rollout restart failed"
         echo "✅ All staging resources applied"
 
     - name: Install Longhorn if not present (skip-if-exists)
@@ -452,6 +454,8 @@ jobs:
             kubectl apply -f "$f" -n meeting-automation 2>&1 || echo "Warning: Failed to apply $f"
           fi
         done
+        # Restart OnlyOffice to pick up ConfigMap changes (initContainer copies at pod startup)
+        kubectl rollout restart deployment/onlyoffice -n meeting-automation 2>&1 || echo "Warning: OnlyOffice rollout restart failed"
         echo "✅ Production ConfigMaps and non-immutable resources applied"
 
     - name: Deploy to Production
