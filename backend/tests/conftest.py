@@ -147,7 +147,7 @@ async def db_session() -> Generator:
         # NUR überschreiben wenn E2E_TEST=true UND Secret gesetzt
         # Sonst: Password123! aus seed_users.py respektieren
         _is_e2e_env = os.getenv("E2E_TEST", "").lower() == "true"
-        _dg_pw = os.getenv("E2E_TEST_USER_PASSWORD") if _is_e2e_env else "Password123!"
+        _dg_pw = os.getenv("E2E_TEST_USER_PASSWORD", "Password123!") if _is_e2e_env else "Password123!"
         if not dg_user:
             dg_role_result = await session.execute(
                 select(RoleModel).where(RoleModel.name == "dg")
