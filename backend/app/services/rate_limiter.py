@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from typing import Optional
 from fastapi import Request
@@ -46,6 +47,10 @@ def check_api_rate_limit(client_id: str, plan: str) -> dict:
 
 def check_recording_rate_limit(client_id: str, plan: str) -> dict:
     """Prüft Recordings pro Tag."""
+    # Skip rate limiting in E2E tests to avoid 429 errors during test runs
+    if os.getenv("E2E_TEST", "").lower() == "true":
+        return {"allowed": True, "remaining": -1, "limit": -1}
+
     r = _get_redis()
     _, limit, _ = RATE_LIMITS.get(plan, RATE_LIMITS["GRATUIT"])
     if limit <= 0:
