@@ -445,7 +445,6 @@ jobs:
         # Excludes: Deployments (handled by kubectl set image), PVCs (immutable), Secrets (managed separately)
         # Only applies files that exist in infrastructure/kubernetes/production/
         for f in infrastructure/kubernetes/production/onlyoffice-custom-config.yaml \
-                 infrastructure/kubernetes/production/onlyoffice-configmap.yaml \
                  infrastructure/kubernetes/production/ingress-prod.yaml \
                  infrastructure/kubernetes/production/network-policies.yaml; do
           if [ -f "$f" ]; then
