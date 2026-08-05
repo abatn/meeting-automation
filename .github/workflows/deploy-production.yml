@@ -88,6 +88,7 @@ jobs:
           kubectl apply -f livekit-server-deployment.yaml -f livekit-egress-deployment.yaml
           kubectl apply -f network-policies.yaml
           kubectl apply -f ingress-prod.yaml
+          kubectl apply -f n8n-ingress.yaml
           
           # Install Longhorn if not present (skip-if-exists)
           echo "=== Checking Longhorn ==="
