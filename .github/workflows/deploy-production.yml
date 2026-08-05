@@ -137,5 +137,24 @@ jobs:
           kubectl rollout status deployment/backend -n meeting-automation --timeout=180s || true
           kubectl rollout status deployment/frontend -n meeting-automation --timeout=180s || true
           
+          # Import n8n workflows (idempotent: only if DB is empty)
+          echo "=== Import n8n workflows ==="
+          N8N_POD=$(kubectl get pods -n meeting-automation -l app=n8n -o jsonpath='{.items[0].metadata.name}')
+          WORKFLOW_COUNT=$(kubectl exec -n meeting-automation meeting-db-1 -- psql -U postgres -d meeting_db -t -c "SELECT count(*) FROM workflow_entity" 2>/dev/null | tr -d ' ')
+          if [ "$WORKFLOW_COUNT" = "0" ]; then
+            echo "No workflows found — importing from n8n/workflows/*.json"
+            kubectl exec -n meeting-automation $N8N_POD -- mkdir -p /home/node/.n8n/workflows
+            for f in n8n/workflows/*.json; do
+              name=$(basename $f)
+              echo "Importing $name..."
+              cat $f | kubectl exec -i -n meeting-automation $N8N_POD -- tee /home/node/.n8n/workflows/$name > /dev/null
+              kubectl exec -n meeting-automation $N8N_POD -- n8n import:workflow --input=/home/node/.n8n/workflows/$name 2>&1 | tail -1 || true
+            done
+            kubectl rollout restart deployment/n8n -n meeting-automation
+            echo "✅ n8n workflows imported"
+          else
+            echo "✅ n8n workflows already exist ($WORKFLOW_COUNT workflows) — skipping import"
+          fi
+          
           echo "=== Deployment complete ==="
           kubectl get pods -n meeting-automation
