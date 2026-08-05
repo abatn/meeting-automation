@@ -4,16 +4,17 @@
 
 Production soll **identisch** mit Staging sein — automatisch via CI/CD, ohne manuelle Schritte.
 
-## Aktueller Zustand
+## Aktueller Zustand (nach Fix 2026-08-05)
 
 | Komponente | Staging | Production | CI/CD? |
 |---|---|---|---|
-| Workflows (9 Stück) | ✅ | ✅ (manuell importiert) | ⚠️ Teilweise |
-| SMTP Credential | ✅ | ❌ Fehlt | ❌ |
-| n8n Owner Account | ✅ | ❌ Fehlt | ❌ |
+| Workflows (9 Stück) | ✅ | ✅ | ✅ |
+| SMTP Credential | ✅ (`RsSZHOzIodwgsuSc`) | ✅ (`AxoHUH4kCHlr0Zz4`) | ⚠️ Manuelles Setup |
+| n8n Owner Account | ✅ | ✅ | ⚠️ Manuelles Setup |
 | n8n Ingress | ✅ | ✅ | ✅ |
 | N8N_PATH=/n8n/ | ✅ | ✅ | ✅ |
 | N8N_ENCRYPTION_KEY | ✅ | ✅ | ✅ |
+| Credential-ID in Nodes | ✅ Korrekt | ✅ Korrekt (manuell gefixt) | ❌ CI/CD muss fixen |
 
 ## DB Vergleich (Stand: 2026-08-05)
 
@@ -162,13 +163,13 @@ Neue Schritte nach dem Deploy (vor "Rollout restart"):
       
       # In workflow_entity updaten
       kubectl exec -n meeting-automation meeting-db-1 -- psql -U postgres -d meeting_db \
-        -c "UPDATE workflow_entity SET nodes = replace(nodes::text, 'RsSZHOzIodwgsuSc', '$NEW_CRED_ID')::jsonb 
-            WHERE nodes::text LIKE '%RsSZHOzIodwgsuSc%';" 2>/dev/null || true
+        -c "UPDATE workflow_entity SET nodes = replace(nodes::text, 'VJcH9L41G0TRyOok', '$NEW_CRED_ID')::jsonb 
+            WHERE nodes::text LIKE '%VJcH9L41G0TRyOok%';" 2>/dev/null || true
       
-      # In workflow_history updaten (n8n liest Nodes von hier!)
+      # KRITISCH: In workflow_history updaten (n8n liest Nodes von hier!)
       kubectl exec -n meeting-automation meeting-db-1 -- psql -U postgres -d meeting_db \
-        -c "UPDATE workflow_history SET nodes = replace(nodes::text, 'RsSZHOzIodwgsuSc', '$NEW_CRED_ID')::jsonb 
-            WHERE nodes::text LIKE '%RsSZHOzIodwgsuSc%';" 2>/dev/null || true
+        -c "UPDATE workflow_history SET nodes = replace(nodes::text, 'VJcH9L41G0TRyOok', '$NEW_CRED_ID')::jsonb 
+            WHERE nodes::text LIKE '%VJcH9L41G0TRyOok%';" 2>/dev/null || true
       
       echo "✅ Credential references updated"
     else
@@ -322,6 +323,46 @@ curl -s -X POST "https://meeting-automation.com/n8n/rest/login" \
 | 5. Verifikation | Script | 10 Min |
 
 **Gesamt:** ~75 Minuten
+
+---
+
+## KRITISCH: workflow_history (2026-08-05 entdeckt)
+
+### Das Problem
+n8n liest die **aktive Workflow-Version** aus `workflow_history`, NICHT aus `workflow_entity`!
+
+Wenn nur `workflow_entity` aktualisiert wird, bleibt n8n auf der alten Version — Credential-Errors bleiben bestehen.
+
+### Die Lösung
+**BEIDE Tabellen** müssen aktualisiert werden:
+
+```sql
+-- workflow_entity (Definition)
+UPDATE workflow_entity SET nodes = replace(nodes::text, 'OLD_ID', 'NEW_ID')::jsonb
+WHERE nodes::text LIKE '%OLD_ID%';
+
+-- workflow_history (AKTIVE Version — n8n liest von hier!)
+UPDATE workflow_history SET nodes = replace(nodes::text, 'OLD_ID', 'NEW_ID')::jsonb
+WHERE nodes::text LIKE '%OLD_ID%';
+
+-- Dann n8n neustarten
+kubectl rollout restart deployment/n8n -n meeting-automation
+```
+
+### CI/CD Auswirkung
+Das `deploy-production.yml` Script muss BEIDE Tabellen aktualisieren:
+
+```yaml
+# In Schritt 4 (Update Workflow Credential References):
+- name: Update workflow_entity
+  run: |
+    # ...
+    kubectl exec ... -- psql -c "UPDATE workflow_entity SET nodes = ..."
+
+- name: Update workflow_history (KRITISCH!)
+  run: |
+    kubectl exec ... -- psql -c "UPDATE workflow_history SET nodes = ..."
+```
 
 ---
 

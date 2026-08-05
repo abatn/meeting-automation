@@ -370,6 +370,18 @@ Extract with: `docker logs celery-worker | grep TIMING`
 - Root Cause: Catch-all `/` in staging-ingress wins over specific paths in monitoring-ingress
 - Fix: Add explicit path to the catch-all ingress too
 
+### 18. n8n liest Nodes aus workflow_history, NICHT workflow_entity (CRITICAL 2026-08-05)
+- Symptom: Credential-ID Update in `workflow_entity` hat keinen Effekt — n8n zeigt weiterhin "Credential does not exist"
+- Root Cause: n8n lädt die aktive Workflow-Version aus `workflow_history`, nicht aus `workflow_entity`
+- Fix: **BEIDE Tabellen** aktualisieren: `workflow_entity` + `workflow_history`
+```sql
+UPDATE workflow_entity SET nodes = replace(nodes::text, 'OLD_ID', 'NEW_ID')::jsonb WHERE nodes::text LIKE '%OLD_ID%';
+UPDATE workflow_history SET nodes = replace(nodes::text, 'OLD_ID', 'NEW_ID')::jsonb WHERE nodes::text LIKE '%OLD_ID%';
+-- Dann: kubectl rollout restart deployment/n8n
+```
+- CI/CD Auswirkung: Das Deploy-Script muss BEIDE Tabellen in der Credential-ID-Update-Phase ansprechen
+- Doku: `docs/N8N_CREDENTIAL_FIX_2026-08-05.md`
+
 ## Development Workflow
 
 ### Adding a New API Endpoint
