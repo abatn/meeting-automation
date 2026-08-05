@@ -426,7 +426,7 @@ Schritt 1 (Key ins Deployment) → Schritt 2 (Restart + NEU Login)
 |---|----------|--------|--------|
 | **L1 (umgesetzt, kurzfristig)** | NodePort re-aktivieren | `kubectl patch service n8n-staging --type merge -p '{"spec":{"type":"NodePort","ports":[{"port":5678,"targetPort":5678,"nodePort":31678}]}}'` → Service `NodePort 5678:31678/TCP`. firewalld `public`-Zone hatte `31678/tcp` schon erlaubt (Reload nach Aktivierung). | ✅ |
 | **L2 (empfohlen, mittelfristig)** | Saubere Subdomain-Ingress | Neue Ingress `n8n-staging` mit Host `n8n.staging.meeting-automation.com` → `n8n-staging:5678` + TLS (cert-manager `staging-tls`). Benötigt DNS A/Record `n8n.staging.meeting-automation.com` → `158.180.18.110` (Cloudflare). Danach Service zurück auf `ClusterIP` → kein offener Port. | ⏳ (DNS nötig) |
-| **L3 (Alternative)** | `/n8n` Subpath korrekt | n8n Env ergänzen: `N8N_PATH=/n8n`, `N8N_PROTOCOL=https`, `N8N_EDITOR_BASE_URL=https://staging.meeting-automation.com/n8n`, `WEBHOOK_URL=https://staging.meeting-automation.com/n8n` → Restart. Dann funktioniert die vorhandene `/n8n`-Route ohne Asset-Bug. | ⏳ |
+| **L3 (umgesetzt, 2026-08-05)** | `/n8n` Subpath korrekt | `N8N_PATH=/n8n/` (mit trailing slash!) im Deployment + separater Ingress `n8n-staging` mit `rewrite-target: /$2` + `/n8n` aus Haupt-Ingress entfernt. Empirisch bewiesen: n8n 2.32.6 braucht den Ingress-Strip, `N8N_PATH` allein reicht NICHT. → Docs: `docs/N8N_SUBPATH_FIX_2026-08-05.md` | ✅ (Staging) |
 
 **Empfehlung**: L2 (Subdomain + TLS) — entfernt das G2-Risiko komplett und macht NodePort überflüssig. L1 nur als Interim bis L2/DNS steht.
 

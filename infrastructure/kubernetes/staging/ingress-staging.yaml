@@ -19,13 +19,6 @@ spec:
   - host: staging.meeting-automation.com
     http:
       paths:
-      - path: /n8n
-        pathType: Prefix
-        backend:
-          service:
-            name: n8n-staging
-            port:
-              number: 5678
       - path: /api
         pathType: Prefix
         backend:

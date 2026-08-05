@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: n8n-staging
+  namespace: meeting-automation-staging
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Strip the /n8n prefix before proxying to n8n. n8n serves its editor UI
+    # under N8N_PATH=/n8n/ but its static assets/webhooks/REST API only at the
+    # root path (verified on n8n 2.32.6). The rewrite makes the browser see
+    # /n8n/... URLs while n8n receives /... — see docs/N8N_SUBPATH_FIX_2026-08-05.md
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - staging.meeting-automation.com
+    secretName: staging-tls
+  rules:
+  - host: staging.meeting-automation.com
+    http:
+      paths:
+      - path: /n8n(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: n8n-staging
+            port:
+              number: 5678

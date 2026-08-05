@@ -46,6 +46,8 @@ spec:
           value: "http://n8n-staging:5678"
         - name: N8N_SECURE_COOKIE
           value: "false"
+        - name: N8N_PATH
+          value: "/n8n/"
         - name: N8N_API_KEY
           valueFrom:
             secretKeyRef:

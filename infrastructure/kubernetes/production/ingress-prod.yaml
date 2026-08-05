@@ -14,13 +14,6 @@ spec:
   - host: meeting-automation.com
     http:
       paths:
-      - path: /n8n
-        pathType: Prefix
-        backend:
-          service:
-            name: n8n
-            port:
-              number: 5678
       - path: /api
         pathType: Prefix
         backend:
