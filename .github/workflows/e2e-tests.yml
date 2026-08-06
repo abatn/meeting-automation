@@ -522,6 +522,46 @@ jobs:
         kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system
         echo "✅ Production System CronJobs applied (kube-system + longhorn-system)"
 
+    - name: Deploy Monitoring Stack to Production
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        # 1. Monitoring namespace erstellen (idempotent)
+        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+        # 2. Monitoring configs deployen (ServiceMonitor, Dashboards, Rules, Ingress)
+        kubectl apply -f infrastructure/kubernetes/production/monitoring/ -n monitoring 2>&1 || echo "Warning: Failed to apply monitoring configs"
+        # 3. Metrics-server patch (hostNetwork + port 4443 — same as staging Phase 189)
+        kubectl apply -f infrastructure/kubernetes/system/metrics-server-patch.yaml -n kube-system 2>&1 || echo "Warning: metrics-server patch failed"
+        echo "✅ Production monitoring configs applied (monitoring + kube-system)"
+
+    - name: Ensure kube-prometheus-stack on Production
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+        helm repo update
+        # Install falls nicht vorhanden, upgrade falls vorhanden (idempotent)
+        if helm list -n monitoring | grep -q kube-prometheus-stack; then
+          echo "kube-prometheus-stack exists — upgrading with hostNetwork"
+          helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+            -n monitoring --reuse-values \
+            --set prometheus.prometheusSpec.hostNetwork=true \
+            --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
+            --set prometheus.service.port=9090
+        else
+          echo "kube-prometheus-stack NOT found — installing fresh"
+          helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+            -n monitoring --create-namespace \
+            --set prometheus.prometheusSpec.hostNetwork=true \
+            --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
+            --set prometheus.service.port=9090 \
+            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage=5Gi \
+            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.storageClassName=local-path \
+            --set grafana.persistence.enabled=false \
+            --set prometheus.prometheusSpec.retention=15d \
+            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
+            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=local-path
+        fi
+        echo "✅ kube-prometheus-stack ready on production"
+
     - name: Run Production Smoke Tests
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-prod

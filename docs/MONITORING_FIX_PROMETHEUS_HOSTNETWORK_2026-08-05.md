@@ -145,3 +145,155 @@ sudo /usr/local/bin/helm upgrade kube-prometheus-stack prometheus-community/kube
 
 ## Option B — Root Cause Fix (später)
 kube-router deaktivieren: `disable-network-policy: true` in `/etc/rancher/k3s/config.yaml` + `systemctl restart k3s`. Entfernt defekte iptables Chains komplett. NetworkPolicies in staging namespace不再 enforced.
+
+---
+
+# Phase 191: Production (Contabo) Monitoring Stack — CI/CD Konsistenz
+
+**Date:** 2026-08-06
+**Server:** Contabo Production (169.58.83.32) — AMD64 (x86_64), Ubuntu 24.04, Kernel 6.8.0-136-generic, k3s
+**Referenz:** Phase 190 (OCI Staging — hostNetwork Fix)
+
+## Production-Analyse (verified via SSH root@169.58.83.32)
+
+### Cluster-Status
+| Komponente | Status | Details |
+|------------|--------|---------|
+| Namespaces | ✅ | `cnpg-system`, `default`, `ingress-nginx`, `kube-system`, `longhorn-system`, `meeting-automation` |
+| **monitoring-namespace** | ❌ **FEHLT** | Wird benötigt für kube-prometheus-stack |
+| Helm Releases | ✅ | `cnpg`, `ingress-nginx`, `longhorn` |
+| **kube-prometheus-stack** | ❌ **NICHT INSTALLIERT** | Weder Helm noch manuell |
+| metrics-server | ✅ Running | Standard-Deployment (kein hostNetwork-Patch) |
+| App-Deployments | ✅ | backend (2), celery-worker (2), celery-worker-pro (2), frontend, livekit-server, livekit-egress, n8n, onlyoffice, redis |
+| livekit-egress | ✅ hostNetwork | Bereits gepatcht (Pod-IP = Node-IP) |
+
+### Netzwerk-Unterschiede OCI vs Contabo
+
+| | OCI Staging | Contabo Production |
+|---|---|---|
+| **OS** | Oracle Linux 9.7 | Ubuntu 24.04 LTS |
+| **Kernel** | 6.12.0-203.76.7.5.el9uek.aarch64 | 6.8.0-136-generic |
+| **Architektur** | ARM64 (aarch64) | AMD64 (x86_64) |
+| **CNI** | kube-router (iptables-nft) | k3s-default (flannel) |
+| **iptables** | Nur `iptables-nft` (kein legacy) | BEIDE: `iptables` (nf_tables) + `iptables-legacy` |
+| **Pod→Pod TCP** | ❌ "No route to host" | ✅ Funktioniert |
+| **hostNetwork nötig?** | ✅ Ja (OCI VNIC-Problem) | ❓ Technisch nein, aber für Konsistenz ja |
+
+### Pod→Pod TCP Verifikation (Contabo)
+```bash
+# Test: backend Pod → anderer backend Pod
+ssh root@169.58.83.32 "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl exec -n meeting-automation backend-6bcd947666-gdbnr -c backend -- python3 -c \"import socket; s=socket.socket(); s.settimeout(3); s.connect(('10.42.0.248', 8000)); print('CONNECTED'); s.close()\""
+# Ergebnis: CONNECTED ✅
+```
+
+**Fazit:** Contabo hat KEIN kube-router-Problem. Pod→Pod TCP funktioniert. hostNetwork ist technisch NICHT nötig.
+
+## Konsistenz-Plan: CI/CD Staging + Production
+
+### Ziel
+Beide Environments sollen identische Monitoring-Stacks haben:
+- kube-prometheus-stack via Helm
+- Gleiche Configs (ServiceMonitor, Dashboards, Rules)
+- Gleicher Zugang (Ingress)
+- hostNetwork auf BEIDEN (für Konsistenz, obwohl Contabo es nicht braucht)
+
+### Was fehlt in Production CI/CD
+
+| Fehlt | Staging | Production | Impact |
+|-------|---------|------------|--------|
+| monitoring-namespace | ✅ Wird erstellt | ❌ Fehlt | Helm-Install schlägt fehl |
+| kube-prometheus-stack Helm | ✅ Wird geupdatet | ❌ Nicht installiert | Kein Monitoring |
+| monitoring-ingress.yaml | ✅ Existiert | ❌ Nicht vorhanden | Kein Web-Zugang |
+| Monitoring-Configs | ✅ Werden deployed | ❌ Nie deployed | Kein ServiceMonitor |
+| metrics-server-patch | ✅ Wird deployed | ❌ Fehlt | Kein node-monitoring |
+
+### Durchführungsplan
+
+#### Schritt 1: monitoring-ingress.yaml für Production erstellen
+**Datei:** `infrastructure/kubernetes/production/monitoring/monitoring-ingress.yaml`
+- Identisch wie Staging
+- Gleiche Domains: `monitoring.meeting-automation.com`, `grafana.meeting-automation.com`, `alertmanager.meeting-automation.com`
+
+#### Schritt 2: Production-Job in CI/CD erweitern
+**Datei:** `.github/workflows/e2e-tests.yml`
+Neue Steps nach "Deploy System CronJobs to Production":
+
+```yaml
+- name: Deploy Monitoring Stack to Production
+  run: |
+    export KUBECONFIG=$(pwd)/kubeconfig-prod
+    # 1. Monitoring namespace erstellen
+    kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+    # 2. Monitoring configs deployen (ServiceMonitor, Dashboards, Rules, Ingress)
+    kubectl apply -f infrastructure/kubernetes/production/monitoring/ -n monitoring 2>&1 || echo "Warning: Failed to apply monitoring configs"
+    # 3. Metrics-server patch (hostNetwork + port 4443 — OCI VNIC workaround)
+    kubectl apply -f infrastructure/kubernetes/system/metrics-server-patch.yaml -n kube-system 2>&1 || echo "Warning: metrics-server patch failed"
+    echo "✅ Production monitoring configs applied"
+
+- name: Ensure kube-prometheus-stack on Production
+  run: |
+    export KUBECONFIG=$(pwd)/kubeconfig-prod
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+    helm repo update
+    # Install falls nicht vorhanden, upgrade falls vorhanden
+    if helm list -n monitoring | grep -q kube-prometheus-stack; then
+      echo "kube-prometheus-stack exists — upgrading with hostNetwork"
+      helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+        -n monitoring --reuse-values \
+        --set prometheus.prometheusSpec.hostNetwork=true \
+        --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
+        --set prometheus.service.port=9090
+    else
+      echo "kube-prometheus-stack NOT found — installing fresh"
+      helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+        -n monitoring --create-namespace \
+        --set prometheus.prometheusSpec.hostNetwork=true \
+        --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
+        --set prometheus.service.port=9090 \
+        --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage=5Gi \
+        --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.storageClassName=local-path \
+        --set grafana.persistence.enabled=false \
+        --set prometheus.prometheusSpec.retention=15d \
+        --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
+        --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=local-path
+    fi
+    echo "✅ kube-prometheus-stack ready on production"
+```
+
+#### Schritt 3: Staging-Job anpassen (idempotent)
+**Datei:** `.github/workflows/e2e-tests.yml`
+Staging-Job bereits angepasst (Phase 190). Keine Änderung nötig.
+
+### Konsistenz-Checkliste
+
+| Ressource | Staging | Production |
+|-----------|---------|------------|
+| monitoring-namespace | ✅ | ✅ (wird erstellt) |
+| kube-prometheus-stack Helm | ✅ (upgrade) | ✅ (install/upgrade) |
+| hostNetwork=true | ✅ | ✅ |
+| monitoring-ingress.yaml | ✅ | ✅ (wird erstellt) |
+| ServiceMonitor (backend) | ✅ | ✅ |
+| Grafana Dashboards | ✅ | ✅ |
+| PrometheusRules | ✅ | ✅ |
+| metrics-server-patch | ✅ | ✅ |
+| CI/CD Pipeline | ✅ | ✅ |
+
+### Risiko-Bewertung Production
+| Risiko | Bewertung | Grund |
+|--------|-----------|-------|
+| Helm-Install fehlschlägt | ⚠️ Mittel | Erstes Mal — CRDs müssen vorhanden sein |
+| Port 9090 Konflikt | ✅ Keiner | Kein Prometheus auf Production |
+| Prometheus Data Verlust | ✅ Kein | Frische Installation |
+| hostNetwork unnötig | ✅ Harmlos | Funktioniert trotzdem, Konsistenz > Effizienz |
+
+### Rollback Production
+```bash
+# kube-prometheus-stack deinstallieren
+helm uninstall kube-prometheus-stack -n monitoring
+kubectl delete namespace monitoring
+```
+
+## Zusammenfassung
+
+**Phase 190 (OCI Staging):** ✅ Abgeschlossen — 15/15 Targets UP
+**Phase 191 (Contabo Production):** geplant — Monitoring Stack installieren + CI/CD konsistent machen
