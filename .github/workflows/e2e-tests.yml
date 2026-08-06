@@ -238,7 +238,15 @@ jobs:
         kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system
         # Metrics-server patch (hostNetwork + port 4443 for OCI VNIC workaround)
         kubectl apply -f infrastructure/kubernetes/system/metrics-server-patch.yaml -n kube-system
-        echo "✅ System CronJobs + metrics-server applied (kube-system + longhorn-system)"
+        # Prometheus hostNetwork (OCI VNIC workaround — same as metrics-server Phase 189)
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+        helm repo update
+        helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+          -n monitoring --reuse-values \
+          --set prometheus.prometheusSpec.hostNetwork=true \
+          --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
+          --set prometheus.service.port=9090 || echo "⚠️ Warning: Prometheus helm upgrade failed, continuing deployment"
+        echo "✅ System CronJobs + metrics-server + Prometheus hostNetwork applied (kube-system + longhorn-system + monitoring)"
 
     - name: Deploy Backend to Staging
       run: |
