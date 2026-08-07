@@ -2,7 +2,7 @@
 
 ## Status
 - **Staging**: ✅ VERIFIZIERT — https://staging.meeting-automation.com/n8n zeigt n8n Editor
-- **Production**: ⏳ Dateien erstellt, deploy Bereit (nicht angewendet)
+- **Production**: ⏳ CI/CD Pipeline angepasst, Secret mit Encryption Key aktualisiert
 
 ## Problem (bewiesen, nicht geraten)
 `https://staging.meeting-automation.com/n8n` zeigte eine weiße Seite.
@@ -118,10 +118,15 @@ Falls n8n wieder von Root bedient werden soll:
 ## Production (2026-08-05)
 
 ### Status
-- **Production**: ⏳ Dateien erstellt, deploy-bereit (nicht angewendet)
-- **N8N_ENCRYPTION_KEY**: Muss noch generiert werden (`openssl rand -hex 32`)
+- **Production**: ⏳ Dateien bereit, CI/CD Pipeline angepasst
+- **N8N_ENCRYPTION_KEY**: ✅ Generiert + in Secrets-Datei eingefügt
+- **TLS**: Cloudflare terminiert TLS — kein cert-manager nötig
 
-### Dateien erstellt/bearbeitet
+### Wichtiger Unterschied zu Staging
+Production hat **KEIN cert-manager** installiert. TLS wird von **Cloudflare** am Edge terminiert.
+Der n8n-Ingress braucht daher KEIN `tls:` Block und KEINE `cert-manager.io/cluster-issuer` Annotation.
+
+### Dateien geändert
 
 #### 1. `infrastructure/kubernetes/production/n8n-deployment.yaml`
 - `N8N_PATH=/n8n/` nach `N8N_SECURE_COOKIE` eingefügt
@@ -131,8 +136,8 @@ Falls n8n wieder von Root bedient werden soll:
 - Eigenständiger Ingress mit:
   - `nginx.ingress.kubernetes.io/rewrite-target: /$2`
   - `nginx.ingress.kubernetes.io/use-regex: "true"`
-  - `cert-manager.io/cluster-issuer: letsencrypt-prod`
-  - TLS via `production-tls` (Let's Encrypt)
+  - **KEIN TLS** (Cloudflare terminiert TLS)
+  - **KEIN cert-manager** (nicht installiert)
   - Path: `/n8n(/|$)(.*)` (pathType: ImplementationSpecific)
   - Host: `meeting-automation.com`
   - Proxy-Timeouts (86400s für SSE/WebSocket)
@@ -141,50 +146,57 @@ Falls n8n wieder von Root bedient werden soll:
 - `/n8n` Path (Prefix → n8n:5678) **entfernt** (nun in eigenem Ingress)
 
 #### 4. `infrastructure/kubernetes/production/n8n-secrets.yaml`
-- `N8N_ENCRYPTION_KEY: "CHANGE_ME_TO_RANDOM_HEX_64"` hinzugefügt
-- **MUSS vor Deploy durch echten Key ersetzt werden**
+- `N8N_ENCRYPTION_KEY` mit echtem 64-Zeichen Hex-Wert eingefügt
+- **WICHTIG**: Der Key darf NIE gewechselt werden (sonst gehen alle n8n-Credentials verloren)
 
-### Unterschiede zu Staging
+#### 5. `.github/workflows/deploy-production.yml`
+- `kubectl apply -f n8n-ingress.yaml` nach `ingress-prod.yaml` eingefügt
+
+### CI/CD Deployment (automatisch via Pipeline)
+
+Der `deploy-production.yml` Pipeline wendet nun automatisch alle n8n-Dateien an:
+1. `n8n-deployment.yaml` (N8N_PATH + N8N_ENCRYPTION_KEY)
+2. `n8n-ingress.yaml` (rewrite-target, kein TLS)
+3. `ingress-prod.yaml` (/n8n entfernt)
+
+**Hinweis**: `n8n-secrets.yaml` wird nur bei Nicht-Existenz erstellt (Pipeline-Logik).
+Da der Secret bereits existiert, muss der `N8N_ENCRYPTION_KEY` manuell angewendet werden:
+
+```bash
+# Einmalig: Secret mit Encryption Key aktualisieren
+kubectl apply -f infrastructure/kubernetes/production/n8n-secrets.yaml -n meeting-automation
+```
+
+### Unterschiede Staging vs Production
 
 | Eigenschaft | Staging | Production |
 |---|---|---|
 | Namespace | `meeting-automation-staging` | `meeting-automation` |
 | Service-Name | `n8n-staging` | `n8n` |
 | Host | `staging.meeting-automation.com` | `meeting-automation.com` |
-| TLS-Secret | `staging-tls` | `production-tls` |
-| cert-manager | ✅ `letsencrypt-prod` | ✅ `letsencrypt-prod` |
+| TLS | cert-manager + staging-tls | **Cloudflare** (kein K8s-TLS) |
+| cert-manager | ✅ installiert | ❌ nicht installiert |
 | Ingress-Name | `n8n-staging` | `n8n` |
-| N8N_ENCRYPTION_KEY | ✅ vorhanden | ⏳ muss generiert werden |
+| N8N_ENCRYPTION_KEY | ✅ vorhanden | ✅ generiert + eingefügt |
+| CI/CD | manuell | **Pipeline** (deploy-production.yml) |
 
-### Deployment-Befehle (Schritt-für-Schritt)
+### Verifikation (nach Deploy)
 
 ```bash
-# 1. Production kubeconfig verwenden
-export KUBECONFIG=/path/to/production-kubeconfig
-
-# 2. N8N_ENCRYPTION_KEY generieren und einsetzen
-ENCRYPTION_KEY=$(openssl rand -hex 32)
-sed -i "s/CHANGE_ME_TO_RANDOM_HEX_64/$ENCRYPTION_KEY/" infrastructure/kubernetes/production/n8n-secrets.yaml
-
-# 3. Secrets anwenden (ZUERST!)
-kubectl apply -f infrastructure/kubernetes/production/n8n-secrets.yaml -n meeting-automation
-
-# 4. Deployment anwenden
-kubectl apply -f infrastructure/kubernetes/production/n8n-deployment.yaml -n meeting-automation
-
-# 5. Ingress anwenden
-kubectl apply -f infrastructure/kubernetes/production/n8n-ingress.yaml -n meeting-automation
-kubectl apply -f infrastructure/kubernetes/production/ingress-prod.yaml -n meeting-automation
-
-# 6. Rollout-Status prüfen
+# 1. Rollout-Status prüfen
 kubectl rollout status deployment/n8n -n meeting-automation --timeout=180s
 
-# 7. Verifikation
+# 2. base-path.js (THE CRITICAL TEST)
 curl -s https://meeting-automation.com/n8n/static/base-path.js | head -c 50
 # Erwartet: window.BASE_PATH = '/n8n/'
 
+# 3. Healthz
 curl -s https://meeting-automation.com/n8n/healthz
 # Erwartet: {"status":"ok"}
+
+# 4. Regression: Frontend
+curl -sI https://meeting-automation.com/ | head -3
+# Erwartet: 200 text/html
 ```
 
 ### Rollback (bei Problemen)
@@ -192,9 +204,9 @@ curl -s https://meeting-automation.com/n8n/healthz
 # YAML-Dateien reverten
 git checkout infrastructure/kubernetes/production/n8n-deployment.yaml
 git checkout infrastructure/kubernetes/production/ingress-prod.yaml
-git rm infrastructure/kubernetes/production/n8n-ingress.yaml
+git checkout .github/workflows/deploy-production.yml
 
-# Erneut anwenden
+# Erneut anwenden (n8n-ingress.yaml muss aus Pipeline entfernt werden)
 kubectl apply -f infrastructure/kubernetes/production/n8n-deployment.yaml -n meeting-automation
 kubectl apply -f infrastructure/kubernetes/production/ingress-prod.yaml -n meeting-automation
 kubectl rollout restart deployment/n8n -n meeting-automation

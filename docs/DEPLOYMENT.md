@@ -217,16 +217,33 @@ For production environments, the system is designed to be deployed on a cloud pr
 
 ## 3. CI/CD Pipelines
 
+> **AKTUELLER PLAN**: Siehe `docs/CICD_RESTRUCTURE_PLAN_2026-08-07.md` für die vollständige 3-Workflow-Umstrukturierung (Staging/Production Trennung).
+
 The `.github/workflows` directory contains GitHub Actions for automated testing, building, and security scanning.
+
+### 3.1 Aktuelle Workflows (pre-restructure)
 
 -   **`backend-ci.yml`**: Runs tests, linting, type checks for the backend, builds the Docker image, and performs vulnerability scanning (Trivy).
 -   **`frontend-ci.yml`**: Runs tests, linting, type checks for the frontend, builds the Docker image, and uploads build artifacts.
--   **`docker-build.yml`**: (Placeholder, typically used for pushing images to a registry for deployment).
+-   **`e2e-tests.yml`**: Komplette Pipeline (Build + Test + Deploy Staging + Deploy Production) — wird aufgeteilt in 3 separate Workflows.
+-   **`deploy-production.yml`**: Production-Deploy via SCP + SSH (wird auf manuellen Trigger + Approval umgestellt).
 
-For production CI/CD, these workflows would be extended to include:
--   Pushing Docker images to a container registry.
--   Triggering Terraform apply for infrastructure updates.
--   Triggering Kubernetes deployments for application updates.
+### 3.2 Geplante Workflows (post-restructure)
+
+| Workflow | Trigger | Aufgabe |
+|----------|---------|---------|
+| **`ci.yml`** | `push` main/develop | Tests + Build + Push Images (KEIN Deploy) |
+| **`deploy-staging.yml`** | `workflow_run` nach CI + `workflow_dispatch` | Deploy Staging + E2E Tests |
+| **`deploy-production.yml`** | `workflow_dispatch` NUR | Deploy Production + Approval + Smoke Tests |
+
+### 3.3 GitHub Environments
+
+| Environment | Approval | Secrets |
+|-------------|----------|---------|
+| `staging` | Keiner (auto) | `KUBE_CONFIG_STAGING`, AI Keys |
+| `production` | `required_reviewers` | `KUBE_CONFIG_PRODUCTION`, Docker Hub |
+
+Siehe `docs/CICD_RESTRUCTURE_PLAN_2026-08-07.md` für vollständige Spezifikation.
 
 ## 4. Backup and Recovery
 

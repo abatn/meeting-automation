@@ -1,0 +1,73 @@
+# LiveKit Egress Helm Chart Values
+# Staging Environment
+# Erstellt: 2026-08-06
+# KORRIGIERT: 2026-08-06 (chart-konform, 100% belegt)
+#
+# WICHTIG (Chart-Struktur):
+# Das egress-Chart rendert die Config AUSSCHLIESSLICH aus `toYaml .Values.egress`
+# und uebergibt sie als `EGRESS_CONFIG_BODY` an den Container.
+# Ein freies `env:`-Feld existiert im Chart NICHT — alle Settings (Redis, S3,
+# Server-Verbindung) gehoeren unter `.Values.egress`.
+# Quelle: egress/templates/configmap.yaml + deployment.yaml (Chart v1.8.4)
+
+replicaCount: 1
+
+image:
+  repository: livekit/egress
+  pullPolicy: IfNotPresent
+
+# ---------------------------------------------------------------------------
+# Egress-Config (exakt die funktionierende Raw-Configmap abgebildet)
+# ---------------------------------------------------------------------------
+egress:
+  log_level: debug
+  insecure: true
+  # Verbindung zum LiveKit Server (statt env LIVEKIT_WS_URL/API_KEY/SECRET)
+  ws_url: ws://livekit-server-staging:7880
+  api_key: meeting-api-key
+  api_secret: meeting-api-secret-2026-minimum-32-chars!
+  redis:
+    address: redis-staging.meeting-automation-staging.svc.cluster.local:6379
+    password: redis_password
+    db: 0
+  s3:
+    access_key: minio_user
+    secret: minio_password
+    endpoint: http://minio-staging:9000
+    bucket: meeting-recordings-staging
+    region: us-east-1
+    force_path_style: true
+  health_port: 7000
+  template_port: 7980
+  prometheus_port: 7002
+  cpu_cost:
+    room_composite_cpu_cost: 1.5
+    web_cpu_cost: 1.5
+    track_composite_cpu_cost: 1.0
+    track_cpu_cost: 0.5
+
+# Resource Limits (angepasst an funktionierende Raw-Config: 200m request / 1 CPU / 2Gi)
+# Grund: Node CPU Requests = 99%; 1000m request wuerde nie schedulen (Insufficient cpu)
+resources:
+  limits:
+    cpu: "1"
+    memory: 2Gi
+  requests:
+    cpu: 200m
+    memory: 512Mi
+
+# Graceful Shutdown
+terminationGracePeriodSeconds: 3600
+
+# CRITICAL: Recreate-Strategie (Chart: .Values.deploymentStrategy)
+# Verhindert parallele Pods (alter Pod mit 1000m Request blockiert Node -> Insufficient cpu)
+deploymentStrategy:
+  type: Recreate
+
+# Autoscaling (deaktiviert fuer Test)
+autoscaling:
+  enabled: false
+
+# Security
+podSecurityContext: {}
+securityContext: {}

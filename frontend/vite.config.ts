@@ -18,10 +18,15 @@ export default defineConfig({
     }
   },
   server: {
-    port: 3000,
+    // TEMPORARY for local test against staging (2026-08-06): port 3001 because
+    // an unrelated process (HEIMAT) occupies 3000. Proxy targets the STAGING
+    // backend so the new Recording-Start-Guard can be tested against the real
+    // Helm pipeline. REVERT after test: cp /tmp/vite.config.ts.original frontend/vite.config.ts
+    port: 3001,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'https://staging.meeting-automation.com',
+        secure: false,
         changeOrigin: true,
         timeout: 600000, // 10 minutes
         proxyTimeout: 600000,

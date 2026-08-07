@@ -22,7 +22,7 @@ data:
     keys:
       meeting-api-key: meeting-api-secret-2026-minimum-32-chars!
     turn:
-      enabled: true
+      enabled: false
       udp_port: 3478
     webhook:
       api_key: meeting-api-key

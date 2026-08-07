@@ -1,0 +1,98 @@
+# LiveKit Server Helm Chart Values
+# Staging Environment
+# Erstellt: 2026-08-06
+# KORRIGIERT: 2026-08-06 (chart-konform, 100% belegt)
+#
+# Fixes:
+# 1. nameOverride = livekit-server-staging (Labels: app.kubernetes.io/name)
+# 2. fullnameOverride = livekit-server-staging (Service/Deployment Name)
+# 3. loadBalancer.servicePort = 7880 (Service Port)
+# 4. force_tcp / allow_tcp_fallback / tcp_fallback_rtt_threshold ENTFERNT
+#    (keine gueltigen LiveKit-Chart-Keys — RTC-Ports via port_range_start/end)
+# 5. turn.enabled: false (TURN ohne TLS-Cert verursacht 403 CreatePermission)
+#    Beweis: Egress-Log "CreatePermission error response (error 403:)"
+# 6. UDP-Range 50000-60000 + hostNetwork sind OFFIZIELLE CHART-DEFAULTS
+#    (keine hostPorts noetig — bei hostNetwork werden hostPorts ignoriert)
+
+replicaCount: 1
+
+image:
+  repository: livekit/livekit-server
+  pullPolicy: IfNotPresent
+
+# CRITICAL: BEIDE Override noetig!
+# nameOverride -> aendert Labels (app.kubernetes.io/name)
+# fullnameOverride -> aendert Resource-Namen (Deployment, Service, ConfigMap)
+nameOverride: livekit-server-staging
+fullnameOverride: livekit-server-staging
+
+livekit:
+  port: 7880
+  log_level: info
+  rtc:
+    tcp_port: 7881
+    port_range_start: 50000
+    port_range_end: 60000
+    use_external_ip: true
+  redis:
+    address: redis-staging.meeting-automation-staging.svc.cluster.local:6379
+    password: redis_password
+    db: 0
+  keys:
+    meeting-api-key: meeting-api-secret-2026-minimum-32-chars!
+  # TURN: deaktiviert — direkter UDP-Pfad reicht im Cluster (Beweis: "test 67" 154KB OK)
+  # Nur aktivieren, wenn TURN zwingend gebraucht wird — DANN mit TLS-Zertifikat:
+  #   enabled: true
+  #   udp_port: 3478
+  #   tls_port: 5349
+  #   domain: turn.meeting-automation.com   # muss zum Zertifikat passen
+  #   secretName: livekit-turn-tls          # TLS-Secret mit cert+key
+  turn:
+    enabled: false
+  webhook:
+    api_key: meeting-api-key
+    urls:
+      - http://backend.meeting-automation-staging.svc.cluster.local:8000/api/v1/livekit/webhooks
+
+# CRITICAL: loadBalancer.servicePort MUSS = livekit.port sein!
+loadBalancer:
+  type: disable
+  servicePort: 7880
+
+# HostNetwork fuer WebRTC UDP beibehalten (OFFIZIELLER Chart-Default)
+podHostNetwork: true
+
+# CRITICAL: hostNetwork + hostPort erfordert Recreate (kein RollingUpdate)
+# Zwei Pods koennen nicht gleichzeitig dieselben hostPorts binden -> neuer Pod waere Pending
+# (Chart-Template: {{- if .Values.deploymentStrategy }} ... {{- end }}, offiziell unterstuetzt)
+deploymentStrategy:
+  type: Recreate
+
+# Node Selection
+nodeSelector:
+  kubernetes.io/hostname: instance-20260329-0846
+
+# Resource Limits (angepasst an funktionierende Raw-Config: 100m request / 500m limit / 512Mi)
+# Grund: Node CPU Requests = 99%; 1000m request blockiert den Node (Egress kann nie schedulen)
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Autoscaling (deaktiviert fuer Test)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 80
+
+# Monitoring
+serviceMonitor:
+  create: false
+
+# Security
+podSecurityContext: {}
+securityContext: {}

@@ -83,6 +83,7 @@ class LiveKitService:
 
         req = RoomCompositeEgressRequest()
         req.room_name = meeting_id
+        req.layout = "speaker"  # Explizit setzen (dokumentiertes Default-Layout)
         req.preset = EncodingOptionsPreset.H264_720P_30
         req.audio_only = True
         req.file.CopyFrom(file_output)

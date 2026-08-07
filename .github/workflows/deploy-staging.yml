@@ -1,0 +1,381 @@
+name: Deploy Staging
+
+on:
+  # Automatisch nach CI-Pipeline (nur main)
+  workflow_run:
+    workflows: [CI Pipeline]
+    types: [completed]
+    branches: [main]
+
+  # Manueller Trigger
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image Tag (default: latest)'
+        required: false
+        default: 'latest'
+        type: string
+
+env:
+  IMAGE_NAME: docker.io/batnini/meeting-automation-backend
+  FRONTEND_IMAGE: docker.io/batnini/meeting-automation-frontend
+
+jobs:
+  # ============================================
+  # PRE-FLIGHT: Nur bei erfolgreichem CI deployen
+  # ============================================
+  pre-flight:
+    runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.workflow_run.conclusion == 'success')
+    outputs:
+      image_tag: ${{ steps.resolve-tag.outputs.tag }}
+    steps:
+    - name: Resolve image tag
+      id: resolve-tag
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "tag=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
+          echo "🔧 Manual deploy with tag: ${{ inputs.image_tag }}"
+        else
+          echo "tag=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+          echo "🔄 Auto deploy with SHA: ${{ github.event.workflow_run.head_sha }}"
+        fi
+
+  # ============================================
+  # DEPLOY STAGING
+  # ============================================
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: pre-flight
+    environment: staging
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check Staging Secrets
+      run: |
+        if [ -z "${{ secrets.KUBE_CONFIG_STAGING }}" ]; then
+          echo "❌ KUBE_CONFIG_STAGING secret not configured."
+          echo "Required: GitHub → Settings → Environments → staging → Secrets"
+          exit 1
+        fi
+
+    - name: Configure K8s context for staging
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_STAGING }}" > kubeconfig-staging
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        CONTEXT=$(kubectl config get-contexts -o name | head -1)
+        if [ -z "$CONTEXT" ]; then
+          echo "❌ No contexts found in kubeconfig"
+          exit 1
+        fi
+        echo "Using context: $CONTEXT"
+        kubectl config use-context "$CONTEXT"
+        kubectl get namespace meeting-automation-staging || kubectl apply -f infrastructure/kubernetes/staging/namespace.yaml
+
+    - name: Create/Update Staging Secrets from GitHub Secrets
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        kubectl create secret generic e2e-test-user \
+          --namespace meeting-automation-staging \
+          --from-literal=E2E_TEST_USER_EMAIL="${{ secrets.STAGING_E2E_USER_EMAIL }}" \
+          --from-literal=E2E_TEST_USER_PASSWORD="${{ secrets.STAGING_E2E_USER_PASSWORD }}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create secret generic backend-api-keys-staging \
+          --namespace meeting-automation-staging \
+          --from-literal=MISTRAL_API_KEY="${{ secrets.MISTRAL_API_KEY_STAGING }}" \
+          --from-literal=GLADIA_API_KEY="${{ secrets.GLADIA_API_KEY_STAGING }}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Ensure Docker Hub Pull Secret
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        kubectl create secret docker-registry dockerhub-pull-secret \
+          --namespace meeting-automation-staging \
+          --docker-server=https://index.docker.io/v1/ \
+          --docker-username=batnini \
+          --docker-password="${{ secrets.DOCKERHUB_TOKEN }}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        for deploy in $(kubectl get deploy -n meeting-automation-staging -o name 2>/dev/null); do
+          HAS_SECRET=$(kubectl get "$deploy" -n meeting-automation-staging -o jsonpath='{.spec.template.spec.imagePullSecrets[?(@.name=="dockerhub-pull-secret")].name}' 2>/dev/null)
+          if [ -z "$HAS_SECRET" ]; then
+            kubectl patch "$deploy" -n meeting-automation-staging --type=json \
+              -p='[{"op":"add","path":"/spec/template/spec/imagePullSecrets","value":[{"name":"dockerhub-pull-secret"}]}]' 2>&1 || true
+          fi
+        done
+        echo "✅ Docker Hub pull secret ready"
+
+    - name: Cleanup completed pods
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        echo "Cleaning up completed/failed pods..."
+        kubectl delete pods -n meeting-automation-staging --field-selector=status.phase=Succeeded --ignore-not-found 2>&1 || true
+        kubectl delete pods -n meeting-automation-staging --field-selector=status.phase=Failed --ignore-not-found 2>&1 || true
+
+    - name: Fix immutable PVCs if storageClass mismatch
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        echo "🔍 Checking PVC storageClasses..."
+        NEEDS_REAPPLY=false
+        for pvc in postgres-backup-pvc postgres-data-postgres-staging-0; do
+          SC=$(kubectl get pvc "$pvc" -n meeting-automation-staging \
+            -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "none")
+          if [ "$SC" = "none" ]; then
+            echo "  ✅ PVC $pvc does not exist — will be created"
+          elif [ "$SC" != "local-path" ]; then
+            echo "  ⚠️  PVC $pvc has wrong storageClass: $SC — deleting..."
+            kubectl delete pvc "$pvc" -n meeting-automation-staging --ignore-not-found
+            NEEDS_REAPPLY=true
+          else
+            echo "  ✅ PVC $pvc already correct"
+          fi
+        done
+        if [ "$NEEDS_REAPPLY" = "true" ]; then
+          sleep 5
+        fi
+
+    - name: Install Longhorn if not present (skip-if-exists)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        if kubectl get namespace longhorn-system &>/dev/null; then
+          echo "✅ longhorn-system already exists — skipping"
+        else
+          echo "📦 Installing Longhorn v1.12.0..."
+          helm repo add longhorn https://charts.longhorn.io 2>/dev/null || true
+          helm repo update
+          helm install longhorn longhorn/longhorn \
+            --namespace longhorn-system --create-namespace --version 1.12.0 \
+            --set defaultSettings.defaultReplicaCount=1 \
+            --set defaultSettings.createDefaultDiskLabeledNodes=true \
+            --set defaultSettings.defaultClass=false \
+            --wait --timeout 10m || echo "⚠️ Warning: Longhorn install failed, continuing"
+        fi
+
+    - name: Deploy All Staging Resources (idempotent)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        kubectl apply -f infrastructure/kubernetes/staging/ -n meeting-automation-staging
+        kubectl rollout restart deployment/onlyoffice-staging -n meeting-automation-staging 2>&1 || echo "Warning: OnlyOffice restart failed"
+
+    - name: Deploy System CronJobs + Monitoring Stack
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        # System CronJobs
+        kubectl apply -f infrastructure/kubernetes/system/ephemeral-storage-cleanup-cronjob.yaml -n kube-system
+        kubectl apply -f infrastructure/kubernetes/system/pod-garbage-collector-cronjob.yaml -n kube-system
+        kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system 2>&1 || true
+        # Metrics-server
+        kubectl apply -f infrastructure/kubernetes/system/metrics-server-patch.yaml -n kube-system
+        # Monitoring
+        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
+        helm repo update
+        helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+          -n monitoring --reuse-values \
+          --set prometheus.prometheusSpec.hostNetwork=true \
+          --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
+          --set prometheus.service.port=9090 || true
+        kubectl apply -f infrastructure/kubernetes/staging/monitoring/ -n monitoring 2>&1 || true
+
+    - name: Deploy Backend to Staging
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        TAG=${{ needs.pre-flight.outputs.image_tag }}
+        kubectl set image deployment/backend \
+          backend=${{ env.IMAGE_NAME }}:$TAG \
+          alembic-migrate=${{ env.IMAGE_NAME }}:$TAG \
+          -n meeting-automation-staging --record
+        kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=600s
+
+    - name: Deploy Frontend to Staging
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        TAG=${{ needs.pre-flight.outputs.image_tag }}
+        kubectl set image deployment/frontend \
+          frontend=${{ env.FRONTEND_IMAGE }}:$TAG \
+          -n meeting-automation-staging --record
+        kubectl rollout status deployment/frontend -n meeting-automation-staging --timeout=120s
+
+    - name: Deploy Celery Workers to Staging
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        TAG=${{ needs.pre-flight.outputs.image_tag }}
+        BACKEND_IMAGE="${{ env.IMAGE_NAME }}:$TAG"
+        kubectl set image deployment/celery-worker-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
+        kubectl set image deployment/celery-worker-pro-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
+        kubectl set image deployment/celery-beat-staging celery-beat="$BACKEND_IMAGE" -n meeting-automation-staging --record
+        kubectl rollout status deployment/celery-worker-staging -n meeting-automation-staging --timeout=300s
+        kubectl rollout status deployment/celery-beat-staging -n meeting-automation-staging --timeout=120s
+
+    - name: Import n8n Workflows to Staging (idempotent)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        N8N_POD=$(kubectl get pods -n meeting-automation-staging -l app=n8n-staging -o jsonpath='{.items[0].metadata.name}')
+        WORKFLOW_COUNT=$(kubectl exec -n meeting-automation-staging meeting-db-1 -- psql -U postgres -d meeting_db_staging -t -c "SELECT count(*) FROM workflow_entity" 2>/dev/null | tr -d ' ')
+        if [ "$WORKFLOW_COUNT" = "0" ]; then
+          echo "No workflows — importing..."
+          kubectl exec -n meeting-automation-staging $N8N_POD -- mkdir -p /home/node/.n8n/workflows
+          for f in n8n/workflows/*.json; do
+            name=$(basename $f)
+            cat $f | kubectl exec -i -n meeting-automation-staging $N8N_POD -- tee /home/node/.n8n/workflows/$name > /dev/null
+            kubectl exec -n meeting-automation-staging $N8N_POD -- n8n import:workflow --input=/home/node/.n8n/workflows/$name 2>&1 | tail -1 || true
+          done
+          kubectl rollout restart deployment/n8n-staging -n meeting-automation-staging
+        else
+          echo "✅ n8n workflows exist ($WORKFLOW_COUNT) — skipping"
+        fi
+
+    - name: Validate required AI API keys
+      run: |
+        if [ -z "${{ secrets.MISTRAL_API_KEY_STAGING }}" ]; then
+          echo "❌ MISTRAL_API_KEY_STAGING not set"
+          exit 1
+        fi
+        if [ -z "${{ secrets.GLADIA_API_KEY_STAGING }}" ]; then
+          echo "❌ GLADIA_API_KEY_STAGING not set"
+          exit 1
+        fi
+        echo "✅ AI API keys present"
+
+    - name: Ensure E2E Test User Exists in Staging
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        STAGING_URL="https://staging.meeting-automation.com"
+        for i in {1..30}; do
+          if curl -s -f "$STAGING_URL/health" > /dev/null; then
+            echo "Backend is ready"
+            break
+          fi
+          echo "Waiting for backend..."
+          sleep 2
+        done
+        REGISTER_PAYLOAD=$(jq -n \
+          --arg email "${{ secrets.STAGING_E2E_USER_EMAIL }}" \
+          --arg password "${{ secrets.STAGING_E2E_USER_PASSWORD }}" \
+          --arg name "E2E Tester" \
+          '{
+            email: $email,
+            password: $password,
+            full_name: $name,
+            company_name: "E2E Tests"
+          }')
+        RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$STAGING_URL/api/v1/auth/register" \
+          -H "Content-Type: application/json" \
+          -d "$REGISTER_PAYLOAD")
+        if [ "$RESPONSE" = "201" ] || [ "$RESPONSE" = "200" ]; then
+          echo "✅ Test user created or already exists"
+        else
+          echo "⚠️ Could not create test user (HTTP $RESPONSE)"
+        fi
+
+    - name: Wait for Staging Health Endpoint
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        STAGING_URL="https://staging.meeting-automation.com"
+        echo "Waiting for $STAGING_URL/health..."
+        for i in {1..60}; do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL/health 2>/dev/null || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "Staging is healthy"
+            break
+          fi
+          echo "Health check returned $STATUS, waiting... (attempt $i)"
+          sleep 5
+        done
+        curl -f $STAGING_URL/health || (echo "Staging health check failed" && exit 1)
+
+  # ============================================
+  # E2E TESTS (gegen Staging)
+  # ============================================
+  e2e-test-staging:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_STAGING }}" > kubeconfig-staging
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        CONTEXT=$(kubectl config get-contexts -o name | head -1)
+        kubectl config use-context "$CONTEXT"
+
+    - name: Port-forward + Run E2E Tests against Staging
+      shell: bash
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        export DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5433/meeting_db_staging"
+
+        # Port-forward DB + Backend + MinIO
+        kubectl port-forward -n meeting-automation-staging svc/meeting-db-rw 5433:5432 &
+        PF_PID_DB=$!
+        kubectl port-forward -n meeting-automation-staging svc/backend 8080:8000 &
+        PF_PID_BACKEND=$!
+        kubectl port-forward -n meeting-automation-staging svc/minio-staging 9002:9000 &
+        PF_PID_MINIO=$!
+        trap "kill $PF_PID_DB $PF_PID_BACKEND $PF_PID_MINIO 2>/dev/null || true" EXIT
+
+        for i in {1..30}; do
+          if nc -z localhost 5433 && nc -z localhost 8080 && nc -z localhost 9002; then
+            echo "Port forwards ready"
+            break
+          fi
+          sleep 1
+        done
+
+        cd backend
+        pip install -q -r requirements.txt -r requirements-dev.txt
+        pytest tests/e2e/ \
+          -v \
+          --tb=short \
+          --junitxml=staging-e2e-report.xml \
+          -m "e2e and not flaky" \
+          --reruns 2 \
+          --reruns-delay 1
+      env:
+        TEST_ENV: staging
+        E2E_TEST: "true"
+        E2E_TEST_USER_EMAIL: ${{ secrets.STAGING_E2E_USER_EMAIL }}
+        E2E_TEST_USER_PASSWORD: ${{ secrets.STAGING_E2E_USER_PASSWORD }}
+        E2E_BASE_URL: "http://localhost:8080"
+        DATABASE_URL: "postgresql+asyncpg://meeting_user:meeting_password@localhost:5433/meeting_db_staging"
+        S3_ENDPOINT: "http://localhost:9002"
+        S3_ACCESS_KEY: "minio_user"
+        S3_SECRET_KEY: "minio_password"
+        ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        PYTHONHTTPSVERIFY: "0"
+
+    - name: Check Staging E2E Pass Rate Gate (≥95%)
+      id: e2e-gate
+      run: |
+        cd backend
+        if [ ! -f staging-e2e-report.xml ]; then
+          echo "E2E report not found!"
+          exit 1
+        fi
+        PASSED=$(grep -c 'testcase.*status="passed"' staging-e2e-report.xml || echo 0)
+        FAILED=$(grep -c 'testcase.*status="failed"' staging-e2e-report.xml || echo 0)
+        TOTAL=$((PASSED + FAILED))
+        echo "E2E Results: PASSED=$PASSED FAILED=$FAILED TOTAL=$TOTAL"
+        if [ $TOTAL -eq 0 ]; then
+          echo "No E2E tests executed!"
+          exit 1
+        fi
+        PASS_RATE=$((PASSED * 100 / TOTAL))
+        echo "E2E Pass rate: ${PASS_RATE}%"
+        echo "pass_rate=$PASS_RATE" >> $GITHUB_OUTPUT
+        if [ $PASS_RATE -lt 95 ]; then
+          echo "❌ E2E pass rate below 95%"
+          exit 1
+        fi
+        echo "✅ E2E pass rate ≥95%"
+
+    - name: Upload Staging test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: staging-e2e-results
+        path: |
+          backend/staging-e2e-report.xml
+          backend/coverage.xml
