@@ -1,7 +1,7 @@
 # LiveKit Integration — Minimaler Plan
 
 **Erstellt:** 2026-06-05 | **Ziel:** Echtzeit-Audio für alle Teilnehmer + Recording → Pipeline
-**Aktualisiert:** 2026-08-12 | **NetworkPolicy-Fix für Helm-deployed Pods**
+**Aktualisiert:** 2026-08-08 | **Production auf Helm umgestellt wie Staging**
 
 ---
 
@@ -353,62 +353,125 @@ Der Egress-Pod braucht **keinen direkten MinIO-Zugang**:
 
 ---
 
-## Production-Deployment (2026-08-08)
+## Staging vs Production Vergleich (2026-08-08)
 
-### Unterschiede Staging vs Production
+**Beide Umgebungen nutzen jetzt identische Helm-Charts.** Die einzigen Unterschiede sind Namespace und Credentials.
 
-| Aspekt | Staging | Production |
-|--------|---------|------------|
-| Namespace | `meeting-automation-staging` | `meeting-automation` |
-| Server-Label | `app.kubernetes.io/name: livekit-server-staging` | `app: livekit-server` |
-| Egress-Label | `app.kubernetes.io/name: egress` | `app: livekit-egress` |
-| Redis | `redis-staging:6379` | `redis:6379` |
-| MinIO | `minio-staging:9000` | `minio:9000` |
-| API Keys | `meeting-api-key` | `prod-9a4ac9f9...` |
-| TURN | deaktiviert | aktiviert (Port 3478) |
-| Deployment-Methode | Helm-Chart | Direkte YAML + Helm Values (Referenz) |
+### Infrastruktur-Vergleich
 
-### Production-Dateien
+| Aspekt | Staging | Production | Identisch? |
+|--------|---------|------------|------------|
+| **Namespace** | `meeting-automation-staging` | `meeting-automation` | ❌ Name |
+| **Helm-Chart (Server)** | `livekit/livekit-server` | `livekit/livekit-server` | ✅ **JA** |
+| **Helm-Chart (Egress)** | `livekit/livekit-egress` | `livekit/livekit-egress` | ✅ **JA** |
+| **hostNetwork (Server)** | ✅ true | ✅ true | ✅ **JA** |
+| **hostNetwork (Egress)** | ✅ true (kubectl patch) | ✅ true (kubectl patch) | ✅ **JA** |
+| **ConfigMaps** | ✅ | ✅ | ✅ Struktur gleich |
+| **Secrets** | ✅ | ✅ | ✅ Struktur gleich |
+| **NetworkPolicies** | Helm-Labels | Helm-Labels | ✅ **JA** |
+| **CI/CD Methode** | `helm upgrade` | `helm upgrade` | ✅ **JA** |
 
-| Datei | Zweck |
-|-------|-------|
-| `infrastructure/kubernetes/production/livekit-server-deployment.yaml` | Server Deployment + Service |
-| `infrastructure/kubernetes/production/livekit-configmap.yaml` | Server-Konfiguration |
-| `infrastructure/kubernetes/production/livekit-secrets.yaml` | API-Keys |
-| `infrastructure/kubernetes/production/livekit-egress-deployment.yaml` | Egress Deployment |
-| `infrastructure/kubernetes/production/livekit-egress-configmap.yaml` | Egress-Konfiguration |
-| `infrastructure/kubernetes/production/egress-values.yaml` | Helm Values (Referenz) |
-| `infrastructure/kubernetes/production/livekit-server-values.yaml` | Helm Values (Referenz) |
-| `infrastructure/kubernetes/production/network-policies.yaml` | NetworkPolicies |
+### Credentials-Vergleich (NUR das unterscheidet sich)
 
-### Production-Deployment-Schritte
+| Credential | Staging | Production |
+|------------|---------|------------|
+| **API Key** | `meeting-api-key` | `prod-9a4ac9f989143b65` |
+| **API Secret** | `meeting-api-secret-2026-minimum-32-chars!` | `prod-8f8b7b429f01180c89e03a1b30eeec4be871c0fa184c823a` |
+| **Redis** | `redis-staging:6379` | `redis:6379` |
+| **Redis Passwort** | `redis_password` | `flgyEhZKHVyMBge1QkdKtA` |
+| **MinIO** | `minio-staging:9000` | `minio:9000` |
+| **MinIO Bucket** | `meeting-recordings-staging` | `meeting-recordings` |
+| **TURN** | deaktiviert | aktiviert (Port 3478) |
+| **Webhook URL** | `backend-staging:8000/...` | `backend:8000/...` |
+
+### Helm Values-Vergleich
+
+| Datei | Staging | Production |
+|-------|---------|------------|
+| `egress-values.yaml` | ✅ Custom Values | ✅ Custom Values |
+| `livekit-server-values.yaml` | ✅ Custom Values | ✅ Custom Values |
+| **Struktur** | Identisch | Identisch |
+| **Unterschied** | Staging-Credentials | Production-Credentials |
+
+### CI/CD Pipeline Vergleich
+
+| Schritt | Staging (`deploy-staging.yml`) | Production (`deploy-production.yml`) |
+|---------|------------------------------|-------------------------------------|
+| **Trigger** | Automatisch nach CI | Manuell (`workflow_dispatch`) |
+| **LiveKit Deploy** | `kubectl apply -f staging/` | `helm upgrade livekit-server ...` |
+| **hostNetwork Patch** | ✅ Nach Helm-Upgrade | ✅ Nach Helm-Upgrade |
+| **ConfigMaps** | `kubectl apply` | `kubectl apply` |
+| **Secrets** | `kubectl create secret` | `kubectl apply` |
+| **Backend/Frontend** | `kubectl set image` | `kubectl set image` |
+
+### NetworkPolicy-Vergleich
+
+| Policy | Staging Selector | Production Selector |
+|--------|------------------|---------------------|
+| `livekit-policy` | `app.kubernetes.io/name: livekit-server-staging` | `app.kubernetes.io/name: livekit-server` |
+| `livekit-egress-policy` | `app.kubernetes.io/name: egress` | `app.kubernetes.io/name: egress` |
+| **Ingress-Regeln** | Egress + Backend | Egress + Backend |
+| **Egress-Regeln** | Redis + Backend + DNS | Redis + Backend + DNS |
+
+### Production-Dateien (aktuell)
+
+| Datei | Zweck | Aktiv? |
+|-------|-------|--------|
+| `production/egress-values.yaml` | Helm Values für Egress | ✅ **AKTIV** (CI/CD nutzt sie) |
+| `production/livekit-server-values.yaml` | Helm Values für Server | ✅ **AKTIV** (CI/CD nutzt sie) |
+| `production/livekit-configmap.yaml` | Server-Konfiguration | ✅ **AKTIV** |
+| `production/livekit-egress-configmap.yaml` | Egress-Konfiguration | ✅ **AKTIV** |
+| `production/livekit-secrets.yaml` | API-Keys | ✅ **AKTIV** |
+| `production/network-policies.yaml` | NetworkPolicies | ✅ **AKTIV** |
+| `production/livekit-server-deployment.yaml` | Server Deployment | ⚠️ Referenz (Helm managed) |
+| `production/livekit-egress-deployment.yaml` | Egress Deployment | ⚠️ Referenz (Helm managed) |
+
+### Deployment-Schritte (Production)
+
+Die CI/CD Pipeline (`deploy-production.yml`) führt automatisch aus:
 
 ```bash
-# 1. ConfigMaps + Secrets applyen
-kubectl apply -f infrastructure/kubernetes/production/livekit-configmap.yaml -n meeting-automation
-kubectl apply -f infrastructure/kubernetes/production/livekit-egress-configmap.yaml -n meeting-automation
-kubectl apply -f infrastructure/kubernetes/production/livekit-secrets.yaml -n meeting-automation
+# 1. Helm-Repo hinzufuegen
+helm repo add livekit https://livekit.github.io/livekit
+helm repo update
 
-# 2. NetworkPolicies applyen
-kubectl apply -f infrastructure/kubernetes/production/network-policies.yaml -n meeting-automation
+# 2. LiveKit Server via Helm
+helm upgrade livekit-server livekit/livekit-server \
+  -n meeting-automation \
+  --values livekit-server-values.yaml \
+  --wait --timeout 5m
 
-# 3. Deployments applyen
-kubectl apply -f infrastructure/kubernetes/production/livekit-server-deployment.yaml -n meeting-automation
-kubectl apply -f infrastructure/kubernetes/production/livekit-egress-deployment.yaml -n meeting-automation
+# 3. hostNetwork Patch (Helm-Chart rendert hostNetwork nicht aus Values)
+kubectl patch deployment livekit-server -n meeting-automation --type='json' \
+  -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true}]'
 
-# 4. Verifizierung
-kubectl get pods -n meeting-automation | grep livekit
-kubectl logs -n meeting-automation deployment/livekit-server --since=5m | grep -i 'listening\|started'
+# 4. LiveKit Egress via Helm
+helm upgrade livekit-egress livekit/livekit-egress \
+  -n meeting-automation \
+  --values egress-values.yaml \
+  --wait --timeout 5m
+
+# 5. hostNetwork Patch fuer Egress
+kubectl patch deployment livekit-egress -n meeting-automation --type='json' \
+  -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true}]'
 ```
 
-### WICHTIG: hostNetwork für Production
+### Verifikation nach Production-Deploy
 
-Falls Production auf Helm-Chart umstellt:
 ```bash
-# hostNetwork-Patch nach jedem helm upgrade:
-kubectl patch deployment livekit-egress -n meeting-automation --type='json' \
-  -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},{"op":"replace","path":"/spec/template/spec/dnsPolicy","value":"ClusterFirstWithHostNet"}]'
-kubectl rollout restart deployment/livekit-egress -n meeting-automation
+# Helm Releases pruefen
+helm list -n meeting-automation | grep livekit
+
+# Pods pruefen
+kubectl get pods -n meeting-automation | grep livekit
+
+# hostNetwork pruefen
+kubectl get deploy livekit-server -n meeting-automation -o jsonpath='{.spec.template.spec.hostNetwork}'
+kubectl get deploy livekit-egress -n meeting-automation -o jsonpath='{.spec.template.spec.hostNetwork}'
+
+# Connectivity testen
+EGRESS_POD=$(kubectl get pods -n meeting-automation -l app.kubernetes.io/name=egress -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n meeting-automation $EGRESS_POD -- wget -q -O /dev/null --timeout=5 http://livekit-server:7880
 ```
 
 ---
