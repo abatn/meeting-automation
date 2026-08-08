@@ -3,10 +3,9 @@ import logging
 from livekit.api import AccessToken, LiveKitAPI, VideoGrants
 from livekit.protocol.egress import (
     EncodedFileOutput,
-    EncodingOptionsPreset,
+    ListEgressRequest,
     RoomCompositeEgressRequest,
     StopEgressRequest,
-    ListEgressRequest,
 )
 from livekit.protocol.room import CreateRoomRequest, DeleteRoomRequest
 
@@ -83,8 +82,13 @@ class LiveKitService:
 
         req = RoomCompositeEgressRequest()
         req.room_name = meeting_id
-        req.layout = "speaker"  # Explizit setzen (dokumentiertes Default-Layout)
-        req.preset = EncodingOptionsPreset.H264_720P_30
+        # Audio-only per official LiveKit docs: leave layout AND custom_base_url
+        # unset — setting either routes the recording through the video pipeline
+        # (Chrome), which then never receives a video start signal in an
+        # audio-only room -> EGRESS_ABORTED "Start signal not received".
+        # https://docs.livekit.io/transport/media/ingress-egress/egress/
+        # https://docs.livekit.io/transport/media/ingress-egress/egress/composite-recording/
+        # No video preset either (H264_720P_30 previously forced video encoding).
         req.audio_only = True
         req.file.CopyFrom(file_output)
 

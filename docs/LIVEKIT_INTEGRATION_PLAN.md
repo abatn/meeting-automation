@@ -1,6 +1,7 @@
 # LiveKit Integration — Minimaler Plan
 
 **Erstellt:** 2026-06-05 | **Ziel:** Echtzeit-Audio für alle Teilnehmer + Recording → Pipeline
+**Aktualisiert:** 2026-08-12 | **NetworkPolicy-Fix für Helm-deployed Pods**
 
 ---
 
@@ -251,6 +252,104 @@ LIVEKIT_API_SECRET=meeting-api-secret-2026
 | 2 | Backend (service + api + meeting_service) | 1 Tag |
 | 3 | Frontend (MeetingRoom + Dependencies) | 1-2 Tag |
 | **Total** | | **2-3 Tage** |
+
+---
+
+## NetworkPolicy-Konfiguration (Staging)
+
+**Wichtig:** Alle NetworkPolicies müssen **zwei Label-Sets** unterstützen:
+1. **Alte Labels** (`app: livekit-server-staging`) — für manuell erstellte Pods
+2. **Helm-Labels** (`app.kubernetes.io/name: livekit-server-staging`) — für Helm-deployed Pods
+
+### Betroffene Policies
+
+| Policy | Pod-Selector | Ingress/Egress |
+|--------|-------------|----------------|
+| `livekit-policy` | `app: livekit-server-staging` + `app.kubernetes.io/name: livekit-server-staging` | Ingress von Egress + Backend |
+| `livekit-egress-policy` | `app: livekit-egress-staging` + `app.kubernetes.io/name: egress` | Egress zu Server |
+| `redis-policy` | `app: redis-staging` | Ingress von Egress + Server |
+| `backend-policy` | `app: backend` | Ingress von LiveKit Server |
+
+### Bekannter Fehler (2026-08-12)
+
+**Problem:** Helm-deployed Egress-Pod (`app.kubernetes.io/name: egress`) konnte sich nicht mit LiveKit-Server verbinden.
+
+**Ursache:**
+- Egress-Pod hat nur Helm-Label: `app.kubernetes.io/name: egress`
+- `livekit-policy` erlaubte Ingress nur von `app: livekit-egress-staging`
+- `default-deny-all` blockierte den Traffic
+
+**Lösung:**
+- Helm-Labels in allen NetworkPolicies ergänzt
+- Veraltete duplicate Policies (`livekit-policy-helm`, `livekit-egress-policy-helm`) gelöscht
+- Datei: `infrastructure/kubernetes/staging/network-policies.yaml`
+
+### Verifikation
+
+```bash
+# Prüfe Ingress-Selector der livekit-policy
+kubectl get networkpolicy livekit-policy -n meeting-automation-staging -o jsonpath='{.spec.ingress[0].from}'
+
+# Erwartet: 3 PodSelector (altes Label, Helm-Label, backend)
+```
+
+---
+
+## EGRESS_ABORTED: Root Cause & Fix (2026-08-12)
+
+### Symptom
+- Egress-Recording bricht nach ~10s mit `EGRESS_ABORTED` ab
+- Fehler: `"Start signal not received"`
+- Chrome wird gestartet, verbindet sich aber **nicht** mit dem LiveKit-Server
+
+### Root Cause: hostNetwork-Mismatch
+
+Der LiveKit-Server läuft mit `hostNetwork: true` (Pod-IP = Host-IP `10.0.0.191`).
+Der Egress-Pod (Helm-Chart) hatte `hostNetwork: false` (Pod-IP `10.42.0.169`).
+Traffic von Nicht-hostNetwork-Pod zu hostNetwork-Pod via ClusterIP oder Node-IP
+wird in k3s/Calico nicht korrekt geroutet → `Connection refused` (TCP RST).
+
+| Test | Target | Ergebnis | Schlussfolgerung |
+|------|--------|----------|------------------|
+| Server-Pod (hostNetwork) | 10.0.0.191:7880 | ✅ HTTP 200 | Server lauscht auf :::7880 |
+| **Egress-Pod (hostNetwork: false)** | livekit-server-staging:7880 | ❌ Connection refused | **hostNetwork-Mismatch** |
+| **Egress-Pod (hostNetwork: false)** | 10.0.0.191:7880 | ❌ Connection refused | **hostNetwork-Mismatch** |
+| Egress-Pod (hostNetwork: false) | Redis 10.43.54.118:6379 | ✅ TCP connect | Normale Pods erreichbar |
+| **Egress-Pod (hostNetwork: true)** | livekit-server-staging:7880 | ✅ Exit-Code 0 | **Fix bestätigt** |
+| **Egress-Pod (hostNetwork: true)** | localhost:7880 | ✅ Exit-Code 0 | **hostNetwork shortcut funktioniert** |
+| **Egress-Pod (hostNetwork: true)** | 10.0.0.191:7880 | ✅ Exit-Code 0 | **Direkte Node-IP funktioniert** |
+
+### Fix (2026-08-12, LIVE IM CLUSTER)
+
+```bash
+# 1. hostNetwork: true + dnsPolicy patchen
+kubectl patch deployment livekit-egress -n meeting-automation-staging --type='json' \
+  -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},{"op":"replace","path":"/spec/template/spec/dnsPolicy","value":"ClusterFirstWithHostNet"}]'
+
+# 2. Rollout restart
+kubectl rollout restart deployment/livekit-egress -n meeting-automation-staging
+```
+
+**WICHTIG:** Das Helm-Chart rendert `hostNetwork` NICHT aus Values. Nach jedem
+`helm upgrade` muss der Patch erneut angewendet werden. Siehe `egress-values.yaml`
+für die manuelle Patch-Anleitung.
+
+### Verifikation
+
+```bash
+# Connectivity testen (alle 3 müssen Exit-Code 0 liefern)
+EGRESS_POD=$(kubectl get pods -n meeting-automation-staging -l app.kubernetes.io/name=egress -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}')
+kubectl exec -n meeting-automation-staging $EGRESS_POD -- wget -q -O /dev/null --timeout=5 http://livekit-server-staging:7880
+kubectl exec -n meeting-automation-staging $EGRESS_POD -- wget -q -O /dev/null --timeout=5 http://localhost:7880
+```
+
+### Wichtiger Hinweis: MinIO-Zugang
+
+Der Egress-Pod braucht **keinen direkten MinIO-Zugang**:
+- Egress schreibt Recording lokal
+- Webhook `egress_ended` löst Celery-Worker aus
+- **Celery-Worker** (`transcription_tasks.py`)uploaded via `boto3` nach MinIO
+- `minio-policy` erlaubt nur: backend, celery-worker, frontend — das ist korrekt
 
 ---
 

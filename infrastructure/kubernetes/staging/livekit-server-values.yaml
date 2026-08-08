@@ -72,15 +72,16 @@ deploymentStrategy:
 nodeSelector:
   kubernetes.io/hostname: instance-20260329-0846
 
-# Resource Limits (angepasst an funktionierende Raw-Config: 100m request / 500m limit / 512Mi)
-# Grund: Node CPU Requests = 99%; 1000m request blockiert den Node (Egress kann nie schedulen)
+# Resource Limits (2026-08-08: CPU-Memory-Fix für stabile ICE-Verbindung)
+# Offizielle Helm-Empfehlung: cpu: 4000-6000m, memory: 1024-2048Mi
+# Minimum für stabile ICE: cpu: 2000m, memory: 1024Mi
 resources:
   limits:
+    cpu: 2000m
+    memory: 1024Mi
+  requests:
     cpu: 500m
     memory: 512Mi
-  requests:
-    cpu: 100m
-    memory: 256Mi
 
 # Autoscaling (deaktiviert fuer Test)
 autoscaling:

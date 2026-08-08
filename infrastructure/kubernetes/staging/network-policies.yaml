@@ -1,4 +1,5 @@
 # Network Policies for Meeting Automation (ISO 27001 Compliance)
+# Aktualisiert: 2026-08-12 - Helm-Labels (app.kubernetes.io/name) ergänzt
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -72,7 +73,13 @@ spec:
           app: livekit-egress-staging
     - podSelector:
         matchLabels:
+          app.kubernetes.io/name: egress
+    - podSelector:
+        matchLabels:
           app: livekit-server-staging
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: livekit-server-staging
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: monitoring
@@ -178,6 +185,9 @@ spec:
           app: livekit-server-staging
     - podSelector:
         matchLabels:
+          app.kubernetes.io/name: livekit-server-staging
+    - podSelector:
+        matchLabels:
           app: onlyoffice-staging
     - podSelector:
         matchLabels:
@@ -273,7 +283,8 @@ spec:
     - protocol: TCP
       port: 5678
 ---
-# LiveKit Server: Egress to Redis, Backend, DNS + Ingress from Egress
+# LiveKit Server: Egress to Redis, Backend, DNS + Ingress from Egress + Frontend (external)
+# FIXED: podSelector auf Helm-Label geaendert (app.kubernetes.io/name)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -282,7 +293,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: livekit-server-staging
+      app.kubernetes.io/name: livekit-server-staging
   egress:
   - to:
     - podSelector:
@@ -312,6 +323,9 @@ spec:
           app: livekit-egress-staging
     - podSelector:
         matchLabels:
+          app.kubernetes.io/name: egress
+    - podSelector:
+        matchLabels:
           app: backend
     ports:
     - protocol: TCP
@@ -331,6 +345,7 @@ spec:
   - Egress
 ---
 # LiveKit Egress: Egress to Redis, MinIO, LiveKit, DNS
+# FIXED: podSelector auf Helm-Label geaendert (app.kubernetes.io/name)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -339,7 +354,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: livekit-egress-staging
+      app.kubernetes.io/name: egress
   egress:
   - to:
     - podSelector:
@@ -359,6 +374,9 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-server-staging
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: livekit-server-staging
     ports:
     - protocol: TCP
       port: 7880

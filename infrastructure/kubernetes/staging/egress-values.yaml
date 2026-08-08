@@ -68,6 +68,17 @@ deploymentStrategy:
 autoscaling:
   enabled: false
 
+# CRITICAL: hostNetwork (2026-08-12)
+# Der Egress-Pod muss hostNetwork: true haben, damit er den LiveKit-Server
+# (ebenfalls hostNetwork: true) via localhost:7880 erreichen kann.
+# Ohne hostNetwork: Connection refused von Calico/kube-proxy DNAT.
+# WICHTIG: Das Helm-Chart rendert hostNetwork NICHT aus Values —
+# muss nach jedem helm upgrade via kubectl patch gesetzt werden:
+#   kubectl patch deployment livekit-egress -n meeting-automation-staging \
+#     --type='json' \
+#     -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},{"op":"replace","path":"/spec/template/spec/dnsPolicy","value":"ClusterFirstWithHostNet"}]'
+hostNetwork: true  # Referenz — manuell per kubectl patch (Chart unterstützt kein hostNetwork in Values)
+
 # Security
 podSecurityContext: {}
 securityContext: {}

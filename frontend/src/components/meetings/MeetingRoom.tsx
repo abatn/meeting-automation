@@ -452,12 +452,26 @@ const MeetingRoom: React.FC = () => {
 
   const handleLiveKitConnectionState = useCallback((state: ConnectionState) => {
     const connected = state === ConnectionState.Connected;
+    const reconnecting =
+      state === ConnectionState.Reconnecting ||
+      state === ConnectionState.SignalReconnecting;
 
     setLivekitConnectionState(state);
     setLivekitConnected(connected);
 
     if (connected) {
       setLivekitError(null);
+      // Room (re)established — initial connect OR reconnect completed.
+      // Replaces the removed onReconnecting/onReconnected props (they were
+      // never wired in @livekit/components-react@2.9.21): restore readiness.
+      setRoomConnectionReady(true);
+      setIsReconnecting(false);
+    } else if (reconnecting) {
+      // Do NOT set roomConnectionReady(false) while a recording is active —
+      // that would disable the recording button and stop Egress. Reconnect
+      // timing prevents DUPLICATE_IDENTITY.
+      console.warn("[LiveKit] Reconnecting...");
+      setIsReconnecting(true);
     }
   }, []);
 
@@ -1050,11 +1064,11 @@ const handleStopRecording = async () => {
                     connect={true}
                     audio={true}
                     video={false}
-                    adaptiveStream={true}
-                    dynacast={true}
+                    options={{ adaptiveStream: true, dynacast: true }}
                     connectOptions={{
-                      peerConnectionTimeout: 30000,
-                      maxRetries: 5,
+                      peerConnectionTimeout: 60000,
+                      websocketTimeout: 60000,
+                      maxRetries: 3,
                     }}
 onConnected={() => {
                        console.log("[LiveKit] Connected — setting roomConnectionReady=true");
@@ -1074,19 +1088,6 @@ onMediaDeviceFailure={(failure, kind) => {
                       if (recordingStatus === "idle") {
                         setLivekitError(`Media device failure: ${failure} (${kind})`);
                       }
-                    }}onReconnecting={() => {
-                       console.warn("[LiveKit] Reconnecting...");
-                       setIsReconnecting(true);
-                       // FIX: NICHT setRoomConnectionReady(false) wenn Recording aktiv
-                       // Das würde den Recording-Button deaktivieren und Egress stoppen
-                       // FIX (offizielle LiveKit-Doku): Reconnect-Timing verhindert DUPLICATE_IDENTITY
-                       // Stats: https://docs.livekit.io/intro/basics/rooms-participants-tracks/participants/
-                     }}
-onReconnected={() => {
-                      console.info("[LiveKit] Reconnected — restoring roomConnectionReady");
-                      setIsReconnecting(false);
-                      setRoomConnectionReady(true);
-                      setLivekitError(null);
                     }}
 onDisconnected={() => {
                       console.warn("[LiveKit] Disconnected");
