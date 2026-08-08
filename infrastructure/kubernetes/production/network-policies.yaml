@@ -90,6 +90,12 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-worker-pro
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: livekit-server   # Helm-Label (Transition)
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: egress           # Helm-Label (Transition)
     ports:
     - protocol: TCP
       port: 6379
@@ -151,6 +157,9 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-worker-pro
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: egress        # Helm-Label (Transition) - Egress lädt Recordings hoch
     ports:
     - protocol: TCP
       port: 9000
@@ -175,6 +184,9 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-server
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: livekit-server  # Helm-Label (Transition) - Webhook
     - podSelector:
         matchLabels:
           app: onlyoffice
@@ -266,9 +278,13 @@ spec:
     - protocol: TCP
       port: 5678
 ---
-# LiveKit Server: Egress to Redis, Backend, DNS + Ingress from Egress + External
-# WICHTIG: PodSelector muss BOTH old Labels UND Helm-Labels matchen
-# (Helm-Chart rendert app.kubernetes.io/name, direkte YAML rendert app:)
+# ============================================================================
+# LIVEKIT TRANSITION (2026-08-08): OLD-Label-Policies + Helm-Label-Policies
+# NetworkPolicy podSelector kann KEIN OR - deshalb je Label-System eine Policy.
+# Beide sind additiv (Union) und decken waehrend der Migration beide Pod-Typen ab.
+# ============================================================================
+
+# --- OLD-Label-Policy: livekit-server (app:) -> matcht aktuelle direkte YAML-Pods ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -277,7 +293,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: livekit-server
+      app: livekit-server
   egress:
   - to:
     - podSelector:
@@ -311,6 +327,9 @@ spec:
     - podSelector:
         matchLabels:
           app: backend
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: livekit-server
     ports:
     - protocol: TCP
       port: 7880
@@ -328,8 +347,76 @@ spec:
   - Ingress
   - Egress
 ---
-# LiveKit Egress: Egress to Redis, MinIO, LiveKit, DNS
-# WICHTIG: PodSelector muss BOTH old Labels UND Helm-Labels matchen
+# --- Helm-Label-Policy: livekit-server (app.kubernetes.io/name) -> matcht Helm-Pods ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: livekit-policy-helm
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: livekit-server
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: backend
+    ports:
+    - protocol: TCP
+      port: 8000
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    to:
+    - namespaceSelector: {}
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: livekit-egress
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: egress
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: livekit-server
+    ports:
+    - protocol: TCP
+      port: 7880
+    - protocol: TCP
+      port: 7881
+  - from:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+    ports:
+    - protocol: TCP
+      port: 7881
+    - protocol: UDP
+      port: 3478
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# --- OLD-Label-Policy: livekit-egress (app:) -> matcht aktuellen direkten YAML-Pod ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -338,7 +425,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: egress
+      app: livekit-egress
   egress:
   - to:
     - podSelector:
@@ -358,6 +445,58 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-server
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: livekit-server
+    ports:
+    - protocol: TCP
+      port: 7880
+  - ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    to:
+    - namespaceSelector: {}
+---
+# --- Helm-Label-Policy: livekit-egress (app.kubernetes.io/name) -> matcht Helm-Pods ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: livekit-egress-policy-helm
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: minio
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: minio
+    ports:
+    - protocol: TCP
+      port: 9000
+  - to:
+    - podSelector:
+        matchLabels:
+          app: livekit-server
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: livekit-server
     ports:
     - protocol: TCP
       port: 7880
