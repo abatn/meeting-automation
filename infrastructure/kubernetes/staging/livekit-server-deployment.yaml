@@ -56,7 +56,7 @@ spec:
             ephemeral-storage: "100Mi"
           limits:
             memory: "1024Mi"
-            cpu: "2000m"
+            cpu: "1000m"
             ephemeral-storage: "500Mi"
         livenessProbe:
           httpGet:

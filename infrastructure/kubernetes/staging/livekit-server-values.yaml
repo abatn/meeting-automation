@@ -74,10 +74,10 @@ nodeSelector:
 
 # Resource Limits (2026-08-08: CPU-Memory-Fix für stabile ICE-Verbindung)
 # Offizielle Helm-Empfehlung: cpu: 4000-6000m, memory: 1024-2048Mi
-# Minimum für stabile ICE: cpu: 2000m, memory: 1024Mi
+# Staging: cpu: 1000m reicht (1 Teilnehmer, Audio-only, aktuelle Nutzung ~1m)
 resources:
   limits:
-    cpu: 2000m
+    cpu: 1000m
     memory: 1024Mi
   requests:
     cpu: 500m
