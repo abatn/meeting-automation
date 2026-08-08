@@ -353,6 +353,66 @@ Der Egress-Pod braucht **keinen direkten MinIO-Zugang**:
 
 ---
 
+## Production-Deployment (2026-08-08)
+
+### Unterschiede Staging vs Production
+
+| Aspekt | Staging | Production |
+|--------|---------|------------|
+| Namespace | `meeting-automation-staging` | `meeting-automation` |
+| Server-Label | `app.kubernetes.io/name: livekit-server-staging` | `app: livekit-server` |
+| Egress-Label | `app.kubernetes.io/name: egress` | `app: livekit-egress` |
+| Redis | `redis-staging:6379` | `redis:6379` |
+| MinIO | `minio-staging:9000` | `minio:9000` |
+| API Keys | `meeting-api-key` | `prod-9a4ac9f9...` |
+| TURN | deaktiviert | aktiviert (Port 3478) |
+| Deployment-Methode | Helm-Chart | Direkte YAML + Helm Values (Referenz) |
+
+### Production-Dateien
+
+| Datei | Zweck |
+|-------|-------|
+| `infrastructure/kubernetes/production/livekit-server-deployment.yaml` | Server Deployment + Service |
+| `infrastructure/kubernetes/production/livekit-configmap.yaml` | Server-Konfiguration |
+| `infrastructure/kubernetes/production/livekit-secrets.yaml` | API-Keys |
+| `infrastructure/kubernetes/production/livekit-egress-deployment.yaml` | Egress Deployment |
+| `infrastructure/kubernetes/production/livekit-egress-configmap.yaml` | Egress-Konfiguration |
+| `infrastructure/kubernetes/production/egress-values.yaml` | Helm Values (Referenz) |
+| `infrastructure/kubernetes/production/livekit-server-values.yaml` | Helm Values (Referenz) |
+| `infrastructure/kubernetes/production/network-policies.yaml` | NetworkPolicies |
+
+### Production-Deployment-Schritte
+
+```bash
+# 1. ConfigMaps + Secrets applyen
+kubectl apply -f infrastructure/kubernetes/production/livekit-configmap.yaml -n meeting-automation
+kubectl apply -f infrastructure/kubernetes/production/livekit-egress-configmap.yaml -n meeting-automation
+kubectl apply -f infrastructure/kubernetes/production/livekit-secrets.yaml -n meeting-automation
+
+# 2. NetworkPolicies applyen
+kubectl apply -f infrastructure/kubernetes/production/network-policies.yaml -n meeting-automation
+
+# 3. Deployments applyen
+kubectl apply -f infrastructure/kubernetes/production/livekit-server-deployment.yaml -n meeting-automation
+kubectl apply -f infrastructure/kubernetes/production/livekit-egress-deployment.yaml -n meeting-automation
+
+# 4. Verifizierung
+kubectl get pods -n meeting-automation | grep livekit
+kubectl logs -n meeting-automation deployment/livekit-server --since=5m | grep -i 'listening\|started'
+```
+
+### WICHTIG: hostNetwork für Production
+
+Falls Production auf Helm-Chart umstellt:
+```bash
+# hostNetwork-Patch nach jedem helm upgrade:
+kubectl patch deployment livekit-egress -n meeting-automation --type='json' \
+  -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},{"op":"replace","path":"/spec/template/spec/dnsPolicy","value":"ClusterFirstWithHostNet"}]'
+kubectl rollout restart deployment/livekit-egress -n meeting-automation
+```
+
+---
+
 ## Rollback
 
 1. `LIVEKIT_URL` aus .env entfernen

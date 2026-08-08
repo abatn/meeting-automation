@@ -1,0 +1,80 @@
+# LiveKit Egress Helm Chart Values
+# Production Environment
+# Erstellt: 2026-08-08 (basierend auf Staging-Konfiguration)
+#
+# WICHTIG (Chart-Struktur):
+# Das egress-Chart rendert die Config AUSSCHLIESSLICH aus `toYaml .Values.egress`
+# und uebergibt sie als `EGRESS_CONFIG_BODY` an den Container.
+# Ein freies `env:`-Feld existiert im Chart NICHT — alle Settings (Redis, S3,
+# Server-Verbindung) gehoeren unter `.Values.egress`.
+# Quelle: egress/templates/configmap.yaml + deployment.yaml (Chart v1.8.4)
+
+replicaCount: 1
+
+image:
+  repository: livekit/egress
+  pullPolicy: IfNotPresent
+
+# ---------------------------------------------------------------------------
+# Egress-Config (Production-Credentials)
+# ---------------------------------------------------------------------------
+egress:
+  log_level: debug
+  insecure: true
+  # Verbindung zum LiveKit Server
+  ws_url: ws://livekit-server:7880
+  api_key: prod-9a4ac9f989143b65
+  api_secret: prod-8f8b7b429f01180c89e03a1b30eeec4be871c0fa184c823a
+  redis:
+    address: redis.meeting-automation.svc.cluster.local:6379
+    password: flgyEhZKHVyMBge1QkdKtA
+    db: 0
+  s3:
+    access_key: minio_user
+    secret: 3Bsd1nsvjsnkCzcPvB96ew
+    endpoint: http://minio:9000
+    bucket: meeting-recordings
+    region: us-east-1
+    force_path_style: true
+  health_port: 7000
+  template_port: 7980
+  prometheus_port: 7002
+  cpu_cost:
+    room_composite_cpu_cost: 1.5
+    web_cpu_cost: 1.5
+    track_composite_cpu_cost: 1.0
+    track_cpu_cost: 0.5
+
+# Resource Limits
+resources:
+  limits:
+    cpu: "1"
+    memory: 2Gi
+  requests:
+    cpu: 200m
+    memory: 512Mi
+
+# Graceful Shutdown
+terminationGracePeriodSeconds: 3600
+
+# CRITICAL: Recreate-Strategie (Chart: .Values.deploymentStrategy)
+deploymentStrategy:
+  type: Recreate
+
+# Autoscaling (deaktiviert)
+autoscaling:
+  enabled: false
+
+# Security
+podSecurityContext: {}
+securityContext: {}
+
+# CRITICAL: hostNetwork (2026-08-08)
+# Das Helm-Chart rendert hostNetwork NICHT aus Values.
+# Muss nach jedem helm upgrade manuell gesetzt werden:
+#   kubectl patch deployment livekit-egress -n meeting-automation \
+#     --type='json' \
+#     -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},{"op":"replace","path":"/spec/template/spec/dnsPolicy","value":"ClusterFirstWithHostNet"}]'
+# WICHTIG: Ohne hostNetwork: true kann der Egress den LiveKit-Server nicht erreichen
+# (Calico/kube-proxy DNAT-Problem in k3s mit hostNetwork-Server-Pods).
+hostNetwork: true  # Referenz — manuell per kubectl patch (Chart unterstützt kein hostNetwork in Values)
