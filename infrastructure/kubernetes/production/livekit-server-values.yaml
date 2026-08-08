@@ -1,75 +1,95 @@
 # LiveKit Server Helm Chart Values
 # Production Environment
-# Erstellt: 2026-08-08 (100% wie Staging, nur Production-Credentials)
+# Erstellt: 2026-08-08
+# KORRIGIERT: 2026-08-08 (chart-konform, 100% wie Staging — nur Production-Credentials)
+#
+# Fixes (gegenüber der ersten Version):
+# 1. `config:` -> `livekit:` (Chart-Schema: {{ toYaml .Values.livekit }})
+# 2. Nicht unterstützte Chart-Keys ENTFERNT: service:, livenessProbe:, readinessProbe:,
+#    dnsPolicy:, force_tcp, allow_tcp_fallback, tcp_fallback_rtt_threshold, ping_interval
+# 3. turn.enabled: false (TURN ohne TLS-Cert verursacht 403 CreatePermission — Staging-Lesson)
+# 4. CPU-Limit 1000m (wie Staging; Nutzung ~6m)
+# 5. loadBalancer.servicePort = 7880 (= livekit.port)
+# 6. nodeSelector auf Production-Node (contabo-prod)
 
 replicaCount: 1
+
+image:
+  repository: livekit/livekit-server
+  pullPolicy: IfNotPresent
+
+# CRITICAL: BEIDE Override noetig!
+# nameOverride -> aendert Labels (app.kubernetes.io/name)
+# fullnameOverride -> aendert Resource-Namen (Deployment, Service, ConfigMap)
+# Name bleibt 'livekit-server' -> LIVEKIT_URL=ws://livekit-server:7880 bleibt gueltig
 nameOverride: livekit-server
 fullnameOverride: livekit-server
 
-# LiveKit Server Konfiguration (identische Struktur wie Staging)
-config:
+livekit:
   port: 7880
   log_level: info
-  room:
-    empty_timeout: 600
-    departure_timeout: 60
-    max_participants: 10
   rtc:
     tcp_port: 7881
     port_range_start: 50000
     port_range_end: 60000
     use_external_ip: true
-    force_tcp: false
-    allow_tcp_fallback: true
-    tcp_fallback_rtt_threshold: 0
-    ping_interval: 5
   redis:
     address: redis.meeting-automation.svc.cluster.local:6379
     password: flgyEhZKHVyMBge1QkdKtA
     db: 0
   keys:
     prod-9a4ac9f989143b65: prod-8f8b7b429f01180c89e03a1b30eeec4be871c0fa184c823a
+  # TURN: deaktiviert — direkter UDP-Pfad reicht (wie Staging).
+  # Nur aktivieren mit TLS-Zertifikat (sonst 403 CreatePermission):
+  #   enabled: true
+  #   udp_port: 3478
+  #   tls_port: 5349
+  #   domain: turn.meeting-automation.com
+  #   secretName: livekit-turn-tls
   turn:
-    enabled: true
-    udp_port: 3478
+    enabled: false
   webhook:
     api_key: prod-9a4ac9f989143b65
     urls:
       - http://backend.meeting-automation.svc.cluster.local:8000/api/v1/livekit/webhooks
 
-# Deployment Strategie
-deploymentStrategy:
-  type: Recreate  # hostNetwork erfordert Recreate
+# CRITICAL: loadBalancer.servicePort MUSS = livekit.port sein!
+loadBalancer:
+  type: disable
+  servicePort: 7880
 
-# Netzwerk (identisch zu Staging)
+# HostNetwork fuer WebRTC UDP beibehalten (OFFIZIELLER Chart-Default)
 podHostNetwork: true
-dnsPolicy: ClusterFirstWithHostNet
 
-# Ressourcen (identisch zu Staging)
+# CRITICAL: hostNetwork + hostPort erfordert Recreate (kein RollingUpdate)
+# Zwei Pods koennen nicht gleichzeitig dieselben hostPorts binden -> neuer Pod waere Pending
+deploymentStrategy:
+  type: Recreate
+
+# Node Selection (Production-Node)
+nodeSelector:
+  kubernetes.io/hostname: contabo-prod
+
+# Resource Limits (identisch zu Staging: cpu 1000m reicht, Nutzung ~6m)
 resources:
   limits:
-    cpu: 2000m
+    cpu: 1000m
     memory: 1024Mi
   requests:
     cpu: 500m
     memory: 512Mi
 
-# Service
-service:
-  type: ClusterIP
-  port: 7880
+# Autoscaling (deaktiviert)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 80
 
-# Probes (identisch zu Staging)
-livenessProbe:
-  httpGet:
-    path: /
-    port: 7880
-  initialDelaySeconds: 15
-  periodSeconds: 15
+# Monitoring
+serviceMonitor:
+  create: false
 
-readinessProbe:
-  httpGet:
-    path: /
-    port: 7880
-  initialDelaySeconds: 10
-  periodSeconds: 10
+# Security
+podSecurityContext: {}
+securityContext: {}
