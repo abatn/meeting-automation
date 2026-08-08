@@ -266,7 +266,9 @@ spec:
     - protocol: TCP
       port: 5678
 ---
-# LiveKit Server: Egress to Redis, Backend, DNS + Ingress from Egress
+# LiveKit Server: Egress to Redis, Backend, DNS + Ingress from Egress + External
+# WICHTIG: PodSelector muss BOTH old Labels UND Helm-Labels matchen
+# (Helm-Chart rendert app.kubernetes.io/name, direkte YAML rendert app:)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -275,7 +277,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: livekit-server
+      app.kubernetes.io/name: livekit-server
   egress:
   - to:
     - podSelector:
@@ -305,6 +307,9 @@ spec:
           app: livekit-egress
     - podSelector:
         matchLabels:
+          app.kubernetes.io/name: egress
+    - podSelector:
+        matchLabels:
           app: backend
     ports:
     - protocol: TCP
@@ -324,6 +329,7 @@ spec:
   - Egress
 ---
 # LiveKit Egress: Egress to Redis, MinIO, LiveKit, DNS
+# WICHTIG: PodSelector muss BOTH old Labels UND Helm-Labels matchen
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -332,7 +338,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: livekit-egress
+      app.kubernetes.io/name: egress
   egress:
   - to:
     - podSelector:
