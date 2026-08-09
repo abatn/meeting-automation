@@ -117,14 +117,16 @@ jobs:
           
           # ============================================
           # LIVEKIT: Helm-Chart Installation (wie Staging)
+          # Vendored Charts unter production/charts/ (kein Repo-Zugriff noetig)
           # ============================================
           echo "=== Deploying LiveKit via Helm (wie Staging) ==="
-          helm repo add livekit https://livekit.github.io/livekit 2>/dev/null || true
-          helm repo update
+          # Charts liegen als Tarballs im Repo (infrastructure/kubernetes/production/charts/)
+          # und werden via scp-action nach /root/production-manifests/charts/ kopiert.
+          # KEIN helm repo add/update noetig - vermeidet Netzwerk-Fehler auf dem Server.
           
           # LiveKit Server via Helm
           echo "--- LiveKit Server ---"
-          helm upgrade livekit-server livekit/livekit-server \
+          helm upgrade --install livekit-server /root/production-manifests/charts/livekit-server-1.9.0.tgz \
             -n meeting-automation \
             --values /root/production-manifests/livekit-server-values.yaml \
             --wait --timeout 5m || echo "⚠️ Warning: LiveKit Server Helm upgrade failed"
@@ -135,8 +137,9 @@ jobs:
           kubectl rollout restart deployment/livekit-server -n meeting-automation 2>/dev/null || true
           
           # LiveKit Egress via Helm
+          # WICHTIG: Chart heisst 'egress' (NICHT 'livekit-egress') - livekit/livekit-egress existiert nicht!
           echo "--- LiveKit Egress ---"
-          helm upgrade livekit-egress livekit/livekit-egress \
+          helm upgrade --install livekit-egress /root/production-manifests/charts/egress-1.8.4.tgz \
             -n meeting-automation \
             --values /root/production-manifests/egress-values.yaml \
             --wait --timeout 5m || echo "⚠️ Warning: LiveKit Egress Helm upgrade failed"

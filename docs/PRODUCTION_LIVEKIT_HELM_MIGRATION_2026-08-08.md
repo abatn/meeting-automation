@@ -1,8 +1,8 @@
-# Production LiveKit Helm Migration — Plan & Staging-Abgleich (2026-08-08)
+# Production LiveKit Helm Migration — Plan & Staging-Abgleich (2026-08-08, abgeschlossen 2026-08-09)
 
-**Erstellt:** 2026-08-08
+**Erstellt:** 2026-08-08 · **Abgeschlossen:** 2026-08-09 (Gate 4 E2E bestanden, Phase 4c Disk-Stabilisierung)
 **Ziel:** Production (`meeting-automation` / Contabo `169.58.83.32`) 100% auf Helm wie Staging bringen — ohne Ausfall.
-**Ausgangslage:** Production läuft seit 12 Tagen stabil mit **direkten YAML-Deployments** (OLD-Labels `app:`). Die Repo-Dateien für Helm-Values existieren, sind aber **nicht chart-konform** und würden bei einem CI/CD-Deploy Production brechen.
+**Ausgangslage:** Production lief seit 12 Tagen stabil mit **direkten YAML-Deployments** (OLD-Labels `app:`). Die Repo-Dateien für Helm-Values existierten, waren aber **nicht chart-konform** und hätten bei einem CI/CD-Deploy Production gebrochen.
 
 ---
 
@@ -207,15 +207,57 @@ kubectl rollout status deployment/livekit-server deployment/livekit-egress -n me
 
 ---
 
-## 5. Verifikation (Gates)
+## 5. Verifikation (Gates) — ERGEBNISSE (2026-08-08, alle bestanden)
 
-| Gate | Phase | Kriterium |
+| Gate | Phase | Kriterium | Ergebnis |
+|---|---|---|---|
+| **0** | 0 | `helm template` rendert gültige ConfigMap (`livekit:`-Schema, `keys: prod-...`) | ✅ Bestanden |
+| **1** | 1 | Policies hinzugefügt, Endpoints unverändert | ✅ Bestanden |
+| **2** | 2 | Pods 1/1, Service-Selector korrekt, Endpoints vorhanden | ✅ Bestanden |
+| **3** | 2 | Backend → Service OK, Ingress kein 502 | ✅ Bestanden |
+| **4** | 3 | E2E-Recording `completed` | ✅ Bestanden (2026-08-09, Staging-Volltest mit echtem Audio-Teilnehmer) |
+
+### Durchgeführte Phasen (Live-Ergebnisse)
+
+| Phase | Status | Details |
 |---|---|---|
-| **0** | 0 | `helm template` rendert gültige ConfigMap (`livekit:`-Schema, `keys: prod-...`) |
-| **1** | 1 | Policies hinzugefügt, Endpoints unverändert |
-| **2** | 2 | Pods 1/1, Service-Selector korrekt, Endpoints vorhanden |
-| **3** | 2 | Backend → Service OK, Ingress kein 502 |
-| **4** | 3 | E2E-Recording `completed` |
+| **0.1** | ✅ | `livekit-server-values.yaml` auf `livekit:`-Schema, TURN aus, CPU 1000m (Commit `cb3877a0`) |
+| **0.2** | ✅ | `network-policies.yaml`: OLD-Policies + Helm-Policies additiv (Commit `a7494a24`) |
+| **1** | ✅ | Transition-Policies deployed: `livekit-policy-helm` + `livekit-egress-policy-helm` erstellt, Endpoints unverändert |
+| **2** | ✅ | Helm-Migration: OLD-Deployments gelöscht, `helm install` aus vendored Charts, Service gelöscht (Helm-Import-Konflikt), hostNetwork-Patch, beide Pods Running |
+| **3** | ✅ | 7 Gates: Pods 1/1, Selector Helm-Labels, Endpoints `169.58.83.32:7880,7881`, Backend OK, hostNetwork true, Server v1.9.0, Ingress 404 (erwartet) |
+| **4a** | ✅ | `deploy-production.yml`: Chart-Name-Fix (`livekit/livekit-egress` → vendored `egress-1.8.4.tgz`), `helm upgrade --install`, Charts vendoriert unter `production/charts/` |
+| **4b** | ✅ | Dieses Dokument aktualisiert |
+| **4c** | ✅ | Staging-DiskPressure-Krise behoben + verifiziert (Details unten) |
+
+### Wichtige Erkenntnisse aus der Migration
+
+1. **Helm-Import-Konflikt**: Der 12-Tage-alte Service `livekit-server` (OLD-Labels, nicht Helm-managed) blockierte `helm install` → musste gelöscht werden, Helm erstellt ihn mit Helm-Labels neu
+2. **`helm repo add livekit` versagte auf dem Server still** (durch `|| true` verschluckt) → Charts als Tarballs vendoriert unter `infrastructure/kubernetes/production/charts/`
+3. **Falscher Chart-Name in CI/CD**: `livekit/livekit-egress` existiert NICHT (korrekt: `livekit/egress`) — wäre beim nächsten Deploy still fehlgeschlagen
+4. **Service-Selector nach Helm**: korrekt `app.kubernetes.io/name` + `instance` → kein Staging-Endpoints-Bug in Production
+5. **Egress pending-install-Lock**: abgebrochener SSH-Lauf hinterließ Lock → `helm uninstall` + frischer `helm upgrade --install`
+6. **Staging-DiskPressure (2026-08-09)**: k3s-Node lief in Eviction-Schleife (imagefs-Schwelle 15% ≈ 27,5G von 183G). Root-Cause: Docker/moby-Store (38G) voll mit alten Build-Artefakten + Kubelet löscht bei DiskPressure ungenutzte k3s-Images → ImagePullBackOff-Welle (`pull QPS exceeded`). Fix: nur **verifiziert ungenutzte** Fix-Tags per `docker rmi` gelöscht (kein `docker system prune`, keine k3s-Images, Ollama unberührt), `DiskPressure=False`, Taint automatisch entfernt, 35+ Pods starteten wieder. **Lehre:** Disk-Puffer > 15% freihalten; alte Build-Tags nicht auf dem Produktions-Node ansammeln.
+7. **E2E-Beweis (2026-08-09, Staging)**: Kompletter Pipeline-Test mit echtem Audio-Teilnehmer (`@livekit/rtc-node`, 440Hz-Ton, 20s): Meeting → Token → Recording-Start → Teilnehmer verbunden (wss) → Track publiziert → `EGRESS_ACTIVE` (kein „Start signal not received“ mehr) → Datei in MinIO (`515b661d..._livekit.ogg`, 335 KB) → `egress completed` → Recording `completed` → Transkription `completed` → PV `draft`. Der frühere `EGRESS_ABORTED`-Fehler trat **nicht** mehr auf.
+
+### Phase 4c — Staging-Disk-Stabilisierung + E2E-Validierung (2026-08-09)
+
+**Auslöser:** Während des E2E-Tests kollabierte Staging durch `DiskPressure=True` (183G-Disk, Eviction-Schwelle 27,5G frei). Evicted wurden u.a. `meeting-db-1` (PostgreSQL) → Login „Internal server error“ (`asyncpg Connection refused`), 42 Pending Pods.
+
+**Root-Cause (verifiziert, nicht geraten):**
+- Kubelet setzte `node.kubernetes.io/disk-pressure:NoSchedule`-Taint (06:11 UTC) → alle Pod-Starts blockiert
+- Kubelet löscht bei DiskPressure ungenutzte Images (Image-GC) → k3s-containerd verlor referenzierte Images → Neustarts pullen von Docker Hub → `pull QPS exceeded` (Rate-Limit) → ImagePullBackOff-Welle
+- Größte Speicherverbraucher: `/var/lib/containerd`/moby-Store 38G (alte `batnini/*`-Builds der Fix-Saga), Ollama-Modelle 11G, k3s-containerd 11G
+
+**Fix (konservativ, schrittweise, mit Freigabe):**
+1. Journal-Vacuum (`journalctl --vacuum-size=100M`) + alte Pod-Logs (>2 Tage) — AGENTS.md-sicher
+2. Alte Completed/Failed Pod-Objekte gelöscht (keine Images)
+3. Kubelet entfernte Taint automatisch nach DiskPressure=False
+4. Nur **verifiziert ungenutzte** Fix-Tags per `docker rmi` gelöscht: `backend:3-fixes`, `backend:egress-audio-fix`, `frontend:15s-fix`, `3-fixes`, `60s-fix`, `ice-failover-fix`, `no-relay`, `timeout-30s`, `turn-relay`, `turn-relay-fix` (~7,3 GB). `latest` blieb. **Beweis der Nutzung:** k3s referenziert `batnini/*` ausschließlich über eigene SHA-Kopien im `k8s.io`-Namespace — kein Pod referenzierte die gelöschten Tags (per `kubectl get pods -A -o jsonpath` geprüft)
+
+**Ergebnis:** `DiskPressure=False`, Taint entfernt, DB/Backend/Redis/MinIO wieder Running, Login HTTP 200, E2E-Pipeline vollständig erfolgreich.
+
+**Noch offen (optional, mit Freigabe):** `backend:latest` (5,44 GB) + `frontend:latest` (119 MB) im Docker-Store — vom Cluster nicht referenziert (k3s hat eigene Kopien, andere SHA), aber als Quellen für neue Deploys nutzbar.
 
 ---
 
@@ -223,21 +265,27 @@ kubectl rollout status deployment/livekit-server deployment/livekit-egress -n me
 
 ```bash
 helm rollback livekit-server livekit-egress -n meeting-automation
-# oder: OLD-YAMLs wieder anwenden
+# oder: OLD-YAMLs wieder anwenden (falls Helm zurueckgebaut werden muss)
 kubectl apply -f production/livekit-server-deployment.yaml -f production/livekit-egress-deployment.yaml
 ```
+
+> **Hinweis nach Migration:** Helm ist jetzt die aktive Quelle. Rollback via `helm rollback` (Release-Revision). Die OLD-YAMLs sind nur noch Referenz.
 
 ---
 
 ## 7. Offene Punkte / Entscheidungen
 
-| # | Frage | Empfehlung |
+| # | Frage | Status / Empfehlung |
 |---|---|---|
-| 1 | Wartungsfenster für Phase 2 (2–3 Min Downtime)? | Außerhalb Geschäftszeiten |
-| 2 | TURN in Production deaktivieren (wie Staging)? | **Ja** — ohne TLS-Cert ist TURN ein 403-Risiko |
-| 3 | `nodeSelector` für Production-Node? | Production ist single-node → optional, aber für 100%-Parität ergänzen |
-| 4 | CPU 1000m (Staging-Wert)? | **Ja** — Nutzung ~6m, 2000m überdimensioniert |
+| 1 | Wartungsfenster für Phase 2 (2–3 Min Downtime)? | ✅ **Durchgeführt** (2026-08-08) |
+| 2 | TURN in Production deaktivieren (wie Staging)? | ✅ **Umgesetzt** (`turn.enabled: false` in Values) |
+| 3 | `nodeSelector` für Production-Node? | ✅ **Ergänzt** (`contabo-prod`) |
+| 4 | CPU 1000m (Staging-Wert)? | ✅ **Umgesetzt** (1000m) |
+| 5 | E2E-Recording-Test | ✅ **Staging vollständig bestanden** (2026-08-09: Recording `completed`, Transkription, PV). Production: nur Smoke laut E2E-Strategie (Login/Meeting/Token/Status `idle`) — volle E2E in Production bewusst nicht ausgeführt |
+| 6 | OLD-`app:`-Policies entfernen | Nach Stabilitätswoche (optional, additiv harmlos) |
+| 7 | `backend:latest`/`frontend:latest` im Docker-Store (5,5 GB) | Nicht vom Cluster referenziert — Freigabe des Betreibers nötig vor Löschung |
+| 8 | Disk-Wachstum Staging überwachen | Empfehlung: > 15% frei halten; alte Build-Tags nicht auf dem Node ansammeln |
 
 ---
 
-*Dieses Dokument dient als verbindlicher Migrationsplan. Keine Änderung am Cluster ohne Freigabe und ohne Gate-Verifikation.*
+*Dieses Dokument dient als verbindlicher Migrationsplan. **Phasen 0–4c sind durchgeführt und verifiziert (2026-08-09).** Gate 4 (E2E-Recording) ist bestanden. Production läuft auf Helm wie Staging; Staging-DiskPressure-Krise behoben und dokumentiert.*
