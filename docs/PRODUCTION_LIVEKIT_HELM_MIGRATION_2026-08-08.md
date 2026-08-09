@@ -259,6 +259,8 @@ kubectl rollout status deployment/livekit-server deployment/livekit-egress -n me
 
 **Noch offen (optional, mit Freigabe):** `backend:latest` (5,44 GB) + `frontend:latest` (119 MB) im Docker-Store — vom Cluster nicht referenziert (k3s hat eigene Kopien, andere SHA), aber als Quellen für neue Deploys nutzbar.
 
+**✅ Inzwischen erledigt (2026-08-09, Abschluss):** `backend:latest` + `frontend:latest` per gezieltem `docker rmi` aus dem Docker-Store freigegeben (~3 GB, 94% → 93% Auslastung, 15G frei). Verifiziert: k3s hält eigene gepinnte Kopien (`io.cattle.k3s.pinned`), keine Pod-Referenz auf die Docker-Store-SHAs. Zusätzlich 28 evicted/error Pod-Artefakte der DiskPressure-Krise gelöscht. `DiskPressure=False`, 10/10 Deployments bereit, Login HTTP 200.
+
 ---
 
 ## 6. Rollback
@@ -283,7 +285,7 @@ kubectl apply -f production/livekit-server-deployment.yaml -f production/livekit
 | 4 | CPU 1000m (Staging-Wert)? | ✅ **Umgesetzt** (1000m) |
 | 5 | E2E-Recording-Test | ✅ **Staging vollständig bestanden** (2026-08-09: Recording `completed`, Transkription, PV). Production: nur Smoke laut E2E-Strategie (Login/Meeting/Token/Status `idle`) — volle E2E in Production bewusst nicht ausgeführt |
 | 6 | OLD-`app:`-Policies entfernen | Nach Stabilitätswoche (optional, additiv harmlos) |
-| 7 | `backend:latest`/`frontend:latest` im Docker-Store (5,5 GB) | Nicht vom Cluster referenziert — Freigabe des Betreibers nötig vor Löschung |
+| 7 | `backend:latest`/`frontend:latest` im Docker-Store (5,5 GB) | ✅ **Freigegeben** (2026-08-09, gezieltes `docker rmi`, ~3 GB — k3s-Kopien blieben unberührt) |
 | 8 | Disk-Wachstum Staging überwachen | Empfehlung: > 15% frei halten; alte Build-Tags nicht auf dem Node ansammeln |
 
 ---
