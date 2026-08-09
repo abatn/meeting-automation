@@ -152,10 +152,20 @@ jobs:
             --wait --timeout 10m || echo "⚠️ Warning: Longhorn install failed, continuing"
         fi
 
-    - name: Deploy All Staging Resources (idempotent)
+    - name: Deploy All Staging Resources (idempotent, exclude Helm values)
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        kubectl apply -f infrastructure/kubernetes/staging/ -n meeting-automation-staging
+        # Deploy only k8s manifests (NOT Helm values files which lack apiVersion/kind,
+        # NOT livekit-*-deployment.yaml which are now Helm-managed)
+        for f in infrastructure/kubernetes/staging/*.yaml; do
+          fname=$(basename "$f")
+          # Skip Helm values (livekit-server-values.yaml, egress-values.yaml)
+          [[ "$fname" == *values*.yaml ]] && continue
+          # Skip old LiveKit deployment YAMLs (Helm-managed now)
+          [[ "$fname" == *livekit-*-deployment.yaml ]] && continue
+          echo "Applying: $fname"
+          kubectl apply -f "$f" -n meeting-automation-staging || echo "Warning: Failed to apply $fname"
+        done
         kubectl rollout restart deployment/onlyoffice-staging -n meeting-automation-staging 2>&1 || echo "Warning: OnlyOffice restart failed"
 
     - name: Deploy System CronJobs + Monitoring Stack
