@@ -66,6 +66,7 @@ jobs:
         host: 169.58.83.32
         username: root
         key: ${{ secrets.CONTABO_SSH_KEY }}
+        command_timeout: 20m
         script: |
           set -e
           echo "=== Deploying Production (tag: ${{ inputs.image_tag }}) ==="
