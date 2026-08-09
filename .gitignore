@@ -124,3 +124,6 @@ git_workflow.txt
 Mailtrap_Credetional.txt
 AGENT_PROMPT.md
 CORRECTION_PROMPT.md
+
+# LiveKit SDK source extraction (analyse artifact, not needed)
+.sdk_src/
