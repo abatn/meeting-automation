@@ -145,9 +145,10 @@ jobs:
             --values /root/production-manifests/egress-values.yaml \
             --wait --timeout 10m || echo "⚠️ Warning: LiveKit Egress Helm upgrade failed"
           
-          # hostNetwork Patch fuer LiveKit Egress (Helm-Chart rendert hostNetwork nicht aus Values)
+          # hostNetwork + Recreate Strategy Patch fuer LiveKit Egress
+          # (Helm-Chart rendert beides nicht aus Values)
           kubectl patch deployment livekit-egress -n meeting-automation --type='json' \
-            -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},{"op":"replace","path":"/spec/template/spec/dnsPolicy","value":"ClusterFirstWithHostNet"}]' 2>/dev/null || true
+            -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},{"op":"replace","path":"/spec/template/spec/dnsPolicy","value":"ClusterFirstWithHostNet"},{"op":"replace","path":"/spec/strategy","value":{"type":"Recreate"}}]' 2>/dev/null || true
           kubectl rollout restart deployment/livekit-egress -n meeting-automation 2>/dev/null || true
           
           echo "✅ LiveKit deployed via Helm (wie Staging)"
