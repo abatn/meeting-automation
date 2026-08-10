@@ -58,7 +58,7 @@ This is the recommended setup for development and testing.
 5.  **Access Applications**:
     Once all services are up and healthy, you can access the system components:
     - **Backend API Documentation (Swagger UI)**: `http://localhost:8000/api/docs`
-    - **Frontend Application**: `http://localhost:3000`
+    - **Frontend Application**: `http://localhost:3001` (temporary port override, normally 3000)
     - **n8n Workflow Automation**: `http://localhost:5678` (Login with `admin`/`admin_password` as defined in `docker-compose.yml`)
     - **MinIO Console**: `http://localhost:9001` (Login with `minio_user`/`minio_password` from `.env.example`)
     - **RabbitMQ Management**: `http://localhost:15672` (Login with `rabbit_user`/`rabbit_password` from `docker-compose.yml`)
@@ -221,14 +221,19 @@ For production environments, the system is designed to be deployed on a cloud pr
 
 The `.github/workflows` directory contains GitHub Actions for automated testing, building, and security scanning.
 
-### 3.1 Aktuelle Workflows (pre-restructure)
+### 3.1 Aktuelle Workflows (Stand 2026-08-10)
 
--   **`backend-ci.yml`**: Runs tests, linting, type checks for the backend, builds the Docker image, and performs vulnerability scanning (Trivy).
--   **`frontend-ci.yml`**: Runs tests, linting, type checks for the frontend, builds the Docker image, and uploads build artifacts.
--   **`e2e-tests.yml`**: Komplette Pipeline (Build + Test + Deploy Staging + Deploy Production) — wird aufgeteilt in 3 separate Workflows.
--   **`deploy-production.yml`**: Production-Deploy via SCP + SSH (wird auf manuellen Trigger + Approval umgestellt).
+| Workflow | Trigger | Aufgabe |
+|----------|---------|---------|
+| **`ci.yml`** | `push` main/develop | Backend-Tests (PostgreSQL + E2E_TEST=true) + Frontend (lint+typecheck+build) + Multi-Arch Docker Images |
+| **`deploy-staging.yml`** | `workflow_dispatch` | Deploy Staging k3s (Helm LiveKit, Backend, Frontend, Celery) |
+| **`deploy-production.yml`** | `workflow_dispatch` | Deploy Production k3s + Smoke Tests |
 
-### 3.2 Geplante Workflows (post-restructure)
+### 3.2 Deaktivierte Workflows (fuer Rollback)
+
+-   **`backend-ci.yml.disabled`**: Alte Backend-Tests (jetzt in ci.yml integriert)
+-   **`frontend-ci.yml.disabled`**: Alte Frontend-Tests (jetzt in ci.yml integriert)
+-   **`e2e-tests.yml.disabled`**: Alte Komplette Pipeline (aufgeteilt in ci.yml + deploy-*.yml)
 
 | Workflow | Trigger | Aufgabe |
 |----------|---------|---------|
