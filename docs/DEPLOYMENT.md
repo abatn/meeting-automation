@@ -201,7 +201,7 @@ For production environments, the system is designed to be deployed on a cloud pr
 
 7.  **Configure Ingress**:
     ```bash
-    kubectl apply -f infrastructure/kubernetes/ingress.yaml
+    kubectl apply -f infrastructure/kubernetes/staging/ingress-staging.yaml  # oder ingress-prod.yaml fuer Production
     ```
 
 8.  **Monitoring and Scaling**:
