@@ -41,6 +41,8 @@ Velero wurde **bereits am 2026-06-28 (Phase 92)** auf dem Staging-Cluster instal
 
 **Fazit:** Velero muss in beiden Clustern frisch installiert werden. Der `velero-backups` Bucket muss neu erstellt werden.
 
+**Update 2026-08-10:** Velero ERFOLGREICH auf Staging installiert (Helm v1.18.1, BSL Available, erstes Backup COMPLETED).
+
 ### Cluster-Inventar
 
 #### Staging (OCI 158.180.18.110)
@@ -358,7 +360,7 @@ helm install velero vmware-tanzu/velero \
   --set configuration.backupStorageLocation.config.s3ForcePathStyle=true \
   --set configuration.backupStorageLocation.config.s3Url=http://minio-staging.meeting-automation-staging.svc:9000 \
   --set credentials.existingSecret=velero-s3-credentials \
-  --set snapshotsEnabled=true \
+  --set snapshotsEnabled=false \  # local-path hat keine CSI-Snapshots
   --set deployNodeAgent=true \
   --set nodeAgent.resources.requests.cpu=200m \
   --set nodeAgent.resources.requests.memory=256Mi \
@@ -483,7 +485,7 @@ helm install velero vmware-tanzu/velero \
   --set configuration.backupStorageLocation.config.s3ForcePathStyle=true \
   --set configuration.backupStorageLocation.config.s3Url=http://minio.meeting-automation.svc:9000 \
   --set credentials.existingSecret=velero-s3-credentials \
-  --set snapshotsEnabled=true \
+  --set snapshotsEnabled=false \  # local-path hat keine CSI-Snapshots
   --set deployNodeAgent=true \
   --set nodeAgent.resources.requests.cpu=200m \
   --set nodeAgent.resources.requests.memory=256Mi \
@@ -727,6 +729,39 @@ velero backup logs $(velero backup get -o json | jq -r '.items[-1].metadata.name
 | ARM64 vs AMD64 Image-Kompatibilität | Velero-Plugins laufen nicht | Multi-Arch Images verwenden |
 
 ---
+
+
+---
+
+## 13. Installations-Lektionen (2026-08-10)
+
+### Helm-Chart v1.18.1 Breaking Changes
+
+| Fehler | Ursache | Lösung |
+|--------|---------|--------|
+| `configuration.backupStorageLocation: Invalid type. Expected: array` | BSL muss als Array `[0]` übergeben werden | `--set 'configuration.backupStorageLocation[0].name=default'` |
+| `provider is required` (in BSL) | Top-level `configuration.provider` entfernt | Provider in jedem BSL-Item setzen: `--set 'configuration.backupStorageLocation[0].provider=aws'` |
+| `VolumeSnapshotLocation.spec.provider: Required value` | `snapshotsEnabled=true` erzeugt VSL ohne Provider | `snapshotsEnabled=false` (local-path hat keine CSI-Snapshots) |
+
+### NetworkPolicy Fix
+
+| Problem | Lösung |
+|---------|-------|
+| `default-deny-all` in `meeting-automation-staging` blockiert Velero->MinIO | `minio-policy` um Velero-Namespace erweitert: `namespaceSelector: kubernetes.io/metadata.name: velero` |
+| BSL `Unavailable` (connection refused) | Erst nach NP-Patch + Velero-Restart wird BSL `Available` |
+
+### MinIO Bucket Struktur
+
+| Fehler | Lösung |
+|--------|-------|
+| Sub-Buckets `staging/` + `production/` in `velero-backups` | Velero erwartet leeren Bucket-Root — Sub-Buckets löschen |
+| `Backup store contains invalid top-level directories` | MinIO `mc rb --force` für Sub-Buckets |
+
+### Korrekter Helm-Befehl (fertig)
+
+```bash
+helm install velero vmware-tanzu/velero   --namespace velero   --create-namespace   --set 'configuration.backupStorageLocation[0].name=default'   --set 'configuration.backupStorageLocation[0].provider=aws'   --set 'configuration.backupStorageLocation[0].bucket=velero-backups'   --set 'configuration.backupStorageLocation[0].config.region=minio'   --set 'configuration.backupStorageLocation[0].config.s3ForcePathStyle=true'   --set 'configuration.backupStorageLocation[0].config.s3Url=http://minio-staging.meeting-automation-staging.svc:9000'   --set 'credentials.existingSecret=velero-s3-credentials'   --set 'snapshotsEnabled=false'   --set 'deployNodeAgent=true'   --set 'nodeAgent.resources.requests.cpu=200m'   --set 'nodeAgent.resources.requests.memory=256Mi'   --set 'nodeAgent.resources.limits.cpu=500m'   --set 'nodeAgent.resources.limits.memory=512Mi'   --set 'initContainers[0].name=velero-plugin-for-aws'   --set 'initContainers[0].image=velero/velero-plugin-for-aws:v1.9.0'   --set 'initContainers[0].volumeMounts[0].mountPath=/target'   --set 'initContainers[0].volumeMounts[0].name=plugins'
+```
 
 ## 11. Offene Fragen
 
