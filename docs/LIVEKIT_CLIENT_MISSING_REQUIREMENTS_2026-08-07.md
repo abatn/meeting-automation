@@ -3,7 +3,7 @@
 ## Status
 - **Erstellt**: 2026-08-07
 - **Fokus**: LiveKit JS SDK v2.19.1 — Was fehlt im Client?
-- **Status**: 100% analysiert, **Option A implementiert** (onReconnecting + onReconnected)
+- **Status**: 100% analysiert, **Option A implementiert** (onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21) + onReconnected)
 
 ---
 
@@ -21,8 +21,8 @@
   adaptiveStream={true}                   // ✅
   dynacast={true}                         // ✅
   connectOptions={{
-    peerConnectionTimeout: 30000,         // ✅
-    maxRetries: 5,                        // ✅
+    peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),         // ✅
+    maxRetries: 3 (verified in MeetingRoom.tsx:1071),                        // ✅
   }}
   onConnected={() => { ... }}             // ✅
   onError={(error) => { ... }}            // ✅
@@ -73,11 +73,11 @@ if (lp) {
 | `onConnected` | „Callback fired when successfully connected to the room" | ✅ Implementiert |
 | `onDisconnected` | „Callback fired when disconnected from the room" | ✅ Implementiert |
 | `onError` | „Callback fired when a connection or runtime error occurs" | ✅ Implementiert |
-| `onReconnecting` | „Callback fired when attempting to reconnect after a connection drop" | ✅ **Implementiert** (2026-08-07) |
+| `onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)` | „Callback fired when attempting to reconnect after a connection drop" | ✅ **Implementiert** (2026-08-07) |
 | `onReconnected` | „Callback fired when successfully reconnected" | ✅ **Implementiert** (2026-08-07) |
 
 **Auswirkung:** UI-Feedback für Reconnect-Versuche. Bei Reconnect:
-- `onReconnecting` → `isReconnecting=true`, `roomConnectionReady=false`
+- `onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)` → `isReconnecting=true`, `roomConnectionReady=false`
 - `onReconnected` → `isReconnecting=false`, `roomConnectionReady=true`, `livekitError=null`
 - `onDisconnected` → `isReconnecting=false`, `roomConnectionReady=false`
 
@@ -111,9 +111,9 @@ if (lp) {
 > „The SDK automatically attempts to reconnect upon encountering transient network interruptions. It only ceases reconnection and transitions to a fully disconnected/left state if explicitly instructed via disconnect(), if a fatal server error occurs, or if reconnection attempts exceed configured thresholds/timeouts."
 
 **Unser Code:**
-- `onReconnecting` → NICHT implementiert (kein UI-Feedback)
+- `onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)` → NICHT implementiert (kein UI-Feedback)
 - `onReconnected` → NICHT implementiert (kein UI-Feedback)
-- `maxRetries: 5` → ✅ Implementiert (aber SDK scheint NICHT zu reconnecten)
+- `maxRetries: 3 (verified in MeetingRoom.tsx:1071)` → ✅ Implementiert (aber SDK scheint NICHT zu reconnecten)
 
 ---
 
@@ -165,7 +165,7 @@ Das bedeutet: Die Ursache liegt **im LiveKit JS SDK v2.19.1** oder im **Netzwerk
 ### Was fehlt (nach offizieller Doku)
 | Fehlende Funktion | Offizielle Empfehlung | Auswirkung |
 |---|---|---|
-| `onReconnecting` | „Callback for reconnection attempt" | Kein UI-Feedback bei Reconnect |
+| `onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)` | „Callback for reconnection attempt" | Kein UI-Feedback bei Reconnect |
 | `onReconnected` | „Callback after successful reconnect" | Kein UI-Feedback nach Reconnect |
 | `options` (RoomOptions) | „Advanced room configuration" | Keine Audio-Qualitäts-Optionen |
 
@@ -201,7 +201,7 @@ const [reconnectAttempt, setReconnectAttempt] = useState(0);
     setIsReconnecting(false);
     setReconnectAttempt(0);
   }}
-  onReconnecting={() => {
+  onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)={() => {
     console.warn("[LiveKit] Reconnecting...");
     setIsReconnecting(true);
     setRoomConnectionReady(false);

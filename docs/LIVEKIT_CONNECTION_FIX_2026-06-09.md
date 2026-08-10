@@ -61,7 +61,7 @@ Geändert:
   - synchronisiert `livekitConnected`
   - löscht `livekitError` bei erfolgreicher Verbindung.
 - `LiveKitRoom` erweitert:
-  - `connectOptions.peerConnectionTimeout: 30000`
+  - `connectOptions.peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069)`
   - `connectOptions.maxRetries: 3`
   - `onDisconnected` setzt `livekitConnected` auf `false`.
 - Recording-Start-Button angepasst:
@@ -151,7 +151,7 @@ Ziel:
 - TCP-ICE-Fallback für WebRTC-Media-Verbindung ermöglichen.
 - Secrets nur zur Laufzeit aus Environment-Variablen einsetzen.
 
-#### `livekit-e2e.yaml`
+#### `livekit-e2e.yaml (REMOVED from repo)`
 
 Analog zu `livekit.yaml` geändert:
 
@@ -166,7 +166,7 @@ Ziel:
 
 ### 3.5 LiveKit Entrypoint
 
-#### `livekit-entrypoint.sh`
+#### `livekit-entrypoint.sh (REMOVED from repo)`
 
 Geändert:
 
@@ -247,7 +247,7 @@ Ziel:
 
 - keine hardcoded LiveKit-Secrets in Egress-Config.
 
-#### `livekit-egress-e2e.yaml`
+#### `livekit-egress-e2e.yaml (REMOVED from repo)`
 
 Analog geändert.
 
@@ -329,7 +329,7 @@ Ergebnis:
 Durchgeführt:
 
 ```bash
-sh -n livekit-entrypoint.sh
+sh -n livekit-entrypoint.sh (REMOVED from repo)
 ```
 
 Ergebnis:
@@ -442,10 +442,10 @@ Diese Dateien wurden manuell geändert und haben kein Backup im Repository:
 - `frontend/src/components/meetings/MeetingRoom.tsx`
 - `backend/app/api/v1/livekit.py`
 - `backend/app/core/config.py`
-- `livekit-e2e.yaml`
-- `livekit-egress-e2e.yaml`
+- `livekit-e2e.yaml (REMOVED from repo)`
+- `livekit-egress-e2e.yaml (REMOVED from repo)`
 - `docker-compose.e2e.yml`
-- `livekit-entrypoint.sh`
+- `livekit-entrypoint.sh (REMOVED from repo)`
 - `.env.example`
 
 Für diese Dateien muss manuell rückgängig gemacht werden.
@@ -516,13 +516,13 @@ webhook:
   api_key: meeting-api-key
 ```
 
-`livekit-e2e.yaml` manuell zurücksetzen:
+`livekit-e2e.yaml (REMOVED from repo)` manuell zurücksetzen:
 
 - `rtc.tcp_port: 7881` entfernen.
 - `keys` wieder hardcoded setzen.
 - `webhook.api_key` wieder hardcoded setzen.
 
-`livekit-entrypoint.sh` manuell zurücksetzen:
+`livekit-entrypoint.sh (REMOVED from repo)` manuell zurücksetzen:
 
 - Env-Prüfung entfernen.
 - `escape_sed_replacement()` entfernen.
@@ -530,7 +530,7 @@ webhook:
 - keine `/tmp/livekit.yaml`-Generierung mehr.
 - LiveKit Server wieder mit `/etc/livekit.yaml` starten.
 
-`livekit-egress.yaml` und `livekit-egress-e2e.yaml` manuell zurücksetzen:
+`livekit-egress.yaml` und `livekit-egress-e2e.yaml (REMOVED from repo)` manuell zurücksetzen:
 
 ```yaml
 log_level: debug

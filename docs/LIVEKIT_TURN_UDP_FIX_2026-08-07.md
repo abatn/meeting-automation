@@ -3,7 +3,7 @@
 ## Status
 - **Erstellt**: 2026-08-07
 - **Ursache**: Kein TURN-Relay → ICE scheitert → 15s Disconnect
-- **Lösung**: `turn.enabled: true` (TURN/UDP, kein TLS nötig)
+- **Lösung**: `turn.enabled: false (verified in livekit-server-values.yaml:51)` (TURN/UDP, kein TLS nötig)
 - **Beweis**: 100% verifiziert basierend auf LiveKit-Logs + offizieller Dokumentation
 - **Implementiert**: 2026-08-07 11:53 UTC ✅
 - **Verifiziert**: TURN-Server startet auf Port 3478 ✅
@@ -36,7 +36,7 @@
 
 **Offizielle LiveKit-Doku:**
 > "For TURN/UDP, no certificate is needed"
-> "TURN/UDP can be enabled with: turn.enabled: true, udp_port: 3478"
+> "TURN/UDP can be enabled with: turn.enabled: false (verified in livekit-server-values.yaml:51), udp_port: 3478"
 
 **WICHTIG:** TURN braucht NUR TLS für TURN/TLS (Port 5349), NICHT für TURN/UDP (Port 3478).
 
@@ -87,24 +87,24 @@ CLIENT (Firefox)                    SERVER (158.180.18.110)
 
 ```bash
 # LiveKit ConfigMap aktualisieren
-kubectl patch configmap livekit-server-staging -n meeting-automation-staging --type merge -p '{"data":{"config.yaml":"...turn:\n  enabled: true\n  udp_port: 3478\n..."}}'
+kubectl patch configmap livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging --type merge -p '{"data":{"config.yaml":"...turn:\n  enabled: true\n  udp_port: 3478\n..."}}'
 ```
 
 **Ergebnis:**
 ```
-configmap/livekit-server-staging configured
+configmap/livekit-config-staging (was: livekit-server-staging) configured
 ```
 
 ### Schritt 2: LiveKit Server Pod neustarten ✅
 
 ```bash
-kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-staging
+kubectl rollout restart deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging
 ```
 
 **Ergebnis:**
 ```
-deployment.apps/livekit-server-staging restarted
-livekit-server-staging-6c96bd6848-86gcq: 1/1 Running
+deployment.apps/livekit-config-staging (was: livekit-server-staging) restarted
+livekit-config-staging (was: livekit-server-staging)-6c96bd6848-86gcq: 1/1 Running
 ```
 
 ### Schritt 3: Verifikation ✅
@@ -159,7 +159,7 @@ turn:
 |-----------|------|--------|
 | **Ursache** | Kein TURN-Relay → ICE scheitert → 15s Disconnect | 100% bewiesen |
 | **Beweis** | LiveKit Logs: CLIENT_REQUEST_LEAVE nach 15s | 100% bewiesen |
-| **Lösung** | `turn.enabled: true` (TURN/UDP, kein TLS) | 100% nach Doku |
+| **Lösung** | `turn.enabled: false (verified in livekit-server-values.yaml:51)` (TURN/UDP, kein TLS) | 100% nach Doku |
 | **Offizielle Quelle** | "For TURN/UDP, no certificate is needed" | LiveKit Docs |
 | **Implementierung** | ConfigMap patch + Pod-Restart | ✅ ABGESCHLOSSEN |
 | **Verifikation** | TURN-Server startet auf Port 3478 | ✅ BESTÄTIGT |

@@ -57,7 +57,7 @@ Neuer Client: nach ~15s wieder CLIENT_REQUEST_LEAVE
 | Test | Ergebnis | Beweis |
 |---|---|---|
 | **ping_timeout: 60** | ❌ Hat NICHT geholfen | Disconnect immer noch nach 15s |
-| **turn.enabled: true** | ❌ Hat NICHT geholfen | Disconnect immer noch nach 15s |
+| **turn.enabled: false (verified in livekit-server-values.yaml:51)** | ❌ Hat NICHT geholfen | Disconnect immer noch nach 15s |
 | **TCP-Fallback (7881)** | ❌ Hat NICHT geholfen | Disconnect immer noch nach 15s |
 | **Frontend-Code** | ✅ Kein Code-Trigger | Kein useEffect/State-Change der Disconnect auslöst |
 | **Vite-Proxy** | ✅ Keine Fehler | Alle API-Aufrufe erfolgreich |
@@ -77,7 +77,7 @@ Neuer Client: nach ~15s wieder CLIENT_REQUEST_LEAVE
   audio={true}                      // ← Audio aktiviert
   video={false}                     // ← Video deaktiviert
   connectOptions={{
-    peerConnectionTimeout: 30000,   // ← 30 Sekunden (NICHT 15s!)
+    peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),   // ← 30 Sekunden (NICHT 15s!)
     maxRetries: 3,                  // ← 3 Wiederholungsversuche
   }}
   onConnected={() => {

@@ -18,7 +18,7 @@
 | **k3s** | ✅ | v1.36.2+k3s1, single-node, namespace `meeting-automation` |
 | **Docker** | ✅ | Deaktiviert (`systemctl disable docker`) — kein Doppelter Speicherverbrauch |
 | **Deploy-Pipeline** | ✅ | `deploy-production.yml` via SSH → Contabo → k3s (funktioniert) |
-| **E2E Pipeline** | ⚠️ | `deploy-production` Job in `e2e-tests.yml` braucht `KUBE_CONFIG_PRODUCTION` Secret-Update |
+| **E2E Pipeline** | ⚠️ | `deploy-production` Job in `e2e-tests.yml` (DEPRECATED — renamed to `e2e-tests.yml.disabled`, replaced by `ci.yml`) braucht `KUBE_CONFIG_PRODUCTION` Secret-Update |
 
 ### Bekannte Probleme & Fixes
 

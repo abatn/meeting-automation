@@ -13,8 +13,8 @@
 ### Hypothese A: WebSocket/Ingress Disconnect ❌ AUSGESCHLOSSEN
 
 **Beweis**:
-- Ingress korrekt konfiguriert: Path `/rtc` → `livekit-server-staging:7880`
-- WebSocket-Services: `backend, livekit-server-staging, onlyoffice-staging`
+- Ingress korrekt konfiguriert: Path `/rtc` → `livekit-config-staging (was: livekit-server-staging):7880`
+- WebSocket-Services: `backend, livekit-config-staging (was: livekit-server-staging), onlyoffice-staging`
 - Proxy-Timeouts: `86400s` (24h) — viel zu lang für 13s Disconnect
 
 **Fazit**: Ingress trennt die Verbindung NICHT.
@@ -134,7 +134,7 @@ ABER: Der Client trennt nach ~13-14s (nicht nach 60s). Das bedeutet:
 onError={(error) => {
   console.error("[LiveKit] Connection error:", error);
 }}
-onReconnecting={() => {
+onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)={() => {
   console.warn("[LiveKit] Reconnecting...");
 }}
 onReconnected={() => {
@@ -153,7 +153,7 @@ npm list livekit-client
 
 ```bash
 # Prüfe ob Server Pings sendet
-kubectl logs -n meeting-automation-staging -l app.kubernetes.io/name=livekit-server-staging --since=5m | grep -i ping
+kubectl logs -n meeting-automation-staging -l app.kubernetes.io/name=livekit-config-staging (was: livekit-server-staging) --since=5m | grep -i ping
 ```
 
 ### Schritt 4: WebSocket-Verbindung testen

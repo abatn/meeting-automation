@@ -343,15 +343,15 @@ graph TB
 
 - **Technology**: n8n (Node.js based workflow automation tool).
 - **Purpose**: Automates complex business workflows and integrates with various external services.
-- **Status**: 6 active workflows (Phase 75). Automation API requires `?client_id=` parameter.
-- **Note**: n8n only activates 3/7 workflows on startup — others need `POST /api/v1/workflows/{id}/activate`. DB changes don't propagate to in-memory state — DELETE + RE-IMPORT required.
+- **Status**: 9 active workflows (Phase 75). Automation API requires `?client_id=` parameter.
+- **Note**: n8n only activates 3/9 workflows on startup — others need `POST /api/v1/workflows/{id}/activate`. DB changes don't propagate to in-memory state — DELETE + RE-IMPORT required.
 - **Key Workflows**:
-    - `meeting-created` (ID: `uB0bPHLt0FNxsaBe`): Triggered when a new meeting is created.
-    - `pv-validated` (ID: `o9NXKZqiDnksQeO3`): Triggered when a PV is validated.
-    - `transcription-completed` (ID: `00tDUsvHjpnWD6oG`): Triggered after transcription completes.
-    - `meeting-status-changed` (ID: `6jsJVqySI9VpnvoO`): Sends status notifications.
-    - `daily-reminders` (ID: `GpER66AvYwapRNP4`): Sends daily reminders via WhatsApp/Email (cron-triggered).
-    - `user-invited` (ID: `CqkpcBkdkXlJtZbo`): Enterprise Onboarding workflow (Way B).
+    - `meeting-created` (ID: `EbdQNas2d3Q9NzuG`): Triggered when a new meeting is created.
+    - `pv-validated` (ID: `5_dJFUYSTiynU5Oe0CEBag`): Triggered when a PV is validated.
+    - `transcription-completed` (ID: `3`): Triggered after transcription completes.
+    - `meeting-status-changed` (ID: `7`): Sends status notifications.
+    - `daily-reminders` (ID: `4`): Sends daily reminders via WhatsApp/Email (cron-triggered).
+    - `user-invited` (ID: `6`): Enterprise Onboarding workflow (Way B).
 - **Integration**: Connects to the Backend API via webhooks and external APIs.
 
 ### 3.5. Infrastructure

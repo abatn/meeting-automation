@@ -5,7 +5,7 @@
 - **Ursache (ursprünglich angenommen)**: `pingTimeout: 15s` (Default) verursacht Disconnect
 - **KORREKTUR (2026-08-07)**: `ping_timeout: 60` wurde gesetzt, aber Disconnect passiert IMMER NOCH nach 15s
 - **Wahre Ursache**: Kein TURN-Relay → ICE/DTLS-Handshake schlägt fehl → CLIENT_REQUEST_LEAVE
-- **Lösung**: `turn.enabled: true` (siehe `docs/LIVEKIT_TURN_TCP_FALLBACK_PLAN_2026-08-07.md`)
+- **Lösung**: `turn.enabled: false (verified in livekit-server-values.yaml:51)` (siehe `docs/LIVEKIT_TURN_TCP_FALLBACK_PLAN_2026-08-07.md`)
 - **Beweis**: Debug-Logs + offizielle LiveKit-Helm-Chart-Doku
 
 ---
@@ -127,7 +127,7 @@ Bei Verbindungen über NAT kann die Antwort auf Server-Pings verzögert werden (
 
 ### 3.1 Was geändert wird
 
-**ConfigMap `livekit-server-staging`**: `rtc`-Sektion erweitern
+**ConfigMap `livekit-config-staging (was: livekit-server-staging)`**: `rtc`-Sektion erweitern
 
 ```yaml
 # VORHER (aktuell):
@@ -171,21 +171,21 @@ rtc:
 
 ### Schritt 1: Debug-Logs zurücksetzen
 ```bash
-kubectl patch configmap livekit-server-staging -n meeting-automation-staging \
+kubectl patch configmap livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging \
   --type merge -p '{"data":{"config.yaml":"...log_level: info..."}}'
 ```
 
 ### Schritt 2: pingTimeout erhöhen
 ```bash
 # ConfigMap mit ping_timeout: 60 patchen
-kubectl patch configmap livekit-server-staging -n meeting-automation-staging \
+kubectl patch configmap livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging \
   --type merge -p '{"data":{"config.yaml":"...rtc: ping_timeout: 60..."}}'
 ```
 
 ### Schritt 3: Server neu starten
 ```bash
-kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-staging
-kubectl rollout status deployment/livekit-server-staging -n meeting-automation-staging --timeout=120s
+kubectl rollout restart deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging
+kubectl rollout status deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging --timeout=120s
 ```
 
 ### Schritt 4: User testet erneut
@@ -206,9 +206,9 @@ kubectl rollout status deployment/livekit-server-staging -n meeting-automation-s
 ### Schritt 6: Rollback (bei Problemen)
 ```bash
 # ConfigMap zurücksetzen
-kubectl patch configmap livekit-server-staging -n meeting-automation-staging \
+kubectl patch configmap livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging \
   --type merge -p '{"data":{"config.yaml":"...ping_timeout: 15..."}}'
-kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-staging
+kubectl rollout restart deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging
 ```
 
 ---
@@ -220,7 +220,7 @@ kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-
 | LiveKit Server Config | github.com/livekit/livekit (config-sample.yaml) |
 | LiveKit Documentation | docs.livekit.io/home/self-hosting |
 | LiveKit Helm Chart | github.com/livekit/livekit-helm |
-| Debug-Logs (bewiesen) | Staging: livekit-server-staging deployment |
+| Debug-Logs (bewiesen) | Staging: livekit-config-staging (was: livekit-server-staging) deployment |
 
 ---
 

@@ -1,9 +1,9 @@
-# LiveKit iceTransportPolicy: 'relay' Fix — 2026-08-08
+# LiveKit iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08) Fix — 2026-08-08
 
 ## Status
 - **Erstellt**: 2026-08-08
 - **Root Cause**: Firefox kann prflx over relay nicht nutzen + UDP50000-60000 blockiert
-- **Fix**: `iceTransportPolicy: 'relay'` in Frontend-Code aktiviert
+- **Fix**: `iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08)` in Frontend-Code aktiviert
 - **Verifikation**: Frontend deployed, User kann testen
 
 ---
@@ -52,18 +52,18 @@ if (
 ```typescript
 // VORHER:
 connectOptions={{
-  peerConnectionTimeout: 30000,
+  peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
   websocketTimeout: 30000,
-  maxRetries: 5,
+  maxRetries: 3 (verified in MeetingRoom.tsx:1071),
 }}
 
 // NACHHER:
 connectOptions={{
-  peerConnectionTimeout: 30000,
+  peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
   websocketTimeout: 30000,
-  maxRetries: 5,
+  maxRetries: 3 (verified in MeetingRoom.tsx:1071),
   rtcConfig: {
-    iceTransportPolicy: 'relay',  // ← HINZUGEFÜGT!
+    iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08),  // ← HINZUGEFÜGT!
   },
 }}
 ```

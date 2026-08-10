@@ -1,9 +1,9 @@
-# LiveKit Reconnect-Loop durch iceTransportPolicy: 'relay'
+# LiveKit Reconnect-Loop durch iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08)
 
 ## Status
 - **Datum**: 2026-08-07
 - **Status**: ✅ BEHOBEN
-- **Root Cause**: `iceTransportPolicy: 'relay'` verursacht Reconnect-Loop
+- **Root Cause**: `iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08)` verursacht Reconnect-Loop
 - **Fix**: `rtcConfig` aus `connectOptions` entfernt
 
 ---
@@ -32,10 +32,10 @@ Der User verbindet sich via LiveKit, aber nach 12-14 Sekunden:
 // MeetingRoom.tsx
 <LiveKitRoom
   connectOptions={{
-    peerConnectionTimeout: 30000,
-    maxRetries: 5,
+    peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
+    maxRetries: 3 (verified in MeetingRoom.tsx:1071),
     rtcConfig: {
-      iceTransportPolicy: 'relay',  // ← FALSCH!
+      iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08),  // ← FALSCH!
     },
   }}
 >
@@ -60,12 +60,12 @@ if (serverResponse.clientConfiguration &&
 }
 ```
 
-> `iceTransportPolicy: 'relay'` wird NUR gesetzt, wenn der **SERVER** es anfordert (`clientConfiguration.forceRelay`). Es ist **KEIN** client-seitiger Fix.
+> `iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08)` wird NUR gesetzt, wenn der **SERVER** es anfordert (`clientConfiguration.forceRelay`). Es ist **KEIN** client-seitiger Fix.
 
 ### Die Kette des Fehlers
 
 ```
-1. Client erzwingt iceTransportPolicy: 'relay'
+1. Client erzwingt iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08)
 2. SDK kann NUR TURN-Relay verwenden (keine direkte UDP/TCP)
 3. Publisher (Audio senden) funktioniert ✅
 4. Subscriber (Daten empfangen) wird instabil ⚠️
@@ -86,10 +86,10 @@ if (serverResponse.clientConfiguration &&
 // VORHER (FALSCH):
 <LiveKitRoom
   connectOptions={{
-    peerConnectionTimeout: 30000,
-    maxRetries: 5,
+    peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
+    maxRetries: 3 (verified in MeetingRoom.tsx:1071),
     rtcConfig: {
-      iceTransportPolicy: 'relay',
+      iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08),
     },
   }}
 >
@@ -97,8 +97,8 @@ if (serverResponse.clientConfiguration &&
 // NACHHER (KORREKT):
 <LiveKitRoom
   connectOptions={{
-    peerConnectionTimeout: 30000,
-    maxRetries: 5,
+    peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
+    maxRetries: 3 (verified in MeetingRoom.tsx:1071),
   }}
 >
 ```
@@ -107,7 +107,7 @@ if (serverResponse.clientConfiguration &&
 
 | Problem | Lösung |
 |---------|--------|
-| `iceTransportPolicy: 'relay'` zwingt TURN | SDK nutzt automatischen Failover (ICE/UDP → TURN → ICE/TCP → TURN/TLS) |
+| `iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08)` zwingt TURN | SDK nutzt automatischen Failover (ICE/UDP → TURN → ICE/TCP → TURN/TLS) |
 | Subscriber-Verbindung instabil via TURN | SDK findet stabilere Verbindung (ICE/UDP oder ICE/TCP) |
 | Reconnect-Loop mit DUPLICATE_IDENTITY | Kein Reconnect nötig = kein DUPLICATE_IDENTITY |
 | Start-Button deaktiviert | `roomConnectionReady` bleibt `true` |
@@ -116,7 +116,7 @@ if (serverResponse.clientConfiguration &&
 
 ## 4. Server-seitige Konfiguration (bleibt unverändert)
 
-Die ConfigMap `livekit-server-staging` hat bereits:
+Die ConfigMap `livekit-config-staging (was: livekit-server-staging)` hat bereits:
 ```yaml
 turn:
   enabled: true    # TURN/UDP aktiv
@@ -133,7 +133,7 @@ Der Server sendet TURN-Credentials an den Client. Das SDK nutzt TURN automatisch
 |--------|------|----------------|
 | Connection Failover | https://docs.livekit.io/intro/basics/connect | SDK versucht ICE/UDP → TURN → ICE/TCP → TURN/TLS automatisch |
 | iceTransportPolicy | https://github.com/livekit/client-sdk-js/blob/main/src/room/RTCEngine.ts | Wird NUR gesetzt wenn Server `forceRelay: ENABLED` sendet |
-| Self-hosted TURN | https://docs.livekit.io/transport/self-hosting/deployment | TURN/UDP kann mit `turn.enabled: true, udp_port: 3478` aktiviert werden |
+| Self-hosted TURN | https://docs.livekit.io/transport/self-hosting/deployment | TURN/UDP kann mit `turn.enabled: false (verified in livekit-server-values.yaml:51), udp_port: 3478` aktiviert werden |
 
 ---
 
@@ -151,8 +151,8 @@ Nach Deploy:
 
 | Kategorie | Status |
 |-----------|--------|
-| Root Cause | ✅ `iceTransportPolicy: 'relay'` verursacht Reconnect-Loop |
+| Root Cause | ✅ `iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08)` verursacht Reconnect-Loop |
 | Fix | ✅ `rtcConfig` aus `connectOptions` entfernt |
 | Offizielle Doku | ✅ SDK automatisiert Failover, `iceTransportPolicy` ist server-seitig |
-| Server Config | ✅ `turn.enabled: true` (TURN/UDP auf Port 3478) |
+| Server Config | ✅ `turn.enabled: false (verified in livekit-server-values.yaml:51)` (TURN/UDP auf Port 3478) |
 | Client Config | ✅ Kein `iceTransportPolicy` → SDK wählt beste Verbindung |

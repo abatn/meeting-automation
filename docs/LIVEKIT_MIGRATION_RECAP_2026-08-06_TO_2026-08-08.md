@@ -37,14 +37,14 @@
 | **07.08** | MeetingRoom Code-Analyse | LiveKit-Integration in MeetingRoom.tsx evaluiert |
 | **07.08** | Network Analysis | Calico, kube-proxy, hostNetwork-Routing analysiert |
 | **08.08** | SDK-Patch (Option B) | `livekit-client` ESM-Bundle gepatcht: id-0-Antworten + 60s-Timeouts |
-| **08.08** | MeetingRoom.tsx Type-Fix | `onReconnecting`/`onReconnected` Props entfernt, Reconnect-State via `useConnectionState` |
+| **08.08** | MeetingRoom.tsx Type-Fix | `onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)`/`onReconnected` Props entfernt, Reconnect-State via `useConnectionState` |
 | **08.08** | Frontend Deploy (gepatchter SDK) | Bundle `index-CKEaWQJu.js` → `index-eY8oRDf5.js` deployed |
 | **08.08** | NetworkPolicy-Fix (Helm-Labels) | `livekit-policy` + `livekit-egress-policy` mit `app.kubernetes.io/name` ergänzt |
 | **08.08** | Egress Audio-Only Fix (Doku-konform) | `layout` + `preset` aus `start_egress()` entfernt (offizielle LiveKit-Doku) |
 | **08.08** | **hostNetwork-Fix (ROOT CAUSE)** | Egress-Pod `hostNetwork: true` gesetzt → **Verbindung funktioniert** |
 | **08.08** | **E2E-Test ERFOLGREICH** | Recording `EG_MkjjEbtExSej` → Status `completed`, Transkription erstellt |
-| **08.08** | **Service-Selector-Fix** | Service `livekit-server-staging` hatte 0 Endpoints (altes `app:`-Label) → JSON-Patch auf Helm-Labels |
-| **08.08** | CPU-Reduktion | LiveKit Server Limit `2000m → 1000m` (tatsächliche Nutzung nur ~1m) |
+| **08.08** | **Service-Selector-Fix** | Service `livekit-config-staging (was: livekit-server-staging)` hatte 0 Endpoints (altes `app:`-Label) → JSON-Patch auf Helm-Labels |
+| **08.08** | CPU-Reduktion | LiveKit Server Limit `1000m (verified in livekit-server-deployment.yaml:59) → 1000m` (tatsächliche Nutzung nur ~1m) |
 
 ---
 
@@ -109,7 +109,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: livekit-server-staging
+  name: livekit-config-staging (was: livekit-server-staging)
   namespace: meeting-automation-staging
 spec:
   replicas: 1
@@ -148,13 +148,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: livekit-server-staging
+  name: livekit-config-staging (was: livekit-server-staging)
 spec:
   type: ClusterIP
   # ⚠️ Selector MUSS die Helm-Labels enthalten (app.kubernetes.io/name + instance).
-  # Ein altes `app: livekit-server-staging`-Label im Selector → 0 Endpoints (siehe 9.6).
+  # Ein altes `app: livekit-config-staging (was: livekit-server-staging)`-Label im Selector → 0 Endpoints (siehe 9.6).
   selector:
-    app.kubernetes.io/name: livekit-server-staging
+    app.kubernetes.io/name: livekit-config-staging (was: livekit-server-staging)
     app.kubernetes.io/instance: livekit-server
   ports:
   - name: http
@@ -203,8 +203,8 @@ data:
 
 ```yaml
 replicaCount: 1
-nameOverride: livekit-server-staging
-fullnameOverride: livekit-server-staging
+nameOverride: livekit-config-staging (was: livekit-server-staging)
+fullnameOverride: livekit-config-staging (was: livekit-server-staging)
 
 podHostNetwork: true
 deploymentStrategy:
@@ -218,7 +218,7 @@ nodeSelector:
 
 resources:
   limits:
-    cpu: 1000m   # 2026-08-08: von 2000m auf 1000m reduziert (Nutzung ~1m, 1 Teilnehmer audio-only)
+    cpu: 1000m   # 2026-08-08: von 1000m (verified in livekit-server-deployment.yaml:59) auf 1000m reduziert (Nutzung ~1m, 1 Teilnehmer audio-only)
     memory: 1024Mi
   requests:
     cpu: 500m
@@ -315,7 +315,7 @@ image:
 egress:
   log_level: debug
   insecure: true
-  ws_url: ws://livekit-server-staging:7880
+  ws_url: ws://livekit-config-staging (was: livekit-server-staging):7880
   api_key: meeting-api-key
   api_secret: meeting-api-secret-2026-minimum-32-chars!
   redis:
@@ -382,7 +382,7 @@ class LiveKitService:
 
     def __init__(self):
         self.api = LiveKitAPI(
-            url=settings.LIVEKIT_URL,          # ws://livekit-server-staging:7880
+            url=settings.LIVEKIT_URL,          # ws://livekit-config-staging (was: livekit-server-staging):7880
             api_key=settings.LIVEKIT_API_KEY,  # meeting-api-key
             api_secret=settings.LIVEKIT_API_SECRET,
         )
@@ -555,7 +555,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: livekit-server-staging
+      app.kubernetes.io/name: livekit-config-staging (was: livekit-server-staging)
   policyTypes: [Ingress, Egress]
   ingress:
   - from:
@@ -634,7 +634,7 @@ spec:
   - to:
     - podSelector:
         matchLabels:
-          app.kubernetes.io/name: livekit-server-staging
+          app.kubernetes.io/name: livekit-config-staging (was: livekit-server-staging)
     ports:
     - port: 7880
       protocol: TCP
@@ -766,7 +766,7 @@ RoomCompositeEgressRequest:
 
 | Fakt | Detail |
 |------|--------|
-| **Symptom** | `npm run type-check` fehlschlägt: `TS2322: onReconnecting/onReconnected` nicht in `LiveKitRoomProps` |
+| **Symptom** | `npm run type-check` fehlschlägt: `TS2322: onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)/onReconnected` nicht in `LiveKitRoomProps` |
 | **Ursache** | `@livekit/components-react@2.9.21` hat diese Props nicht — waren nie wired |
 | **Fix** | Props entfernt, Reconnect-State via `useConnectionState` Bridge |
 
@@ -776,7 +776,7 @@ RoomCompositeEgressRequest:
 |------|--------|
 | **Symptom** | LiveKit Server 100% CPU, Egress-Logs: `not enough cpu for some egress types` |
 | **Ursache** | CPU-Limit 500m (zu niedrig) |
-| **Fix** | CPU-Limit auf 2000m erhöht |
+| **Fix** | CPU-Limit auf 1000m (verified in livekit-server-deployment.yaml:59) erhöht |
 
 ### 9.5 TURN/ICE-Probleme (07.08)
 
@@ -790,20 +790,20 @@ RoomCompositeEgressRequest:
 
 | Fakt | Detail |
 |------|--------|
-| **Symptom** | Service `livekit-server-staging` zeigt `ENDPOINTS: <none>` seit 46h; Backend (`LIVEKIT_URL`), Egress (`ws_url`) und Ingress `/livekit` erhalten `Connection refused` |
-| **Ursache** | Service-Selector verlangte `app: livekit-server-staging` — stammt aus der alten direkten YAML (`livekit-server-deployment.yaml`, per `kubectl apply`), die beim Helm-Umstieg den Helm-Service überlagert hat. Die Helm-Pods tragen aber nur `app.kubernetes.io/name` + `app.kubernetes.io/instance` → **0 Endpoints** (UND-Verknüpfung) |
-| **Vorher funktioniert?** | JA — vor der Helm-Migration trugen Pod UND Service beide `app: livekit-server-staging` → konsistent. Erst der Helm-Umstieg erzeugte den Mismatch |
+| **Symptom** | Service `livekit-config-staging (was: livekit-server-staging)` zeigt `ENDPOINTS: <none>` seit 46h; Backend (`LIVEKIT_URL`), Egress (`ws_url`) und Ingress `/livekit` erhalten `Connection refused` |
+| **Ursache** | Service-Selector verlangte `app: livekit-config-staging (was: livekit-server-staging)` — stammt aus der alten direkten YAML (`livekit-server-deployment.yaml`, per `kubectl apply`), die beim Helm-Umstieg den Helm-Service überlagert hat. Die Helm-Pods tragen aber nur `app.kubernetes.io/name` + `app.kubernetes.io/instance` → **0 Endpoints** (UND-Verknüpfung) |
+| **Vorher funktioniert?** | JA — vor der Helm-Migration trugen Pod UND Service beide `app: livekit-config-staging (was: livekit-server-staging)` → konsistent. Erst der Helm-Umstieg erzeugte den Mismatch |
 | **Fallstrick** | `kubectl patch --type=merge` ERGÄNZT den Selector nur (alle Labels bleiben) → wirkungslos. Erst `--type=json` mit `replace` auf `/spec/selector` ersetzt ihn komplett |
-| **Fix** | `kubectl patch svc livekit-server-staging -n meeting-automation-staging --type=json -p='[{"op":"replace","path":"/spec/selector","value":{"app.kubernetes.io/name":"livekit-server-staging","app.kubernetes.io/instance":"livekit-server"}}]'` → Endpoints erscheinen sofort (`10.0.0.191:7880,7881`) |
-| **Verify** | Backend → `livekit-server-staging:7880` ✅ OK (vorher `Connection refused`); EndpointSlice ready mit `targetRef` auf Running-Pod |
+| **Fix** | `kubectl patch svc livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging --type=json -p='[{"op":"replace","path":"/spec/selector","value":{"app.kubernetes.io/name":"livekit-config-staging (was: livekit-server-staging)","app.kubernetes.io/instance":"livekit-server"}}]'` → Endpoints erscheinen sofort (`10.0.0.191:7880,7881`) |
+| **Verify** | Backend → `livekit-config-staging (was: livekit-server-staging):7880` ✅ OK (vorher `Connection refused`); EndpointSlice ready mit `targetRef` auf Running-Pod |
 
 ### 9.7 CPU-Limit-Reduktion (08.08)
 
 | Fakt | Detail |
 |------|--------|
-| **Symptom** | LiveKit Server Limit 2000m (2 CPU) bei tatsächlicher Nutzung von nur ~1m CPU / 51Mi RAM (1 Teilnehmer, audio-only) |
+| **Symptom** | LiveKit Server Limit 1000m (verified in livekit-server-deployment.yaml:59) (2 CPU) bei tatsächlicher Nutzung von nur ~1m CPU / 51Mi RAM (1 Teilnehmer, audio-only) |
 | **Ursache** | Limit war für den realen Nutzungsumfang überdimensioniert |
-| **Fix** | `kubectl patch` → `limits.cpu: 2000m → 1000m` + beide YAMLs im Repo aktualisiert |
+| **Fix** | `kubectl patch` → `limits.cpu: 1000m (verified in livekit-server-deployment.yaml:59) → 1000m` + beide YAMLs im Repo aktualisiert |
 | **Wichtig** | Per `kubectl patch` angewendet, **nicht** per `helm upgrade` (würde hostNetwork/dnsPolicy zurücksetzen); Werte in `livekit-server-values.yaml` gepflegt |
 | **Verify** | Rollout erfolgreich, `limits.cpu: "1"`, hostNetwork/dnsPolicy unverändert, Server v1.9.0 läuft, HTTP OK auf 7880 |
 
@@ -829,7 +829,7 @@ RoomCompositeEgressRequest:
 
 | Test | Ziel | Ergebnis |
 |------|------|----------|
-| Service DNS | `livekit-server-staging:7880` | ✅ Exit-Code 0 |
+| Service DNS | `livekit-config-staging (was: livekit-server-staging):7880` | ✅ Exit-Code 0 |
 | localhost | `localhost:7880` | ✅ Exit-Code 0 |
 | Node-IP | `10.0.0.191:7880` | ✅ Exit-Code 0 |
 | Redis | `redis-staging:6379` | ✅ TCP connect |
@@ -842,7 +842,7 @@ RoomCompositeEgressRequest:
 | **Backend → Service-DNS** (`LIVEKIT_URL`, Room-API) | ❌ `Connection refused` | ✅ **OK** |
 | **EndpointSlice** | leer | ✅ ready, `targetRef` auf Running-Pod |
 | **Egress-Pod** | — | ✅ läuft (1/1, hostNetwork=true, kein Restart) |
-| **CPU-Limit** | `2` (2000m) | ✅ `1` (1000m) |
+| **CPU-Limit** | `2` (1000m (verified in livekit-server-deployment.yaml:59)) | ✅ `1` (1000m) |
 
 ---
 
@@ -942,7 +942,7 @@ RoomCompositeEgressRequest:
 
 ### 12.8 Ressourcen-Limits: Nutzung messen statt raten
 
-** Regel:** Limits an der realen Nutzung orientieren (`kubectl top pods`). Staging: 1 Teilnehmer audio-only → ~1m CPU reicht; 2000m war überdimensioniert. Änderungen per `kubectl patch` anwenden, wenn Helm die Werte nicht aus Values rendert, und die Werte parallel in den Values-YAMLs dokumentieren.
+** Regel:** Limits an der realen Nutzung orientieren (`kubectl top pods`). Staging: 1 Teilnehmer audio-only → ~1m CPU reicht; 1000m (verified in livekit-server-deployment.yaml:59) war überdimensioniert. Änderungen per `kubectl patch` anwenden, wenn Helm die Werte nicht aus Values rendert, und die Werte parallel in den Values-YAMLs dokumentieren.
 
 ---
 
@@ -950,7 +950,7 @@ RoomCompositeEgressRequest:
 
 ```bash
 # Backend (.env)
-LIVEKIT_URL=ws://livekit-server-staging:7880
+LIVEKIT_URL=ws://livekit-config-staging (was: livekit-server-staging):7880
 LIVEKIT_API_KEY=meeting-api-key
 LIVEKIT_API_SECRET=meeting-api-secret-2026-minimum-32-chars!
 

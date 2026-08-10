@@ -64,10 +64,11 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
     }
     ```
 
-### 1.4. MFA Setup
+### 1.4. MFA Setup (PLANNED — NOT IMPLEMENTED)
 - **Endpoint**: `/api/v1/auth/mfa/setup`
 - **Method**: `POST`
 - **Description**: Initiates MFA setup for the authenticated user, returning a QR code URI.
+- **Status**: Not implemented in backend/app/api/v1/auth.py
 - **Response (200 OK)**:
     ```json
     {
@@ -76,10 +77,11 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
     }
     ```
 
-### 1.5. MFA Verify
+### 1.5. MFA Verify (PLANNED — NOT IMPLEMENTED)
 - **Endpoint**: `/api/v1/auth/mfa/verify`
 - **Method**: `POST`
 - **Description**: Verifies the MFA token provided by the user to enable MFA.
+- **Status**: Not implemented in backend/app/api/v1/auth.py
 - **Request Body**:
     ```json
     {
@@ -510,10 +512,11 @@ This document details the RESTful API endpoints for the Meeting Automation Syste
     }
     ```
 
-### 7.2. Generate Export Report
+### 7.2. Generate Export Report (PLANNED — NOT IMPLEMENTED)
 - **Endpoint**: `/api/v1/reports/export`
 - **Method**: `GET`
 - **Description**: Generates a comprehensive report in a specified format (e.g., PDF, Excel).
+- **Status**: Not implemented in backend/app/api/v1/reports.py
 - **Query Parameters**: `format` (str: "pdf", "xlsx"), `meeting_id` (uuid, optional), `start_date` (date, optional), `end_date` (date, optional)
 - **Response (200 OK)**: Returns the generated report file.
     - `Content-Type: application/pdf` for PDF.

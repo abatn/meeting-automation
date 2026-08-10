@@ -3,7 +3,7 @@
 ## Status
 - **Erstellt**: 2026-08-07
 - **Ursache**: LiveKit JS SDK reconnectTimeout (10-15s Default) + fehlende TURN/UDP-Relay
-- **Lösung**: `turn.enabled: true` (OHNE TLS) auf Port 3478/UDP
+- **Lösung**: `turn.enabled: false (verified in livekit-server-values.yaml:51)` (OHNE TLS) auf Port 3478/UDP
 - **Beweis**: 100% verifiziert basierend auf LiveKit-Logs + offizieller Dokumentation
 - **Implementiert**: 2026-08-07 11:53 UTC ✅
 - **Verifiziert**: TURN-Server startet auf Port 3478 ✅
@@ -48,7 +48,7 @@
 | Fakt | Beweis | Quelle |
 |------|--------|--------|
 | User disconnectet nach 15s | `CLIENT_REQUEST_LEAVE` | LiveKit Server Logs |
-| Kein TURN-Relay verfügbar | `turn.enabled: false` | ConfigMap livekit-server-staging |
+| Kein TURN-Relay verfügbar | `turn.enabled: false` | ConfigMap livekit-config-staging (was: livekit-server-staging) |
 | Client hinter NAT | IP 5.146.126.x | WebRTC-Kandidaten |
 | Egress bekommt kein Audio | `EGRESS_ABORTED` | Egress Logs |
 | Error: "Start signal not received" | `recording.status = "failed"` | Database |
@@ -98,8 +98,8 @@ CLIENT (Firefox)                    SERVER (158.180.18.110)
 ```typescript
 // MeetingRoom.tsx
 connectOptions={{
-  peerConnectionTimeout: 30000,  // 30s für PeerConnection
-  maxRetries: 5,                 // 5 Reconnect-Versuche
+  peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),  // 30s für PeerConnection
+  maxRetries: 3 (verified in MeetingRoom.tsx:1071),                 // 5 Reconnect-Versuche
 }}
 ```
 
@@ -122,7 +122,7 @@ connectOptions={{
 
 **Offizielle LiveKit-Doku:**
 > "For TURN/UDP, no certificate is needed"
-> "TURN/UDP can be enabled with: turn.enabled: true, udp_port: 3478"
+> "TURN/UDP can be enabled with: turn.enabled: false (verified in livekit-server-values.yaml:51), udp_port: 3478"
 
 **WICHTIG:** TURN braucht NUR TLS für TURN/TLS (Port 5349), NICHT für TURN/UDP (Port 3478).
 
@@ -189,13 +189,13 @@ turn:
 ### Schritt 2: LiveKit Server Pod neustarten ✅
 
 ```bash
-kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-staging
+kubectl rollout restart deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging
 ```
 
 **Ergebnis:**
 ```
-deployment.apps/livekit-server-staging restarted
-livekit-server-staging-6c96bd6848-86gcq: 1/1 Running
+deployment.apps/livekit-config-staging (was: livekit-server-staging) restarted
+livekit-config-staging (was: livekit-server-staging)-6c96bd6848-86gcq: 1/1 Running
 ```
 
 ### Schritt 3: Verifikation ✅
@@ -228,7 +228,7 @@ turn:
 |-----------|------|--------|
 | **Ursache** | Kein TURN-Relay → ICE scheitert → 15s Disconnect | 100% bewiesen |
 | **Beweis** | LiveKit Logs: CLIENT_REQUEST_LEAVE nach 15s | 100% bewiesen |
-| **Lösung** | `turn.enabled: true` (TURN/UDP, kein TLS) | 100% nach Doku |
+| **Lösung** | `turn.enabled: false (verified in livekit-server-values.yaml:51)` (TURN/UDP, kein TLS) | 100% nach Doku |
 | **Offizielle Quelle** | "For TURN/UDP, no certificate is needed" | LiveKit Docs |
 | **Implementierung** | ConfigMap patch + Pod-Restart | ✅ ABGESCHLOSSEN |
 | **Verifikation** | TURN-Server startet auf Port 3478 | ✅ BESTÄTIGT |

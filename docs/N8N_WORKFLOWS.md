@@ -26,7 +26,7 @@ Backend (FastAPI) → Webhook → n8n → SMTP/WhatsApp → External
 
 ## Active Workflows (6)
 
-> **Important:** Automation API requires `?client_id=` parameter. n8n only activates 3/7 workflows on startup — others need `POST /api/v1/workflows/{id}/activate`. DB changes don't propagate to n8n in-memory state — DELETE + RE-IMPORT required.
+> **Important:** Automation API requires `?client_id=` parameter. n8n only activates 3/9 workflows on startup — others need `POST /api/v1/workflows/{id}/activate`. DB changes don't propagate to n8n in-memory state — DELETE + RE-IMPORT required.
 
 ### 1. User Invited (`user-invited`) — ID: `CqkpcBkdkXlJtZbo`
 - **Trigger:** Webhook `POST /webhook/user-invited`
@@ -49,7 +49,7 @@ Backend (FastAPI) → Webhook → n8n → SMTP/WhatsApp → External
 
 ### 4. Transcription Completed (`transcription-completed`) — ID: `00tDUsvHjpnWD6oG`
 - **Trigger:** Webhook `POST /webhook/transcription-completed`
-- **Backend Caller:** `transcription_tasks.py:1147`
+- **Backend Caller:** `transcription_tasks.py:1392`
 - **Actions:** Fetch meeting details → Download PDF → Send as email attachment
 - **Status:** ✅ Active (credentials fixed 2026-06-24)
 
@@ -70,14 +70,14 @@ Backend (FastAPI) → Webhook → n8n → SMTP/WhatsApp → External
 ### Audio Uploaded (`audio-uploaded`) — DEPRECATED
 - **Reason:** Redundant with Celery pipeline (`process_recording.delay()`)
 - **Old flow:** n8n webhook → call backend API → start transcription
-- **Current flow:** Backend → Celery task directly (`recording_service.py:83`)
+- **Current flow:** Backend → Celery task directly (`recording_service.py:131`)
 - **Deactivated:** 2026-06-24 (Phase 63)
 
 ## Backend Config Constants
 
 | Constant | Value | Used By |
 |----------|-------|---------|
-| `N8N_WEBHOOK_URL` | `http://n8n:5678/webhook` | Base URL for path construction |
+| `N8N_WEBHOOK_URL` | `http://n8n-staging:5678/webhook` | Base URL for path construction |
 | `N8N_WEBHOOK_USER_INVITED` | `.../webhook/user-invited` | `email_tasks.py`, `webhook_utils.py` |
 | `N8N_WEBHOOK_MEETING_CREATED` | `.../webhook/meeting-created` | `meeting_service.py` |
 | `N8N_WEBHOOK_MEETING_STATUS_CHANGED` | `.../webhook/meeting-status-changed` | `meeting_service.py` |

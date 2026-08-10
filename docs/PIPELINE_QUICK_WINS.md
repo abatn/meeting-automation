@@ -3,8 +3,8 @@
 | # | Fix | File | Gain |
 |---|-----|------|------|
 | 1 | Adaptive Gladia polling: 1s→2s→3s→5s (max 30s total for short audio) | `gladia_service.py:75-95` | ~60-80s |
-| 2 | Start S3 download before `delay()` in `recording_service.after_upload()` | `recording_service.py:78-83` | ~5-10s overlap |
-| 3 | Remove `await asyncio.sleep(0.1)` in speaker batch loop; batch size 5→8 | `transcription_tasks.py:612-614` | ~5-10s |
+| 2 | Start S3 download before `delay()` in `recording_service.after_upload()` | `recording_service.py:274` | ~5-10s overlap |
+| 3 | Remove `await asyncio.sleep(0.1)` in speaker batch loop; batch size 5→8 | `transcription_tasks.py:849` | ~5-10s |
 | 4 | Celery: `prefetch_multiplier=1`, `task_acks_late=True`, `concurrency=CPU*2` | `celery_app.py` | throughput |
 
 ---
@@ -52,14 +52,14 @@ while not done:
 ---
 
 ### 2. Early S3 Download
-**File**: `recording_service.py:78-83` (`after_upload` method)
+**File**: `recording_service.py:274` (`after_upload` method)
 
 Move `_download_audio()` call **before** `transcription_tasks._process_recording_pipeline.delay()` so download overlaps with Gladia upload/processing.
 
 ---
 
 ### 3. Speaker Batch Optimization
-**File**: `transcription_tasks.py:612-614`
+**File**: `transcription_tasks.py:849`
 
 Remove artificial delay:
 ```python

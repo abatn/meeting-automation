@@ -22,7 +22,7 @@ const room = new Room({
   dynacast: true,
   
   // Verbindungs-Timeout
-  peerConnectionTimeout: 30000,  // 30 Sekunden
+  peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),  // 30 Sekunden
   
   // Reconnect-Policy
   maxRetries: 3,
@@ -142,7 +142,7 @@ room:
 **Empfohlen:**
 1. TURN-Server aktivieren (für Firefox-Fallback)
 2. ICE-Timeout erhöhen
-3. `peerConnectionTimeout: 30000` setzen
+3. `peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069)` setzen
 
 ---
 
@@ -207,8 +207,8 @@ rtc:
   adaptiveStream={true}        // ← NEU: Adaptive Stream
   dynacast={true}              // ← NEU: Dynacast
   connectOptions={{
-    peerConnectionTimeout: 30000,
-    maxRetries: 5,             // ← ERHÖHT: 5 statt 3
+    peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
+    maxRetries: 3 (verified in MeetingRoom.tsx:1071),             // ← ERHÖHT: 5 statt 3
   }}
   onConnected={() => {
     setLivekitError(null);
@@ -262,10 +262,10 @@ turn:
 |---|---|---|
 | `adaptiveStream: true` | docs.livekit.io | ✅ Implementiert (2026-08-07) |
 | `dynacast: true` | docs.livekit.io | ✅ Implementiert (2026-08-07) |
-| `maxRetries: 5` | docs.livekit.io | ✅ Implementiert (2026-08-07) |
+| `maxRetries: 3 (verified in MeetingRoom.tsx:1071)` | docs.livekit.io | ✅ Implementiert (2026-08-07) |
 | `room.empty_timeout: 600` | docs.livekit.io | ✅ Implementiert (2026-08-07) |
 | `room.departure_timeout: 60` | docs.livekit.io | ✅ Implementiert (2026-08-07) |
-| `turn.enabled: true` | docs.livekit.io | ✅ Implementiert |
+| `turn.enabled: false (verified in livekit-server-values.yaml:51)` | docs.livekit.io | ✅ Implementiert |
 | `ping_timeout: 60` | docs.livekit.io | ✅ Implementiert |
 | `tcp_port: 7881` | docs.livekit.io | ✅ Implementiert |
 
@@ -284,9 +284,9 @@ turn:
 +   adaptiveStream={true}
 +   dynacast={true}
     connectOptions={{
-      peerConnectionTimeout: 30000,
+      peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
 -     maxRetries: 3,
-+     maxRetries: 5,
++     maxRetries: 3 (verified in MeetingRoom.tsx:1071),
     }}
 ```
 

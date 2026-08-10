@@ -21,8 +21,8 @@ export interface ConnectOptions {
 ### Unser Code (`MeetingRoom.tsx` Zeile 1055-1058)
 ```typescript
 connectOptions={{
-  peerConnectionTimeout: 30000,  // ✅ Überschrieben
-  maxRetries: 5,                  // ✅ Überschrieben
+  peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),  // ✅ Überschrieben
+  maxRetries: 3 (verified in MeetingRoom.tsx:1071),                  // ✅ Überschrieben
   // ❌ websocketTimeout: NICHT GESETZT → Default 15s wird verwendet!
 }}
 ```
@@ -60,15 +60,15 @@ connectOptions={{
 ```typescript
 // VORHER (FALSCH):
 connectOptions={{
-  peerConnectionTimeout: 30000,
-  maxRetries: 5,
+  peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
+  maxRetries: 3 (verified in MeetingRoom.tsx:1071),
 }}
 
 // NACHHER (KORREKT):
 connectOptions={{
-  peerConnectionTimeout: 30000,
+  peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
   websocketTimeout: 30000,  // ← HINZUGEFÜGT!
-  maxRetries: 5,
+  maxRetries: 3 (verified in MeetingRoom.tsx:1071),
 }}
 ```
 

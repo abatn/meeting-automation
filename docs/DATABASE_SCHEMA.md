@@ -47,7 +47,7 @@ erDiagram
         VARCHAR full_name
         VARCHAR status "ACTIVE, PENDING, DISABLED"
         BOOLEAN is_mfa_enabled
-        VARCHAR mfa_secret OPTIONAL
+        VARCHAR totp_secret OPTIONAL (TOTP secret for MFA)
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
@@ -67,7 +67,7 @@ erDiagram
         UUID id PK
         UUID user_id FK UNIQUE
         VARCHAR token UNIQUE "Optional: Plaintext for legacy"
-        VARCHAR token_hash UNIQUE "Secure: SHA-256 hash (preferred)"
+        -- VARCHAR token_hash UNIQUE "PLANNED: SHA-256 hash (not in actual model yet)"
         TIMESTAMP expires_at
         TIMESTAMP created_at
     }
@@ -289,7 +289,7 @@ erDiagram
     - `id` (UUID, Primary Key).
     - `user_id` (UUID, Foreign Key to `users.id`, Unique): The pending user.
     - `token` (VARCHAR, Unique, Optional): Secure URL-safe token (plaintext, for backward compatibility).
-    - `token_hash` (VARCHAR, Unique): SHA-256 hash of token (secure storage, preferred method).
+    - ~~`token_hash` (VARCHAR, Unique)~~: **PLANNED** — not in actual ActivationToken model (user.py:121-130).
     - `expires_at` (TIMESTAMP): Token expiration date (48 hours standard).
     - `created_at` (TIMESTAMP): When token was created.
 - **Security Notes**:

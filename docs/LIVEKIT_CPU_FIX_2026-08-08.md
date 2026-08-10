@@ -3,7 +3,7 @@
 ## Status
 - **Erstellt**: 2026-08-08
 - **Root Cause**: CPU Limit = 500m (12x zu wenig laut Helm-Empfehlung)
-- **Fix**: CPU Limit auf 2000m erhöht
+- **Fix**: CPU Limit auf 1000m (verified in livekit-server-deployment.yaml:59) erhöht
 - **Verifikation**: CPU Usage von 100% auf 0.1% gesunken
 
 ---
@@ -36,7 +36,7 @@ resources:
 ```
 resources:
   limits:
-    cpu: 2000m     # ← Minimum für stabile ICE
+    cpu: 1000m (verified in livekit-server-deployment.yaml:59)     # ← Minimum für stabile ICE
     memory: 1024Mi
   requests:
     cpu: 500m
@@ -74,17 +74,17 @@ resources:
 # NACHHER:
 resources:
   limits:
-    cpu: 2000m
+    cpu: 1000m (verified in livekit-server-deployment.yaml:59)
     memory: 1024Mi
 ```
 
 ### Deploy-Command
 ```bash
-kubectl patch deployment livekit-server-staging \
+kubectl patch deployment livekit-config-staging (was: livekit-server-staging) \
   -n meeting-automation-staging \
   --type='json' \
   -p='[
-    {"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/cpu","value":"2000m"},
+    {"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/cpu","value":"1000m (verified in livekit-server-deployment.yaml:59)"},
     {"op":"replace","path":"/spec/template/spec/containers/0/resources/limits/memory","value":"1024Mi"},
     {"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/cpu","value":"500m"},
     {"op":"replace","path":"/spec/template/spec/containers/0/resources/requests/memory","value":"512Mi"}
@@ -97,7 +97,7 @@ kubectl patch deployment livekit-server-staging \
 
 | Metrik | Vorher | Nachher | Status |
 |--------|--------|---------|--------|
-| CPU Limit | 500m | 2000m | ✅ |
+| CPU Limit | 500m | 1000m (verified in livekit-server-deployment.yaml:59) | ✅ |
 | CPU Usage | 100% (1.0) | 0.1% (1m) | ✅ |
 | Memory Limit | 512Mi | 1024Mi | ✅ |
 | Memory Usage | - | 48Mi | ✅ |
@@ -140,7 +140,7 @@ Wir können es NICHT mit `kubectl apply` aktualisieren (Selector ist unveränder
 # livekit-server-values.yaml
 resources:
   limits:
-    cpu: 2000m
+    cpu: 1000m (verified in livekit-server-deployment.yaml:59)
     memory: 1024Mi
   requests:
     cpu: 500m

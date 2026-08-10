@@ -15,28 +15,28 @@
 | ConfigMap | Inhalt | Verwendung |
 |---|---|---|
 | `livekit-config-staging` (19h alt) | TURN: **enabled**, rtc: allow_tcp_fallback: **true** | **NICHT in use** |
-| `livekit-server-staging` (8h alt) | TURN: **enabled: false**, rtc: **kein** allow_tcp_fallback | **In use (Helm)** |
+| `livekit-config-staging (was: livekit-server-staging)` (8h alt) | TURN: **enabled: false**, rtc: **kein** allow_tcp_fallback | **In use (Helm)** |
 
 ### Der Beweis (100% Fakten)
 
-**LiveKit Server Deployment verwendet `livekit-server-staging`:**
+**LiveKit Server Deployment verwendet `livekit-config-staging (was: livekit-server-staging)`:**
 ```yaml
 env:
 - name: LIVEKIT_CONFIG
   valueFrom:
     configMapKeyRef:
       key: config.yaml
-      name: livekit-server-staging  ← Das ist die Config!
+      name: livekit-config-staging (was: livekit-server-staging)  ← Das ist die Config!
 ```
 
-**`livekit-server-staging` hat `turn.enabled: false`:**
+**`livekit-config-staging (was: livekit-server-staging)` hat `turn.enabled: false`:**
 ```yaml
 turn:
   enabled: false    ← TURN IST DEAKTIVIERT!
   udp_port: 3478
 ```
 
-**`livekit-config-staging` (alte Config) hat `turn.enabled: true`:**
+**`livekit-config-staging` (alte Config) hat `turn.enabled: false (verified in livekit-server-values.yaml:51)`:**
 ```yaml
 turn:
   enabled: true    ← TURN war aktiv!
@@ -47,7 +47,7 @@ turn:
 
 ```
 1. Helm Chart installiert LiveKit Server
-2. Helm erstellt ConfigMap "livekit-server-staging"
+2. Helm erstellt ConfigMap "livekit-config-staging (was: livekit-server-staging)"
 3. ConfigMap hat turn.enabled: false (Helm-Default!)
 4. LiveKit Server startet OHNE TURN
 5. User verbindet sich via WebRTC
@@ -59,7 +59,7 @@ turn:
 
 ### Die Lösung
 
-**ConfigMap `livekit-server-staging` korrigieren:**
+**ConfigMap `livekit-config-staging (was: livekit-server-staging)` korrigieren:**
 ```yaml
 turn:
   enabled: true    # ← TURN muss aktiv sein!
@@ -262,7 +262,7 @@ const audioTrackPublished = !!localParticipantRef.current?.getTrackPublication(T
 
 **Chrome-URL aus den Egress-Logs:**
 ```
-http://localhost:7980/?layout=&token=...&url=ws://livekit-server-staging:7880
+http://localhost:7980/?layout=&token=...&url=ws://livekit-config-staging (was: livekit-server-staging):7880
 ```
 
 **`layout=` ist LEER!**

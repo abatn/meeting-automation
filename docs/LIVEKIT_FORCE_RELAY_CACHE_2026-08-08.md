@@ -79,10 +79,10 @@ React.useEffect(() => {
 
 ## Fix (implementiert 2026-08-08)
 
-### Schritt 1: ConfigMap `livekit-server-staging` aktualisieren
-**Datei**: ConfigMap `livekit-server-staging` (NICHT `livekit-config-staging`!)
+### Schritt 1: ConfigMap `livekit-config-staging (was: livekit-server-staging)` aktualisieren
+**Datei**: ConfigMap `livekit-config-staging (was: livekit-server-staging)` (NICHT `livekit-config-staging`!)
 
-**WICHTIG**: Der Pod liest `livekit-server-staging` (über `LIVEKIT_CONFIG` env), NICHT `livekit-config-staging`.
+**WICHTIG**: Der Pod liest `livekit-config-staging (was: livekit-server-staging)` (über `LIVEKIT_CONFIG` env), NICHT `livekit-config-staging`.
 
 ```yaml
 # VORHER:
@@ -96,7 +96,7 @@ turn:
 
 ### Schritt 2: Pod-Restart (Cache leeren)
 ```bash
-kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-staging
+kubectl rollout restart deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging
 ```
 
 ### Verifikation

@@ -463,7 +463,7 @@ the namespace "meeting-automation-staging"
 
 **Root Cause:** CronJob-Dateien (`ephemeral-storage-cleanup`, `pod-garbage-collector`, `longhorn-cleanup`) mit hardcoded `namespace: kube-system` lagen in `infrastructure/kubernetes/staging/`. CI/CD `kubectl apply -f .../staging/ -n meeting-automation-staging` wandte ALLE Dateien mit `-n meeting-automation-staging` an → Namespace-Konflikt.
 
-**Fix:** CronJob-Dateien nach `infrastructure/kubernetes/system/` verschoben + separater CI/CD-Step in `e2e-tests.yml`.
+**Fix:** CronJob-Dateien nach `infrastructure/kubernetes/system/` verschoben + separater CI/CD-Step in `e2e-tests.yml` (DEPRECATED — renamed to `e2e-tests.yml.disabled`, replaced by `ci.yml`).
 
 **Änderung:** `.github/workflows/e2e-tests.yml` (neuer Step "Deploy System CronJobs")
 

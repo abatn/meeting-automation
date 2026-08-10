@@ -194,8 +194,8 @@ image:
   pullPolicy: IfNotPresent
 
 # Labels/Service-Name identisch zu den Raw-Manifesten halten
-nameOverride: livekit-server-staging
-fullnameOverride: livekit-server-staging
+nameOverride: livekit-config-staging (was: livekit-server-staging)
+fullnameOverride: livekit-config-staging (was: livekit-server-staging)
 
 livekit:
   port: 7880
@@ -237,7 +237,7 @@ nodeSelector:
 
 resources:
   limits:
-    cpu: 2000m
+    cpu: 1000m (verified in livekit-server-deployment.yaml:59)
     memory: 1024Mi
   requests:
     cpu: 1000m
@@ -277,7 +277,7 @@ egress:
 
 resources:
   limits:
-    cpu: 2000m
+    cpu: 1000m (verified in livekit-server-deployment.yaml:59)
     memory: 1024Mi
   requests:
     cpu: 1000m
@@ -382,8 +382,8 @@ kubectl apply -f infrastructure/kubernetes/staging/livekit-egress-deployment.yam
 kubectl apply -f infrastructure/kubernetes/staging/livekit-service.yaml
 kubectl apply -f infrastructure/kubernetes/staging/livekit-configmap.yaml
 kubectl apply -f infrastructure/kubernetes/staging/livekit-networkpolicy.yaml
-kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-staging
-kubectl rollout status deployment/livekit-server-staging -n meeting-automation-staging --timeout=180s
+kubectl rollout restart deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging
+kubectl rollout status deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging --timeout=180s
 ```
 
 **Rollback-Verifikation:** Pods Running, Recording-Test erneut (Vergleichs-Baseline: "test 67"

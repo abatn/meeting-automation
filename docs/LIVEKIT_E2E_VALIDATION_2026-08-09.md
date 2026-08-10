@@ -73,7 +73,7 @@ SELECT id, status, is_validated FROM pvs WHERE meeting_id='1af9742f-e633-44f2-bc
 
 ### 3.2 Audio-Track publiziert + Teilnehmer aktiv (LiveKit-Server)
 
-`kubectl logs deployment/livekit-server-staging -n meeting-automation-staging`
+`kubectl logs deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging`
 
 ```
 2026-08-09T06:41:35.560Z  INFO  livekit.pub  rtc/participant.go:1930  mediaTrack published

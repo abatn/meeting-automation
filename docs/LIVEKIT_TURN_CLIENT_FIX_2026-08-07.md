@@ -1,4 +1,4 @@
-# LiveKit TURN Client-Side Fix: iceTransportPolicy: 'relay'
+# LiveKit TURN Client-Side Fix: iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08)
 
 ## Status
 - **Erstellt**: 2026-08-07
@@ -14,8 +14,8 @@
 
 ```
 CLUSTER STATE (was wirklich läuft):
-  livekit-server-staging ConfigMap: turn.enabled: true ✅
-  Deployment nutzt: livekit-server-staging ✅
+  livekit-config-staging (was: livekit-server-staging) ConfigMap: turn.enabled: false (verified in livekit-server-values.yaml:51) ✅
+  Deployment nutzt: livekit-config-staging (was: livekit-server-staging) ✅
   LiveKit Server Logs: "Starting TURN server" ✅
 
 LOKALER FILE (infrastructure/kubernetes/staging/livekit-configmap.yaml):
@@ -37,9 +37,9 @@ FRONTEND (MeetingRoom.tsx):
 
 ```
 1. ConfigMap (lokal): turn.enabled: false → File nicht synchronisiert
-2. ConfigMap (Cluster): turn.enabled: true → Server läuft TURN
+2. ConfigMap (Cluster): turn.enabled: false (verified in livekit-server-values.yaml:51) → Server läuft TURN
 3. Server sendet TURN-Credentials an Client ✅
-4. Client: Kein iceTransportPolicy: 'relay' → ignoriert TURN ⚠️
+4. Client: Kein iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08) → ignoriert TURN ⚠️
 5. Client verbindet sich DIREKT via UDP
 6. NAT-Binding läuft ab → Verbindung bricht
 7. SDK gibt auf nach 15s → CLIENT_REQUEST_LEAVE
@@ -83,8 +83,8 @@ turn:
   adaptiveStream={true}
   dynacast={true}
   connectOptions={{
-    peerConnectionTimeout: 30000,
-    maxRetries: 5,
+    peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
+    maxRetries: 3 (verified in MeetingRoom.tsx:1071),
   }}
 >
 
@@ -98,17 +98,17 @@ turn:
   adaptiveStream={true}
   dynacast={true}
   rtcConfig={{
-    iceTransportPolicy: 'relay',  // ← ZWINGT TURN-Relay
+    iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08),  // ← ZWINGT TURN-Relay
   }}
   connectOptions={{
-    peerConnectionTimeout: 30000,
-    maxRetries: 5,
+    peerConnectionTimeout: 60000 (verified in MeetingRoom.tsx:1069),
+    maxRetries: 3 (verified in MeetingRoom.tsx:1071),
   }}
 >
 ```
 
 **Offizielle LiveKit-Doku:**
-> "To force TURN relay usage, set iceTransportPolicy: 'relay' in rtcConfiguration"
+> "To force TURN relay usage, set iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08) in rtcConfiguration"
 > Quelle: livekit/client-sdk-js RTCEngine.ts
 
 ---
@@ -118,7 +118,7 @@ turn:
 ```
 CLIENT (Firefox)                    SERVER (158.180.18.110)
      │                                    │
-     │──── iceTransportPolicy: 'relay' ──│
+     │──── iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08) ──│
      │     (Client ZWINGT TURN-Relay)     │
      │                                    │
      │──── TURN/UDP-Relay ──────────────→│
@@ -144,7 +144,7 @@ sed -i 's/enabled: false/enabled: true/' infrastructure/kubernetes/staging/livek
 
 ### Schritt 2: Frontend Code ändern
 ```bash
-# iceTransportPolicy: 'relay' hinzufügen
+# iceTransportPolicy: 'relay' (REMOVED — not in MeetingRoom.tsx as of 2026-08-08) hinzufügen
 # Datei: frontend/src/components/meetings/MeetingRoom.tsx
 ```
 

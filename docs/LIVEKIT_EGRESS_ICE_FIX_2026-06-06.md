@@ -59,7 +59,7 @@ The `[::]:37171` is the IPv6 wildcard bind. Docker's bridge network rejects IPv6
 
 A custom entrypoint script sets the `--node-ip` flag for `livekit-server` to its Docker bridge IP. This ensures the server's host candidates match the network the Egress is actually reachable on.
 
-**`livekit-entrypoint.sh`:**
+**`livekit-entrypoint.sh (REMOVED from repo)`:**
 ```bash
 #!/bin/sh
 # Detect container IP via hostname -i (works in Docker, K8s, Cloud)
@@ -93,7 +93,7 @@ livekit-server:
     - "7881-7890:7881-7890/udp"
   volumes:
     - ./livekit.yaml:/etc/livekit.yaml:ro
-    - ./livekit-entrypoint.sh:/opt/livekit/entrypoint.sh:ro
+    - ./livekit-entrypoint.sh (REMOVED from repo):/opt/livekit/entrypoint.sh:ro
 ```
 
 The script is mounted to `/opt/livekit/entrypoint.sh` (not `/etc/livekit/entrypoint.sh`) to avoid overwriting the image's original entrypoint.
@@ -157,12 +157,12 @@ The following failures in the E2E test suite are pre-existing and unrelated to t
 
 | File | Change |
 |------|--------|
-| `livekit-entrypoint.sh` | **New** — dynamic node IP detection script |
+| `livekit-entrypoint.sh (REMOVED from repo)` | **New** — dynamic node IP detection script |
 | `docker-compose.yml` | Added `entrypoint`, port range 7881-7890, volume mount for script |
 | `livekit.yaml` | `port_range_end: 7890`, `logging.level: info` |
 | `docker-compose.e2e.yml` | Added `livekit-server` and `livekit-egress` services with E2E-specific Redis/MinIO hosts |
-| `livekit-e2e.yaml` | **New** — E2E-specific LiveKit server config (`redis-test:6379`) |
-| `livekit-egress-e2e.yaml` | **New** — E2E-specific Egress config (`redis-test:6379`, `minio-test:9000`) |
+| `livekit-e2e.yaml (REMOVED from repo)` | **New** — E2E-specific LiveKit server config (`redis-test:6379`) |
+| `livekit-egress-e2e.yaml (REMOVED from repo)` | **New** — E2E-specific Egress config (`redis-test:6379`, `minio-test:9000`) |
 
 ---
 

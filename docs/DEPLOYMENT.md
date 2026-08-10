@@ -109,7 +109,7 @@ CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//" \
 SECRET_KEY="dev-secret-key-meeting-automation-2026" \
 ENCRYPTION_KEY="6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=" \
 TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=" \
-/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/ -v
+python3 (from virtualenv) -m pytest tests/ -v
 ```
 
 #### E2E Smoke Tests ausführen
@@ -123,7 +123,7 @@ CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//" \
 SECRET_KEY="dev-secret-key-meeting-automation-2026" \
 ENCRYPTION_KEY="6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=" \
 TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=" \
-/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/e2e/test_smoke.py -v
+python3 (from virtualenv) -m pytest tests/e2e/test_smoke.py -v
 ```
 
 #### Ergebnis (Stand 2026-06-04)

@@ -116,7 +116,7 @@ turn:
   loadBalancerAnnotations: {}
 ```
 
-**ConfigMap `livekit-server-staging`:**
+**ConfigMap `livekit-config-staging (was: livekit-server-staging)`:**
 
 ```yaml
 # VORHER:
@@ -211,7 +211,7 @@ turn:
 
 ### Schritt 7: LiveKit Server rollout restart
 ```bash
-kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-staging
+kubectl rollout restart deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging
 ```
 
 ### Schritt 8: User testet erneut
@@ -240,11 +240,11 @@ kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-
 ### Fallback B: Komplett-Rollback
 ```bash
 # 1. ConfigMap zurücksetzen
-kubectl patch configmap livekit-server-staging -n meeting-automation-staging \
+kubectl patch configmap livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging \
   --type merge -p '{"data":{"config.yaml":"...turn.enabled: false..."}}'
 
 # 2. Deployment zurücksetzen
-kubectl rollout undo deployment/livekit-server-staging -n meeting-automation-staging
+kubectl rollout undo deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging
 
 # 3. OCI Security List: Port 5349 wieder entfernen
 ```
@@ -268,7 +268,7 @@ kubectl rollout undo deployment/livekit-server-staging -n meeting-automation-sta
 |---|---|
 | **Ursache** | Kein TURN-Relay → ICE/DTLS schlägt fehl → CLIENT_REQUEST_LEAVE |
 | **Beweis** | Logs: `client doesn't support prflx over relay` + `turn.enabled: false` |
-| **Lösung** | `turn.enabled: true` + UDP-TURN (3478) aktiviert |
+| **Lösung** | `turn.enabled: false (verified in livekit-server-values.yaml:51)` + UDP-TURN (3478) aktiviert |
 | **TLS-Hinweis** | `tls_port` braucht Zertifikat → siehe `docs/LIVEKIT_TURN_TLS_CONFIGURATION_2026-08-07.md` |
 | **Offizielle Doku** | „TURN provides fallback for clients behind NAT" |
 | **Risiko** | Mittel — erfordert OCI-Security-List-Änderung |

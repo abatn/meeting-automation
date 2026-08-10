@@ -204,12 +204,12 @@ On page load: `GET /meetings/{id}/ai-insights` → restores real state if record
 
 ```bash
 # Full E2E suite
-cd backend && E2E_MODE=true python -m pytest tests/e2e/ -v
+cd backend && E2E_TEST=true python -m pytest tests/e2e/ -v
 
 # Specific pipeline tests
-E2E_MODE=true pytest tests/e2e/test_recording_transcription_pipeline.py -v
-E2E_MODE=true pytest tests/e2e/test_phase8_02_speaker_profile.py -v
-E2E_MODE=true pytest tests/e2e/test_phase8_04_cosine_matching.py -v
+E2E_TEST=true pytest tests/e2e/test_recording_transcription_pipeline.py -v
+E2E_TEST=true pytest tests/e2e/test_phase8_02_speaker_profile.py -v
+E2E_TEST=true pytest tests/e2e/test_phase8_04_cosine_matching.py -v
 
 # Production smoke test
 curl -X POST http://localhost:8000/api/v1/auth/login \
@@ -267,14 +267,14 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: livekit-server-staging
+            name: livekit-config-staging (was: livekit-server-staging)
             port:
               number: 7880
       - path: /twirp
         pathType: Prefix
         backend:
           service:
-            name: livekit-server-staging
+            name: livekit-config-staging (was: livekit-server-staging)
             port:
               number: 7880
       - path: /api

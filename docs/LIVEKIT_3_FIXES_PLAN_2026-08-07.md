@@ -5,7 +5,7 @@
 - **Umgesetzt**: 2026-08-07
 - **Beweis**: 100% verifiziert basierend auf offizieller LiveKit-Dokumentation
 - **Ziel**: EGRESS_ABORTED beheben (Chrome abortet nach 7s wegen "start signal not received")
-- **ConfigMap**: livekit-server-staging (NICHT livekit-config-staging!)
+- **ConfigMap**: livekit-config-staging (was: livekit-server-staging) (NICHT livekit-config-staging!)
 
 ---
 
@@ -14,7 +14,7 @@
 | Nr | Datei | Änderung | Priorität |
 |----|-------|----------|-----------|
 | 1 | `infrastructure/kubernetes/staging/livekit-configmap.yaml` | `turn.enabled: false` | P0 |
-| 2 | `backend/app/services/livekit_service.py` | `req.layout = "speaker"` | P0 |
+| 2 | `backend/app/services/livekit_service.py` | `req.layout = "speaker" (REMOVED — layout unset per official docs)` | P0 |
 | 3 | `frontend/src/components/meetings/MeetingRoom.tsx` | Reconnect-Guard | P1 |
 
 ---
@@ -22,7 +22,7 @@
 ## FIX 1: ConfigMap — `turn.enabled: false` (P0)
 
 ### WICHTIG: Richtige ConfigMap
-Der LiveKit Server Deployment verwendet `livekit-server-staging` (NICHT `livekit-config-staging`)!
+Der LiveKit Server Deployment verwendet `livekit-config-staging (was: livekit-server-staging)` (NICHT `livekit-config-staging`)!
 
 ```yaml
 # Deployment-Referenz:
@@ -31,7 +31,7 @@ env:
   valueFrom:
     configMapKeyRef:
       key: config.yaml
-      name: livekit-server-staging  ← Das ist die korrekte ConfigMap!
+      name: livekit-config-staging (was: livekit-server-staging)  ← Das ist die korrekte ConfigMap!
 ```
 
 ### Problem
@@ -64,9 +64,9 @@ turn:
 ### Umsetzung
 ```bash
 # ConfigMap aktualisieren
-kubectl get configmap livekit-server-staging -n meeting-automation-staging -o json | python3 -c '...'
+kubectl get configmap livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging -o json | python3 -c '...'
 # Server neu starten
-kubectl rollout restart deployment/livekit-server-staging -n meeting-automation-staging
+kubectl rollout restart deployment/livekit-config-staging (was: livekit-server-staging) -n meeting-automation-staging
 ```
 
 ### Status
@@ -77,7 +77,7 @@ Niedrig — ConfigMap-Änderung, kein Code-Deploy nötig.
 
 ---
 
-## FIX 2: Backend — `req.layout = "speaker"` (P0)
+## FIX 2: Backend — `req.layout = "speaker" (REMOVED — layout unset per official docs)` (P0)
 
 ### Problem
 `RoomCompositeEgressRequest()` erzeugt `layout=""` (Protobuf default). Die offizielle Doku sagt:
@@ -103,7 +103,7 @@ req.file.CopyFrom(file_output)
 ```python
 req = RoomCompositeEgressRequest()
 req.room_name = meeting_id
-req.layout = "speaker"  # Explizit setzen (dokumentiertes Default-Layout)
+req.layout = "speaker" (REMOVED — layout unset per official docs)  # Explizit setzen (dokumentiertes Default-Layout)
 req.audio_only = True
 req.file.CopyFrom(file_output)
 ```
@@ -124,7 +124,7 @@ LiveKit Server Source Code (github.com/livekit/livekit):
 
 ### Ist-Zustand (FALSCH)
 ```tsx
-onReconnecting={() => {
+onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)={() => {
   console.warn("[LiveKit] Reconnecting...");
   setIsReconnecting(true);
   setRoomConnectionReady(false);  // ← Button wird disabled → aber Recording läuft weiter
@@ -133,7 +133,7 @@ onReconnecting={() => {
 
 ### Soll-Zustand (KORREKT)
 ```tsx
-onReconnecting={() => {
+onReconnecting (REMOVED — not wired in @livekit/components-react@2.9.21)={() => {
   console.warn("[LiveKit] Reconnecting...");
   setIsReconnecting(true);
   // NICHT: setRoomConnectionReady(false) wenn Recording aktiv
@@ -152,7 +152,7 @@ Mittel — UI-Logik, aber keine Änderung an der Recording-Logik.
 | Schritt | Erwartung |
 |---------|-----------|
 | 1. ConfigMap ändern | LiveKit-Pod neu starten |
-| 2. Backend deployen | `req.layout = "speaker"` aktiv |
+| 2. Backend deployen | `req.layout = "speaker" (REMOVED — layout unset per official docs)` aktiv |
 | 3. Frontend deployen | Reconnect-Guard aktiv |
 | 4. Recording-Test | Egress-Log zeigt `layout=speaker` (nicht `layout=`) |
 | 5. Recording-Dauer | > 10s (nicht 7s) |
