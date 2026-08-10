@@ -10,9 +10,9 @@
 * git ist verboten
 ---
 
-## Fix 1: Container-Name in `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`)
+## Fix 1: Container-Name in `e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — replaced by `ci.yml`)
 
-**Datei:** `.github/workflows/e2e-tests.yml` (Zeilen 382-387)
+**Datei:** `.github/workflows/e2e-tests.yml (DEPRECATED)` (Zeilen 382-387)
 
 **Problem:**
 `kubectl set image` nutzt Container-Name `celery=` — aber der tatsächliche Container-Name in beiden Deployments ist `celery-worker`.
@@ -88,8 +88,8 @@ Ohne diesen Fix matcht der Vergleich NIE → alle PRO/ENTREPRISE-Recordings land
 
 | # | Datei | Zeile | Alt | Neu | Priorität |
 |---|-------|-------|-----|-----|-----------|
-| 1 | `.github/workflows/e2e-tests.yml` | 383 | `celery=` | `celery-worker=` | Hoch (Deploy blockiert) |
-| 2 | `.github/workflows/e2e-tests.yml` | 386 | `celery=` | `celery-worker=` | Hoch (Deploy blockiert) |
+| 1 | `.github/workflows/e2e-tests.yml (DEPRECATED)` | 383 | `celery=` | `celery-worker=` | Hoch (Deploy blockiert) |
+| 2 | `.github/workflows/e2e-tests.yml (DEPRECATED)` | 386 | `celery=` | `celery-worker=` | Hoch (Deploy blockiert) |
 | 3 | `backend/app/tasks/celery_app.py` | 78 | `("pro", "entrepise")` | `("PRO", "ENTREPRISE")` | Hoch (Sentinel blockiert) |
 | 4 | `backend/app/tasks/celery_app.py` | 96 | `("pro", "entrepise")` | `("PRO", "ENTREPRISE")` | Hoch (Sentinel blockiert) |
 
@@ -138,7 +138,7 @@ Ohne diesen Fix matcht der Vergleich NIE → alle PRO/ENTREPRISE-Recordings land
 
 ### Was NICHT ging
 
-- **git push** für Commit `97e98eae` (celery_app.py Fix + e2e-tests.yml Container-Name) — verboten per Regel
+- **git push** für Commit `97e98eae` (celery_app.py Fix + e2e-tests.yml (DEPRECATED) Container-Name) — verboten per Regel
 - **`k3s ctr images import` ohne `sudo`** — Permission Denied auf `/run/k3s/containerd/containerd.sock`
 - **MinIO `mc ls` ohne Auth** — Access Denied
 
@@ -146,7 +146,7 @@ Ohne diesen Fix matcht der Vergleich NIE → alle PRO/ENTREPRISE-Recordings land
 
 | Commit | Inhalt | pushed? |
 |--------|--------|---------|
-| `97e98eae` | celery_app.py `("PRO", "ENTREPRISE")` + e2e-tests.yml `celery-worker=` | NEIN (git verboten) |
+| `97e98eae` | celery_app.py `("PRO", "ENTREPRISE")` + e2e-tests.yml (DEPRECATED) `celery-worker=` | NEIN (git verboten) |
 | `657fdbef` | E2E Login Fix (`E2E_TEST_USER_EMAIL`) | JA |
 | `192cfb0f` | Phase79 Timing Fix (`timedelta(hours=1)`) | JA |
 | `414fd0c2` | Docs Update (Recovery Plan + Production Deployment Plan) | JA |
@@ -781,7 +781,7 @@ kubectl rollout restart deployment/backend ...
 | 2 | `infrastructure/kubernetes/staging/onlyoffice-custom-config.yaml` | Export aus Cluster |
 | 3 | `infrastructure/kubernetes/staging/sentinel-models-claim.yaml` | Export aus Cluster |
 
-#### 2. Pipeline `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) fixen
+#### 2. Pipeline `e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — replaced by `ci.yml`) fixen
 
 | # | Fix | Datei | Beschreibung |
 |---|-----|-------|-------------|
@@ -824,7 +824,7 @@ the namespace "meeting-automation-staging". You must pass '--namespace=kube-syst
 | # | Fakt | Beweis |
 |---|------|--------|
 | 1 | CronJob-Dateien haben `namespace: kube-system` hardcoded | `ephemeral-storage-cleanup-cronjob.yaml` Z.5,30,36 + `pod-garbage-collector-cronjob.yaml` Z.5,30,36 |
-| 2 | `kubectl apply -f .../staging/ -n meeting-automation-staging` wendet ALLE Dateien an | `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) Z.175 |
+| 2 | `kubectl apply -f .../staging/ -n meeting-automation-staging` wendet ALLE Dateien an | `e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — replaced by `ci.yml`) Z.175 |
 | 3 | CronJobs wurden in Commit `b3dfad55` IN `staging/` verschoben | `git log --follow` |
 | 4 | `kubectl apply` Step wurde in Commit `ff410384` zur CI/CD hinzugefügt | `git log -S` |
 
@@ -835,7 +835,7 @@ the namespace "meeting-automation-staging". You must pass '--namespace=kube-syst
    - `pod-garbage-collector-cronjob.yaml` → `infrastructure/kubernetes/system/` (namespace: kube-system)
    - `longhorn-cleanup-cronjob.yaml` → `infrastructure/kubernetes/system/` (namespace: longhorn-system)
 
-2. **Separater Step** in `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) nach "Deploy All Staging Resources":
+2. **Separater Step** in `e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — replaced by `ci.yml`) nach "Deploy All Staging Resources":
 
 ```yaml
 - name: Deploy System CronJobs (kube-system + longhorn-system)

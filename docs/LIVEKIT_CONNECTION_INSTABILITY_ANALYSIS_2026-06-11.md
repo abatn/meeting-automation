@@ -320,7 +320,7 @@ turn:
 LIVEKIT_PUBLIC_URL=ws://localhost:7880  # statt ngrok
 
 # Browser
-http://localhost:3000/meetings/{id}
+http://localhost:3001/meetings/{id}
 ```
 
 **Erwartung:** Keine `DUPLICATE_IDENTITY` oder `participant_connection_aborted` mehr.

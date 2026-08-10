@@ -179,7 +179,7 @@ Neue Schritte nach dem Deploy (vor "Rollout restart"):
     KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 ```
 
-### 2.2 e2e-tests.yml (Staging)
+### 2.2 e2e-tests.yml (DEPRECATED) (Staging)
 
 Gleicher Ansatz für Staging — nach "Deploy Celery Workers to Staging":
 
@@ -317,7 +317,7 @@ curl -s -X POST "https://meeting-automation.com/n8n/rest/login" \
 | Schritt | Datei | Aufwand |
 |---|---|---|
 | 1. GitHub Secrets | GitHub UI | 5 Min |
-| 2. CI/CD Pipeline | deploy-production.yml + e2e-tests.yml | 30 Min |
+| 2. CI/CD Pipeline | deploy-production.yml + e2e-tests.yml (DEPRECATED) | 30 Min |
 | 3. n8n Owner Setup | CI/CD oder Setup-Script | 15 Min |
 | 4. Credential-ID Update | CI/CD Script | 15 Min |
 | 5. Verifikation | Script | 10 Min |

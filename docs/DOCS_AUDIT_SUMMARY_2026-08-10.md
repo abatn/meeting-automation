@@ -19,7 +19,7 @@ Am 10.08.2026 wurde ein umfassendes Audit aller Dokumentationsdateien durchgefue
 ### 1. AGENTS.md (26 Aenderungen)
 
 **CI/CD Pipeline Section (Zeilen 255-273):**
-- Alt: Referenzierte `backend-ci.yml`, `frontend-ci.yml`, `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) (alle deaktiviert)
+- Alt: Referenzierte `backend-ci.yml`, `frontend-ci.yml`, `e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — replaced by `ci.yml`) (alle deaktiviert)
 - Neu: Beschreibt `ci.yml` (einheitliche Pipeline), `deploy-staging.yml`, `deploy-production.yml`
 - Erklaert dass alte Workflows mit `.disabled` Suffix fuer Rollback existieren
 

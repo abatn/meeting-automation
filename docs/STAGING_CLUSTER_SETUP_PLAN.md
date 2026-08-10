@@ -250,7 +250,7 @@ cat kubeconfig-staging
 
 ### 2.4 Staging Secrets setzen
 
-Die CI-Pipeline erstellt Secrets automatisch aus GitHub Secrets (siehe `.github/workflows/e2e-tests.yml`, Step "Create/Update Staging Secrets from GitHub Secrets").
+Die CI-Pipeline erstellt Secrets automatisch aus GitHub Secrets (siehe `.github/workflows/e2e-tests.yml (DEPRECATED)`, Step "Create/Update Staging Secrets from GitHub Secrets").
 
 Stelle sicher, dass folgende Secrets in GitHub existieren:
 
@@ -384,7 +384,7 @@ asyncio.run(check())
 ### Pass-Gate anpassen:
 
 ```bash
-# In .github/workflows/e2e-tests.yml, Zeile 263:
+# In .github/workflows/e2e-tests.yml (DEPRECATED), Zeile 263:
 if [ $PASS_RATE -lt 85 ]; then   # temporary threshold
 #                                 ^^^ anpassen zu 95 nach Stabilisierung
 ```

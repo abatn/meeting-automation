@@ -463,9 +463,9 @@ the namespace "meeting-automation-staging"
 
 **Root Cause:** CronJob-Dateien (`ephemeral-storage-cleanup`, `pod-garbage-collector`, `longhorn-cleanup`) mit hardcoded `namespace: kube-system` lagen in `infrastructure/kubernetes/staging/`. CI/CD `kubectl apply -f .../staging/ -n meeting-automation-staging` wandte ALLE Dateien mit `-n meeting-automation-staging` an → Namespace-Konflikt.
 
-**Fix:** CronJob-Dateien nach `infrastructure/kubernetes/system/` verschoben + separater CI/CD-Step in `e2e-tests.yml` (DEPRECATED — renamed to `e2e-tests.yml.disabled`, replaced by `ci.yml`).
+**Fix:** CronJob-Dateien nach `infrastructure/kubernetes/system/` verschoben + separater CI/CD-Step in `e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — renamed to `e2e-tests.yml.disabled`, replaced by `ci.yml`).
 
-**Änderung:** `.github/workflows/e2e-tests.yml` (neuer Step "Deploy System CronJobs")
+**Änderung:** `.github/workflows/e2e-tests.yml (DEPRECATED)` (neuer Step "Deploy System CronJobs")
 
 ---
 
@@ -524,7 +524,7 @@ the namespace "meeting-automation-staging"
 **Commits:**
 | Hash | Beschreibung |
 |------|-------------|
-| `8587c7f1` | fix(ci): CronJob Namespace-Mismatch in e2e-tests.yml |
+| `8587c7f1` | fix(ci): CronJob Namespace-Mismatch in e2e-tests.yml (DEPRECATED) |
 | `380c9644` | docs: add Phase 188 — Longhorn repair on OCI Staging |
 | `38607fa2` | docs: add Phase 189 — metrics-server repair |
 | `e5a4c23f` | fix(k8s): add metrics-server-patch.yaml |

@@ -117,7 +117,7 @@ curl -s http://10.0.0.191:9090/api/v1/targets | python3 -c "import sys,json; d=j
 ### Schritt 5 — CI/CD Pipeline anpassen (MS5 Lessons)
 Helm Upgrade in Pipeline aufnehmen für zukünftige Deployments:
 ```yaml
-# In .github/workflows/e2e-tests.yml, nach Longhorn-Install:
+# In .github/workflows/e2e-tests.yml (DEPRECATED), nach Longhorn-Install:
 - name: Ensure kube-prometheus-stack hostNetwork
   run: |
     export KUBECONFIG=$(pwd)/kubeconfig-staging
@@ -132,7 +132,7 @@ Helm Upgrade in Pipeline aufnehmen für zukünftige Deployments:
 ### Schritt 6 — Git-commit
 Änderungen in Git dokumentieren:
 - `docs/MONITORING_FIX_PROMETHEUS_HOSTNETWORK_2026-08-05.md` (diese Datei)
-- `.github/workflows/e2e-tests.yml` (Pipeline-Integration)
+- `.github/workflows/e2e-tests.yml (DEPRECATED)` (Pipeline-Integration)
 
 ## Rollback
 ```bash
@@ -215,7 +215,7 @@ Beide Environments sollen identische Monitoring-Stacks haben:
 - Gleiche Domains: `monitoring.meeting-automation.com`, `grafana.meeting-automation.com`, `alertmanager.meeting-automation.com`
 
 #### Schritt 2: Production-Job in CI/CD erweitern
-**Datei:** `.github/workflows/e2e-tests.yml`
+**Datei:** `.github/workflows/e2e-tests.yml (DEPRECATED)`
 Neue Steps nach "Deploy System CronJobs to Production":
 
 ```yaml
@@ -261,7 +261,7 @@ Neue Steps nach "Deploy System CronJobs to Production":
 ```
 
 #### Schritt 3: Staging-Job anpassen (idempotent)
-**Datei:** `.github/workflows/e2e-tests.yml`
+**Datei:** `.github/workflows/e2e-tests.yml (DEPRECATED)`
 Staging-Job bereits angepasst (Phase 190). Keine Änderung nötig.
 
 ### Konsistenz-Checkliste
@@ -303,7 +303,7 @@ kubectl delete namespace monitoring
 # CI/CD Fehleranalyse — 100% fehlerfreie Lösung
 
 **Date:** 2026-08-06
-**Betrifft:** `.github/workflows/e2e-tests.yml` — Staging + Production Jobs
+**Betrifft:** `.github/workflows/e2e-tests.yml (DEPRECATED)` — Staging + Production Jobs
 
 ## Gefundene Probleme
 
@@ -481,5 +481,5 @@ Staging:                                          Production:
 
 | Datei | Änderung |
 |-------|----------|
-| `.github/workflows/e2e-tests.yml` | Staging + Production Job korrigieren |
+| `.github/workflows/e2e-tests.yml (DEPRECATED)` | Staging + Production Job korrigieren |
 | `docs/MONITORING_FIX_PROMETHEUS_HOSTNETWORK_2026-08-05.md` | Diese Analyse
