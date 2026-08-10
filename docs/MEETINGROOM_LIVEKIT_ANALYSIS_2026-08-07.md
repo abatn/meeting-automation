@@ -21,8 +21,8 @@
   adaptiveStream={true}                   // ✅ OFFIZIELLE EMPFEHLUNG
   dynacast={true}                         // ✅ OFFIZIELLE EMPFEHLUNG
   connectOptions={{
-    peerConnectionTimeout: 30000,         // ✅ 30s Timeout
-    maxRetries: 5,                        // ✅ 5 Reconnect-Versuche
+    peerConnectionTimeout: 60000,         // ✅ 30s Timeout
+    maxRetries: 3,                        // ✅ 5 Reconnect-Versuche
   }}
   onConnected={() => {                    // ✅ Callback
     setRoomConnectionReady(true);
@@ -52,7 +52,7 @@
 | `video` | boolean | `false` | `false` | ✅ |
 | `adaptiveStream` | boolean | — | `true` | ✅ |
 | `dynacast` | boolean | — | `true` | ✅ |
-| `connectOptions` | object | — | `{peerConnectionTimeout: 30000, maxRetries: 5}` | ✅ |
+| `connectOptions` | object | — | `{peerConnectionTimeout: 60000, maxRetries: 3}` | ✅ |
 | `onConnected` | function | — | `setRoomConnectionReady(true)` | ✅ |
 | `onDisconnected` | function | — | `setRoomConnectionReady(false)` | ✅ |
 | `onError` | function | — | `console.error(...)` | ✅ |
@@ -201,8 +201,8 @@ Das bedeutet: Die Ursache liegt **im LiveKit JS SDK v2.19.1** oder im **Netzwerk
 |---|---|---|
 | `adaptiveStream: true` | ✅ Implementiert | docs.livekit.io |
 | `dynacast: true` | ✅ Implementiert | docs.livekit.io |
-| `maxRetries: 5` | ✅ Implementiert | docs.livekit.io |
-| `peerConnectionTimeout: 30000` | ✅ Implementiert | docs.livekit.io |
+| `maxRetries: 3` | ✅ Implementiert | docs.livekit.io |
+| `peerConnectionTimeout: 60000` | ✅ Implementiert | docs.livekit.io |
 | Audio-Track guard | ✅ Implementiert | docs.livekit.io |
 | `onReconnecting` | ❌ NICHT implementiert | docs.livekit.io |
 | `onReconnected` | ❌ NICHT implementiert | docs.livekit.io |

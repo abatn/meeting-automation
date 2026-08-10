@@ -16,7 +16,7 @@ LiveKit Recording funktionierte nicht — Browser zeigte "pc connection" Error, 
 ### Lösung
 28.06 Config wiederhergestellt + 2-Node Struktur beibehalten:
 - **LiveKit**: `hostNetwork: true` + `hostPort 7880/50000/60000` + `port_range 50000-60000` + `force_tcp: false`
-- **Egress**: `hostNetwork: true` + DNS (`ws://livekit-server-staging:7880`) + `nodeSelector` Node 2
+- **Egress**: `hostNetwork: true` + DNS (`ws://livekit-config-staging:7880`) + `nodeSelector` Node 2
 - **Secrets**: Alle 4 Komponenten aligniert auf `meeting-api-secret-2026-minimum-32-chars!`
 
 ### Dateien
@@ -36,7 +36,7 @@ LiveKit Recording funktionierte nicht — Browser zeigte "pc connection" Error, 
 
 ### Erkenntnisse
 - **hostNetwork ist PFLICHT für WebRTC**: LiveKit Docs: "LiveKit does not support deployment to private clusters."
-- **DNS-Ansatz (`ws://livekit-server-staging:7880`) funktioniert**: Muss NICHT auf `localhost` zurückgesetzt werden
+- **DNS-Ansatz (`ws://livekit-config-staging:7880`) funktioniert**: Muss NICHT auf `localhost` zurückgesetzt werden
 - **Git-History PRÜFEN vor Debugging**: Die funktionierende Config war im Commit `9d0b24ba` (28.06)
 
 ---

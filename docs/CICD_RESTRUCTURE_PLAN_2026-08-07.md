@@ -16,7 +16,7 @@
 |----------|-------|---------|---------|
 | **Backend CI** | `backend-ci.yml` | `push` auf `main`/`develop` | Tests + Build (kein Deploy) |
 | **Frontend CI** | `frontend-ci.yml` | `push` auf `main`/`develop` | Lint + TypeCheck + Build (kein Deploy) |
-| **E2E Tests + Deploy** | `e2e-tests.yml` | `push` auf `main` | **ALLES**: Tests → Build → Push Images → Deploy Staging → E2E Tests → Deploy Production |
+| **E2E Tests + Deploy** | `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) | `push` auf `main` | **ALLES**: Tests → Build → Push Images → Deploy Staging → E2E Tests → Deploy Production |
 | **Deploy Production** | `deploy-production.yml` | `workflow_run` (nach Docker Build) | Deploy Production via SCP + SSH |
 
 ### 1.2 Kernproblem
@@ -534,7 +534,7 @@ jobs:
 - **Trigger 2**: Manuell (`workflow_dispatch`) mit Image-Tag Input
 - 3 Jobs: `pre-flight` → `deploy-staging` → `e2e-test-staging`
 - Environment `staging` (kein Approval)
-- Alle Steps aus aktuellem `e2e-tests.yml` (Build-Step entfernt)
+- Alle Steps aus aktuellem `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) (Build-Step entfernt)
 
 ---
 
@@ -705,11 +705,11 @@ jobs:
 
 | # | Schritt | Datei | Risiko |
 |---|---------|-------|--------|
-| 1 | `ci.yml` erstellen (aus `e2e-tests.yml` Build-Steps extrahieren) | `.github/workflows/ci.yml` | Niedrig |
-| 2 | `deploy-staging.yml` erstellen (aus `e2e-tests.yml` Deploy-Steps extrahieren) | `.github/workflows/deploy-staging.yml` | Niedrig |
+| 1 | `ci.yml` erstellen (aus `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) Build-Steps extrahieren) | `.github/workflows/ci.yml` | Niedrig |
+| 2 | `deploy-staging.yml` erstellen (aus `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) Deploy-Steps extrahieren) | `.github/workflows/deploy-staging.yml` | Niedrig |
 | 3 | `deploy-production.yml` umbenennen → manueller Trigger + Approval | `.github/workflows/deploy-production.yml` | Mittel |
 | 4 | GitHub Environments einrichten (staging + production) | GitHub UI | Niedrig |
-| 5 | `e2e-tests.yml` deaktivieren (nicht löschen!) | `.github/workflows/e2e-tests.yml` | Niedrig |
+| 5 | `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) deaktivieren (nicht löschen!) | `.github/workflows/e2e-tests.yml` | Niedrig |
 | 6 | Testen: Push auf main → CI → auto-deploy Staging | Git push | Mittel |
 | 7 | Testen: Manual deploy Production → Approval | GitHub UI | Mittel |
 
@@ -725,7 +725,7 @@ Wenn die neue Pipeline Fehler hat:
 
 ### 5.3 CI/CD Änderungen im Detail
 
-#### Was aus `e2e-tests.yml` wandert
+#### Was aus `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) wandert
 
 | aktueller Step | neuer Workflow |
 |----------------|----------------|
@@ -804,7 +804,7 @@ Die n8n-Steps aus dem CI/CD-Plan werden in `deploy-staging.yml` und `deploy-prod
 
 | # | Frage | Empfehlung |
 |---|-------|------------|
-| 1 | Soll `e2e-tests.yml` gelöscht oder deaktiviert werden? | Deaktivieren (rename) — für Rollback |
+| 1 | Soll `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) gelöscht oder deaktiviert werden? | Deaktivieren (rename) — für Rollback |
 | 2 | Soll Production auch Auto-Deploy nach Staging-Erfolg unterstützen? | Optional: `repository_dispatch` Trigger |
 | 3 | Sollen die 3 Fixes (TURN, layout, Reconnect) vor oder nach CI/CD-Umstrukturierung deployed werden? | **VORHER** — CI/CD-Änderung ist unabhängig vom LiveKit-Fix |
 | 4 | Soll `deploy-staging.yml` auch `repository_dispatch` unterstützen? | Ja — für externe Trigger (z.B. n8n) |

@@ -340,7 +340,7 @@ Umgebung: E2E_TEST=true (echte PostgreSQL/Redis)
 - ✅ Frontend: Team-View Auto-Refresh + Manual Refresh
 - ✅ E2E-Tests: 5/5 PASSED gegen echte Docker-Infrastruktur
 - ✅ Security: Alle Sicherheits-Szenarien verifiziert
-- ✅ Database: Migration `add_token_hash_activation` angewendet
+- ✅ Database: Migration `add_token_hash (PLANNED — not in actual model)_activation` angewendet
 - ✅ User-Flow: Professionelle End-to-End Aktivierung funktioniert
 
 ---

@@ -100,7 +100,7 @@ Prometheus kann `/metrics` nicht erreichen weil der Endpoint `get_current_user` 
 
 ### Grafana nicht erreichbar
 `kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring`
-Dann: `http://localhost:3000` → Login admin/prom-operator
+Dann: `http://localhost:3001` → Login admin/prom-operator
 
 ### Alerts nicht sichtbar
 Prometheus → Status → Rules prüfen ob Rules geladen sind.

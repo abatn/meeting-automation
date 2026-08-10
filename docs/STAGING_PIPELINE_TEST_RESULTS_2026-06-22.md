@@ -34,7 +34,7 @@
 ### LiveKit Configuration (k3s)
 - LiveKit running in cluster with `hostNetwork: true`
 - Browser connects to: `ws://158.180.18.110:7880` (hostNetwork)
-- Backend connects to: `ws://livekit-server-staging:7880` (internal K8s DNS)
+- Backend connects to: `ws://livekit-config-staging:7880` (internal K8s DNS)
 - Egress connects to: `minio-staging:9000` (internal K8s DNS)
 
 ### No hostAliases needed

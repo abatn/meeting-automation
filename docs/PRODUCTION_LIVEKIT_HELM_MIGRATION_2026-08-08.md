@@ -46,8 +46,8 @@ Weil Production **nie den Helm-Umstieg gemacht hat**: Pods, Service-Selector UND
 | Feld | Staging (funktionierend) | Production (Repo, fehlerhaft) | Ähnlich? | Fix |
 |---|---|---|---|---|
 | Top-Level-Schema | `livekit:` | ❌ `config:` | **NEIN** | `config:` → `livekit:` |
-| `nameOverride` | `livekit-server-staging` | `livekit-server` | ✅ (Namensunterschied ok) | — |
-| `fullnameOverride` | `livekit-server-staging` | `livekit-server` | ✅ (Namensunterschied ok) | — |
+| `nameOverride` | `livekit-config-staging` | `livekit-server` | ✅ (Namensunterschied ok) | — |
+| `fullnameOverride` | `livekit-config-staging` | `livekit-server` | ✅ (Namensunterschied ok) | — |
 | `livekit.port` | `7880` | (unter config) | — | übernehmen |
 | `livekit.rtc.tcp_port` | `7881` | (unter config) | — | übernehmen |
 | `livekit.rtc.port_range_start/end` | `50000/60000` | (unter config) | — | übernehmen |
@@ -66,7 +66,7 @@ Weil Production **nie den Helm-Umstieg gemacht hat**: Pods, Service-Selector UND
 | `dnsPolicy` | **NICHT als Value** (Chart setzt selbst) | ❌ `ClusterFirstWithHostNet` als Value | **NEIN** | **entfernen** |
 | `deploymentStrategy.type` | `Recreate` | `Recreate` | ✅ | — |
 | `nodeSelector` | `kubernetes.io/hostname: instance-20260329-0846` (Staging-Node) | ❌ fehlt | **NEIN** (Production braucht Prod-Node-Name) | ergänzen |
-| `resources.limits.cpu` | `1000m` | ❌ `2000m` | **NEIN** | `1000m` |
+| `resources.limits.cpu` | `1000m` | ❌ `1000m` | **NEIN** | `1000m` |
 | `resources.limits.memory` | `1024Mi` | `1024Mi` | ✅ | — |
 | `resources.requests` | `500m/512Mi` | `500m/512Mi` | ✅ | — |
 | `autoscaling` | `enabled: false` | ❌ fehlt | **NEIN** | ergänzen |
@@ -80,7 +80,7 @@ Weil Production **nie den Helm-Umstieg gemacht hat**: Pods, Service-Selector UND
 | Feld | Staging | Production | Ähnlich? | Fix |
 |---|---|---|---|---|
 | Schema `egress:` | ✅ | ✅ | **JA** | — |
-| `ws_url` | `ws://livekit-server-staging:7880` | `ws://livekit-server:7880` | ✅ (Env) | — |
+| `ws_url` | `ws://livekit-config-staging:7880` | `ws://livekit-server:7880` | ✅ (Env) | — |
 | `api_key` / `api_secret` | `meeting-api-key` | `prod-...` | ✅ (Env) | — |
 | `redis` | staging | prod | ✅ (Env) | — |
 | `s3` | staging (minio-staging) | prod (minio) | ✅ (Env) | — |
@@ -93,7 +93,7 @@ Weil Production **nie den Helm-Umstieg gemacht hat**: Pods, Service-Selector UND
 
 | Policy | Staging (funktionierend) | Production (Repo) | Ähnlich? | Fix |
 |---|---|---|---|---|
-| `livekit-policy` podSelector | `app.kubernetes.io/name: livekit-server-staging` | ❌ `app.kubernetes.io/name: livekit-server` (nur Helm-Label) | ⚠️ | **Transition:** OLD-Policy `app: livekit-server` BEHALTEN + NEUE `livekit-policy-helm` HINZUFÜGEN (podSelector kann kein OR) |
+| `livekit-policy` podSelector | `app.kubernetes.io/name: livekit-config-staging` | ❌ `app.kubernetes.io/name: livekit-server` (nur Helm-Label) | ⚠️ | **Transition:** OLD-Policy `app: livekit-server` BEHALTEN + NEUE `livekit-policy-helm` HINZUFÜGEN (podSelector kann kein OR) |
 | `livekit-egress-policy` podSelector | `app.kubernetes.io/name: egress` | ❌ `app.kubernetes.io/name: egress` (nur Helm-Label) | ⚠️ | gleiche Transition wie oben |
 | `minio-policy` (Egress → MinIO) | ✅ Egress-Pod in from-Liste | ❌ **Egress fehlt** in `from` | **NEIN** | `app.kubernetes.io/name: egress` ergänzen |
 | `redis-policy` | ✅ Egress enthalten | ✅ `app: livekit-egress` + `app: livekit-server` | ⚠️ | Helm-Label zusätzlich ergänzen |
@@ -111,7 +111,7 @@ Programmatischer Key-Strukturvergleich beider Values-Dateien (YAML-Parsing, alle
 
 **Livekit-Server — die 44 Production-only-Keys (Auszug):** `config.*` (kompletter Block statt `livekit:`), `dnsPolicy`, `livenessProbe.*`, `readinessProbe.*`, `service.*`
 
-**Wert-Abweichung bei gemeinsamen Keys:** `resources.limits.cpu` = staging `1000m` vs. prod `2000m` ❌
+**Wert-Abweichung bei gemeinsamen Keys:** `resources.limits.cpu` = staging `1000m` vs. prod `1000m` ❌
 
 **Fazit:** `livekit-server-values.yaml` ist **nicht chart-konform** und muss vollständig auf das Staging-Schema umgebaut werden (Phase 0.1). `egress-values.yaml` ist bereits 100% konform.
 
@@ -131,7 +131,7 @@ Programmatischer Key-Strukturvergleich beider Values-Dateien (YAML-Parsing, alle
 
 1. **`livekit-server-values.yaml` falsches Schema** (`config:` statt `livekit:`) → Server startet mit Default-Config (keine Keys, kein Redis, kein Webhook) → **kompletter Ausfall**
 2. **Nicht unterstützte Chart-Keys** (`service:`, `livenessProbe:`, `readinessProbe:`, `dnsPolicy:`, `force_tcp`, `ping_interval`) → werden ignoriert oder brechen das Rendering
-3. **`turn.enabled: true` ohne TLS** → bekannter `403 CreatePermission` (Staging-Lesson #5)
+3. **`turn.enabled: false` ohne TLS** → bekannter `403 CreatePermission` (Staging-Lesson #5)
 4. **NetworkPolicies podSelectors nur Helm-Label** → matchen OLD-Pods nicht → `default-deny-all` schneidet LiveKit ab
 5. **`minio-policy` fehlt Egress** → Egress kann Recordings nicht hochladen
 6. **Deployment-Selektoren immutable** → OLD-Deployments müssen vor Helm-Install gelöscht werden (Wartungsfenster)

@@ -10,7 +10,7 @@
 * git ist verboten
 ---
 
-## Fix 1: Container-Name in `e2e-tests.yml`
+## Fix 1: Container-Name in `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`)
 
 **Datei:** `.github/workflows/e2e-tests.yml` (Zeilen 382-387)
 
@@ -473,7 +473,7 @@ Grund: Vorherige Änderungen (postStart-Hook, EXTERNAL_HOST_URL, Lessons O14-O17
 | redis-staging | ✅ Running | 0 |
 | minio-staging | ✅ Running | 0 |
 | onlyoffice-staging | ✅ Running | 0 |
-| livekit-server-staging | ✅ Running | 2 |
+| livekit-config-staging | ✅ Running | 2 |
 | livekit-egress-staging | ✅ Running | 0 |
 | n8n-staging | ✅ Running | 1 |
 
@@ -610,7 +610,7 @@ Baseline-Match mit Phase 185. Keine Regression durch Queue-Fix + OnlyOffice Rest
 | redis-staging | ✅ Running |
 | minio-staging-0 | ✅ Running |
 | onlyoffice-staging | ✅ Running |
-| livekit-server-staging | ✅ Running |
+| livekit-config-staging | ✅ Running |
 | livekit-egress-staging | ✅ Running |
 | n8n-staging | ✅ Running |
 
@@ -781,7 +781,7 @@ kubectl rollout restart deployment/backend ...
 | 2 | `infrastructure/kubernetes/staging/onlyoffice-custom-config.yaml` | Export aus Cluster |
 | 3 | `infrastructure/kubernetes/staging/sentinel-models-claim.yaml` | Export aus Cluster |
 
-#### 2. Pipeline `e2e-tests.yml` fixen
+#### 2. Pipeline `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) fixen
 
 | # | Fix | Datei | Beschreibung |
 |---|-----|-------|-------------|
@@ -824,7 +824,7 @@ the namespace "meeting-automation-staging". You must pass '--namespace=kube-syst
 | # | Fakt | Beweis |
 |---|------|--------|
 | 1 | CronJob-Dateien haben `namespace: kube-system` hardcoded | `ephemeral-storage-cleanup-cronjob.yaml` Z.5,30,36 + `pod-garbage-collector-cronjob.yaml` Z.5,30,36 |
-| 2 | `kubectl apply -f .../staging/ -n meeting-automation-staging` wendet ALLE Dateien an | `e2e-tests.yml` Z.175 |
+| 2 | `kubectl apply -f .../staging/ -n meeting-automation-staging` wendet ALLE Dateien an | `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) Z.175 |
 | 3 | CronJobs wurden in Commit `b3dfad55` IN `staging/` verschoben | `git log --follow` |
 | 4 | `kubectl apply` Step wurde in Commit `ff410384` zur CI/CD hinzugefügt | `git log -S` |
 
@@ -835,7 +835,7 @@ the namespace "meeting-automation-staging". You must pass '--namespace=kube-syst
    - `pod-garbage-collector-cronjob.yaml` → `infrastructure/kubernetes/system/` (namespace: kube-system)
    - `longhorn-cleanup-cronjob.yaml` → `infrastructure/kubernetes/system/` (namespace: longhorn-system)
 
-2. **Separater Step** in `e2e-tests.yml` nach "Deploy All Staging Resources":
+2. **Separater Step** in `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) nach "Deploy All Staging Resources":
 
 ```yaml
 - name: Deploy System CronJobs (kube-system + longhorn-system)

@@ -77,7 +77,7 @@ room:
 | Empfehlung | Status | Details |
 |---|---|---|
 | `use_external_ip: true` | ✅ Implementiert | Für Cloud/NAT-Umgebungen |
-| `turn.enabled: true` | ✅ Implementiert | Für NAT-Fallback |
+| `turn.enabled: false` | ✅ Implementiert | Für NAT-Fallback |
 | `hostNetwork: true` | ✅ Implementiert | Für direkte UDP-Ports |
 | UDP 50000-65535 | ⚠️ TEILWEISE | Nur 50000-60000 (statt 65535) |
 | TCP 3478 | ❌ NICHT GEÖFFNET | TURN TCP Port |

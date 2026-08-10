@@ -113,7 +113,7 @@ curl -X POST http://localhost:8000/api/v1/meetings/{id}/livekit/stop-recording -
 | celery-worker-staging | 1m | 403Mi |
 | celery-worker-pro (6cg27) | 1m | 403Mi |
 | celery-worker-pro (7fh8r) | 8m | 403Mi |
-| livekit-server-staging | 501m | 120Mi |
+| livekit-config-staging | 501m | 120Mi |
 | livekit-egress-staging | 8m | 77Mi |
 | rabbitmq-staging | 82m | 129Mi |
 | meeting-db-1 | 5m | 124Mi |

@@ -109,7 +109,7 @@ initContainers:
 ```yaml
 annotations:
   nginx.ingress.kubernetes.io/proxy-set-headers: "ingress-nginx/onlyoffice-proxy-headers"
-  nginx.ingress.kubernetes.io/websocket-services: "backend, livekit-server-staging, onlyoffice-staging"
+  nginx.ingress.kubernetes.io/websocket-services: "backend, livekit-config-staging, onlyoffice-staging"
 paths:
   - /web-apps → onlyoffice-staging:80
   - /cache → onlyoffice-staging:80

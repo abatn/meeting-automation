@@ -9,20 +9,20 @@ Meeting Created → LiveKit Room + Egress → MinIO (S3) → Celery Worker
 
 ## Infrastructure (Staging — 2026-08-07)
 
-> **AKTUELLER ZUSTAND:** ConfigMap korrigiert mit `turn.enabled: true` (TURN/UDP).
+> **AKTUELLER ZUSTAND:** ConfigMap korrigiert mit `turn.enabled: false` (TURN/UDP).
 > 15-Sekunden-Disconnect behoben durch TURN/UDP-Relay.
 
-### LiveKit Server (ConfigMap livekit-server-staging)
+### LiveKit Server (ConfigMap livekit-config-staging)
 | Eigenschaft | Wert |
 |-------------|------|
-| **Deployment** | `livekit-server-staging` (kubectl-managed) |
+| **Deployment** | `livekit-config-staging` (kubectl-managed) |
 | **Image** | `livekit/livekit-server:latest` |
 | **hostNetwork** | `true` |
 | **Service** | ClusterIP (Port 7880, 7881) |
 | **Node** | `instance-20260329-0846` (OCI ARM64) |
-| **ConfigMap** | `livekit-server-staging` |
+| **ConfigMap** | `livekit-config-staging` |
 
-### LiveKit Server Config (livekit-server-staging)
+### LiveKit Server Config (livekit-config-staging)
 ```yaml
 keys:
   meeting-api-key: meeting-api-secret-2026-minimum-32-chars!
@@ -99,7 +99,7 @@ webhook:
 
 **Offizielle LiveKit-Doku:**
 > "For TURN/UDP, no certificate is needed"
-> "TURN/UDP can be enabled with: turn.enabled: true, udp_port: 3478"
+> "TURN/UDP can be enabled with: turn.enabled: false, udp_port: 3478"
 
 **WICHTIG:** TURN braucht NUR TLS für TURN/TLS (Port 5349), NICHT für TURN/UDP (Port 3478).
 
@@ -166,7 +166,7 @@ CLIENT (Firefox)                    SERVER (158.180.18.110)
   adaptiveStream={true}    // OFFIZIELLE EMPFEHLUNG
   dynacast={true}          // OFFIZIELLE EMPFEHLUNG
   connectOptions={{
-    maxRetries: 5,         // ERHOEHT (3 → 5)
+    maxRetries: 3,         // ERHOEHT (3 → 5)
   }}
 >
 ```
@@ -317,9 +317,9 @@ req.file.CopyFrom(file_output)
 - `resolved_name` verwenden, nicht `.name` (sonst `"Speaker 0"`)
 - PV-Sections sind verschlüsselt (Fernet) — Inhalt beginnt mit `gAAAAAB...`
 - Confidence: `None` = "nie gemessen", `0.0` = "explizit niedrig"
-- **Helm Chart Labels**: `app.kubernetes.io/name: livekit-server-staging` (NICHT `app: livekit-server-staging`)
+- **Helm Chart Labels**: `app.kubernetes.io/name: livekit-config-staging` (NICHT `app: livekit-config-staging`)
 - **NetworkPolicy**: Muss Helm-Labels beruecksichtigen (beide alte und neue Labels erlauben)
-- **TURN/UDP**: `turn.enabled: true` OHNE TLS funktioniert für TURN/UDP (Port 3478)
+- **TURN/UDP**: `turn.enabled: false` OHNE TLS funktioniert für TURN/UDP (Port 3478)
 - **TURN/TLS**: Braucht Zertifikat — NICHT für TURN/UDP nötig
 
 ---

@@ -137,7 +137,7 @@ Begründung: Release-Priorität. Die kritischen undefined-name-Fehler wurden ber
 - [ ] Phase 1 abgeschlossen
 - [ ] Phase 2 abgeschlossen  
 - [ ] Phase 3 abgeschlossen
-- [ ] Lint-Job wieder aktivieren in `backend-ci.yml`
+- [ ] Lint-Job wieder aktivieren in `backend-ci.yml` (DEPRECATED — replaced by `ci.yml`)
 - [ ] Pass-Gate auf 100% setzen (optional)
 
 ---

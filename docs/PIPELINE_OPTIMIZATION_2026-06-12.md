@@ -243,7 +243,7 @@ result = await loop.run_in_executor(
 
 ### T9 — Frontend Recording State Redux
 
-**Neue Datei:** `frontend/src/store/recordingSlice.ts`
+**Neue Datei:** `frontend/src/store/recordingSlice.ts (NEVER CREATED)`
 
 ```typescript
 interface RecordingState {
@@ -361,7 +361,7 @@ backend/app/services/speaker_embedding_service.py (erweitert)
 backend/alembic/versions/g1h2i3j4k5l6_add_missing_indexes.py
 
 # Phase 4
-frontend/src/store/recordingSlice.ts (NEU)
+frontend/src/store/recordingSlice.ts (NEVER CREATED) (NEU)
 frontend/src/store/index.ts
 frontend/src/components/meetings/MeetingRoom.tsx
 backend/app/services/audio_segment_service.py

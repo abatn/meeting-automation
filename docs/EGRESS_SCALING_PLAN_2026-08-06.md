@@ -199,7 +199,7 @@ spec:
 ### Kommunikationswege (bleiben gleich)
 ```yaml
 # Egress → LiveKit Server (WebSocket)
-LIVEKIT_WS_URL=ws://livekit-server-staging:7880
+LIVEKIT_WS_URL=ws://livekit-config-staging:7880
 
 # Egress → Redis (TCP)
 redis.address=redis-staging.meeting-automation-staging.svc.cluster.local:6379

@@ -229,7 +229,7 @@ kubectl apply -f infrastructure/kubernetes/ -n meeting-automation-prod
 kubectl exec -i deployment/backend -n meeting-automation-prod -- alembic upgrade head
 
 # 6. Smoke Tests
-./scripts/validate-production.sh
+./scripts/validate-production.sh (NEVER CREATED)
 
 # 7. Bei Erfolg: Production Live
 ```

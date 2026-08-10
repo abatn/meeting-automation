@@ -213,13 +213,13 @@ test_p34_same_email_different_meetings_allowed      ✅ PASS
 ### Run Commands
 ```bash
 # Phase 3 Tests nur
-E2E_MODE=true pytest tests/e2e/test_phase3_meeting_lifecycle.py -v
+E2E_TEST=true pytest tests/e2e/test_phase3_meeting_lifecycle.py -v
 
 # Mit PostgreSQL (Docker)
-docker compose exec -T backend bash -c "E2E_MODE=true pytest tests/e2e/test_phase3_meeting_lifecycle.py -v"
+docker compose exec -T backend bash -c "E2E_TEST=true pytest tests/e2e/test_phase3_meeting_lifecycle.py -v"
 
 # Coverage Report
-E2E_MODE=true pytest tests/e2e/test_phase3_meeting_lifecycle.py --cov=app --cov-report=html
+E2E_TEST=true pytest tests/e2e/test_phase3_meeting_lifecycle.py --cov=app --cov-report=html
 ```
 
 ---

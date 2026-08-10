@@ -10,7 +10,7 @@
 | Aspekt | Aktuell | Ziel |
 |--------|---------|------|
 | **Deployment** | Raw Manifests (kubectl apply) | Helm Chart |
-| **Server** | livekit-server-staging (hostNetwork: true) | livekit/livekit-server Chart |
+| **Server** | livekit-config-staging (hostNetwork: true) | livekit/livekit-server Chart |
 | **Egress** | livekit-egress-staging (hostNetwork: true) | livekit/egress Chart ⚠️ Chart kann KEIN hostNetwork setzen |
 | **Skalierung** | 1 Pod pro Komponente | 2+ Pods (Autoscaling möglich) |
 | **Wartung** | Manuell | Helm-managed |
@@ -64,9 +64,9 @@
 #### Schritt 1.1: Aktuellen Zustand sichern
 ```bash
 # Backup aller LiveKit-Ressourcen
-kubectl get deployment livekit-server-staging -o yaml > /tmp/livekit-server-backup.yaml
+kubectl get deployment livekit-config-staging -o yaml > /tmp/livekit-server-backup.yaml
 kubectl get deployment livekit-egress-staging -o yaml > /tmp/livekit-egress-backup.yaml
-kubectl get service livekit-server-staging -o yaml > /tmp/livekit-service-backup.yaml
+kubectl get service livekit-config-staging -o yaml > /tmp/livekit-service-backup.yaml
 kubectl get configmap livekit-config-staging -o yaml > /tmp/livekit-config-backup.yaml
 kubectl get configmap livekit-egress-config-staging -o yaml > /tmp/livekit-egress-config-backup.yaml
 kubectl get networkpolicy livekit-policy -o yaml > /tmp/livekit-network-backup.yaml
@@ -128,7 +128,7 @@ nodeSelector:
 
 resources:
   limits:
-    cpu: 2000m
+    cpu: 1000m
     memory: 1024Mi
   requests:
     cpu: 1000m
@@ -190,7 +190,7 @@ kubectl get service -n livekit-test
 #### Schritt 3.1: LiveKit Server migrieren
 ```bash
 # Alten Server stoppen
-kubectl scale deployment livekit-server-staging --replicas=0
+kubectl scale deployment livekit-config-staging --replicas=0
 
 # Neuen Server starten
 helm install livekit-server livekit/livekit-server \
@@ -204,7 +204,7 @@ helm install livekit-server livekit/livekit-server \
 #### Schritt 3.2: Service updaten
 ```bash
 # Alten Service löschen
-kubectl delete service livekit-server-staging
+kubectl delete service livekit-config-staging
 
 # Helm-Service verwenden (automatisch erstellt)
 # ODER alten Service beibehalten wenn Labels nicht matchen
@@ -223,7 +223,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: livekit-server-staging  # Helm-Label (nameOverride!)
+      app.kubernetes.io/name: livekit-config-staging  # Helm-Label (nameOverride!)
   ingress:
   - ports:
     - port: 7880
@@ -253,7 +253,7 @@ image:
 egress:
   log_level: debug
   insecure: true
-  ws_url: ws://livekit-server-staging:7880
+  ws_url: ws://livekit-config-staging:7880
   api_key: meeting-api-key
   api_secret: meeting-api-secret-2026-minimum-32-chars!
   redis:
@@ -282,7 +282,7 @@ egress:
 
 resources:
   limits:
-    cpu: 2000m
+    cpu: 1000m
     memory: 1024Mi
   requests:
     cpu: 1000m
@@ -378,11 +378,11 @@ kubectl apply -f /tmp/livekit-network-backup.yaml
 kubectl apply -f /tmp/livekit-egress-network-backup.yaml
 
 # 3. Pods starten
-kubectl scale deployment livekit-server-staging --replicas=1
+kubectl scale deployment livekit-config-staging --replicas=1
 kubectl scale deployment livekit-egress-staging --replicas=1
 
 # 4. Verifizieren
-kubectl get pods -l app=livekit-server-staging
+kubectl get pods -l app=livekit-config-staging
 kubectl get pods -l app=livekit-egress-staging
 ```
 
@@ -436,7 +436,7 @@ jobs:
 
       - name: Backup current deployment
         run: |
-          kubectl get deployment livekit-server-staging -o yaml > /tmp/livekit-server-backup.yaml
+          kubectl get deployment livekit-config-staging -o yaml > /tmp/livekit-server-backup.yaml
           kubectl get deployment livekit-egress-staging -o yaml > /tmp/livekit-egress-backup.yaml
 
       - name: Install Helm chart
@@ -532,8 +532,8 @@ jobs:
 | Problem | Loesung |
 |---------|--------|
 | Service Port 80 statt 7880 | `loadBalancer.servicePort: 7880` |
-| Labels `livekit-server` statt `livekit-server-staging` | `nameOverride: livekit-server-staging` |
-| Service Name `livekit-server` statt `livekit-server-staging` | `fullnameOverride: livekit-server-staging` |
+| Labels `livekit-server` statt `livekit-config-staging` | `nameOverride: livekit-config-staging` |
+| Service Name `livekit-server` statt `livekit-config-staging` | `fullnameOverride: livekit-config-staging` |
 | NetworkPolicy passte nicht zu Helm Labels | NetworkPolicy mit neuen Labels aktualisiert |
 | Deployment selector immutable | Altes Release loeschen + neu installieren |
 
@@ -597,10 +597,10 @@ turn:
 **Referenz:** `docs/LIVEKIT_HELM_REDO_PROMPT_2026-08-06.md` (vollstaendiger Prompt fuer den Wiederaufbau).
 
 ### Verifizierung
-- ✅ Pod Running: `livekit-server-staging-764ff6b6bb-lddqp` (Node: instance-20260329-0846)
-- ✅ Service: `livekit-server-staging` ClusterIP 10.43.99.173 (Port 7880)
+- ✅ Pod Running: `livekit-config-staging-764ff6b6bb-lddqp` (Node: instance-20260329-0846)
+- ✅ Service: `livekit-config-staging` ClusterIP 10.43.99.173 (Port 7880)
 - ✅ Endpoints: 10.0.0.191:7880, 10.0.0.191:7881
-- ✅ Labels: `app.kubernetes.io/name: livekit-server-staging`
+- ✅ Labels: `app.kubernetes.io/name: livekit-config-staging`
 - ✅ Egress -> LiveKit: OK (wget successful)
 - ✅ Server Logs: Redis verbunden, TURN gestartet
 - ✅ hostNetwork: true (IP 10.0.0.191 = Node IP)

@@ -360,7 +360,7 @@ Das Staging-Cluster läuft auf **k3s v1.35.5+k3s1** auf OCI VM. Die Pipeline (Re
 - [ ] Secrets mit Production-Werten deployen
 - [ ] Anwendung deployen
 - [ ] DB-Migration durchführen
-- [ ] Smoke Tests durchführen (`scripts/validate-production.sh`)
+- [ ] Smoke Tests durchführen (`scripts/validate-production.sh (NEVER CREATED)`)
 - [ ] Monitoring Dashboards aktivieren
 - [ ] Alertmanager Rules aktivieren
 - [ ] Backup Retention Policy setzen
@@ -414,7 +414,7 @@ Das Staging-Cluster läuft auf **k3s v1.35.5+k3s1** auf OCI VM. Die Pipeline (Re
 - [ ] Resource Limits:
   - Backend: `memory: "2Gi"`, `cpu: "1000m"`, `replicas: 3`
   - Celery Worker: `memory: "2Gi"`, `cpu: "1000m"`, `replicas: 3`
-  - PostgreSQL: `memory: "4Gi"`, `cpu: "2000m"`
+  - PostgreSQL: `memory: "4Gi"`, `cpu: "1000m"`
 - [ ] Health Checks: `/health` mit proper timeouts
 - [ ] DB Migration `alembic upgrade head` erfolgreich getestet
 - [ ] Initial users geseedet (admin, tech_admin, dg, manager)

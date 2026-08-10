@@ -258,14 +258,14 @@ LIVEKIT_API_SECRET=meeting-api-secret-2026
 ## NetworkPolicy-Konfiguration (Staging)
 
 **Wichtig:** Alle NetworkPolicies müssen **zwei Label-Sets** unterstützen:
-1. **Alte Labels** (`app: livekit-server-staging`) — für manuell erstellte Pods
-2. **Helm-Labels** (`app.kubernetes.io/name: livekit-server-staging`) — für Helm-deployed Pods
+1. **Alte Labels** (`app: livekit-config-staging`) — für manuell erstellte Pods
+2. **Helm-Labels** (`app.kubernetes.io/name: livekit-config-staging`) — für Helm-deployed Pods
 
 ### Betroffene Policies
 
 | Policy | Pod-Selector | Ingress/Egress |
 |--------|-------------|----------------|
-| `livekit-policy` | `app: livekit-server-staging` + `app.kubernetes.io/name: livekit-server-staging` | Ingress von Egress + Backend |
+| `livekit-policy` | `app: livekit-config-staging` + `app.kubernetes.io/name: livekit-config-staging` | Ingress von Egress + Backend |
 | `livekit-egress-policy` | `app: livekit-egress-staging` + `app.kubernetes.io/name: egress` | Egress zu Server |
 | `redis-policy` | `app: redis-staging` | Ingress von Egress + Server |
 | `backend-policy` | `app: backend` | Ingress von LiveKit Server |
@@ -312,10 +312,10 @@ wird in k3s/Calico nicht korrekt geroutet → `Connection refused` (TCP RST).
 | Test | Target | Ergebnis | Schlussfolgerung |
 |------|--------|----------|------------------|
 | Server-Pod (hostNetwork) | 10.0.0.191:7880 | ✅ HTTP 200 | Server lauscht auf :::7880 |
-| **Egress-Pod (hostNetwork: false)** | livekit-server-staging:7880 | ❌ Connection refused | **hostNetwork-Mismatch** |
+| **Egress-Pod (hostNetwork: false)** | livekit-config-staging:7880 | ❌ Connection refused | **hostNetwork-Mismatch** |
 | **Egress-Pod (hostNetwork: false)** | 10.0.0.191:7880 | ❌ Connection refused | **hostNetwork-Mismatch** |
 | Egress-Pod (hostNetwork: false) | Redis 10.43.54.118:6379 | ✅ TCP connect | Normale Pods erreichbar |
-| **Egress-Pod (hostNetwork: true)** | livekit-server-staging:7880 | ✅ Exit-Code 0 | **Fix bestätigt** |
+| **Egress-Pod (hostNetwork: true)** | livekit-config-staging:7880 | ✅ Exit-Code 0 | **Fix bestätigt** |
 | **Egress-Pod (hostNetwork: true)** | localhost:7880 | ✅ Exit-Code 0 | **hostNetwork shortcut funktioniert** |
 | **Egress-Pod (hostNetwork: true)** | 10.0.0.191:7880 | ✅ Exit-Code 0 | **Direkte Node-IP funktioniert** |
 
@@ -339,7 +339,7 @@ für die manuelle Patch-Anleitung.
 ```bash
 # Connectivity testen (alle 3 müssen Exit-Code 0 liefern)
 EGRESS_POD=$(kubectl get pods -n meeting-automation-staging -l app.kubernetes.io/name=egress -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}')
-kubectl exec -n meeting-automation-staging $EGRESS_POD -- wget -q -O /dev/null --timeout=5 http://livekit-server-staging:7880
+kubectl exec -n meeting-automation-staging $EGRESS_POD -- wget -q -O /dev/null --timeout=5 http://livekit-config-staging:7880
 kubectl exec -n meeting-automation-staging $EGRESS_POD -- wget -q -O /dev/null --timeout=5 http://localhost:7880
 ```
 
@@ -408,7 +408,7 @@ Der Egress-Pod braucht **keinen direkten MinIO-Zugang**:
 
 | Policy | Staging Selector | Production Selector |
 |--------|------------------|---------------------|
-| `livekit-policy` | `app.kubernetes.io/name: livekit-server-staging` | `app.kubernetes.io/name: livekit-server` |
+| `livekit-policy` | `app.kubernetes.io/name: livekit-config-staging` | `app.kubernetes.io/name: livekit-server` |
 | `livekit-egress-policy` | `app.kubernetes.io/name: egress` | `app.kubernetes.io/name: egress` |
 | **Ingress-Regeln** | Egress + Backend | Egress + Backend |
 | **Egress-Regeln** | Redis + Backend + DNS | Redis + Backend + DNS |

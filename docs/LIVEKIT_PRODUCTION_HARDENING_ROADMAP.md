@@ -59,7 +59,7 @@ recordings.status: failed
 ```
 
 **Sub-fixes added during Tier 1.5 (discovered while verifying 1.3):**
-- 1.5a: LiveKit `webhook` config (`livekit.yaml`, `livekit-e2e.yaml`) — `urls: [...]` not `url: ...`
+- 1.5a: LiveKit `webhook` config (`livekit.yaml`, `livekit-e2e.yaml (REMOVED)`) — `urls: [...]` not `url: ...`
 - 1.5b: DNS hostname in webhook URL is the docker-compose **service name** (`backend`), not container name (`meeting-automation-backend-e2e`)
 - 1.5c: Backend webhook handler supports LiveKit JWT auth (protobuf `WebhookReceiver`) + Bearer `INTERNAL_API_SECRET` fallback for manual tests
 - 1.5d: Corrected `EgressStatus.EGRESS_STATUS_FAILED` → `EGRESS_FAILED` (enum name in livekit-api 1.1.0)

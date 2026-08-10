@@ -19,7 +19,7 @@ Am 10.08.2026 wurde ein umfassendes Audit aller Dokumentationsdateien durchgefue
 ### 1. AGENTS.md (26 Aenderungen)
 
 **CI/CD Pipeline Section (Zeilen 255-273):**
-- Alt: Referenzierte `backend-ci.yml`, `frontend-ci.yml`, `e2e-tests.yml` (alle deaktiviert)
+- Alt: Referenzierte `backend-ci.yml`, `frontend-ci.yml`, `e2e-tests.yml` (DEPRECATED — replaced by `ci.yml`) (alle deaktiviert)
 - Neu: Beschreibt `ci.yml` (einheitliche Pipeline), `deploy-staging.yml`, `deploy-production.yml`
 - Erklaert dass alte Workflows mit `.disabled` Suffix fuer Rollback existieren
 
@@ -28,7 +28,7 @@ Am 10.08.2026 wurde ein umfassendes Audit aller Dokumentationsdateien durchgefue
 - Neu: "waren in backend-ci.yml, jetzt in ci.yml — nie wieder aktivieren"
 
 **Frontend Port (Zeilen 139, 326):**
-- Alt: `localhost:3000`
+- Alt: `localhost:3001`
 - Neu: `localhost:3001` (temporaerer Override fuer Staging-Test)
 
 **n8n Workflow IDs (Zeilen 171-173):**
@@ -49,11 +49,11 @@ Am 10.08.2026 wurde ein umfassendes Audit aller Dokumentationsdateien durchgefue
 - Neu: Section 3.2 "Deaktivierte Workflows (fuer Rollback)"
 
 **Ingress-Referenz (Zeile 204):**
-- Alt: `infrastructure/kubernetes/ingress.yaml` (existiert nicht)
+- Alt: `infrastructure/kubernetes/staging/ingress-staging.yaml` (existiert nicht)
 - Neu: `infrastructure/kubernetes/staging/ingress-staging.yaml` (mit Hinweis auf production)
 
 **Frontend Port (Zeile 60):**
-- Alt: `http://localhost:3000`
+- Alt: `http://localhost:3001`
 - Neu: `http://localhost:3001` (temporaerer Override)
 
 ### 3. docs/TESTING.md (23 Aenderungen)
@@ -67,7 +67,7 @@ Am 10.08.2026 wurde ein umfassendes Audit aller Dokumentationsdateien durchgefue
 - Neu: `npm run lint && npm run type-check && npm run build`
 
 **Backend Test-Pfade:**
-- Alt: Hardcoded `/home/batnini/meeting-automation/backend/venv_test/bin/python`
+- Alt: Hardcoded `./meeting-automation/backend/venv_test/bin/python`
 - Neu: `python -m pytest`
 
 **Cypress Reference (Zeile 58):**

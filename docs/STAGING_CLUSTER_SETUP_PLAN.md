@@ -498,7 +498,7 @@ kubectl exec -i deployment/backend -n meeting-automation-prod -- alembic upgrade
 
 ### Phase 5: Post-Deployment Validation
 
-- Smoke Tests (`scripts/validate-production.sh`)
+- Smoke Tests (`scripts/validate-production.sh (NEVER CREATED)`)
 - Monitoring: Custom Dashboard, Prometheus Metrics
 - Alerting: Alertmanager Rules aktivieren
 - Backup: PostgreSQL CronJob + MinIO Versioning

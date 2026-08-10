@@ -35,7 +35,7 @@
 | Redis URL | `redis://:redis_password@redis-staging.meeting-automation-staging.svc.cluster.local:6379/0` |
 | Celery Broker | `amqp://rabbit_user:rabbit_password@rabbitmq-staging.meeting-automation-staging.svc.cluster.local:5672//` |
 | S3 Endpoint | `http://minio-staging:9000` |
-| LiveKit URL | `ws://livekit-server-staging:7880` |
+| LiveKit URL | `ws://livekit-config-staging:7880` |
 
 ## 3. API Endpoints
 
@@ -108,7 +108,7 @@ kubectl top pods -n meeting-automation-staging --sort-by=cpu
 kubectl logs -f -n meeting-automation-staging deployment/celery-worker-staging | grep TIMING
 
 # LiveKit Logs
-kubectl logs -f -n meeting-automation-staging deployment/livekit-server-staging
+kubectl logs -f -n meeting-automation-staging deployment/livekit-config-staging
 kubectl logs -f -n meeting-automation-staging deployment/livekit-egress-staging
 
 # Prometheus Metrics
