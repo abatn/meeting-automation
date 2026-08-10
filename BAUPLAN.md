@@ -635,6 +635,8 @@ Plan-Datei: `.mimocode/plans/1782956362564-playful-wizard.md`
 
 ## Status: ✅ IMPLEMENTIERT (2026-07-17) — e2e-tests.yml repariert + `infrastructure/kubernetes/production/` angelegt (30 Dateien, YAML validiert). KEINE Commits ohne Order.
 
+> **Hinweis (2026-08-10):** Die in Phase 181 reparierten Workflows (`e2e-tests.yml`, `backend-ci.yml`, `frontend-ci.yml`) wurden subsequently in `ci.yml` + `deploy-staging.yml` + `deploy-production.yml` umstrukturiert. Die alten Dateien existieren noch mit `.disabled` Suffix fuer Rollback-Zwecke. Siehe `docs/CICD_RESTRUCTURE_PLAN_2026-08-07.md` fuer Details.
+
 ## Ziel
 1. `e2e-tests.yml` reparieren (10 Probleme, siehe `.loop.md` Phase 181 Tabelle)
 2. `infrastructure/kubernetes/production/` anlegen (Deployment-Problem #7): Job 3 zeigt auf `infrastructure/kubernetes/production/`
