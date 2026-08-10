@@ -1,7 +1,8 @@
 # CI/CD Umstrukturierungsplan — Staging/Production Trennung
 
 > **Erstellt**: 2026-08-07
-> **Status**: ⏳ GEPLANT (nicht implementiert)
+> **Status**: ✅ IMPLEMENTIERT (2026-08-08)
+> **Aktualisiert**: 2026-08-10 — Workflows ci.yml, deploy-staging.yml, deploy-production.yml sind aktiv. Alte Workflows (backend-ci.yml, frontend-ci.yml, e2e-tests.yml) existieren noch mit .disabled Suffix fuer Rollback.
 > **Nächste Phase**: Phase 190 in `.loop.md`
 > **Basiert auf**: Phase 176 (CI/CD Audit), Phase 187-189c (CronJob/Longhorn/Metrics-Server Fixes), `docs/N8N_CICD_PLAN_2026-08-05.md`
 
