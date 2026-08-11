@@ -2,7 +2,7 @@
 
 **Status:** IMPLEMENTIERT (Staging + Production)
 **Erstellt:** 2026-08-10
-**Aktualisiert:** 2026-08-11 (Production FSB aktiviert + erstes Full-Backup COMPLETED)
+**Aktualisiert:** 2026-08-11 (Scoped Backup + Restore-Test + Monitoring abgeschlossen)
 **Cluster:** Staging (OCI 158.180.18.110) + Production (Contabo 169.58.83.32)
 
 ---
@@ -440,6 +440,20 @@ velero backup create fsb-scoped-$(date +%Y%m%d) \
 
 **Ergebnis (2026-08-11):** Backup PartiallyFailed (Kopia-Repo noch nicht initialisiert).
 
+**UPDATE (2026-08-11):** Nach Kopia-Repo-Initialisierung funktioniert Scoped Backup:
+
+```bash
+# Nur sentinel-models-claim (2Gi)
+velero backup create fsb-small-$(date +%Y%m%d) \
+  --include-namespaces=meeting-automation-staging \
+  --selector 'app=celery-worker-pro-staging' \
+  --wait
+```
+
+**Ergebnis:** COMPLETED in 18 Sekunden, 1 PVB (sentinel-models-claim, 1.1GB).
+
+**Lektion:** `--selector` mit Pod-Label filtert nur PVCs der passenden Pods. Funktioniert zuverlässig.
+
 ### Phase 8: Kopia-Repository Recovery
 
 **Problem:** Nach Löschen von MinIO velero-backups/ funktionieren alle PVBs nicht mehr.
@@ -622,6 +636,68 @@ kubectl get podvolumebackups.velero.io -n velero
 
 **Hinweis:** Die 9 Warnings betreffen Cluster-Scoped Ressourcen (ClusterRoles, CRDs) — nicht kritisch.
 
+### Schritt 9: Restore-Test (verifiziert 2026-08-11)
+
+**Sicherheitsregel:** NICHT ins laufende Namespace restoren!
+
+```bash
+# 1. Temporären Namespace erstellen
+kubectl create namespace restore-test
+
+# 2. Restore mit Namespace-Mapping
+velero restore create restore-test-mapped \
+  --from-backup init-meta-prod-20260811 \
+  --namespace-mappings meeting-automation:restore-test \
+  --restore-volumes=true \
+  --wait
+
+# 3. Verifikation
+kubectl get all -n restore-test
+kubectl get pvc -n restore-test
+kubectl exec -n restore-test minio-0 -- ls /data/
+
+# 4. Aufräumen
+kubectl delete namespace restore-test
+```
+
+**Ergebnis:**
+
+| Metrik | Wert |
+|--------|------|
+| Items restored | 179 |
+| PVCs erstellt | 7/7 Bound ✅ |
+| MinIO-Daten | ✅ Wiederhergestellt (meeting-recordings, qwen-models, etc.) |
+| Running Pods | 10/14 (main services) |
+| Namespace-Mapping | ✅ `meeting-automation` → `restore-test` |
+| Restore-Status | PartiallyFailed (3 Errors — hostNetwork-Konflikte, erwartet) |
+
+**Lektion:** `--namespace-mappings` ist KRITISCH für Restore in separaten Namespace.
+
+### Schritt 10: Velero Monitoring (verifiziert 2026-08-11)
+
+```yaml
+# ServiceMonitor (deployed in monitoring/)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: velero
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: velero
+  namespaceSelector:
+    matchNames:
+      - velero
+  endpoints:
+    - port: http-metrics
+      interval: 60s
+```
+
+**Alerts:** VeleroBackupFailed (critical), VeleroBackupTooOld (warning), VeleroBackupDurationHigh (warning), VeleroBackupPartialFailure (warning)
+
+**Deployed:** Staging + Production ✅
+
 ### CI/CD Integration (geplant)
 
 In `.github/workflows/deploy-production.yml` vor dem Deploy einfügen:
@@ -695,7 +771,14 @@ kubectl exec -n meeting-automation postgres-staging-0 -- \
 
 ---
 
-## 9. Monitoring & Alerting
+## 9. Monitoring & Alerting — ✅ ABGESCHLOSSEN (2026-08-11)
+
+### Deployed Resources
+
+| Ressource | Staging | Production |
+|-----------|---------|------------|
+| ServiceMonitor `velero` | ✅ Deployed | ✅ Deployed |
+| PrometheusRule `velero-alerts` | ✅ Deployed | ✅ Deployed |
 
 ### Velero-Metriken für Prometheus
 
@@ -708,6 +791,9 @@ kind: ServiceMonitor
 metadata:
   name: velero
   namespace: monitoring
+  labels:
+    app.kubernetes.io/name: velero
+    release: kube-prometheus-stack
 spec:
   selector:
     matchLabels:
@@ -718,6 +804,7 @@ spec:
   endpoints:
     - port: http-metrics
       interval: 60s
+      path: /metrics
 ```
 
 ### Wichtige Metriken
@@ -799,8 +886,9 @@ velero backup logs $(velero backup get -o json | jq -r '.items[-1].metadata.name
 | **P0** | Production FSB aktivieren | 15 Min | Niedrig | ✅ Erledigt |
 | **P0** | Production erstes FSB-Backup | 15 Min | Mittel | ✅ Erledigt |
 | **P1** | Backup-Schedules konfigurieren | 5 Min | Niedrig | ✅ Erledigt |
-| **P1** | Velero ServiceMonitor + Alerting | 10 Min | Niedrig | ⬜ Offen |
-| **P1** | Restore-Test durchführen | 30 Min | Hoch | ⬜ Offen |
+| **P1** | Velero ServiceMonitor + Alerting | 10 Min | Niedrig | ✅ Erledigt |
+| **P1** | Restore-Test durchführen | 30 Min | Hoch | ✅ Erledigt |
+| **P1** | Scoped FSB Backup testen | 5 Min | Niedrig | ✅ Erledigt |
 | **P2** | CI/CD Pre-Deploy-Backup integrieren | 15 Min | Niedrig | ⬜ Offen |
 | **P2** | Dokumentation (diese Datei) | ✅ Erledigt | Keins | ✅ Erledigt |
 
