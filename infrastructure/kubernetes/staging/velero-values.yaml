@@ -1,0 +1,82 @@
+# Velero Helm Values — Staging
+# Chart: vmware-tanzu/velero v12.1.0
+# App Version: v1.18.1
+# Install: helm upgrade velero vmware-tanzu/velero -n velero -f velero-values.yaml --install
+
+configuration:
+  # Kopia als Upload-Type (statt Restic)
+  uploaderType: "kopia"
+
+  # File System Backup als Default aktivieren
+  # Erzwingt Kopia-FSB für alle Pods (statt CSI-Snapshots)
+  defaultVolumesToFsBackup: true
+
+  # Backup Storage Location (MinIO)
+  backupStorageLocation:
+    - name: default
+      provider: aws
+      bucket: velero-backups
+      default: true
+      config:
+        region: minio
+        s3ForcePathStyle: "true"
+        s3Url: "http://minio-staging.meeting-automation-staging.svc:9000"
+
+  # Keine Volume Snapshot Locations (MinIO hat keine CSI-Snapshots)
+  volumeSnapshotLocation: []
+
+  # Features
+  features: ""
+
+# Credentials für MinIO
+credentials:
+  useSecret: true
+  name: velero-s3-credentials
+  secretContents:
+    cloud: |
+      [default]
+      aws_access_key_id = minio_user
+      aws_secret_access_key = minio_password
+
+# Velero Server
+image:
+  repository: velero/velero
+  tag: v1.18.1
+  pullPolicy: IfNotPresent
+
+# Server Args
+initContainers:
+  - name: velero-plugin-for-aws
+    image: velero/velero-plugin-for-aws:v1.9.0
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+# Keine Resource Limits (verhindert OOM-Kill des Plugin-Prozesses)
+# Das ist BEWUSST — file already closed Error wird dadurch vermieden
+resources: {}
+
+# Repo Maintenance ConfigMap
+repoMaintenanceJobConfigMap: velero-repo-maintenance
+
+# Metrics für Prometheus
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: kube-prometheus-stack
+
+# Schedules
+schedules:
+  daily-backup:
+    disabled: false
+    schedule: "0 2 * * *"
+    useOwnerReferencesInBackup: false
+    template:
+      includedNamespaces:
+        - meeting-automation-staging
+      ttl: 168h0m0s  # 7 Tage
+      storageLocation: default
+      defaultVolumesToFsBackup: true

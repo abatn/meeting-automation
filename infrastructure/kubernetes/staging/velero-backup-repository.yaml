@@ -1,0 +1,32 @@
+# Velero BackupRepository — Staging
+# Wird von Velero automatisch erstellt bei erstem Backup mit FSB
+# Dieses YAML dient als Referenz / Fallback wenn Auto-Init fehlschlägt
+# 
+# Hinweis: Velero erstellt das Repository automatisch wenn:
+#   1. BSL konfiguriert ist (velero-backups Bucket in MinIO)
+#   2. Erstes Backup mit --default-volumes-to-fs-backup erstellt wird
+#   3. Kein BackupRepository für den VolumeNamespace existiert
+#
+# Dieses CRD manuell anwenden NUR wenn Velero das Repo nicht automatisch findet:
+#   kubectl apply -f velero-backup-repository.yaml
+
+apiVersion: velero.io/v1
+kind: BackupRepository
+metadata:
+  name: meeting-automation-staging-default-kopia
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    velero.io/storage-location: default
+spec:
+  # Verweis auf die BackupStorageLocation
+  backupStorageLocation: default
+  
+  # Namespace der gesicherten Pods
+  volumeNamespace: meeting-automation-staging
+  
+  # Kopia Repository Typ
+  repositoryType: kopia
+  
+  # Wartungs-Intervall (24 Stunden)
+  maintenanceFrequency: 24h
