@@ -1,8 +1,8 @@
 # Velero Backup & Recovery Plan
 
-**Status:** PLAN (kein Deploy durchgeführt)
+**Status:** IMPLEMENTIERT (Staging + Production)
 **Erstellt:** 2026-08-10
-**Aktualisiert:** 2026-08-10 (mit Phase-92-Historie)
+**Aktualisiert:** 2026-08-11 (Production Velero installiert + erstes Backup COMPLETED)
 **Cluster:** Staging (OCI 158.180.18.110) + Production (Contabo 169.58.83.32)
 
 ---
@@ -32,16 +32,16 @@ Velero wurde **bereits am 2026-06-28 (Phase 92)** auf dem Staging-Cluster instal
 
 | Eigenschaft | Staging | Production |
 |------------|---------|------------|
-| Velero installiert | ❌ NEIN | ❌ NEIN |
-| Velero CLI | v1.14.0 (auf OCI-Server) | Nicht vorhanden |
-| Backup-Backend | Keines | Keines |
-| Schedules | Keine | Keine |
-| Bestehende Backups | Keine (Phase 92 verloren) | Keine |
-| MinIO `velero-backups` Bucket | ❌ Gelöscht | ❌ Nicht vorhanden |
+| Velero installiert | ✅ JA (v1.18.1) | ✅ JA (v1.18.1) |
+| Velero CLI | v1.14.0 | v1.18.1 |
+| Backup-Backend | MinIO `velero-backups` | MinIO `velero-backups` |
+| BSL Status | ✅ Available | ✅ Available |
+| Schedule | `daily-backup` (0 2 * * *, TTL 168h) | `daily-backup` (0 2 * * *, TTL 336h) |
+| Erstes Backup | ✅ COMPLETED (215 Items, 304KiB) | ✅ COMPLETED (0 Errors, 0 Warnings) |
+| MinIO `velero-backups` Bucket | ✅ Vorhanden | ✅ Vorhanden (leer, erstes Backup läuft) |
+| Namespace | `velero` | `velero` |
 
-**Fazit:** Velero muss in beiden Clustern frisch installiert werden. Der `velero-backups` Bucket muss neu erstellt werden.
-
-**Update 2026-08-10:** Velero ERFOLGREICH auf Staging installiert (Helm v1.18.1, BSL Available, erstes Backup COMPLETED).
+**Fazit:** Velero ist auf BEIDEN Clustern installiert und funktional.
 
 ### Cluster-Inventar
 
@@ -321,7 +321,7 @@ stringData:
 
 ---
 
-## 6. Installations-Schritte (Staging)
+## 6. Installations-Schritte (Staging) — ✅ ABGESCHLOSSEN
 
 ### Phase 1: MinIO Bucket erstellen
 
@@ -329,17 +329,15 @@ stringData:
 # Port-Forward zu MinIO
 kubectl port-forward -n meeting-automation-staging svc/minio-staging 9400:9000 &
 
-# MinIO Client installieren (falls nicht vorhanden)
-curl -sL https://dl.min.io/client/mc/release/linux-arm64/mc -o /usr/local/bin/mc
-chmod +x /usr/local/bin/mc
+# MinIO Client installieren (ARM64)
+curl -sL https://dl.min.io/client/mc/release/linux-arm64/mc -o /tmp/mc
+chmod +x /tmp/mc
 
 # MinIO Alias konfigurieren
-mc alias set staging http://localhost:9400 minio_user minio_password
+/tmp/mc alias set staging http://localhost:9400 minio_user minio_password
 
-# Bucket erstellen
-mc mb staging/velero-backups
-mc mb staging/velero-backups/staging
-mc mb staging/velero-backups/production
+# Bucket erstellen (sub-Buckets NICHT erstellen — Velero erwartet leeren Bucket-Root)
+/tmp/mc mb staging/velero-backups
 ```
 
 ### Phase 2: Velero installieren (Helm)
@@ -349,111 +347,105 @@ mc mb staging/velero-backups/production
 helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
 helm repo update
 
-# Velero installieren
+# Velero installieren (v1.18.1 — BSL als Array, kein top-level provider)
 helm install velero vmware-tanzu/velero \
   --namespace velero \
   --create-namespace \
-  --set configuration.provider=aws \
-  --set configuration.backupStorageLocation.name=default \
-  --set configuration.backupStorageLocation.bucket=velero-backups/staging \
-  --set configuration.backupStorageLocation.config.region=minio \
-  --set configuration.backupStorageLocation.config.s3ForcePathStyle=true \
-  --set configuration.backupStorageLocation.config.s3Url=http://minio-staging.meeting-automation-staging.svc:9000 \
-  --set credentials.existingSecret=velero-s3-credentials \
-  --set snapshotsEnabled=false \  # local-path hat keine CSI-Snapshots
-  --set deployNodeAgent=true \
-  --set nodeAgent.resources.requests.cpu=200m \
-  --set nodeAgent.resources.requests.memory=256Mi \
-  --set nodeAgent.resources.limits.cpu=500m \
-  --set nodeAgent.resources.limits.memory=512Mi \
-  --set initContainers[0].name=velero-plugin-for-aws \
-  --set initContainers[0].image=velero/velero-plugin-for-aws:v1.9.0 \
-  --set initContainers[0].volumeMounts[0].mountPath=/target \
-  --set initContainers[0].volumeMounts[0].name=plugins
+  --set 'configuration.backupStorageLocation[0].name=default' \
+  --set 'configuration.backupStorageLocation[0].provider=aws' \
+  --set 'configuration.backupStorageLocation[0].bucket=velero-backups' \
+  --set 'configuration.backupStorageLocation[0].config.region=minio' \
+  --set 'configuration.backupStorageLocation[0].config.s3ForcePathStyle=true' \
+  --set 'configuration.backupStorageLocation[0].config.s3Url=http://minio-staging.meeting-automation-staging.svc:9000' \
+  --set 'credentials.existingSecret=velero-s3-credentials' \
+  --set 'snapshotsEnabled=false' \
+  --set 'deployNodeAgent=true' \
+  --set 'nodeAgent.resources.requests.cpu=200m' \
+  --set 'nodeAgent.resources.requests.memory=256Mi' \
+  --set 'nodeAgent.resources.limits.cpu=500m' \
+  --set 'nodeAgent.resources.limits.memory=512Mi' \
+  --set 'initContainers[0].name=velero-plugin-for-aws' \
+  --set 'initContainers[0].image=velero/velero-plugin-for-aws:v1.9.0' \
+  --set 'initContainers[0].volumeMounts[0].mountPath=/target' \
+  --set 'initContainers[0].volumeMounts[0].name=plugins'
 ```
 
-### Phase 3: Backup-Schedule erstellen
+### Phase 3: NetworkPolicy Fix
 
-**Historischer Schedule-Name (Phase 92):** `daily-backup`
-**Neuer Schedule-Name (konsistent):** `daily-backup`
+`default-deny-all` in `meeting-automation-staging` blockiert Velero→MinIO Traffic:
+
+```bash
+# minio-policy um Velero-Namespace erweitern
+kubectl patch networkpolicy minio-policy -n meeting-automation-staging --type=json \
+  -p '[{"op":"add","path":"/spec/ingress/0/from/-","value":{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"velero"}}}}]'
+```
+
+### Phase 4: Backup-Schedule erstellen
 
 ```bash
 # Tägliches Voll-Backup (02:00)
 velero schedule create daily-backup \
   --schedule="0 2 * * *" \
   --ttl=168h \
-  --include-namespaces=meeting-automation-staging \
-  --snapshot-volumes
-
-# Alle 6 Stunden inkrementelles Backup
-velero schedule create every-6h \
-  --schedule="0 */6 * * *" \
-  --ttl=72h \
   --include-namespaces=meeting-automation-staging
-
-# Vor-Deploy-Backup (manuell, konsistent mit Phase 92)
-velero backup create pre-deploy-$(date +%Y%m%d-%H%M) \
-  --include-namespaces=meeting-automation-staging \
-  --snapshot-volumes \
-  --ttl=336h
 ```
 
-### Phase 4: Verifikation
+### Phase 5: Erstes Backup & Verifikation
 
 ```bash
-# Status prüfen
-velero get backup-locations
-velero get snapshots
-velero schedule get
-velero backup get
-
 # Erstes Backup manuell auslösen
-velero backup create test-backup-001 --include-namespaces=meeting-automation-staging --snapshot-volumes
+velero backup create first-backup-$(date +%Y%m%d) \
+  --include-namespaces=meeting-automation-staging \
+  --wait
 
-# Backup-Status prüfen
-velero backup describe test-backup-001 --details
-velero backup logs test-backup-001
+# Status prüfen
+velero backup get
+velero backup describe first-backup-20260810 --details
+velero schedule get
+velero backup-location get
 ```
+
+**Ergebnis (2026-08-10):** `first-backup-20260810` — COMPLETED, 215 Items, 304KiB, 11 Sekunden.
 
 ---
 
-## 7. Production-Deployment-Plan
+## 7. Production-Deployment — ✅ ABGESCHLOSSEN (2026-08-11)
 
 ### Voraussetzungen
 
 | Voraussetzung | Status | Aktion |
 |---------------|--------|--------|
-| Velero CLI installiert | ❌ | `curl -sL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc` |
+| Velero CLI installiert | ✅ | `v1.18.1` auf `/usr/local/bin/velero` |
 | MinIO erreichbar | ✅ | `minio-0` läuft in `meeting-automation` |
-| Velero-Backup-Bucket | ❌ | `mc mb production/velero-backups` |
-| Credential-Secret | ❌ | Muss überführt werden |
+| Velero-Backup-Bucket | ✅ | `velero-backups` vorhanden (leer) |
+| Credential-Secret | ✅ | `velero-s3-credentials` (MinIO-Passwort: `3Bsd1nsvjsnkCzcPvB96ew`) |
+| minio-policy erweitert | ✅ | Velero-Ingress-Regel hinzugefügt |
+| Velero installiert | ✅ | Helm v1.18.1, `deployed` |
+| BSL Available | ✅ | MinIO erreichbar |
+| Schedule | ✅ | `daily-backup` (0 2 * * *, TTL 336h) |
+| Erstes Backup | ✅ | `first-backup-prod-20260810` — COMPLETED |
 
-### Schritt-für-Schritt Plan
+### Durchgeführte Schritte
 
-#### Schritt 1: MinIO Bucket erstellen (Production)
+#### Schritt 1: mc (MinIO Client) installieren
 
 ```bash
 ssh root@169.58.83.32
-
-# MinIO Client installieren
 curl -sL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
 chmod +x /usr/local/bin/mc
-
-# Port-Forward
-kubectl port-forward -n meeting-automation svc/minio 9400:9000 &
-
-# Bucket erstellen
-mc alias set prod http://localhost:9400 minio_user minio_password
-mc mb prod/velero-backups
-mc mb prod/velero-backups/production
 ```
 
-#### Schritt 2: Velero Credential-Secret
+#### Schritt 2: velero-backups Bucket verifizieren
 
 ```bash
-# Secret erstellen
-kubectl create namespace velero
+# Bucket existierte bereits (leer)
+kubectl exec -n meeting-automation minio-0 -- ls /data/velero-backups/
+```
 
+#### Schritt 3: Velero Namespace + Secret
+
+```bash
+kubectl create namespace velero
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Secret
@@ -465,11 +457,22 @@ stringData:
   cloud: |
     [default]
     aws_access_key_id=minio_user
-    aws_secret_access_key=minio_password
+    aws_secret_access_key=3Bsd1nsvjsnkCzcPvB96ew
 EOF
 ```
 
-#### Schritt 3: Velero installieren
+**WICHTIG:** Production MinIO-Passwort ist `3Bsd1nsvjsnkCzcPvB96ew`, NICHT `minio_password`!
+
+#### Schritt 4: minio-policy erweitern
+
+```bash
+kubectl patch networkpolicy minio-policy -n meeting-automation --type=json \
+  --patch-file=/dev/stdin <<EOF
+[{"op":"add","path":"/spec/ingress/0/from/-","value":{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"velero"}}}}]
+EOF
+```
+
+#### Schritt 5: Velero via Helm installieren
 
 ```bash
 helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts
@@ -477,42 +480,43 @@ helm repo update
 
 helm install velero vmware-tanzu/velero \
   --namespace velero \
-  --create-namespace \
-  --set configuration.provider=aws \
-  --set configuration.backupStorageLocation.name=default \
-  --set configuration.backupStorageLocation.bucket=velero-backups/production \
-  --set configuration.backupStorageLocation.config.region=minio \
-  --set configuration.backupStorageLocation.config.s3ForcePathStyle=true \
-  --set configuration.backupStorageLocation.config.s3Url=http://minio.meeting-automation.svc:9000 \
-  --set credentials.existingSecret=velero-s3-credentials \
-  --set snapshotsEnabled=false \  # local-path hat keine CSI-Snapshots
-  --set deployNodeAgent=true \
-  --set nodeAgent.resources.requests.cpu=200m \
-  --set nodeAgent.resources.requests.memory=256Mi \
-  --set nodeAgent.resources.limits.cpu=500m \
-  --set nodeAgent.resources.limits.memory=512Mi \
-  --set initContainers[0].name=velero-plugin-for-aws \
-  --set initContainers[0].image=velero/velero-plugin-for-aws:v1.9.0 \
-  --set initContainers[0].volumeMounts[0].mountPath=/target \
-  --set initContainers[0].volumeMounts[0].name=plugins
+  --set 'configuration.backupStorageLocation[0].name=default' \
+  --set 'configuration.backupStorageLocation[0].provider=aws' \
+  --set 'configuration.backupStorageLocation[0].bucket=velero-backups' \
+  --set 'configuration.backupStorageLocation[0].config.region=minio' \
+  --set 'configuration.backupStorageLocation[0].config.s3ForcePathStyle=true' \
+  --set 'configuration.backupStorageLocation[0].config.s3Url=http://minio.meeting-automation.svc:9000' \
+  --set 'credentials.existingSecret=velero-s3-credentials' \
+  --set 'snapshotsEnabled=false' \
+  --set 'deployNodeAgent=true' \
+  --set 'nodeAgent.resources.requests.cpu=200m' \
+  --set 'nodeAgent.resources.requests.memory=256Mi' \
+  --set 'nodeAgent.resources.limits.cpu=500m' \
+  --set 'nodeAgent.resources.limits.memory=512Mi' \
+  --set 'initContainers[0].name=velero-plugin-for-aws' \
+  --set 'initContainers[0].image=velero/velero-plugin-for-aws:v1.9.0' \
+  --set 'initContainers[0].volumeMounts[0].mountPath=/target' \
+  --set 'initContainers[0].volumeMounts[0].name=plugins'
 ```
 
-#### Schritt 4: Backup-Schedules
+#### Schritt 6: Backup-Schedule + erstes Backup
 
 ```bash
-# Tägliches Voll-Backup (02:00 Production-Time = 01:00 UTC, Tunisia = UTC+1)
-# Historischer Name (Phase 92): daily-backup
+# Schedule (TTL 336h = 14 Tage für Production)
 velero schedule create daily-backup \
-  --schedule="0 1 * * *" \
+  --schedule="0 2 * * *" \
   --ttl=336h \
-  --include-namespaces=meeting-automation \
-  --snapshot-volumes
+  --include-namespaces=meeting-automation
 
-# Vor-Deploy-Backup (manuell, von CI/CD ausgelöst)
-# Wird in deploy-production.yml als Step hinzugefügt
+# Erstes Backup
+velero backup create first-backup-prod-$(date +%Y%m%d) \
+  --include-namespaces=meeting-automation \
+  --wait
 ```
 
-#### Schritt 5: CI/CD Integration
+**Ergebnis (2026-08-11):** `first-backup-prod-20260810` — COMPLETED, 0 Errors, 0 Warnings.
+
+### CI/CD Integration (geplant)
 
 In `.github/workflows/deploy-production.yml` vor dem Deploy einfügen:
 
@@ -522,27 +526,9 @@ In `.github/workflows/deploy-production.yml` vor dem Deploy einfügen:
     export KUBECONFIG=$(pwd)/kubeconfig-prod
     velero backup create pre-deploy-${{ github.sha }} \
       --include-namespaces=meeting-automation \
-      --snapshot-volumes \
       --ttl=336h \
       --wait
     echo "✅ Velero backup created: pre-deploy-${{ github.sha }}"
-```
-
-#### Schritt 6: Verifikation
-
-```bash
-# Status prüfen
-velero get backup-locations
-velero schedule get
-
-# Erstes Backup auslösen
-velero backup create prod-test-backup-001 \
-  --include-namespaces=meeting-automation \
-  --snapshot-volumes
-
-# Prüfen
-velero backup describe prod-test-backup-001 --details
-velero backup logs prod-test-backup-001
 ```
 
 ---
@@ -697,27 +683,27 @@ velero backup logs $(velero backup get -o json | jq -r '.items[-1].metadata.name
 
 ### Nächste Schritte
 
-| Priorität | Schritt | Aufwand | Risiko |
-|-----------|---------|---------|--------|
-| **P0** | MinIO Bucket `velero-backups` erstellen | 5 Min | Niedrig |
-| **P0** | Velero Credential-Secret erstellen | 5 Min | Niedrig |
-| **P0** | Velero via Helm installieren (Staging) | 15 Min | Mittel |
-| **P0** | Erstes Backup ausführen & verifizieren | 10 Min | Niedrig |
-| **P1** | Backup-Schedules konfigurieren | 5 Min | Niedrig |
-| **P1** | Velero ServiceMonitor + Alerting | 10 Min | Niedrig |
-| **P1** | Restore-Test durchführen | 30 Min | Hoch |
-| **P2** | Production-Deployment | 60 Min | Hoch |
-| **P2** | CI/CD Pre-Deploy-Backup integrieren | 15 Min | Niedrig |
-| **P2** | Dokumentation (diese Datei) | ✅ Erledigt | Keins |
+| Priorität | Schritt | Aufwand | Risiko | Status |
+|-----------|---------|---------|--------|--------|
+| **P0** | MinIO Bucket `velero-backups` erstellen | 5 Min | Niedrig | ✅ Erledigt |
+| **P0** | Velero Credential-Secret erstellen | 5 Min | Niedrig | ✅ Erledigt |
+| **P0** | Velero via Helm installieren (Staging) | 15 Min | Mittel | ✅ Erledigt |
+| **P0** | Erstes Backup ausführen & verifizieren | 10 Min | Niedrig | ✅ Erledigt |
+| **P0** | Production-Deployment | 60 Min | Hoch | ✅ Erledigt |
+| **P1** | Backup-Schedules konfigurieren | 5 Min | Niedrig | ✅ Erledigt |
+| **P1** | Velero ServiceMonitor + Alerting | 10 Min | Niedrig | ⬜ Offen |
+| **P1** | Restore-Test durchführen | 30 Min | Hoch | ⬜ Offen |
+| **P2** | CI/CD Pre-Deploy-Backup integrieren | 15 Min | Niedrig | ⬜ Offen |
+| **P2** | Dokumentation (diese Datei) | ✅ Erledigt | Keins | ✅ Erledigt |
 
 ### Geschätzter Gesamtaufwand
 
-| Phase | Aufwand |
-|-------|---------|
-| Staging installieren + testen | ~2 Stunden |
-| Production deployen | ~1 Stunde |
-| CI/CD integrieren | ~30 Minuten |
-| **Gesamt** | **~3.5 Stunden** |
+| Phase | Aufwand | Status |
+|-------|---------|--------|
+| Staging installieren + testen | ~2 Stunden | ✅ Erledigt |
+| Production deployen | ~1 Stunde | ✅ Erledigt |
+| CI/CD integrieren | ~30 Minuten | ⬜ Offen |
+| **Gesamt** | **~3.5 Stunden** | **~3h erledigt** |
 
 ### Risiken
 
@@ -757,17 +743,86 @@ velero backup logs $(velero backup get -o json | jq -r '.items[-1].metadata.name
 | Sub-Buckets `staging/` + `production/` in `velero-backups` | Velero erwartet leeren Bucket-Root — Sub-Buckets löschen |
 | `Backup store contains invalid top-level directories` | MinIO `mc rb --force` für Sub-Buckets |
 
-### Korrekter Helm-Befehl (fertig)
+### Production-spezifische Lektionen
+
+| Problem | Staging | Production |
+|---------|---------|------------|
+| MinIO-Passwort | `minio_password` (Standard) | `3Bsd1nsvjsnkCzcPvB96ew` (Custom) — Secret musste korrigiert werden |
+| Helm-Repo | Bereits vorhanden | Musste `vmware-tanzu` erst hinzugefügt werden |
+| Velero CLI | Bereits vorhanden (v1.14.0) | Musste v1.18.1 installiert werden |
+| velero-backups Bucket | Neu erstellt | Bereits vorhanden (leer) — keine Aktion nötig |
+| minio-policy | Velero-Namespace fehlte | Velero-Namespace fehlte — musste erweitert werden |
+| BSL Provider | Immer Required | `configuration.provider` muss in jedem BSL-Item sein (nicht top-level) |
+
+### Korrekter Helm-Befehl (Staging)
 
 ```bash
-helm install velero vmware-tanzu/velero   --namespace velero   --create-namespace   --set 'configuration.backupStorageLocation[0].name=default'   --set 'configuration.backupStorageLocation[0].provider=aws'   --set 'configuration.backupStorageLocation[0].bucket=velero-backups'   --set 'configuration.backupStorageLocation[0].config.region=minio'   --set 'configuration.backupStorageLocation[0].config.s3ForcePathStyle=true'   --set 'configuration.backupStorageLocation[0].config.s3Url=http://minio-staging.meeting-automation-staging.svc:9000'   --set 'credentials.existingSecret=velero-s3-credentials'   --set 'snapshotsEnabled=false'   --set 'deployNodeAgent=true'   --set 'nodeAgent.resources.requests.cpu=200m'   --set 'nodeAgent.resources.requests.memory=256Mi'   --set 'nodeAgent.resources.limits.cpu=500m'   --set 'nodeAgent.resources.limits.memory=512Mi'   --set 'initContainers[0].name=velero-plugin-for-aws'   --set 'initContainers[0].image=velero/velero-plugin-for-aws:v1.9.0'   --set 'initContainers[0].volumeMounts[0].mountPath=/target'   --set 'initContainers[0].volumeMounts[0].name=plugins'
+helm install velero vmware-tanzu/velero \
+  --namespace velero \
+  --create-namespace \
+  --set 'configuration.backupStorageLocation[0].name=default' \
+  --set 'configuration.backupStorageLocation[0].provider=aws' \
+  --set 'configuration.backupStorageLocation[0].bucket=velero-backups' \
+  --set 'configuration.backupStorageLocation[0].config.region=minio' \
+  --set 'configuration.backupStorageLocation[0].config.s3ForcePathStyle=true' \
+  --set 'configuration.backupStorageLocation[0].config.s3Url=http://minio-staging.meeting-automation-staging.svc:9000' \
+  --set 'credentials.existingSecret=velero-s3-credentials' \
+  --set 'snapshotsEnabled=false' \
+  --set 'deployNodeAgent=true' \
+  --set 'nodeAgent.resources.requests.cpu=200m' \
+  --set 'nodeAgent.resources.requests.memory=256Mi' \
+  --set 'nodeAgent.resources.limits.cpu=500m' \
+  --set 'nodeAgent.resources.limits.memory=512Mi' \
+  --set 'initContainers[0].name=velero-plugin-for-aws' \
+  --set 'initContainers[0].image=velero/velero-plugin-for-aws:v1.9.0' \
+  --set 'initContainers[0].volumeMounts[0].mountPath=/target' \
+  --set 'initContainers[0].volumeMounts[0].name=plugins'
 ```
 
-## 11. Offene Fragen
+### Korrekter Helm-Befehl (Production)
+
+```bash
+helm install velero vmware-tanzu/velero \
+  --namespace velero \
+  --create-namespace \
+  --set 'configuration.backupStorageLocation[0].name=default' \
+  --set 'configuration.backupStorageLocation[0].provider=aws' \
+  --set 'configuration.backupStorageLocation[0].bucket=velero-backups' \
+  --set 'configuration.backupStorageLocation[0].config.region=minio' \
+  --set 'configuration.backupStorageLocation[0].config.s3ForcePathStyle=true' \
+  --set 'configuration.backupStorageLocation[0].config.s3Url=http://minio.meeting-automation.svc:9000' \
+  --set 'credentials.existingSecret=velero-s3-credentials' \
+  --set 'snapshotsEnabled=false' \
+  --set 'deployNodeAgent=true' \
+  --set 'nodeAgent.resources.requests.cpu=200m' \
+  --set 'nodeAgent.resources.requests.memory=256Mi' \
+  --set 'nodeAgent.resources.limits.cpu=500m' \
+  --set 'nodeAgent.resources.limits.memory=512Mi' \
+  --set 'initContainers[0].name=velero-plugin-for-aws' \
+  --set 'initContainers[0].image=velero/velero-plugin-for-aws:v1.9.0' \
+  --set 'initContainers[0].volumeMounts[0].mountPath=/target' \
+  --set 'initContainers[0].volumeMounts[0].name=plugins'
+```
+
+## 11. Production-Unterschiede (Lektionen)
+
+| Aspekt | Staging | Production |
+|--------|---------|------------|
+| MinIO-Passwort | `minio_password` | **`3Bsd1nsvjsnkCzcPvB96ew`** (anders!) |
+| MinIO Service DNS | `minio-staging.meeting-automation-staging.svc` | `minio.meeting-automation.svc` |
+| Namespace | `meeting-automation-staging` | `meeting-automation` |
+| Schedule TTL | 168h (7 Tage) | 336h (14 Tage) |
+| Helm-Repo | Bereits vorhanden | Musste `vmware-tanzu` hinzugefügt werden |
+| Velero CLI | Bereits vorhanden (v1.14.0) | Musste installiert werden (v1.18.1) |
+| mc (MinIO Client) | `/tmp/mc` (ARM64) | `/usr/local/bin/mc` (AMD64) |
+| velero-backups Bucket | Neu erstellt | Bereits vorhanden (leer) |
+| Disk | 183G (81% belegt) | 290G (82% belegt) |
+
+## 12. Offene Fragen
 
 | Frage | Entscheidung nötig | Vorschlag |
 |-------|-------------------|-----------|
-| Soll Velero in **meeting-automation** Namespace laufen oder eigenes **velero** Namespace? | Ja | Eigenes `velero` Namespace (saubere Trennung) |
+| ~~Soll Velero in **meeting-automation** Namespace laufen oder eigenes **velero** Namespace?~~ | ✅ Erledigt | Eigenes `velero` Namespace (beide Cluster) |
 | Soll der Pre-Deploy-Backup in CI/CD **blockierend** sein (wenn Backup fehlschlägt, kein Deploy)? | Ja | Ja, blockierend für Production, Warning für Staging |
 | Soll CNPG Backup (Point-in-Time) **zusätzlich** zu Velero laufen? | Ja | Ja — Velero für Cluster-State, CNPG für DB-Point-in-Time |
 | Soll Velero auch **monitoring** Namespace sichern? | Ja | Nein — Prometheus/Alertmanager-Daten nicht kritisch |
@@ -775,7 +830,7 @@ helm install velero vmware-tanzu/velero   --namespace velero   --create-namespac
 
 ---
 
-## 12. Cluster-Rebuild Recovery (Lektion aus Phase 92)
+## 13. Cluster-Rebuild Recovery (Lektion aus Phase 92)
 
 **Lektion:** Velero ging bei Cluster-Rebuilds (Phasen 188, 189) komplett verloren —Namespace, CRDs, Buckets, Secrets, Schedules. Bei jedem Rebuild muss Velero neu installiert werden.
 
