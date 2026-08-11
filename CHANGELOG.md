@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.90.0] — 2026-08-11
 
 ### Fixed
+- **🔴 CRITICAL — pg_dump Backup Root Cause (Production)**: `cnpg-policy` NetworkPolicy fehlte `podSelector: app: postgres-backup` → CronJob-Ports blockiert → 20-Byte GZip-Header statt echte Backups (6 defekte Backups Aug 6-11). FIX: Ingress-Regel in `cnpg-policy` um `app: postgres-backup` erweitert. **Kein hostNetwork-Problem, kein DNS-Problem** — reine NetworkPolicy-Blockade.
 - **Backup CronJob pg_dump Image**: `postgres:15-alpine` → `postgres:18-alpine` (Staging + Production) — PG 15 Dump inkompatibel mit PG 18 Restore
 - **Backup CronJob DNS (Staging)**: Hardcoded IP `10.43.101.189` → `meeting-db-rw...svc.cluster.local` — pg_dump fehlgeschlagen seit Tagen
 - **Ephemeral Storage Limits**: CronJobs mit `limits: 2Gi`, `requests: 200Mi` hinzugefügt
