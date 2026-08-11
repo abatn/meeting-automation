@@ -2,7 +2,7 @@
 
 **Status:** IMPLEMENTIERT (Staging + Production)
 **Erstellt:** 2026-08-10
-**Aktualisiert:** 2026-08-11 (Production Velero installiert + FSB-Kopia-Repo-Lektionen dokumentiert)
+**Aktualisiert:** 2026-08-11 (Production FSB aktiviert + erstes Full-Backup COMPLETED)
 **Cluster:** Staging (OCI 158.180.18.110) + Production (Contabo 169.58.83.32)
 
 ---
@@ -37,11 +37,14 @@ Velero wurde **bereits am 2026-06-28 (Phase 92)** auf dem Staging-Cluster instal
 | Backup-Backend | MinIO `velero-backups` | MinIO `velero-backups` |
 | BSL Status | ✅ Available | ✅ Available |
 | Schedule | `daily-backup` (0 2 * * *, TTL 168h) | `daily-backup` (0 2 * * *, TTL 336h) |
-| Erstes Backup | ✅ COMPLETED (215 Items, 304KiB) | ✅ COMPLETED (0 Errors, 0 Warnings) |
+| Erstes Backup | ✅ COMPLETED (215 Items, 304KiB) | ✅ COMPLETED (28.7GiB, 7/7 PVCs) |
+| FSB aktiviert | ✅ `configuration.defaultVolumesToFsBackup=true` | ✅ `configuration.defaultVolumesToFsBackup=true` |
+| BackupRepository CRD | ✅ `meeting-automation-staging-default-kopia` | ✅ `meeting-automation-default-kopia` |
+| PodVolumeBackups | ✅ Funktionieren | ✅ Funktionieren (11 PVBs) |
 | MinIO `velero-backups` Bucket | ✅ Vorhanden | ✅ Vorhanden (leer, erstes Backup läuft) |
 | Namespace | `velero` | `velero` |
 
-**Fazit:** Velero ist auf BEIDEN Clustern installiert und funktional.
+**Fazit:** Velero ist auf BEIDEN Clustern installiert, FSB aktiviert, und sichert automatisch PVC-Daten.
 
 ### Cluster-Inventar
 
@@ -574,6 +577,51 @@ velero backup create first-backup-prod-$(date +%Y%m%d) \
 
 **Ergebnis (2026-08-11):** `first-backup-prod-20260810` — COMPLETED, 0 Errors, 0 Warnings.
 
+#### Schritt 7: FSB (File System Backup) aktivieren
+
+**Problem:** Die ersten Production-Backups enthielten nur Metadaten (213 Items, ~304KiB) — KEINE PVCs!
+**Ursache:** FSB war bei der Initial-Installation nicht aktiviert.
+
+```bash
+# FSB aktivieren (KORREKTER Helm-Key)
+helm upgrade velero vmware-tanzu/velero -n velero --reuse-values \
+  --set configuration.defaultVolumesToFsBackup=true
+
+# Verifikation
+kubectl get deploy velero -n velero -o jsonpath='{.spec.template.spec.containers[0].args}'
+# Erwartet: --default-volumes-to-fs-backup im Deployment-Args
+```
+
+#### Schritt 8: Kopia-Repository initialisieren
+
+```bash
+# Metadata-only Backup (initialisiert Kopia-Repo + sichert PVCs)
+velero backup create init-meta-prod-$(date +%Y%m%d) \
+  --include-namespaces=meeting-automation \
+  --snapshot-volumes=false \
+  --wait
+
+# Verifikation
+kubectl get backuprepositories.velero.io -n velero
+# Erwartet: meeting-automation-default-kopia (AGE > 0)
+
+kubectl get podvolumebackups.velero.io -n velero
+# Erwartet: 7+ PVBs (alle PVCs im Namespace)
+```
+
+**Ergebnis (2026-08-11):**
+
+| Metrik | Wert |
+|--------|------|
+| Backup-Status | ✅ COMPLETED (0 Errors, 9 Warnings) |
+| PVBs | ✅ 11 Completed (7 PVCs + 4 Nachzügler) |
+| BackupRepository CRD | ✅ `meeting-automation-default-kopia` |
+| Backup-Größe | ~28.7GiB (alle 7 PVCs gesichert) |
+| Disk | 79% (62G frei) — stabil |
+| Dauer | ~10 Minuten |
+
+**Hinweis:** Die 9 Warnings betreffen Cluster-Scoped Ressourcen (ClusterRoles, CRDs) — nicht kritisch.
+
 ### CI/CD Integration (geplant)
 
 In `.github/workflows/deploy-production.yml` vor dem Deploy einfügen:
@@ -748,6 +796,8 @@ velero backup logs $(velero backup get -o json | jq -r '.items[-1].metadata.name
 | **P0** | Velero via Helm installieren (Staging) | 15 Min | Mittel | ✅ Erledigt |
 | **P0** | Erstes Backup ausführen & verifizieren | 10 Min | Niedrig | ✅ Erledigt |
 | **P0** | Production-Deployment | 60 Min | Hoch | ✅ Erledigt |
+| **P0** | Production FSB aktivieren | 15 Min | Niedrig | ✅ Erledigt |
+| **P0** | Production erstes FSB-Backup | 15 Min | Mittel | ✅ Erledigt |
 | **P1** | Backup-Schedules konfigurieren | 5 Min | Niedrig | ✅ Erledigt |
 | **P1** | Velero ServiceMonitor + Alerting | 10 Min | Niedrig | ⬜ Offen |
 | **P1** | Restore-Test durchführen | 30 Min | Hoch | ⬜ Offen |
@@ -1029,6 +1079,9 @@ helm install velero vmware-tanzu/velero \
 | mc (MinIO Client) | `/tmp/mc` (ARM64) | `/usr/local/bin/mc` (AMD64) |
 | velero-backups Bucket | Neu erstellt | Bereits vorhanden (leer) |
 | Disk | 183G (81% belegt) | 290G (82% belegt) |
+| FSB aktiviert | ✅ Bei Installation | ❌ Erst nach Helm-Upgrade (Schritt 7) |
+| Erstes FSB-Backup | ~30Gi (Staging) | ~28.7Gi (Production) |
+| BackupRepository CRD | `meeting-automation-staging-default-kopia` | `meeting-automation-default-kopia` |
 
 ## 12. Offene Fragen
 
