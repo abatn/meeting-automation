@@ -2,7 +2,7 @@
 
 **Status:** IMPLEMENTIERT (Staging + Production)
 **Erstellt:** 2026-08-10
-**Aktualisiert:** 2026-08-11 (Production Velero installiert + erstes Backup COMPLETED)
+**Aktualisiert:** 2026-08-11 (Production Velero installiert + FSB-Kopia-Repo-Lektionen dokumentiert)
 **Cluster:** Staging (OCI 158.180.18.110) + Production (Contabo 169.58.83.32)
 
 ---
@@ -839,6 +839,121 @@ velero-backups/
 | Scoped (klein) | `app in (n8n-staging,celery-worker-pro-staging,rabbitmq-staging)` | n8n+sentinel+rabbitmq | ~3-5Gi | 168h |
 | Kritisch | `app in (postgres-staging,minio-staging)` | PostgreSQL+MinIO | ~15-20Gi | 720h |
 | Voll | Keiner | Alle 38Gi | ~25-30Gi | 720h |
+
+### Kopia-Repository Management (Lektionen aus 2026-08-11)
+
+**Kernproblem:** Wenn MinIO `velero-backups/` gelöscht wird, geht auch das Kopia-Repository verloren. Velero kann dann keine PodVolumeBackups mehr erstellen — alle PVBs scheitern mit `repository not initialized in the provided storage`.
+
+#### Kopia-Repository Struktur in MinIO
+
+```
+velero-backups/
+├── kopia/
+│   └── meeting-automation-staging/      # Namespace-scoped
+│       ├── kopia.blobcfg                # Kopia-Konfiguration (Verschlüsselung, etc.)
+│       ├── kopia.repository             # Repository-Metadaten
+│       ├── p027c0870.../                # Blob-Objekte (PVB-Daten)
+│       ├── p04e0fe3.../
+│       └── ...
+└── backups/
+    └── <backup-name>/
+        ├── <backup-name>-logs.gz
+        ├── <backup-name>-results.gz
+        └── ...
+```
+
+#### BackupRepository CRD Lifecycle
+
+```
+Velero installiert (Helm)
+    │
+    ├── BSL Available ✅
+    ├── node-agent Running ✅
+    │
+    ├── Erstes FSB-Backup gestartet
+    │   └── node-agent initialisiert Kopia-Repo automatisch
+    │       ├── Kopia-Repo in MinIO erstellt (kopia.blobcfg + kopia.repository)
+    │       └── BackupRepository CRD erstellt: <namespace>-default-kopia
+    │
+    ├── BackupRepository CRD: Ready ✅
+    │   └── Zeigt auf MinIO kopia/ Verzeichnis
+    │
+    ├── ── MINIO VELO-BACKUPS GELOESCHT ──
+    │   └── BackupRepository CRD: stale (zeigt auf nicht-existierendes Repo)
+    │
+    ├── Alle PVBs: Failed ❌
+    │   └── "repository not initialized in the provided storage"
+    │
+    └── RECOVERY: BackupRepository CRD löschen
+        ├── kubectl delete backuprepositories.velero.io --all -n velero
+        ├── Velero server restartet
+        └── Nächstes Backup initialisiert Kopia-Repo automatisch neu
+```
+
+#### Recovery-Verfahren (verifiziert 2026-08-11)
+
+**WICHTIG:** Diese Schritte MÜSSEN in dieser Reihenfolge ausgeführt werden!
+
+```bash
+# 1. BackupRepository CRD löschen (KRITISCH — ohne diesen Schritt funktioniert nichts!)
+kubectl delete backuprepositories.velero.io --all -n velero
+
+# 2. MinIO velero-backups leeren (nur wenn Kopia-Repo defekt)
+kubectl exec -n <namespace> minio-<pod> -- rm -rf /data/velero-backups/*
+kubectl exec -n <namespace> minio-<pod> -- mkdir -p /data/velero-backups
+
+# 3. Alle alten Backup-Records löschen (zeigen auf defektes Repo)
+for b in $(velero backup get -o json | python3 -c "import sys,json; [print(i['metadata']['name']) for i in json.load(sys.stdin).get('items',[])]"); do
+  velero backup delete $b --confirm
+done
+
+# 4. Velero Server restarten
+kubectl rollout restart deployment/velero -n velero
+
+# 5. Metadata-only Backup (initialisiert Kopia-Repo OHNE große Datenmenge)
+velero backup create init-meta-$(date +%Y%m%d) \
+  --include-namespaces=<namespace> \
+  --snapshot-volumes=false \
+  --wait
+
+# 6. Verifikation: Kopia-Repo existiert
+kubectl exec -n <namespace> minio-<pod> -- ls -la /data/velero-backups/kopia/
+# Erwartet: kopia.blobcfg + kopia.repository
+
+# 7. FSB Backup (jetzt funktioniert es)
+velero backup create fsb-after-recovery-$(date +%Y%m%d) \
+  --include-namespaces=<namespace> \
+  --wait
+```
+
+#### Häufige Fehlerquellen
+
+| Fehler | Ursache | Lösung |
+|--------|--------|--------|
+| `repository not initialized in the provided storage` | Kopia-Repo gelöscht oder BackupRepository CRD stale | Schritte 1-7 oben ausführen |
+| `FailedValidation: backup storage location not available` | Velero Server noch nicht ready nach Restart | 15s warten, erneut versuchen |
+| PVB `Error: repo-maintain-jobs` fehlgeschlagen | Kopia-Maintenance auf defektem Repo | Schritt 1 (CRD löschen) + Velero Restart |
+| `--snapshot-volumes=false` verhindert PVBs NICHT | `defaultVolumesToFsBackup=true` override | Nur per `--selector` PVCs einschränken |
+| Backup `PartiallyFailed` (0 Items) | BSL war beim Start noch nicht Ready | Velero 15s nach Restart warten |
+
+#### Wann BackupRepository CRD löschen?
+
+| Szenario | CRD löschen? | Begründung |
+|----------|-------------|------------|
+| MinIO velero-backups/ gelöscht | ✅ JA | CRD zeigt auf nicht-existierendes Repo |
+| Kopia-Repo defekt (Blob-Fehler) | ✅ JA | Erzwingt Neu-Initialisierung |
+| Velero Helm-Upgrade | ❌ NEIN | CRD wird beibehalten |
+| Velero Namespace gelöscht | ✅ JA (automatisch) | CRD im Namespace |
+| Nur Backup-Records gelöscht | ❌ NEIN | Repo bleibt intakt |
+
+#### node-agent vs velero-server: Kopia-Binary
+
+| Komponente | Kopia-Binary | Verwendung |
+|------------|-------------|------------|
+| Velero Server | ❌ Kein Kopia | Verwaltet PVBs, schreibt Metadaten |
+| node-agent (DaemonSet) | ✅ Kopia (eingebaut) | Führt Volume-Backups durch, initialisiert Repo |
+
+**Achtung:** `kopia repository status` im node-agent Pod ist NICHT direkt ausführbar — Kopia läuft als subprocess innerhalb des node-agent Prozesses. Debugging über `velero backup logs` und `kubectl logs daemonset/node-agent`.
 
 ### Production-spezifische Lektionen
 
