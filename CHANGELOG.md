@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **🔴 CRITICAL — pg_dump Backup Root Cause (Production)**: CronJob hatte HARDCODED `TIMESTAMP=20260811-114339` → jeder Lauf überschrieb dieselbe Datei → 20-Byte GZip-Header (5 defekte Backups Aug 6-11). FIX: `TIMESTAMP=$(date +%Y%m%d-%H%M%S)` für dynamischen Timestamp. **NetworkPolicy-Regel für `postgres-backup` zusätzlich hinzugefügt** (war nicht die Root Cause, aber Good Practice).
+- **🔴 CRITICAL — OnlyOffice Production ConfigMap**: ConfigMap wurde gelöscht aber nie wiederhergestellt → `TypeError: Cannot set properties of undefined (setting 'allowPrivateIPAddress')` + nginx Start fehlgeschlagen. FIX: Korrektes `local.json` mit `request-filtering-agent` Sektion + korrekte Secrets + `ds-docservice.conf` wiederhergestellt.
+- **OnlyOffice Production Secret Mismatch**: `local.json` hatte `production-onlyoffice-secret-jwt-key-2026`, aber Deployment Env hatte `tHjRho7Mrgicb9g09trClzCPt9X5OI48ZIfGWILLnkQ` → Browser Auth fehlgeschlagen. FIX: Secrets synchronisiert.
+- **OnlyOffice Production Image unpinned**: `onlyoffice/documentserver:latest` → `onlyoffice/documentserver:9.4.0` (wie Staging) — verhindert unvorhersehbare Updates.
+- **OnlyOffice CI/CD Drift**: Manuelle Prod-Änderungen (ConfigMap + Image) nicht in Git → nächstes Deploy hätte korrekten Zustand überschrieben. FIX: YAML-Dateien in Git aktualisiert (`infrastructure/kubernetes/production/onlyoffice-custom-config.yaml` + `onlyoffice-deployment.yaml`).
 - **Backup CronJob pg_dump Image**: `postgres:15-alpine` → `postgres:18-alpine` (Staging + Production) — PG 15 Dump inkompatibel mit PG 18 Restore
 - **Backup CronJob DNS (Staging)**: Hardcoded IP `10.43.101.189` → `meeting-db-rw...svc.cluster.local` — pg_dump fehlgeschlagen seit Tagen
 - **Ephemeral Storage Limits**: CronJobs mit `limits: 2Gi`, `requests: 200Mi` hinzugefügt
