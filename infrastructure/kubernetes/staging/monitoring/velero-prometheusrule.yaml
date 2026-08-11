@@ -1,0 +1,56 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: velero-alerts
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: velero
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: velero
+      rules:
+        - alert: VeleroBackupFailed
+          expr: velero_backup_successful == 0
+          for: 1h
+          labels:
+            severity: critical
+          annotations:
+            summary: "Velero backup {{ $labels.schedule }} failed"
+            description: "Velero backup has been failing for more than 1 hour."
+
+        - alert: VeleroBackupTooOld
+          expr: time() - velero_backup_last_successful_timestamp > 86400
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Velero backup is older than 24 hours"
+            description: "No successful Velero backup in the last 24 hours."
+
+        - alert: VeleroBackupDurationHigh
+          expr: velero_backup_duration_seconds > 3600
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Velero backup taking longer than 1 hour"
+            description: "Backup duration exceeds 1 hour threshold."
+
+        - alert: VeleroRestoreFailed
+          expr: velero_restore_successful == 0
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Velero restore failed"
+            description: "A Velero restore operation has failed."
+
+        - alert: VeleroBackupPartialFailure
+          expr: velero_backup_partial_failure_count > 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Velero backup partially failed"
+            description: "Velero backup completed with warnings/partial failures."
