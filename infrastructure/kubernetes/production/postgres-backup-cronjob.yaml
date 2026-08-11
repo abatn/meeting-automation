@@ -32,6 +32,7 @@ spec:
           containers:
           - name: pg-dump
             image: postgres:18-alpine
+            imagePullPolicy: Always
             command:
             - sh
             - -c
