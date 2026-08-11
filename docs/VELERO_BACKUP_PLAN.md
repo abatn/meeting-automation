@@ -407,6 +407,64 @@ velero backup-location get
 
 **Ergebnis (2026-08-10):** `first-backup-20260810` — COMPLETED, 215 Items, 304KiB, 11 Sekunden.
 
+### Phase 6: FSB (File System Backup) aktivieren
+
+**Ziel:** PVC-Daten (PostgreSQL, MinIO, RabbitMQ) in Velero-Backups einbeziehen.
+
+```bash
+# FSB aktivieren (KORREKTER Helm-Key: configuration.defaultVolumesToFsBackup)
+helm upgrade velero vmware-tanzu/velero -n velero --reuse-values \
+  --set configuration.defaultVolumesToFsBackup=true
+
+# Verifikation
+kubectl get deploy velero -n velero -o jsonpath='{.spec.template.spec.containers[0].args}' | grep default-volumes-to-fs-backup
+# Erwartet: --default-volumes-to-fs-backup im Deployment
+```
+
+**Ergebnis (2026-08-11):** Kopia-Repository initialisiert, PVBs funktionieren.
+
+### Phase 7: Scoped FSB Backup (2-3 PVCs)
+
+**Ziel:** Nur kritische PVCs sichern (nicht alle 38Gi).
+
+```bash
+# Nur n8n + sentinel + rabbitmq (8Gi gesamt)
+velero backup create fsb-scoped-$(date +%Y%m%d) \
+  --include-namespaces=meeting-automation-staging \
+  --selector 'app in (n8n-staging,celery-worker-pro-staging,rabbitmq-staging)' \
+  --wait
+```
+
+**Ergebnis (2026-08-11):** Backup PartiallyFailed (Kopia-Repo noch nicht initialisiert).
+
+### Phase 8: Kopia-Repository Recovery
+
+**Problem:** Nach Löschen von MinIO velero-backups/ funktionieren alle PVBs nicht mehr.
+**Fehler:** `repository not initialized in the provided storage`
+
+**Lösung (verifiziert):** BackupRepository CRD löschen → Velero initialisiert Kopia-Repo automatisch neu.
+
+```bash
+# 1. Stale BackupRepository CRD löschen
+kubectl delete backuprepositories.velero.io --all -n velero
+
+# 2. MinIO velero-backups leeren
+kubectl exec -n meeting-automation-staging minio-staging-0 -- rm -rf /data/velero-backups/*
+
+# 3. Bucket neu erstellen
+kubectl exec -n meeting-automation-staging minio-staging-0 -- mkdir -p /data/velero-backups
+
+# 4. Velero Server restarten
+kubectl rollout restart deployment/velero -n velero
+
+# 5. Erstes Backup auslösen (initialisiert Kopia-Repo)
+velero backup create init-$(date +%Y%m%d) \
+  --include-namespaces=meeting-automation-staging \
+  --wait
+```
+
+**WICHTIG:** Ohne Schritt 1 (BackupRepository CRD löschen) funktioniert NICHTS!
+
 ---
 
 ## 7. Production-Deployment — ✅ ABGESCHLOSSEN (2026-08-11)
@@ -742,6 +800,45 @@ velero backup logs $(velero backup get -o json | jq -r '.items[-1].metadata.name
 |--------|-------|
 | Sub-Buckets `staging/` + `production/` in `velero-backups` | Velero erwartet leeren Bucket-Root — Sub-Buckets löschen |
 | `Backup store contains invalid top-level directories` | MinIO `mc rb --force` für Sub-Buckets |
+
+### FSB (File System Backup) Lektionen
+
+| Problem | Ursache | Lösung |
+|---------|--------|-------|
+| `defaultVolumesToFsBackup` nicht wirksam | Falscher Helm-Key (top-level statt `configuration.`) | `configuration.defaultVolumesToFsBackup=true` |
+| Node-Agent Eviction bei Full Backup | 38Gi PVCs → Disk-Pressure 92% | Nur kritische PVCs mit `--selector` sichern |
+| Kopia-Repo nicht initialisiert | MinIO velero-backups/ gelöscht | BackupRepository CRD löschen → Velero auto-init |
+| `repository not initialized in the provided storage` | BackupRepository CRD zeigt auf nicht-existierendes Repo | CRD löschen + Velero restarten |
+| Backup-Größe 764K (keine PVCs) | FSB nicht aktiviert (falscher Helm-Key) | Helm-Key korrigieren |
+| Backup-Größe 57Gi (zu groß) | Alle PVCs inkl. MinIO + PostgreSQL | Selektive Backups mit `--selector` |
+| `--snapshot-volumes=false` verhindert PVBs NICHT | FSB wird durch `defaultVolumesToFsBackup=true` getriggert | Nur per `--selector` PVCs einschränken |
+
+### Kopia-Repository Struktur in MinIO
+
+```
+velero-backups/
+├── kopia/
+│   └── meeting-automation-staging/
+│       ├── kopia.blobcfg          # Kopia-Konfiguration
+│       ├── kopia.repository       # Repository-Metadaten
+│       ├── p027c0870.../          # Blob-Objekte (PVB-Daten)
+│       ├── p04e0fe3.../
+│       └── ...
+└── backups/
+    └── <backup-name>/
+        ├── <backup-name>-logs.gz
+        ├── <backup-name>-results.gz
+        └── ...
+```
+
+### Empfohlene FSB-Strategie
+
+| Backup-Typ | Selector | PVCs | Geschätzte Größe | TTL |
+|------------|----------|------|-----------------|-----|
+| Metadaten only | Keiner | Keine | ~500K | 168h |
+| Scoped (klein) | `app in (n8n-staging,celery-worker-pro-staging,rabbitmq-staging)` | n8n+sentinel+rabbitmq | ~3-5Gi | 168h |
+| Kritisch | `app in (postgres-staging,minio-staging)` | PostgreSQL+MinIO | ~15-20Gi | 720h |
+| Voll | Keiner | Alle 38Gi | ~25-30Gi | 720h |
 
 ### Production-spezifische Lektionen
 
