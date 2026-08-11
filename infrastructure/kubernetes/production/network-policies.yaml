@@ -542,6 +542,13 @@ spec:
       port: 8000
     - protocol: TCP
       port: 9187
+  - from:
+    - podSelector:
+        matchLabels:
+          app: postgres-backup
+    ports:
+    - protocol: TCP
+      port: 5432
 
 # CNPG MinIO Access: CNPG Pods brauchen Zugriff auf MinIO fuer WAL-Archiv
 # (Bereits in minio-policy enthalten via CNPG Label app.kubernetes.io/name=postgresql)
