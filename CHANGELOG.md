@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.91.0] — 2026-08-12
+
+### Added
+- **Velero Pre-Deploy-Backup (CI/CD)**: `deploy-production.yml` erstellt automatisch Velero Backup vor jedem Production-Deploy — Name: `pre-deploy-<sha>-<timestamp>`, TTL 14 Tage
+- **MinIO PVC Alerts (Prometheus)**: `MinIOPvcHighUsage` (80% Warning) + `MinIOPvcCriticalUsage` (90% Critical) für Staging + Production
+- **Velero Backup Size Alert**: `VeleroBackupSizeHigh` (>30GB Warning) nur für Staging
+- **VELERO_BACKUP_PLAN.md Section 15**: Staging Disk-Pressure Lektionen (local-path erzwingt keine Limits, Prometheus erzeugt 44GB aus 5Gi PVC)
+- **VELERO_BACKUP_PLAN.md Section 16**: Recovery-Verfahren (Kopia-Repository Reset) — 8-Schritte Prozess mit Quick Reference Tabelle
+- **VELERO_BACKUP_PLAN.md Section 17**: Roadmap — CI/CD Pre-Deploy-Backup + Externes S3 + Priorisierte offene Punkte
+
+### Changed
+- **Staging Velero Retention**: TTL von 168h (7 Tage) auf 72h (3 Tage) gekürzt — spart Speicher auf 183GB Disk
+- **Staging Velero Schedule**: `excludedNamespaces: [monitoring]` + `labelSelector: app in (minio-staging,postgres-staging)` — nur 20Gi PVCs statt 43Gi
+- **Staging Velero Helm Upgrade**: REVISION 5 mit `deployNodeAgent=true` (DaemonSet war verschwunden)
+
+### Fixed
+- **Staging Node-Agent verschwunden**: Helm `--reuse-values` hat DaemonSet nicht wiederhergestellt — manuell per Helm Upgrade mit `deployNodeAgent=true` wiederhergestellt
+- **Staging Grafana im Completed-State**: 11 alte Pods im Succeeded/Failed State — gelöscht + Deployment rollout restart
+- **VELERO_BACKUP_PLAN.md Schedule-Patch Hinweis**: Dokumentiert dass Helm keine bestehenden Schedules aktualisiert — manueller Patch erforderlich
+
 ## [1.90.0] — 2026-08-11
 
 ### Fixed
