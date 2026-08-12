@@ -2,7 +2,7 @@
 
 **Status:** IMPLEMENTIERT (Staging + Production)
 **Erstellt:** 2026-08-10
-**Aktualisiert:** 2026-08-11 (Scoped Backup + Restore-Test + Monitoring abgeschlossen)
+**Aktualisiert:** 2026-08-12 (Staging FSB-Test: BackupRepository Namespace, Disk-Limits, MinIO-Separation Lektionen)
 **Cluster:** Staging (OCI 158.180.18.110) + Production (Contabo 169.58.83.32)
 
 ---
@@ -1180,6 +1180,155 @@ helm install velero vmware-tanzu/velero \
 | Soll CNPG Backup (Point-in-Time) **zusätzlich** zu Velero laufen? | Ja | Ja — Velero für Cluster-State, CNPG für DB-Point-in-Time |
 | Soll Velero auch **monitoring** Namespace sichern? | Ja | Nein — Prometheus/Alertmanager-Daten nicht kritisch |
 | Soll der Velero-Backup-Bucket **verschlüsselt** werden? | Ja | Server-Side Encryption mit MinIO |
+
+---
+
+## 14. Staging FSB-Test Lektionen (2026-08-12)
+
+### Durchgeführte Tests
+
+Ein umfangreicher Staging-Test wurde durchgeführt, um Velero FSB (File System Backup) mit echten PVC-Daten zu verifizieren.
+
+### Test 1: FSB Backup mit Volume-Daten
+
+| Metrik | Wert |
+|--------|------|
+| Backup-Name | `fsb-test-20260812-094239` |
+| PVBs erstellt | 4 (sentinel-models, minio-data, postgres-data, n8n) |
+| PVBs Completed | 2 (sentinel-models 58MB, minio-data 1.1GB) |
+| PVBs Failed | 2 (postgres-data, n8n) |
+| Root Cause | Kopia-Repository nicht initialisiert (`repository not initialized in the provided storage`) |
+
+**Lektion:** Nach Löschen von `velero-backups/` in MinIO muss die BackupRepository CRD gelöscht werden, damit Velero das Kopia-Repo neu initialisiert.
+
+### Test 2: BackupRepository Namespace
+
+**BEWEIS (verifiziert 2026-08-12):**
+
+```
+BEFEHL: kubectl get backuprepositories.velero.io -A
+
+ERGEBNIS:
+NAMESPACE                    NAME                                       AGE
+meeting-automation-staging   meeting-automation-staging-default-kopia   79m
+velero                       meeting-automation-staging-default-kopia   75m
+```
+
+**Regel:** Velero erstellt BackupRepository CRD automatisch im `velero` Namespace — NICHT im Backup's Namespace. Manuell erstellte CRDs im Backup-Namespace werden NICHT von Velero verwendet.
+
+| Aktion | Ergebnis |
+|--------|----------|
+| BackupRepository im `velero` Namespace | ✅ Wird von Velero verwendet (Status: Ready) |
+| BackupRepository im `meeting-automation-staging` Namespace | ❌ Wird NICHT verwendet (kein Status) |
+| BEIDE löschen + Velero restarten | ✅ Velero erstellt automatisch neue im `velero` Namespace |
+
+### Test 3: Disk-Pressure durch FSB Backups
+
+**BEWEIS (verifiziert 2026-08-12):**
+
+```
+BEFEHL: df -h / && du -sh /var/lib/rancher/k3s/storage/pvc-*minio*
+
+ERGEBNIS:
+Filesystem: 183G, Used: 173G (95%)  ← KRITISCH!
+MinIO PVC:  59GB (PVC-Claim: 10Gi)   ← local-path erzwingt keine Limits!
+```
+
+**Root Cause:** Velero-Backups (Kopia-Daten) wurden in der MinIO gespeichert. local-path StorageClass erzwingt KEINE Größenlimits — eine 10Gi PVC kann beliebig viel Daten halten.
+
+| PVC | Claim-Größe | Tatsächliche Nutzung |
+|-----|-------------|--------------------|
+| minio-data-minio-staging-0 | 10Gi | **59GB** (Velero-Backups!) |
+| meeting-db-1 | 10Gi | 22GB (PostgreSQL + WAL) |
+| postgres-data-postgres-staging-0 | 10Gi | 46MB |
+| sentinel-models-claim | 2Gi | 1.1GB |
+| rabbitmq-storage | 5Gi | 548KB |
+| n8n-pvc | 1Gi | 0B |
+| postgres-backup-pvc | 5Gi | 3.2MB |
+| prometheus-db | 5Gi | 1.6GB |
+| alertmanager-db | 5Gi | 0B |
+| **Gesamt** | **53Gi** | **84GB** (59GB Velero in MinIO!) |
+
+**Fix:** Velero-Backups aus MinIO gelöscht → Disk von 95% auf 63% gesunken.
+
+### Test 4: Prometheus PVC erzeugt riesige Backup-Daten
+
+**BEWEIS (verifiziert 2026-08-12):**
+
+```
+PVB: fsb-test-20260812-095218-686nf (Prometheus PVC)
+  Total Bytes: 5.3GB (PVC-Claim)
+  Bytes Done:  44.6GB (Kopia-Upload!)
+  MinIO Wachstum: 0 → 46GB in 15 Minuten
+```
+
+**Root Cause:** Kopia sichert das gesamte Overlay-FS inklusive temporärer Dateien, WAL-Logs und Metadaten. Prometheus schreibt intensiv in sein TSDB → Kopia dedupliziert, aber die Rohdaten sind enorm.
+
+**Empfehlung:** Prometheus aus Velero-FSB ausschließen:
+
+```bash
+# Bei Backup: --exclude-resources persistentvolumeclaims (im monitoring Namespace)
+# Oder: Prometheus-PVC mit Label versehen und Velero-Selector verwenden
+```
+
+### Test 5: BSL (BackupStorageLocation) nach Bucket-Löschung
+
+**BEWEIS (verifiziert 2026-08-12):**
+
+```
+BEFEHL: velero backup logs fsb-test-...
+
+ERGEBNIS:
+"BackupStorageLocation is unavailable"
+"NoSuchBucket: velero-backups"
+```
+
+**Regel:** Wenn der MinIO-Bucket gelöscht wird:
+
+1. Bucket neu erstellen: `mc mb local/velero-backups`
+2. Velero Server restarten: `kubectl rollout restart deployment/velero -n velero`
+3. 30-60s warten bis BSL `Available` wird
+4. Erstes Backup auslösen (initialisiert Kopia-Repo)
+
+### Test 6: Erfolgreiches FSB Backup (nach Recovery)
+
+**BEWEIS (verifiziert 2026-08-12):**
+
+```
+Backup: clean-test-20260812-095218
+PVBs:
+  ✅ sentinel-models: 58MB (Completed)
+  ✅ minio-data: 1.1GB (Completed)
+  ✅ postgres-data: 23.3GB (Completed)
+  ✅ n8n: 1.1MB (Completed)
+  🔄 prometheus: InProgress (44.6GB — abgebrochen wegen Disk-Pressure)
+
+MinIO: 46GB (nach 15 Min)
+Disk: 82% (nach 15 Min)
+```
+
+**Backup-Funktioniert!** Aber Prometheus verursacht Disk-Pressure → muss ausgeschlossen werden.
+
+### Zusammenfassung der Lektionen
+
+| # | Lektion | Impact |
+|---|---------|--------|
+| 1 | **BackupRepository CRD gehört in `velero` Namespace** | Velero sucht CRD im `velero` Namespace, nicht im Backup-Namespace |
+| 2 | **local-path erzwingt KEINE PVC-Limits** | 10Gi PVC kann 59GB halten → Disk-Limitsillusio |
+| 3 | **Velero-Backups im selben MinIO = Gefahr** | Kopia-Daten füllen MinIO-PVC → Disk-Pressure |
+| 4 | **Prometheus erzeugt 8x mehr Backup-Daten als PVC-Claim** | 5Gi PVC → 44GB Kopia-Upload |
+| 5 | **Kopia-Repo nach Bucket-Löschung neu initialisieren** | BackupRepository CRD löschen + Velero restarten |
+| 6 | **BSL wird nach Bucket-Löschung `Unavailable`** | Bucket neu erstellen + Velero restarten |
+
+### Empfehlungen für Production
+
+| # | Empfehlung | Aufwand |
+|---|-----------|--------|
+| 1 | **Velero-Backups NICHT im selben MinIO** — separater Bucket oder externes S3 | 30 Min |
+| 2 | **Prometheus aus FSB ausschließen** — `--exclude-namespaces monitoring` | 5 Min |
+| 3 | **Disk-Monitoring** — AlertRule für Disk >75% | 10 Min |
+| 4 | **Velero BackupRepository CRD Recovery-Doku** — in CI/CD-Script einbauen | 15 Min |
+| 5 | **Velero Schedule mit kleinerem Scope** — nur kritische PVCs | 10 Min |
 
 ---
 
