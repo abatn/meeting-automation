@@ -296,6 +296,22 @@ logger.info(f"TIMING: operation_name_duration={time.time()-start:.2f}s")
 ```
 Extract with: `docker logs celery-worker | grep TIMING`
 
+**Pipeline TIMING Stages** (transcription_tasks.py):
+- `s3_download`: Audio download from MinIO
+- `onnx_init`: ONNX Runtime initialization
+- `gladia_transcription`: Gladia V2 diarization
+- `speaker_identification`: Speaker ID (ONNX + heuristic + text)
+- `onnx_segment_reassignment`: Per-segment ONNX reassignment
+- `sentinel_llm`: Qwen-1.5B summarization (or fallback)
+- `mistral_pv`: Mistral PV generation
+- `persistence`: DB save (transcription + PV + actions)
+- `pipeline_total`: Total pipeline with full breakdown
+
+**Example output:**
+```
+TIMING: pipeline_total duration=23.45s (s3=0.1s gladia=13.2s speaker=2.1s sentinel=0.0s mistral=8.4s persist=0.3s)
+```
+
 ## Common Pitfalls
 
 ### 1. Wrong Env Var for E2E Tests
