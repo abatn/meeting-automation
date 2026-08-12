@@ -102,6 +102,41 @@ spec:
             summary: "Disk space < 20% free"
             description: "Only {{ $value | humanizePercentage }} of disk space is available"
 
+        # MinIO PVC Usage > 80% (Warning)
+        - alert: MinIOPvcHighUsage
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"minio.*"}
+            / kubelet_volume_stats_capacity_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"minio.*"} > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "MinIO PVC usage > 80%"
+            description: "MinIO PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full"
+
+        # MinIO PVC Usage > 90% (Critical)
+        - alert: MinIOPvcCriticalUsage
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"minio.*"}
+            / kubelet_volume_stats_capacity_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"minio.*"} > 0.9
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MinIO PVC usage > 90%"
+            description: "MinIO PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full — disk-pressure imminent!"
+
+        # Velero Backup Size > 30GB (Warning)
+        - alert: VeleroBackupSizeHigh
+          expr: |
+            velero_backup_attempted_bytes > 32212254720
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Velero backup size > 30GB"
+            description: "Velero backup size is {{ $value | humanize1024 }}B — consider using scoped backups"
+
         # Gladia API Errors
         - alert: GladiaHighErrorRate
           expr: |
