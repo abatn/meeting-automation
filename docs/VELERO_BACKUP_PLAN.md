@@ -1374,3 +1374,135 @@ Füge den Velero-Install-Step in `deploy-staging.yml` und `deploy-production.yml
         --wait --timeout 10m || echo "⚠️ Warning: Velero install failed"
     fi
 ```
+
+---
+
+## 15. Staging Disk-Pressure Lektionen (2026-08-12)
+
+### Kernproblem
+
+Staging-Cluster hat nur **183GB Disk**. Velero FSB-Backups erzeugen **30-50GB Kopia-Daten** aus 43Gi PVCs → Disk-Pressure → Pods werden evicted → BackupRepository geht verloren → Kreislauf.
+
+### Verifizierte Fakten
+
+| Fakt | Wert | Beweis |
+|------|------|--------|
+| Disk Gesamt | 183GB | `df -h /` |
+| Disk belegt (vor Backup) | 118GB (65%) | `df -h /` |
+| Disk belegt (nach Backup) | 173GB (95%) | `df -h /` nach 15 Min |
+| MinIO PVC Claim | 10Gi | `kubectl get pvc` |
+| MinIO PVC tatsächlich | 59GB | `du -sh /var/lib/rancher/k3s/storage/pvc-*minio*` |
+| Prometheus PVC Claim | 5Gi | `kubectl get pvc` |
+| Prometheus Kopia-Upload | 44GB | PVB Bytes Done |
+| Kopia-Repo Initialisierung | ~500K | `du -sh velero-backups/kopia/` |
+| Kopia-Voll-Backup | 30-50GB | MinIO Wachstum |
+
+### Root Cause: local-path erzwingt keine Limits
+
+```
+BEFEHL: kubectl get pvc -n meeting-automation-staging -o custom-columns='NAME:.metadata.name,CAP:.status.capacity.storage,SC:.spec.storageClassName'
+
+ERGEBNIS:
+NAME                          CAP   SC
+minio-data-minio-staging-0    10Gi  local-path
+meeting-db-1                  10Gi  local-path
+postgres-data-postgres-0      10Gi  local-path
+rabbitmq-storage              5Gi   local-path
+sentinel-models-claim         2Gi   local-path
+n8n-pvc                       1Gi   local-path
+postgres-backup-pvc           5Gi   local-path
+
+BEFEHL: du -sh /var/lib/rancher/k3s/storage/pvc-*minio*
+ERGEBNIS: 59GB (trotz 10Gi Claim!)
+```
+
+**Regel:** `local-path` StorageClass erzwingt KEINE Größenlimits. Eine 10Gi PVC kann beliebig viel Daten halten.
+
+### Root Cause: Prometheus erzeugt 8x mehr Daten
+
+```
+BEFEHL: kubectl get podvolumebackups.velero.io -A -o wide | grep prometheus
+
+ERGEBNIS:
+NAME              STATUS      TOTALBYTES   BYTESDONE
+686nf-...         InProgress  5368709120   47244640256
+(5.3Gi Claim)     (44.6GB Kopia-Upload!)
+```
+
+**Regel:** Kopia sichert das gesamte Overlay-FS inklusive temporärer Dateien. Prometheus schreibt intensiv in sein TSDB → Kopia erzeugt 8x mehr Daten als der PVC-Claim.
+
+### Disk-Pressure Taint
+
+```
+BEFEHL: kubectl get node instance-20260329-0846 -o json | python3 -c "import sys,json; d=json.load(sys.stdin); [print(c['type'],c['status']) for c in d['status']['conditions'] if c['type']=='DiskPressure']"
+
+ERGEBNIS:
+DiskPressure True  (bei 95%)
+DiskPressure False (bei 65%)
+```
+
+**Regel:** k3s Kubelet erkennt Disk-Pressure automatisch und setzt Taint `node.kubernetes.io/disk-pressure:NoSchedule`. Velero Pods werden dann evicted.
+
+### Recovery-Prozess (verifiziert)
+
+Wenn Velero nach Disk-Pressure evicted wurde:
+
+```bash
+# 1. Velero-Backups aus MinIO löschen (schnellste Methode)
+sudo rm -rf /var/lib/rancher/k3s/storage/pvc-*minio*/velero-backups/
+
+# 2. Bucket neu erstellen
+kubectl exec -n meeting-automation-staging minio-staging-0 -- \
+  sh -c 'mc alias set local http://localhost:9000 minio_user minio_password 2>/dev/null && mc mb local/velero-backups 2>&1'
+
+# 3. BackupRepository CRD löschen
+kubectl delete backuprepositories.velero.io --all -n velero
+
+# 4. Velero Server restarten
+kubectl rollout restart deployment/velero -n velero
+
+# 5. Warten bis DiskPressure=False (k3s prüft alle 5s)
+sleep 60
+
+# 6. Neues Backup starten
+velero backup create recovery-$(date +%Y%m%d-%H%M%S) \
+  --include-namespaces meeting-automation-staging \
+  --exclude-namespaces monitoring \
+  --wait
+```
+
+### Empfehlung: Scoped Backup (nur kritische PVCs)
+
+```bash
+# Nur n8n + sentinel + rabbitmq (8Gi gesamt, ~3-5GB Backup)
+velero backup create scoped-$(date +%Y%m%d) \
+  --include-namespaces meeting-automation-staging \
+  --selector 'app in (n8n-staging,celery-worker-pro-staging,rabbitmq-staging)' \
+  --exclude-namespaces monitoring \
+  --wait
+```
+
+### Empfehlung: Schedule mit Exclude
+
+```bash
+# Schedule mit monitoring ausgeschlossen
+velero schedule create daily-backup \
+  --schedule="0 2 * * *" \
+  --ttl=168h \
+  --include-namespaces=meeting-automation-staging \
+  --exclude-namespaces=monitoring
+```
+
+### Production-Vergleich
+
+| Aspekt | Staging | Production |
+|--------|---------|------------|
+| Disk | 183GB (⚠️ knapp) | 290G (✅ genug) |
+| PVCs Gesamt | 43Gi | 58Gi |
+| Kopia-Backup | 30-50GB | 28.7GiB |
+| Disk nach Backup | 95% (⚠️) | 73% (✅) |
+| Disk-Pressure | ⚠️ Possible | ✅ Unwahrscheinlich |
+| FSB empfohlen | Nur Scoped (Selector) | Voll (alle PVCs) |
+
+**Fazit:** Production hat genug Disk (290G) für FSB-Backups. Staging braucht Scoped Backups mit `--selector` und `--exclude-namespaces monitoring`.
+

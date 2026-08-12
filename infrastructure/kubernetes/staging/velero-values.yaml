@@ -2,6 +2,10 @@
 # Chart: vmware-tanzu/velero v12.1.0
 # App Version: v1.18.1
 # Install: helm upgrade velero vmware-tanzu/velero -n velero -f velero-values.yaml --install
+#
+# WARNUNG: Staging hat nur 183GB Disk. Full FSB Backup (43Gi PVCs) erzeugt
+# 30-50GB Kopia-Daten → DiskPressure → Pods evicted → BackupRepository verloren.
+# daher: Nur kritische PVCs mit Label-Selector sichern (20Gi statt 43Gi).
 
 configuration:
   # Kopia als Upload-Type (statt Restic)
@@ -69,6 +73,9 @@ metrics:
       release: kube-prometheus-stack
 
 # Schedules
+# WARNUNG: labelSelector ist KRITISCH für Staging (183GB Disk)
+# Ohne Selector: 43Gi PVCs → 30-50GB Kopia → DiskPressure
+# Mit Selector: 20Gi PVCs → 15-20GB Kopia → ~75% Disk (stabil)
 schedules:
   daily-backup:
     disabled: false
@@ -77,6 +84,19 @@ schedules:
     template:
       includedNamespaces:
         - meeting-automation-staging
+      excludedNamespaces:
+        - monitoring  # Prometheus erzeugt 44GB Kopia-Daten aus 5Gi PVC
       ttl: 168h0m0s  # 7 Tage
       storageLocation: default
       defaultVolumesToFsBackup: true
+      # Nur kritische PVCs: MinIO + PostgreSQL (20Gi)
+      # Ausgeschlossen: rabbitmq (5Gi), n8n (1Gi), sentinel (2Gi), postgres-backup (5Gi)
+      labelSelector:
+        matchLabels:
+          app: minio-staging
+        matchExpressions:
+          - key: app
+            operator: In
+            values:
+              - minio-staging
+              - postgres-staging
