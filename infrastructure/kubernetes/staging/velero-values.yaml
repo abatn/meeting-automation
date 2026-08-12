@@ -86,7 +86,7 @@ schedules:
         - meeting-automation-staging
       excludedNamespaces:
         - monitoring  # Prometheus erzeugt 44GB Kopia-Daten aus 5Gi PVC
-      ttl: 168h0m0s  # 7 Tage
+      ttl: 72h0m0s  # 3 Tage (weniger Speicher auf 183GB Disk)
       storageLocation: default
       defaultVolumesToFsBackup: true
       # Nur kritische PVCs: MinIO + PostgreSQL (20Gi)
