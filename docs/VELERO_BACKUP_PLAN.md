@@ -1484,14 +1484,46 @@ velero backup create scoped-$(date +%Y%m%d) \
 
 ### Empfehlung: Schedule mit Exclude
 
+**WICHTIG:** Helm aktualisiert keine bestehenden Schedules! Der Schedule muss manuell gepatcht werden:
+
 ```bash
-# Schedule mit monitoring ausgeschlossen
-velero schedule create daily-backup \
-  --schedule="0 2 * * *" \
-  --ttl=168h \
-  --include-namespaces=meeting-automation-staging \
-  --exclude-namespaces=monitoring
+# Schedule manuell patchen (excludedNamespaces + labelSelector)
+kubectl patch schedule daily-backup -n velero --type=merge -p '{
+  "spec": {
+    "template": {
+      "excludedNamespaces": ["monitoring"],
+      "labelSelector": {
+        "matchExpressions": [{
+          "key": "app",
+          "operator": "In",
+          "values": ["minio-staging", "postgres-staging"]
+        }]
+      }
+    }
+  }
+}'
 ```
+
+**Ergebnis (verifiziert 2026-08-12):**
+
+```yaml
+spec:
+  template:
+    includedNamespaces:
+    - meeting-automation-staging
+    excludedNamespaces:
+    - monitoring
+    labelSelector:
+      matchExpressions:
+      - key: app
+        operator: In
+        values:
+        - minio-staging
+        - postgres-staging
+    ttl: 168h0m0s
+```
+
+**Backup-Größe:** 20Gi (minio + postgres) → ~15-20GB Kopia → ~75% Disk (stabil)
 
 ### Production-Vergleich
 
