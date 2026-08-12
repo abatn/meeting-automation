@@ -29,11 +29,83 @@ jobs:
         echo "✅ Production deploy confirmed with tag: ${{ inputs.image_tag }}"
 
   # ============================================
+  # PRE-DEPLOY BACKUP: Velero Backup
+  # ============================================
+  pre-deploy-backup:
+    runs-on: ubuntu-latest
+    needs: pre-flight
+    environment: production
+    
+    steps:
+    - name: Configure K8s context for production
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" > kubeconfig-prod
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        
+        # Get the first available context
+        CONTEXT=$(kubectl config get-contexts -o name | head -1)
+        if [ -z "$CONTEXT" ]; then
+          echo "❌ No contexts found in kubeconfig"
+          exit 1
+        fi
+        
+        echo "Using context: $CONTEXT"
+        kubectl config use-context "$CONTEXT"
+
+    - name: Velero Pre-Deploy Backup
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        
+        echo "=== Creating Velero pre-deploy backup ==="
+        echo "Git SHA: ${{ github.sha }}"
+        echo "Image Tag: ${{ inputs.image_tag }}"
+        
+        # Check if Velero is available
+        if ! kubectl get deployment velero -n velero &>/dev/null; then
+          echo "⚠️ Velero not installed — skipping backup"
+          exit 0
+        fi
+        
+        # Check if BSL is available
+        BSL_STATUS=$(kubectl get backupstoragelocations.velero.io -n velero -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "Unavailable")
+        if [ "$BSL_STATUS" != "Available" ]; then
+          echo "⚠️ BSL status: $BSL_STATUS — skipping backup"
+          exit 0
+        fi
+        
+        # Create backup with git SHA as name
+        BACKUP_NAME="pre-deploy-$(echo ${{ github.sha }} | head -c 8)-$(date +%Y%m%d-%H%M%S)"
+        echo "Creating backup: $BACKUP_NAME"
+        
+        velero backup create "$BACKUP_NAME" \
+          --include-namespaces=meeting-automation \
+          --ttl=336h \
+          --wait
+        
+        # Verify backup
+        BACKUP_STATUS=$(kubectl get backups.velero.io "$BACKUP_NAME" -n velero -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+        ITEMS=$(kubectl get backups.velero.io "$BACKUP_NAME" -n velero -o jsonpath='{.status.progress.itemsBackedUp}' 2>/dev/null || echo "0")
+        ERRORS=$(kubectl get backups.velero.io "$BACKUP_NAME" -n velero -o jsonpath='{.status.errors}' 2>/dev/null || echo "0")
+        
+        echo "Backup Status: $BACKUP_STATUS"
+        echo "Items: $ITEMS"
+        echo "Errors: $ERRORS"
+        
+        if [ "$BACKUP_STATUS" = "Completed" ]; then
+          echo "✅ Velero backup created successfully: $BACKUP_NAME"
+        elif [ "$BACKUP_STATUS" = "PartiallyFailed" ] && [ "$ERRORS" = "0" ]; then
+          echo "⚠️ Velero backup partially failed (0 errors) — continuing deploy"
+        else
+          echo "❌ Velero backup failed with $ERRORS errors"
+          echo "Deploy will continue (backup is advisory, not blocking)"
+        fi
+
+  # ============================================
   # DEPLOY PRODUCTION (mit Approval via Environment)
   # ============================================
   deploy:
     runs-on: ubuntu-latest
-    needs: pre-flight
+    needs: pre-deploy-backup
     environment: production
     
     steps:
