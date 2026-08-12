@@ -1538,3 +1538,243 @@ spec:
 
 **Fazit:** Production hat genug Disk (290G) für FSB-Backups. Staging braucht Scoped Backups mit `--selector` und `--exclude-namespaces monitoring`.
 
+---
+
+## 16. Recovery-Verfahren (Kopia-Repository Reset)
+
+### Wann ist das nötig?
+
+| Szenario | Symptom | Ursache |
+|----------|---------|--------|
+| MinIO `velero-backups/` gelöscht | `repository not initialized` | Kopia-Repo gone |
+| Kopia-Repo defekt | `Failed to wait BackupRepository` | Blob-Fehler |
+| BackupRepository CRD stale | PVBs fehlgeschlagen | CRD zeigt auf nicht-existierendes Repo |
+| Velero Helm-Upgrade fehlgeschlagen | BSL `Unavailable` | Konfiguration kaputt |
+
+### Recovery-Schritte (VERIFIZIERT 2026-08-12)
+
+```bash
+# ============================================================
+# RECOVERY: Kopia-Repository + Velero Reset
+# ============================================================
+# WARNUNG: Dies löscht ALLE existierenden Backups!
+# Nur ausführen wenn Backups defekt oder unzugänglich.
+# ============================================================
+
+# Schritt 1: BackupRepository CRD löschen (KRITISCH!)
+# ------------------------------------------------------
+# Ohne diesen Schritt funktioniert NICHTS!
+# Velero kann keine PVBs erstellen wenn die CRD stale ist.
+kubectl delete backuprepositories.velero.io --all -n velero
+
+# Schritt 2: Alle alten Backup-Records löschen
+# ------------------------------------------------------
+# Alte Records zeigen auf defektes Repo → müssen weg.
+for b in $(kubectl get backups.velero.io -n velero -o json | \
+  python3 -c "import sys,json; [print(i['metadata']['name']) for i in json.load(sys.stdin).get('items',[])]"); do
+  kubectl delete backups.velero.io $b -n velero 2>/dev/null
+done
+
+# Schritt 3: MinIO velero-backups komplett leeren
+# ------------------------------------------------------
+# ACHTUNG: Pfad ist node-spezifisch!
+# Staging: /var/lib/rancher/k3s/storage/pvc-<ID>_meeting-automation-staging_minio-data-minio-staging-0/
+# Production: /var/lib/rancher/k3s/storage/pvc-<ID>_meeting-automation_minio-data-minio-0/
+
+# Staging:
+sudo rm -rf /var/lib/rancher/k3s/storage/pvc-*minio*/velero-backups/
+echo 'Deleted velero-backups'
+
+# Production (SSH zu 169.58.83.32):
+# sudo rm -rf /var/lib/rancher/k3s/storage/pvc-*minio*/velero-backups/
+
+# Schritt 4: Bucket neu erstellen
+# ------------------------------------------------------
+# Staging:
+kubectl exec -n meeting-automation-staging minio-staging-0 -- \
+  sh -c 'mc alias set local http://localhost:9000 minio_user minio_password 2>/dev/null && \
+  mc mb local/velero-backups 2>&1'
+
+# Production:
+# kubectl exec -n meeting-automation minio-0 -- \
+#   sh -c 'mc alias set local http://localhost:9000 minio_user 3Bsd1nsvjsnkCzcPvB96ew 2>/dev/null && \
+#   mc mb local/velero-backups 2>&1'
+
+# Schritt 5: Velero Server restarten
+# ------------------------------------------------------
+kubectl rollout restart deployment/velero -n velero
+
+# Schritt 6: Warten (BSL muss Available werden)
+# ------------------------------------------------------
+echo 'Warte 60s für Velero Server + BSL...'
+sleep 60
+
+# BSL Status prüfen
+kubectl get backupstoragelocations.velero.io -n velero -o jsonpath='{.items[0].status.phase}'
+# Erwartet: Available
+
+# Schritt 7: Erstes Backup (initialisiert Kopia-Repo)
+# ------------------------------------------------------
+# Staging (Scoped):
+velero backup create recovery-$(date +%Y%m%d-%H%M%S) \
+  --include-namespaces meeting-automation-staging \
+  --exclude-namespaces monitoring \
+  --selector 'app in (minio-staging,postgres-staging)' \
+  --wait
+
+# Production (Voll):
+# velero backup create recovery-prod-$(date +%Y%m%d-%H%M%S) \
+#   --include-namespaces meeting-automation \
+#   --wait
+
+# Schritt 8: Verifikation
+# ------------------------------------------------------
+# BackupRepository CRD (auto-erstellt)
+kubectl get backuprepositories.velero.io -A
+# Erwartet: <namespace>-default-kopia (AGE > 0)
+
+# PodVolumeBackups
+cubectl get podvolumebackups.velero.io -A -o wide
+# Erwartet: PVBs mit Status Completed oder InProgress
+
+# Disk
+df -h /
+# Erwartet: < 80%
+```
+
+### Recovery-Tabelle (Quick Reference)
+
+| Schritt | Befehl | Erwartetes Ergebnis |
+|---------|--------|--------------------|
+| 1. CRD löschen | `kubectl delete backuprepositories.velero.io --all -n velero` | Keine CRDs mehr |
+| 2. Backup-Records löschen | `kubectl delete backups.velero.io -n velero --all` | Keine Backups mehr |
+| 3. MinIO leeren | `sudo rm -rf .../velero-backups/` | Bucket leer |
+| 4. Bucket erstellen | `mc mb local/velero-backups` | Bucket vorhanden |
+| 5. Velero restarten | `kubectl rollout restart deployment/velero -n velero` | Neuer Pod |
+| 6. Warten | `sleep 60` | BSL Available |
+| 7. Erstes Backup | `velero backup create ... --wait` | COMPLETED |
+| 8. Verifikation | `kubectl get backuprepositories.velero.io -A` | CRD Ready |
+
+### Häufige Fehler bei Recovery
+
+| Fehler | Ursache | Lösung |
+|--------|--------|--------|
+| `BackupStorageLocation is unavailable` | BSL noch nicht ready | 60s warten, Velero neu starten |
+| `repository not initialized` | Schritt 1 vergessen | **BackupRepository CRD löschen!** |
+| `found existing data in storage` | MinIO nicht leer | Schritt 3 korrekt ausführen |
+| PVB `Error: node-agent not found` | DaemonSet fehlt | `helm upgrade ... --set deployNodeAgent=true` |
+| Disk-Pressure nach Backup | Zu viele PVCs gesichert | `--selector` für Scoped Backup verwenden |
+
+---
+
+## 17. Roadmap — Offene Punkte
+
+### P2: CI/CD Pre-Deploy-Backup
+
+**Ziel:** Vor jedem Production-Deploy ein automatisches Backup erstellen.
+
+**Vorgehen:**
+
+1. **GitHub Action in `deploy-production.yml` einfügen:**
+
+```yaml
+- name: Velero Pre-Deploy Backup
+  run: |
+    export KUBECONFIG=$(pwd)/kubeconfig-prod
+    velero backup create pre-deploy-${{ github.sha }} \
+      --include-namespaces=meeting-automation \
+      --ttl=336h \
+      --wait
+    echo "✅ Velero backup created: pre-deploy-${{ github.sha }}"
+```
+
+2. **Backup muss COMPLETED sein bevor Deploy startet**
+   - `--wait` blockiert bis Backup fertig
+   - Bei Fehler: Deploy abbrechen
+
+3. **Naming:** `pre-deploy-<git-sha>` (z.B. `pre-deploy-3be60a13`)
+
+**Risiko:** Niedrig
+**Aufwand:** ~15 Minuten
+**Status:** ⬜ Offen
+
+### P2: Velero-Backups auf externes S3
+
+**Problem:** Velero-Backups liegen im selben MinIO (im selben Cluster). Bei Cluster-Verlust sind auch die Backups weg.
+
+**Lösung:** Externes S3 als Backup-Backend.
+
+**Optionen:**
+
+| Option | Kosten | Aufwand | Sicherheit |
+|--------|--------|---------|------------|
+| **AWS S3** | ~$0.023/GB/Monat | Mittel | Hoch |
+| **Wasabi** | $6.99/TB/Monat (kein Egress-Fee) | Mittel | Hoch |
+| **Backblaze B2** | $0.006/GB/Monat | Mittel | Hoch |
+| **MinIO auf zweitem Server** | Server-Kosten | Hoch | Mittel |
+
+**Empfehlung:** Wasabi oder Backblaze B2 (günstig, kein Egress-Fee).
+
+**Vorgehen:**
+
+1. **S3-Bucket erstellen** (externer Anbieter)
+2. **Velero Secret für externes S3 erstellen:**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: velero-s3-external
+  namespace: velero
+type: Opaque
+stringData:
+  cloud: |
+    [default]
+    aws_access_key_id=<EXTERNAL_KEY>
+    aws_secret_access_key=<EXTERNAL_SECRET>
+```
+
+3. **Zweite BSL hinzufügen:**
+
+```bash
+helm upgrade velero vmware-tanzu/velero -n velero --reuse-values \
+  --set 'configuration.backupStorageLocation[1].name=external' \
+  --set 'configuration.backupStorageLocation[1].provider=aws' \
+  --set 'configuration.backupStorageLocation[1].bucket=velero-external-backups' \
+  --set 'configuration.backupStorageLocation[1].config.region=us-east-1' \
+  --set 'configuration.backupStorageLocation[1].config.s3Url=https://s3.wasabisys.com' \
+  --set 'configuration.backupStorageLocation[1].credential=velero-s3-external,cloud'
+```
+
+4. **Schedule für externes Backup:**
+
+```bash
+velero schedule create weekly-external \
+  --schedule="0 3 * * 0" \
+  --ttl=720h \
+  --storage-location=external \
+  --include-namespaces=meeting-automation
+```
+
+**Risiko:** Mittel (neue Abhängigkeit)
+**Aufwand:** ~1 Stunde
+**Status:** ⬜ Offen
+
+### Priorisierte Roadmap
+
+| # | Punkt | Priorität | Aufwand | Risiko | Status |
+|---|-------|-----------|---------|--------|--------|
+| 1 | CI/CD Pre-Deploy-Backup | P2 | 15 Min | Niedrig | ⬜ Offen |
+| 2 | Externes S3 (Wasabi/Backblaze) | P2 | 1 Std | Mittel | ⬜ Offen |
+| 3 | MinIO PVC Monitoring (Alert >80%) | P3 | 10 Min | Niedrig | ⬜ Offen |
+| 4 | Velero Backup-Retention auf 3 Tage (Staging) | P3 | 5 Min | Niedrig | ⬜ Offen |
+| 5 | Velero Upgrade auf v1.19.x (wenn verfügbar) | P3 | 30 Min | Mittel | ⬜ Offen |
+
+### Entscheidungen (offen)
+
+| Frage | Option A | Option B | Empfehlung |
+|-------|----------|----------|------------|
+| Pre-Deploy-Backup blockierend? | Ja (CI/CD stoppt) | Nein (Warning) | Ja für Prod, Nein für Staging |
+| Externes S3? | Wasabi ($7/TB) | Backblaze ($6/TB) | Wasabi (einfacher) |
+| Staging Retention? | 7 Tage | 3 Tage | 3 Tage (weniger Speicher) |
+| Production Retention? | 14 Tage | 7 Tage | 14 Tage (Sicherheit) |
