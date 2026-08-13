@@ -260,6 +260,41 @@ jobs:
             echo "To enable: install Longhorn first, then re-run this deployment"
           fi
           
+          # Deploy System CronJobs (kube-system)
+          kubectl apply -f /root/production-manifests/system/ephemeral-storage-cleanup-cronjob.yaml -n kube-system || echo "Warning: ephemeral-storage-cleanup failed"
+          kubectl apply -f /root/production-manifests/system/pod-garbage-collector-cronjob.yaml -n kube-system || echo "Warning: pod-garbage-collector failed"
+          
+          # Deploy Image-Cleanup (systemd timer)
+          echo "=== Deploying Image-Cleanup ==="
+          # Copy script to host
+          cp /root/production-manifests/system/image-cleanup-script.sh /usr/local/bin/image-cleanup.sh
+          chmod +x /usr/local/bin/image-cleanup.sh
+          # Copy systemd units
+          cp /root/production-manifests/system/image-cleanup.service /etc/systemd/system/
+          cp /root/production-manifests/system/image-cleanup.timer /etc/systemd/system/
+          # Reload and enable
+          systemctl daemon-reload
+          systemctl enable image-cleanup.timer
+          systemctl start image-cleanup.timer
+          echo "✅ Image-Cleanup timer enabled (weekly Sunday 03:00 UTC)"
+          
+          # Set kubelet-arg for Image-GC Threshold (75% instead of default 85%)
+          echo "=== Configuring kubelet-arg ==="
+          if ! grep -q "image-gc-high-threshold" /etc/rancher/k3s/config.yaml; then
+            echo "Adding kubelet-arg to k3s config..."
+            echo "" >> /etc/rancher/k3s/config.yaml
+            echo "# Image-GC Threshold (deployed via CI/CD)" >> /etc/rancher/k3s/config.yaml
+            echo "kubelet-arg:" >> /etc/rancher/k3s/config.yaml
+            echo "  - \"image-gc-high-threshold=75\"" >> /etc/rancher/k3s/config.yaml
+            echo "  - \"image-gc-low-threshold=70\"" >> /etc/rancher/k3s/config.yaml
+            echo "⚠️ kubelet-arg added — k3s restart required for changes to take effect"
+            echo "k3s will be restarted after deployment completes"
+            RESTART_K3S=true
+          else
+            echo "✅ kubelet-arg already configured"
+            RESTART_K3S=false
+          fi
+          
           # Deploy with specific tag
           echo "=== Deploying with tag: $TAG ==="
           kubectl set image deployment/backend \
@@ -403,6 +438,24 @@ jobs:
           else
             echo "⚠️ Production smoke test INCONCLUSIVE — deployments may still be starting"
             echo "   Deploy was successful (set image + rollout). Manual verification recommended."
+          fi
+          
+          # Restart k3s if kubelet-arg was added
+          if [ "$RESTART_K3S" = "true" ]; then
+            echo "=== Restarting k3s for kubelet-arg changes ==="
+            systemctl restart k3s
+            echo "Waiting 30s for k3s to restart..."
+            sleep 30
+            # Verify node is ready
+            for i in $(seq 1 10); do
+              STATUS=$(kubectl get nodes -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+              if [ "$STATUS" = "True" ]; then
+                echo "✅ Node is Ready after k3s restart"
+                break
+              fi
+              echo "Waiting for node to be Ready... ($i/10)"
+              sleep 5
+            done
           fi
           
           echo "=== Deployment complete ==="
