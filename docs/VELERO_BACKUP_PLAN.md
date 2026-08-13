@@ -1769,6 +1769,9 @@ velero schedule create weekly-external \
 | 3 | MinIO PVC Monitoring (Alert >80%) | P3 | 10 Min | Niedrig | ⬜ Offen |
 | 4 | Velero Backup-Retention auf 3 Tage (Staging) | P3 | 5 Min | Niedrig | ⬜ Offen |
 | 5 | Velero Upgrade auf v1.19.x (wenn verfügbar) | P3 | 30 Min | Mittel | ⬜ Offen |
+| 6 | Containerd Image Cleanup (systemd timer) | P2 | 30 Min | Niedrig | ✅ Erledigt (Staging) |
+| 7 | Production: Image-GC Threshold 75% | P2 | 5 Min | Niedrig | ⬜ Offen |
+| 8 | Production: Weekly Cleanup deployen | P2 | 30 Min | Niedrig | ⬜ Offen |
 
 ### Entscheidungen (offen)
 
@@ -1778,3 +1781,125 @@ velero schedule create weekly-external \
 | Externes S3? | Wasabi ($7/TB) | Backblaze ($6/TB) | Wasabi (einfacher) |
 | Staging Retention? | 7 Tage | 3 Tage | 3 Tage (weniger Speicher) |
 | Production Retention? | 14 Tage | 7 Tage | 14 Tage (Sicherheit) |
+
+---
+
+## 18. Containerd Image Cleanup (Phase 3) — ✅ ABGESCHLOSSEN (2026-08-13)
+
+### Kernproblem
+
+Staging-Cluster (183GB Disk) hatte **81% Belegung** (148G). Hauptursache: **45G containerd Images** die nach jedem CI/CD-Deploy nicht automatisch gelöscht wurden. Der kubelet Image-GC Threshold war auf 85% (Default) — zu hoch für die aktuelle Disk-Größe.
+
+### Verifizierte Fakten
+
+| Fakt | Wert | Beweis |
+|------|------|--------|
+| Disk Gesamt | 183GB | `df -h /` |
+| Disk belegt (vorher) | 148GB (81%) | `df -h /` |
+| Disk belegt (nachher) | 134GB (73%) | `df -h /` nach Phase 1 |
+| Containerd Images | 45G | `sudo du -sh /var/lib/rancher/k3s/agent/containerd/` |
+| Containerd Snapshots | 529 | `ls snapshots/ | wc -l` |
+| Image-GC Threshold (vorher) | 85% (Default) | k3s Default |
+| Image-GC Threshold (nachher) | 75% | kubelet-arg in k3s Config |
+
+### Root Cause
+
+```
+CI/CD Deploy
+  → Neue Images werden pulled
+  → Alte Images bleiben auf dem Node
+  → Snapshots akkumulieren sich
+  → Disk steigt: 76% → 81% → 85%?
+  → Image-GC startet bei 85%
+  → ABER: Bei 81% ist es zu spät!
+  → Resultat: Immer volle Disk
+```
+
+### Durchgeführte Maßnahmen
+
+#### Phase 1: Sofortige Bereinigung
+
+| Schritt | Befehl | Ergebnis |
+|---------|--------|----------|
+| 1.1 | `sudo k3s ctr images prune` | 10 alte Images entfernt |
+| 1.2 | Snapshots geprüft | 34 Snapshots entfernt |
+| 1.3 | Disk geprüft | 134G/183G (73%) — +14G freigeben |
+
+#### Phase 2: Image-GC Threshold senken
+
+| Schritt | Befehl | Ergebnis |
+|---------|--------|----------|
+| 2.1 | Backup: `sudo cp config.yaml /tmp/` | ✅ |
+| 2.2 | Config: `kubelet-arg: [image-gc-high-threshold=75]` | ✅ |
+| 2.3 | Restart: `sudo systemctl restart k3s` | ✅ |
+| 2.4 | Verifikation: kubelet Args in Logs | ✅ `--image-gc-high-threshold=75` |
+
+#### Phase 3: Weekly Cleanup (systemd timer)
+
+| Schritt | Status | Details |
+|---------|--------|--------|
+| Script | ✅ | `/usr/local/bin/image-cleanup.sh` |
+| Systemd Timer | ✅ | `image-cleanup.timer` (enabled) |
+| Schedule | ✅ | Sonntag 03:00 UTC (wöchentlich) |
+| Test-Lauf | ✅ | Script ausgeführt, Logs vorhanden |
+| Git Commit | ✅ | `6f28a5c5` |
+
+### Technische Details
+
+| Komponente | Wert |
+|------------|------|
+| Script | `/usr/local/bin/image-cleanup.sh` |
+| Timer | `image-cleanup.timer` (enabled) |
+| Service | `image-cleanup.service` |
+| Schedule | Sonntag 03:00 UTC (wöchentlich) |
+| Nächster Lauf | 2026-08-16 03:00 UTC |
+| Log-Datei | `/var/log/image-cleanup.log` |
+| Befehl | `ctr images prune --all` |
+
+### Verifikation
+
+```bash
+# Timer Status prüfen
+sudo systemctl status image-cleanup.timer
+
+# Nächsten Lauf prüfen
+sudo systemctl list-timers image-cleanup.timer
+
+# Manuell ausführen
+sudo /usr/local/bin/image-cleanup.sh
+
+# Logs prüfen
+cat /var/log/image-cleanup.log
+```
+
+### Rollback
+
+```bash
+# Timer deaktivieren
+sudo systemctl disable image-cleanup.timer
+sudo systemctl stop image-cleanup.timer
+
+# k3s Config zurücksetzen
+sudo cp /tmp/config.yaml.bak.20260813105455 /etc/rancher/k3s/config.yaml
+sudo systemctl restart k3s
+```
+
+### Lessons Learned
+
+1. **Image-GC Threshold ist kritisch:** Default-Wert (85%) zu hoch für SingleNode-Cluster mit CI/CD
+2. **containerd Snapshot-Akkumulation:** Jeder Deploy erstellt neue Snapshots die nicht automatisch gelöscht werden
+3. **Monitoring fehlt:** Kein Alert für Disk-Utilization → Problem erst bei 81% bemerkt
+4. **K8s CronJob kann nicht auf host namespace zugreifen:** containerd socket erfordert hostPID + hostNetwork + hostPath mounts → systemd timer ist die richtige Lösung
+
+### Production-Vergleich
+
+| Aspekt | Staging | Production |
+|--------|---------|------------|
+| Disk | 183GB (81%) | 290G (82%) |
+| Image-GC Threshold | 75% (angepasst) | 85% (Default) |
+| Weekly Cleanup | ✅ systemd timer | ⬜ Offen |
+| Disk-Pressure Risk | ⚠️ Hoch | 🟡 Mittel |
+
+**Empfehlung:** Production braucht ebenfalls:
+1. Image-GC Threshold auf 75% senken
+2. Weekly Cleanup (systemd timer) deployen
