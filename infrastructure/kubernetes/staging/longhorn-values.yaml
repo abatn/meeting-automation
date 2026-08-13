@@ -1,0 +1,25 @@
+# Longhorn Helm Values — Staging
+# Chart: longhorn/longhorn v1.12.0
+# Install: helm upgrade longhorn longhorn/longhorn -n longhorn-system -f longhorn-values.yaml --reuse-values
+#
+# Reduzierte CPU Requests für Staging (4000m Node):
+# - instance-manager: 480m → 200m (Default war 480m)
+# - spart 280m CPU auf dem Node
+
+defaultSettings:
+  createDefaultDiskLabeledNodes: true
+  defaultDataLocality: best-effort
+  defaultReplicaCount: 1
+  storageMinimalAvailablePercentage: 10
+  # CPU Request für instance-manager reduzieren (480m → 200m)
+  # Longhorn Default: 480m — zu viel für Single-Node Staging
+  guaranteedInstanceManagerCPU: 200
+
+global:
+  storageClass:
+    create: true
+    defaultClass: true
+
+persistence:
+  defaultClassReplicaCount: 1
+  removeSnapshotsDuringDelete: true

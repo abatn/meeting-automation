@@ -61,6 +61,17 @@ initContainers:
 # Das ist BEWUSST — file already closed Error wird dadurch vermieden
 resources: {}
 
+# Node-Agent: CPU Request reduzieren (200m → 100m)
+# Statt Default 200m nur 100m — Velero ist meist idle
+nodeAgent:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
 # Repo Maintenance ConfigMap
 repoMaintenanceJobConfigMap: velero-repo-maintenance
 
