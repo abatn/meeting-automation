@@ -11,10 +11,10 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["pods", "namespaces"]
-  verbs: ["list", "delete"]
+  verbs: ["list", "delete", "get"]
 - apiGroups: ["apps"]
   resources: ["replicasets"]
-  verbs: ["list", "delete"]
+  verbs: ["list", "delete", "get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
