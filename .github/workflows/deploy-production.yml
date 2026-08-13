@@ -132,6 +132,16 @@ jobs:
         target: "/root/production-manifests/system"
         strip_components: 3
 
+    - name: Copy k3s config.yaml to Contabo
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: 169.58.83.32
+        username: root
+        key: ${{ secrets.CONTABO_SSH_KEY }}
+        source: "infrastructure/kubernetes/production/k3s-config.yaml"
+        target: "/root/production-manifests/k3s-config.yaml"
+        strip_components: 4
+
     - name: Deploy to Contabo Production
       uses: appleboy/ssh-action@v1
       with:
@@ -278,20 +288,20 @@ jobs:
           systemctl start image-cleanup.timer
           echo "✅ Image-Cleanup timer enabled (weekly Sunday 03:00 UTC)"
           
-          # Set kubelet-arg for Image-GC Threshold (75% instead of default 85%)
-          echo "=== Configuring kubelet-arg ==="
-          if ! grep -q "image-gc-high-threshold" /etc/rancher/k3s/config.yaml; then
-            echo "Adding kubelet-arg to k3s config..."
-            echo "" >> /etc/rancher/k3s/config.yaml
-            echo "# Image-GC Threshold (deployed via CI/CD)" >> /etc/rancher/k3s/config.yaml
-            echo "kubelet-arg:" >> /etc/rancher/k3s/config.yaml
-            echo "  - \"image-gc-high-threshold=75\"" >> /etc/rancher/k3s/config.yaml
-            echo "  - \"image-gc-low-threshold=70\"" >> /etc/rancher/k3s/config.yaml
-            echo "⚠️ kubelet-arg added — k3s restart required for changes to take effect"
-            echo "k3s will be restarted after deployment completes"
+          # Deploy k3s config.yaml (identical to Staging)
+          echo "=== Deploying k3s config.yaml ==="
+          cp /root/production-manifests/k3s-config.yaml /etc/rancher/k3s/config.yaml
+          echo "✅ k3s config.yaml deployed"
+          
+          # Ensure k3s.service uses --config flag
+          if ! grep -q "--config" /etc/systemd/system/k3s.service; then
+            echo "Adding --config flag to k3s.service..."
+            sed -i 's|ExecStart=/usr/local/bin/k3s \\|ExecStart=/usr/local/bin/k3s \\\n    --config /etc/rancher/k3s/config.yaml|' /etc/systemd/system/k3s.service
+            systemctl daemon-reload
+            echo "⚠️ k3s.service updated — k3s restart required"
             RESTART_K3S=true
           else
-            echo "✅ kubelet-arg already configured"
+            echo "✅ --config flag already in k3s.service"
             RESTART_K3S=false
           fi
           

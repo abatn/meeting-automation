@@ -1,0 +1,17 @@
+# k3s configuration — Meeting Automation Production
+# Identical to Staging config
+
+write-kubeconfig-mode: "644"
+
+disable:
+  - traefik
+
+node-name: contabo-prod
+
+tls-san:
+  - 169.58.83.32
+  - meeting-automation.com
+
+kubelet-arg:
+  - "image-gc-high-threshold=75"
+  - "image-gc-low-threshold=70"
