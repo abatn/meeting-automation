@@ -90,6 +90,18 @@ spec:
             summary: "Container memory > 80% of limit"
             description: "Container {{ $labels.name }} is using {{ $value | humanizePercentage }} of memory limit"
 
+        # Disk Space Warning (> 70% used)
+        - alert: DiskSpaceWarning
+          expr: |
+            node_filesystem_avail_bytes{mountpoint="/"}
+            / node_filesystem_size_bytes{mountpoint="/"} < 0.3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Disk space < 30% free"
+            description: "Only {{ $value | humanizePercentage }} of disk space is available"
+
         # Disk Space Low (< 20% free)
         - alert: DiskSpaceLow
           expr: |
@@ -101,6 +113,30 @@ spec:
           annotations:
             summary: "Disk space < 20% free"
             description: "Only {{ $value | humanizePercentage }} of disk space is available"
+
+        # Disk Space Critical (< 15% free)
+        - alert: DiskSpaceCritical
+          expr: |
+            node_filesystem_avail_bytes{mountpoint="/"}
+            / node_filesystem_size_bytes{mountpoint="/"} < 0.15
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Disk space < 15% free"
+            description: "Only {{ $value | humanizePercentage }} of disk space is available — immediate action required"
+
+        # Disk Space Emergency (< 5% free)
+        - alert: DiskSpaceEmergency
+          expr: |
+            node_filesystem_avail_bytes{mountpoint="/"}
+            / node_filesystem_size_bytes{mountpoint="/"} < 0.05
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Disk space < 5% free — EMERGENCY"
+            description: "Only {{ $value | humanizePercentage }} of disk space is available — system may crash"
 
         # MinIO PVC Usage > 80% (Warning)
         - alert: MinIOPvcHighUsage
