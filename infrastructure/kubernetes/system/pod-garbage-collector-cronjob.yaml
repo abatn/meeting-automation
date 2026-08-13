@@ -64,18 +64,22 @@ spec:
               echo "[$TIMESTAMP] === Pod GC: Phase 1 — Cleaning failed/evicted pods ==="
 
               for ns in $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}'); do
-                # Skip kube-system and kube-public (prevent breaking cluster components)
-                case "$ns" in kube-system|kube-public) continue ;; esac
+                # Skip kube-system and kube-public for FAILED pods (prevent breaking cluster components)
+                # But DO clean Completed pods in kube-system (they're harmless)
+                is_system_ns=false
+                case "$ns" in kube-system|kube-public) is_system_ns=true ;; esac
 
-                # Delete pods with terminal states
-                pods=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | \
-                  awk '$3 ~ /^(Error|Evicted|ContainerStatusUnknown|CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerConfigError|RunContainerError|Init:Error|Init:ContainerStatusUnknown|Init:ErrImagePull|Unknown|DeadlineExceeded)$/ {print $1}')
+                # Delete pods with terminal states (skip in kube-system for safety)
+                if [ "$is_system_ns" = false ]; then
+                  pods=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | \
+                    awk '$3 ~ /^(Error|Evicted|ContainerStatusUnknown|CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerConfigError|RunContainerError|Init:Error|Init:ContainerStatusUnknown|Init:ErrImagePull|Unknown|DeadlineExceeded)$/ {print $1}')
 
-                for pod in $pods; do
-                  kubectl delete pod "$pod" -n "$ns" --grace-period=0 --force 2>/dev/null && DELETED=$((DELETED+1)) || true
-                done
+                  for pod in $pods; do
+                    kubectl delete pod "$pod" -n "$ns" --grace-period=0 --force 2>/dev/null && DELETED=$((DELETED+1)) || true
+                  done
+                fi
 
-                # Delete Completed pods older than 1 hour (prevent accumulation)
+                # Delete Completed pods older than 1 hour (ALL namespaces including kube-system)
                 completed=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | \
                   awk '$3 == "Completed" {print $1}')
                 for pod in $completed; do
