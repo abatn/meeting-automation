@@ -52,6 +52,16 @@ jobs:
         echo "Using context: $CONTEXT"
         kubectl config use-context "$CONTEXT"
 
+    - name: Install Velero CLI
+      run: |
+        VELERO_VERSION="v1.18.1"
+        echo "Installing Velero CLI ${VELERO_VERSION}..."
+        curl -fsSL "https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-amd64.tar.gz" | tar -xz
+        sudo mv "velero-${VELERO_VERSION}-linux-amd64/velero" /usr/local/bin/velero
+        rm -rf "velero-${VELERO_VERSION}-linux-amd64"
+        velero version --client-only
+        echo "✅ Velero CLI installed"
+
     - name: Velero Pre-Deploy Backup
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-prod
