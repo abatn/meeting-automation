@@ -10,7 +10,7 @@ metadata:
   name: pod-gc
 rules:
 - apiGroups: [""]
-  resources: ["pods"]
+  resources: ["pods", "namespaces"]
   verbs: ["list", "delete"]
 - apiGroups: ["apps"]
   resources: ["replicasets"]
