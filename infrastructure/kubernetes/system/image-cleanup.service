@@ -1,0 +1,12 @@
+[Unit]
+Description=Containerd Image Cleanup
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/image-cleanup.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

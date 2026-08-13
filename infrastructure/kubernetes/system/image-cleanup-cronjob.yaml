@@ -1,0 +1,40 @@
+# DEPRECATED: This CronJob is not used.
+# We use systemd timer instead (image-cleanup.timer + image-cleanup.service)
+# because k3s containerd socket requires host namespace access.
+#
+# See: /etc/systemd/system/image-cleanup.timer
+# See: /etc/systemd/system/image-cleanup.service
+# See: /usr/local/bin/image-cleanup.sh
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: image-cleanup
+  namespace: kube-system
+  labels:
+    app: image-cleanup
+    purpose: containerd-image-pruning
+    status: deprecated
+spec:
+  schedule: "0 3 * * 0"  # Weekly on Sunday at 03:00 UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 600
+      template:
+        spec:
+          serviceAccountName: image-cleanup
+          restartPolicy: Never
+          containers:
+          - name: cleanup
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "This CronJob is deprecated. Use systemd timer instead."
+              echo "See: /etc/systemd/system/image-cleanup.timer"
+              exit 0
