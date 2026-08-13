@@ -535,6 +535,9 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-worker-pro
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: cloudnative-pg
     ports:
     - protocol: TCP
       port: 5432

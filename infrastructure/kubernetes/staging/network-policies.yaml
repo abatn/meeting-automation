@@ -418,6 +418,9 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-beat-staging
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: cloudnative-pg
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: monitoring
