@@ -47,8 +47,8 @@ def check_api_rate_limit(client_id: str, plan: str) -> dict:
 
 def check_recording_rate_limit(client_id: str, plan: str) -> dict:
     """Prüft Recordings pro Tag."""
-    # Skip rate limiting in E2E tests to avoid 429 errors during test runs
-    if os.getenv("E2E_TEST", "").lower() == "true":
+    # Skip rate limiting in E2E tests or staging (without triggering Celery eager mode)
+    if os.getenv("E2E_TEST", "").lower() == "true" or os.getenv("SKIP_RECORDING_RATE_LIMIT", "").lower() == "true":
         return {"allowed": True, "remaining": -1, "limit": -1}
 
     r = _get_redis()

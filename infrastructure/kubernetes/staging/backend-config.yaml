@@ -35,5 +35,5 @@ data:
   ONLYOFFICE_BACKEND_URL: "http://backend.meeting-automation-staging.svc.cluster.local:8000"
   FRONTEND_URL: "https://staging.meeting-automation.com"
   CORS_ORIGINS: '["https://staging.meeting-automation.com","http://localhost:3000"]'
-  # E2E tests: skip rate limiting, Celery eager mode, NullPool, ACTIVE client status
-  E2E_TEST: "true"
+  # Staging: skip recording rate limit for E2E tests (safe — no Celery eager mode)
+  SKIP_RECORDING_RATE_LIMIT: "true"
