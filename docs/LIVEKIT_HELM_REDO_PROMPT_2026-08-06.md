@@ -403,7 +403,146 @@ mit 154KB erfolgreich).
 
 ---
 
-## 5. Abschlussbericht an den User
+## 5. Offizieller LiveKit Recording Workflow (aus offizieller Dokumentation)
+
+> **Quellen:** docs.livekit.io/transport/self-hosting/deployment/, docs.livekit.io/transport/self-hosting/egress/, github.com/livekit/egress
+
+### 5.1 Architektur (offiziell)
+
+```
+LiveKit Server (hostNetwork, port 7880)
+  │
+  ├── WebRTC (TCP 7881 + UDP 50000-60000)
+  ├── TURN (optional, port 3478/5349)
+  └── Redis (session state)
+        │
+        ▼
+LiveKit Egress (Chrome-basiert)
+  │
+  ├── Connects via ws_url zu LiveKit Server
+  ├── Records Room Composite / Track Composite
+  └── Uploads zu S3/MinIO/Azure/GCP
+        │
+        ▼
+Celery Pipeline (Gladia → Mistral → PV)
+```
+
+### 5.2 TURN-Konfiguration (3 offizielle Optionen)
+
+| Option | Config | Wann nötig? | Risiko |
+|--------|--------|-------------|--------|
+| **A: TURN deaktivieren** | `turn.enabled: false` | Gleiche Netzwerk (Cluster, hostNetwork) | Kein externer Zugang |
+| **B: TURN/TLS** | `turn.enabled: true` + `tls_port: 5349` + `domain` + `cert_file` + `key_file` | Externe Teilnehmer hinter Corporate Firewall | TLS-Zertifikat nötig |
+| **C: TURN/UDP** | `turn.enabled: true` + `udp_port: 443` | QUIC-kompatible Firewalls | Begrenzte Kompatibilität |
+
+**Empfehlung für unseren Cluster:** Option A (TURN deaktivieren) — alle Teilnehmer sind im gleichen Netzwerk, hostNetwork ist aktiv, direkte UDP-Pfade sind verfügbar.
+
+### 5.3 Egress-Config (offizielle Pflichtfelder)
+
+```yaml
+# Pflichtfelder:
+api_key: <LIVEKIT_API_KEY>
+api_secret: <LIVEKIT_API_SECRET>
+ws_url: ws://livekit-server:7880    # ← Muss erreichbar sein!
+redis:
+  address: redis:6379               # ← Gleiche Adresse wie LiveKit Server
+
+# Optional:
+health_port: 8080
+template_port: 7980
+prometheus_port: 9090
+log_level: info
+
+# Storage (nur eines):s3:
+  endpoint: http://minio:9000
+  access_key: minio_user
+  secret: minio_password
+  bucket: meeting-recordings
+
+# Resource-Kosten (aus offizieller Doku):
+cpu_cost:
+  room_composite_cpu_cost: 3.0      # ← 2-6 CPUs pro Recording!
+  audio_room_composite_cpu_cost: 1.0
+  track_composite_cpu_cost: 2.0
+  track_cpu_cost: 1.0
+```
+
+**Wichtig:** Egress kann nur **1 Recording pro Instance** verarbeiten. Bei 3 parallelen Tenants braucht man 3 Egress-Instances.
+
+### 5.4 Egress Autoscaling (offiziell)
+
+```yaml
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  # Custom Metric (empfohlen — präziser als CPU):
+  # metricName: livekit_egress_available
+  # targetAverageValue: 3
+```
+
+**Custom Metric:** `livekit_egress_available` (Prometheus) — jeder Instance prüft eigene CPU-Verfügbarkeit. Präziser als durchschnittliche CPU-Auslastung.
+
+### 5.5 Egress Helm-Chart (offiziell)
+
+```bash
+# Install:
+helm install livekit-egress livekit/egress \
+  --namespace meeting-automation \
+  --values egress-values.yaml
+
+# Upgrade:
+helm upgrade livekit-egress livekit/egress \
+  --namespace meeting-automation \
+  --values egress-values.yaml
+```
+
+**Chart-Struktur:**
+- `egress/templates/configmap.yaml`: Rendert `.Values.egress` als `config.yaml`
+- `egress/templates/deployment.yaml`: Setzt `EGRESS_CONFIG_BODY` aus ConfigMap
+- **KEIN** `hostNetwork` im Chart-Template → Egress läuft auf Pod-IP
+
+### 5.6 LiveKit Server Helm-Chart (offiziell)
+
+```yaml
+# Offizielle Defaults (v1.9.0):
+podHostNetwork: true          # ← hostNetwork ist DEFAULT!
+livekit:
+  port: 7880
+  rtc:
+    tcp_port: 7881
+    port_range_start: 50000   # ← UDP-Range ist DEFAULT!
+    port_range_end: 60000
+    use_external_ip: true
+  turn:
+    enabled: false            # ← TURN ist per Default AUS
+```
+
+### 5.7 Fehler-Checkliste (aus offizieller Doku)
+
+| Fehler | Ursache | Lösung |
+|--------|--------|--------|
+| `no response from egress service` | LiveKit kann Egress nicht via Redis erreichen | Gleiche Redis-Adresse prüfen |
+| `chrome failed to start` | Chrome-Sandboxing fehlt | `--cap-add=SYS_ADMIN` oder `enable_chrome_sandbox: true` |
+| `CreatePermission error 403` | TURN ohne TLS-Zertifikat | `turn.enabled: false` ODER TLS konfigurieren |
+| Leere Aufnahme (< 10KB) | TURN-403 → nur 3964 Bytes Audio | TURN deaktivieren (bei hostNetwork) |
+| Egress skaliert nicht | hostNetwork-Portkonflikt | Helm-Egress (kein hostNetwork) + autoscaling |
+
+### 5.8 Unser aktueller Stand (2026-08-14)
+
+| Komponente | Staging | Production |
+|------------|---------|------------|
+| LiveKit Server | ✅ Helm v1.9.0 | ✅ Helm v1.9.0 |
+| LiveKit Egress | ✅ Helm v1.8.4 | ✅ Helm v1.8.4 |
+| hostNetwork | ✅ true (via Patch) | ✅ true (via Patch) |
+| TURN | ⚠️ enabled: true (OHNE TLS) | ⚠️ enabled: true (OHNE TLS) |
+| Egress ws_url | ✅ Service DNS | ✅ Service DNS |
+| Autoscaling | ❌ enabled: false | ❌ enabled: false |
+| Recording funktioniert | ✅ (bei direktem UDP-Pfad) | ⚠️ (nicht getestet) |
+
+---
+
+## 6. Abschlussbericht an den User
 
 Am Ende lieferst du:
 1. Welche Dateien geändert/erstellt wurden (Pfade).
@@ -418,4 +557,6 @@ Am Ende lieferst du:
 
 *Referenzen: offizielle Chart-Values v1.9.0/v1.8.4, Chart-Templates (configmap.yaml,
 deployment.yaml), config-sample.yaml aus livekit/livekit, Cluster-Logs (Egress 403,
-webhook egress_ended HTTP 200), Cluster-Configmap vs. Git-Raw (identisch).*
+webhook egress_ended HTTP 200), Cluster-Configmap vs. Git-Raw (identisch),
+docs.livekit.io/transport/self-hosting/deployment/, docs.livekit.io/transport/self-hosting/egress/,
+github.com/livekit/egress (offizielle Config-Dokumentation).*
