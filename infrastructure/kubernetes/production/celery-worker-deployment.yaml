@@ -46,9 +46,9 @@ spec:
             - /bin/sh
             - -c
             - celery -A app.tasks.celery_app inspect ping --timeout=10
-          initialDelaySeconds: 180
+          initialDelaySeconds: 60
           periodSeconds: 60
-          timeoutSeconds: 120
+          timeoutSeconds: 30
           failureThreshold: 5
         env:
         - name: PYTHONPATH
