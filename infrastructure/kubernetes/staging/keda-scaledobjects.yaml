@@ -1,0 +1,78 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: celery-worker-gratuit
+  namespace: meeting-automation-staging
+spec:
+  scaleTargetRef:
+    name: celery-worker-staging
+  minReplicaCount: 0        # Scale-to-zero wenn Queue leer
+  maxReplicaCount: 10       # Dynamisch basiert auf Queue-Tiefe
+  pollingInterval: 15       # Alle 15s Queue pruefen
+  cooldownPeriod: 300       # 5min nach letzter Message skaliert runter
+  triggers:
+    - type: rabbitmq
+      metadata:
+        host: amqp://rabbit_user:rabbit_password@rabbitmq-staging.meeting-automation-staging.svc.cluster.local:5672//
+        queueName: transcription_gratuit
+        mode: QueueLength
+        value: "5"            # 5 Messages pro Worker
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: celery-worker-pro
+  namespace: meeting-automation-staging
+spec:
+  scaleTargetRef:
+    name: celery-worker-pro-staging
+  minReplicaCount: 0        # Scale-to-zero wenn Queue leer
+  maxReplicaCount: 10       # Dynamisch basiert auf Queue-Tiefe
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    - type: rabbitmq
+      metadata:
+        host: amqp://rabbit_user:rabbit_password@rabbitmq-staging.meeting-automation-staging.svc.cluster.local:5672//
+        queueName: transcription_pro
+        mode: QueueLength
+        value: "5"            # 5 Messages pro Worker
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: livekit-egress
+  namespace: meeting-automation-staging
+spec:
+  scaleTargetRef:
+    name: livekit-egress
+  minReplicaCount: 1        # Mindestens 1 (Recording immer moeglich)
+  maxReplicaCount: 5        # Dynamisch basiert auf CPU
+  pollingInterval: 30
+  cooldownPeriod: 120
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "80"         # Bei 80% CPU skaliert hoch
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: backend
+  namespace: meeting-automation-staging
+spec:
+  scaleTargetRef:
+    name: backend
+  minReplicaCount: 2        # Mindestens 2 (HA)
+  maxReplicaCount: 10       # Dynamisch basiert auf CPU
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"         # Bei 70% CPU skaliert hoch
