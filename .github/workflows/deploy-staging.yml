@@ -153,6 +153,42 @@ jobs:
             --wait --timeout 10m || echo "⚠️ Warning: Longhorn install failed, continuing"
         fi
 
+    - name: Install KEDA (idempotent)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        helm repo add kedacore https://kedacore.github.io/charts 2>/dev/null || true
+        helm repo update
+        helm upgrade --install keda kedacore/keda \
+          --namespace keda --create-namespace \
+          --set operator.replicaCount=1 \
+          --set metricsServer.replicaCount=1 \
+          --wait --timeout 5m || echo "⚠️ Warning: KEDA install failed"
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=keda-operator -n keda --timeout=120s || true
+        echo "✅ KEDA installed"
+
+    - name: Test KEDA → RabbitMQ Cross-Namespace Connectivity
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        echo "Testing cross-namespace network: keda → rabbitmq-staging..."
+        kubectl run keda-nettest --rm -i --restart=Never --image=busybox:1.36 -n keda \
+          -- sh -c "nc -w5 rabbitmq-staging.meeting-automation-staging.svc.cluster.local 5672 && echo OK || echo FAIL" 2>&1 || true
+        # If FAIL: RabbitMQ NetworkPolicy must be fixed before ScaledObjects can work
+        # Production lesson: Cross-Namespace NetworkPolicy blocks KEDA on some k3s clusters
+
+    - name: Deploy KEDA ScaledObjects + NetworkPolicy
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        kubectl apply -f infrastructure/kubernetes/staging/keda-scaledobjects.yaml
+        kubectl apply -f infrastructure/kubernetes/staging/keda-rabbitmq-networkpolicy.yaml
+        echo "✅ KEDA ScaledObjects + NetworkPolicy deployed"
+        kubectl get scaledobject -n meeting-automation-staging
+
+    - name: Delete hardcoded HPA (replaced by KEDA)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        kubectl delete hpa celery-worker-hpa -n meeting-automation-staging --ignore-not-found
+        echo "✅ Hardcoded HPA removed"
+
     - name: Deploy All Staging Resources (idempotent, exclude Helm values)
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
@@ -164,6 +200,8 @@ jobs:
           [[ "$fname" == *values*.yaml ]] && continue
           # Skip old LiveKit deployment YAMLs (Helm-managed now)
           [[ "$fname" == *livekit-*-deployment.yaml ]] && continue
+          # Skip hardcoded HPA (replaced by KEDA ScaledObjects)
+          [[ "$fname" == *hpa*.yaml ]] && continue
           echo "Applying: $fname"
           kubectl apply -f "$f" -n meeting-automation-staging || echo "Warning: Failed to apply $fname"
         done
