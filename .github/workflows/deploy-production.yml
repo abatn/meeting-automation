@@ -142,16 +142,6 @@ jobs:
         target: "/root/production-manifests/system"
         strip_components: 3
 
-    - name: Copy k3s config.yaml to Contabo
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: 169.58.83.32
-        username: root
-        key: ${{ secrets.CONTABO_SSH_KEY }}
-        source: "infrastructure/kubernetes/production/k3s-config.yaml"
-        target: "/root/production-manifests/k3s-config.yaml"
-        strip_components: 4
-
     - name: Deploy to Contabo Production
       uses: appleboy/ssh-action@v1
       with:
