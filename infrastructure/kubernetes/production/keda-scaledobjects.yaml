@@ -12,20 +12,23 @@ spec:
   cooldownPeriod: 300       # 5min nach letzter Message skaliert runter
   triggers:
     - type: rabbitmq
+      authenticationRef:
+        name: rabbitmq-auth
       metadata:
-        host: amqp://rabbit_user:EyftwTfJsJf5448aiLj4g@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: transcription_gratuit
         mode: QueueLength
         value: "5"            # 5 Messages pro Worker
     - type: rabbitmq
+      authenticationRef:
+        name: rabbitmq-auth
       metadata:
-        host: amqp://rabbit_user:EyftwTfJsJf5448aiLj4g@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: email
         mode: QueueLength
         value: "1"            # Scale bei 1. Email (kein Stranding)
     - type: rabbitmq
+      authenticationRef:
+        name: rabbitmq-auth
       metadata:
-        host: amqp://rabbit_user:EyftwTfJsJf5448aiLj4g@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: maintenance
         mode: QueueLength
         value: "1"            # Scale bei 1. Maintenance-Task
@@ -45,8 +48,9 @@ spec:
   cooldownPeriod: 300
   triggers:
     - type: rabbitmq
+      authenticationRef:
+        name: rabbitmq-auth
       metadata:
-        host: amqp://rabbit_user:EyftwTfJsJf5448aiLj4g@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: transcription_pro
         mode: QueueLength
         value: "5"            # 5 Messages pro Worker
