@@ -17,6 +17,18 @@ spec:
         queueName: transcription_gratuit
         mode: QueueLength
         value: "5"            # 5 Messages pro Worker
+    - type: rabbitmq
+      metadata:
+        host: amqp://rabbit_user:rabbit_password@rabbitmq-staging.meeting-automation-staging.svc.cluster.local:5672//
+        queueName: email
+        mode: QueueLength
+        value: "1"            # Scale bei 1. Email (kein Stranding)
+    - type: rabbitmq
+      metadata:
+        host: amqp://rabbit_user:rabbit_password@rabbitmq-staging.meeting-automation-staging.svc.cluster.local:5672//
+        queueName: maintenance
+        mode: QueueLength
+        value: "1"            # Scale bei 1. Maintenance-Task
 
 ---
 apiVersion: keda.sh/v1alpha1

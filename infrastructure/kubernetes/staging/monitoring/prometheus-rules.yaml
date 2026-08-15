@@ -162,6 +162,30 @@ spec:
             summary: "MinIO PVC usage > 90%"
             description: "MinIO PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full — disk-pressure imminent!"
 
+        # PostgreSQL / DB PVC Usage > 80% (Warning) — Haupt-Disk-Verbraucher (CNPG)
+        - alert: PostgresPvcHighUsage
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"meeting-db.*|postgres.*"}
+            / kubelet_volume_stats_capacity_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"meeting-db.*|postgres.*"} > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PostgreSQL PVC usage > 80%"
+            description: "PostgreSQL PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full"
+
+        # PostgreSQL / DB PVC Usage > 90% (Critical)
+        - alert: PostgresPvcCriticalUsage
+          expr: |
+            kubelet_volume_stats_used_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"meeting-db.*|postgres.*"}
+            / kubelet_volume_stats_capacity_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"meeting-db.*|postgres.*"} > 0.9
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL PVC usage > 90%"
+            description: "PostgreSQL PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full — disk-pressure imminent!"
+
         # Velero Backup Size > 30GB (Warning)
         - alert: VeleroBackupSizeHigh
           expr: |
