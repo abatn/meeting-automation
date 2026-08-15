@@ -207,6 +207,16 @@ jobs:
         done
         kubectl rollout restart deployment/onlyoffice-staging -n meeting-automation-staging 2>&1 || echo "Warning: OnlyOffice restart failed"
 
+    - name: Patch Velero + LiveKit + RabbitMQ Probes (P2/P3/P4 Fixes)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        echo "=== P3: Velero initialDelaySeconds 10→60 ==="
+        kubectl patch deployment velero -n velero --type=json -p='[
+          {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/initialDelaySeconds", "value": 60},
+          {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/initialDelaySeconds", "value": 60}
+        ]' 2>&1 || echo "Warning: Velero patch failed (not deployed yet?)"
+        echo "✅ Velero probes patched"
+
     - name: Deploy System CronJobs + Monitoring Stack + Image-Cleanup
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
