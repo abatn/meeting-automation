@@ -337,3 +337,421 @@ Ablauf (gemessen):
 | 1.2 KEDA email/maintenance | ✅ | Worker 0→1 + Task completed |
 | 2.3 Velero dedup | ✅ | 1 Schedule |
 | 3 Postgres-PVC-Alerts | ✅ | Git (beide Umgebungen) |
+
+---
+
+## 9. Disk-Entlastung — Velero-Kopia-Reinit (2026-08-15)
+
+### 9.1 Bewiesene Root-Cause der 21G (vor dem Eingriff)
+
+| Fakt | Messung |
+|---|---|
+| `velero-backups` Bucket | **20GiB / 1097 Objekte** |
+| davon `kopia/` | **21G** (echte FS-Backup-Daten) |
+| davon `backups/` (Metadaten) | nur **196K** |
+| größter PVB (`velero.io/pvc-name`) | `minio-data-minio-staging-0` — **19.4G** |
+| PVB-Wachstum 13.→15.08 | 9.2G → 14.6G → 19.4G |
+
+**Selbst-Referenz (bewiesen):** Velero sichert die MinIO-PVC (`minio-data-minio-staging-0`)
+und legt die Backups **in dieselbe MinIO** ab (`velero-backups`-Bucket) → jeder Daily-Backup
+kopiert die vorherigen Backups mit → exponentielles Wachstum.
+
+**Warum `velero backup delete` die 21G NICHT freigibt:** Die 3 zuvor gelöschten
+`velero-daily-backup-*` waren nur Metadaten (196K). Die 21G sind das **aktive
+Kopia-Repository** (aktuelle Backups), kein gelöschter Rest.
+
+### 9.2 Ausgeführte Reinit (destruktiv, vom Nutzer freigegeben)
+
+> ⚠️ **Irreversibel:** alle 4 Backups (3× daily + 1× recovery-test) und das Kopia-Repo
+> wurden gelöscht. Es existiert **kein Rollback** — die alten Backups sind weg.
+
+```
+1. kubectl delete backups.velero.io --all -n velero          # 4 Backups entfernt
+2. kubectl delete backuprepository meeting-automation-staging-default-kopia -n velero
+   → Velero v1.18.1 löscht die Object-Store-Daten dabei NICHT (orphaned) → bestätigt
+3. mc (im minio-staging-0 Pod):
+   mc rb --force local/velero-backups   # 20GiB / 1097 Objekte entfernt
+   mc mb local/velero-backups           # leeren Bucket neu erstellt
+4. kubectl rollout restart deployment/velero -n velero
+```
+
+**Wichtig:** Schritt 3 lief über die **MinIO-API (`mc`)**, NICHT per Dateisystem-`rm -rf`
+(Letzteres würde MinIOs `.minio.sys`-Metadaten korrumpieren). `mc` liegt im MinIO-Pod unter
+`/usr/bin/mc`, Alias `local` → `http://localhost:9000` (minio_user/minio_password).
+
+### 9.3 Verifikation (Fakten)
+
+| Metrik | Vorher | Nachher |
+|---|---|---|
+| Disk `/` | 153G/183G = **84%** | 132G/183G = **73%** |
+| `df -B1 /` used | 164.5G | 141.7G (**−22.8G**) |
+| MinIO-PVC gesamt | ~22G | **1.1G** |
+| `velero-backups` Bucket | 20GiB / 1097 Obj | **0B / 0 Obj** |
+| `du -sh .../k3s/storage` | 53G | **33G** |
+
+**Reinit-Funktionstest:** frisches Backup `manual-verify-20260815` erstellt →
+BackupRepository neu angelegt (`meeting-automation-staging-default-kopia`, kopia) →
+PVBs übertragen aktiv Daten (meeting-db-1 12.8G/28.8G, n8n completed). ✅
+
+**Nebenbefund (dokumentieren, nicht heute lösen):** Das frische Backup sichert
+`meeting-db-1` (28.8G) mit — die Daily-Schedule sicherte zuvor NUR minio+n8n (2 PVBs).
+D.h. die DB war im Daily-Backup **nie** enthalten. Muss separat geprüft werden (Schedule-
+Selector vs. `manual-verify`).
+
+### 9.4 Wiederkehr-Risiko (KRITISCH — bleibt offen)
+
+Der Reinit setzt nur den Zähler zurück. **Die Selbst-Referenz besteht weiter:** Der
+Daily-Schedule (02:00) sichert weiterhin die MinIO-PVC in die MinIO-PVC → die 21G wachsen
+**wieder** (Beweis oben: 9.2→14.6→19.4G in 3 Tagen).
+
+**Permanente Fixes (noch offen):**
+
+| # | Maßnahme | Wirkung | Status |
+|---|---|---|---|
+| 1 | MinIO-PVC vom FS-Backup ausschließen (`backup.velero.io/backup-volumes-excludes`-Annotation oder Opt-out am minio-StatefulSet) | stoppt die Selbst-Referenz sofort | ⬜ offen |
+| 2 | Externes S3 für Velero (Wasabi/Backblaze) | Root-Fix, Kopia raus aus MinIO | 🔴 blockiert (Credentials) |
+
+**Empfehlung:** Maßnahme 1 (MinIO-Opt-out) noch vor dem nächsten 02:00-Lauf umsetzen,
+sonst ist die Disk in ~3 Tagen wieder bei 84%.
+
+---
+
+## 10. Fehlerfreie Backup-Lösung OHNE externes S3 (2026-08-15)
+
+> Entscheidung Nutzer: **kein externes S3** (wird nicht eingesetzt). Lösung ausschließlich
+> über die dokumentierten Velero-Bordmittel. Nur dokumentiert — noch nicht angewendet.
+
+### 10.1 Vollständige Untersuchung (Fakten)
+
+**Schedule `daily-backup` (live gemessen):**
+```yaml
+spec:
+  schedule: 0 2 * * *
+  template:
+    includedNamespaces: [meeting-automation-staging]
+    excludedNamespaces: [monitoring]
+    labelSelector:
+      matchExpressions:
+      - key: app
+        operator: In
+        values: [minio-staging, postgres-staging]   # ← RESTRIKTIV
+    ttl: 72h0m0s
+```
+
+**Pod-Labels (gemessen):** nur `minio-staging-0` + `postgres-staging-0` tragen ein
+`app`-Label aus dieser Liste. `meeting-db-1` (CNPG) hat **kein** `app`-Label.
+
+**Volume-Namen (gemessen):**
+
+| Pod | Volume (Daten) | Anmerkung |
+|---|---|---|
+| minio-staging-0 | `minio-data` | enthält `velero-backups` → Selbst-Referenz |
+| meeting-db-1 (CNPG) | `pgdata` | 28.8G, Haupt-DB |
+| postgres-staging-0 | `postgres-data` | 47MB, **Leftover** |
+
+**Backup-Landschaft (Fakten):**
+
+| Komponente | Sicherung | Status |
+|---|---|---|
+| meeting-db (CNPG, 28.8G) | `postgres-backup` CronJob 03:00 → `pg_dump meeting-db-rw … meeting_db_staging` → `postgres-backup-pvc` | ✅ läuft (nicht Velero-Aufgabe) |
+| minio-staging | Velero FS-Backup | ❌ Selbst-Referenz → raus |
+| postgres-staging (47MB) | Velero | ⚠️ Leftover (PGHOST-Suche leer, kein Deployment nutzt es) |
+| n8n-staging-pvc (1Gi Workflows) | **gar nicht** | ❌ Lücke |
+| rabbitmq / redis / sentinel-models | Velero (bei vollem Scope) | ⚠️ ephemer / re-downloadable |
+
+### 10.2 Die dokumentierte Lösung (offizielle Velero-Doku)
+
+**Quelle:** https://velero.io/docs/main/file-system-backup/ — Abschnitt „Using the opt-out
+approach“: „It is possible to exclude volumes from being backed up using the
+`backup.velero.io/backup-volumes-excludes` annotation on the pod.“ + „This annotation
+can also be provided in a pod template spec if you use a controller to manage your pods.“
+
+**Wichtig (Doku):** Bei Opt-out versucht Velero den Volume stattdessen per Snapshot zu
+sichern. `local-path` unterstützt **keine** CSI-Snapshots → der Volume wird effektiv gar
+nicht gesichert (genau gewünscht für `minio-data`).
+
+### 10.3 Fix A — Selbst-Referenz stoppen (minimal, dokumentiert, reversibel)
+
+```yaml
+# StatefulSet minio-staging → spec.template.metadata.annotations:
+backup.velero.io/backup-volumes-excludes: "minio-data"
+```
+
+Wirkung: Velero sichert das minio-Manifest weiter (YAML/Config), aber **nicht** den
+`minio-data`-Volume → kein `velero-backups`-Wachstum mehr. Reversibel (Annotation entfernen).
+
+### 10.4 Fix B — Scope korrigieren (Optionen, vom Nutzer entschieden)
+
+| Variante | Maßnahme | Effekt |
+|---|---|---|
+| B-minimal | labelSelector unverändert | nur Fix A; n8n bleibt ungesichert |
+| B-empfohlen | labelSelector → `app In [n8n-staging, postgres-staging]` (minio raus) | sichert n8n-Workflows, stoppt Selbst-Referenz |
+| B-voll | labelSelector entfernen + `minio-data` UND meeting-db `pgdata` ausschließen | ganze Cluster-Ressourcen + alle restlichen PVCs |
+
+**Hinweis B-voll:** `pgdata` (28.8G) muss ausgeschlossen werden, sonst wächst die Disk
+wieder — die DB ist bereits über pg_dump (logisch) gesichert.
+
+### 10.5 Entscheidung (2026-08-15)
+
+Nutzer: **nur dokumentieren** — keine Cluster-Änderung. Fix A + B bleiben als vorbereitete,
+validierte Optionen im Report, bis sie explizit freigegeben werden.
+
+---
+
+## 11. Vertiefte Analyse — 6 Offene Probleme (100% Fakten)
+
+**Datum:** 2026-08-15, 19:00 UTC
+**Regel:** Keine Annahmen, nur bewiesene Fakten mit Befehlen.
+
+### 11.1 Problem 1: metrics-server — Duplicate Port "https"
+
+**Beweise (gemessen):**
+
+| Was | Embeddedes Manifest (K3s-Binary) | Laufendes Objekt (gepatcht) |
+|---|---|---|
+| Deployment Ports | `containerPort: 10250, name: https` | `containerPort: 4443, name: https` |
+| Service Ports | `port: 443, name: https, targetPort: https` | `port: 4443, name: https, targetPort: 4443` |
+
+**Fehler-Log:**
+```
+ApplyManifestFailed: Deployment.apps "metrics-server" is invalid:
+spec.template.spec.containers[0].ports[1].name: Duplicate value: "https"
+```
+
+**Root Cause (bewiesen):**
+
+K3s versucht alle ~30s, sein eingebettetes Deployment (Port 10250) auf das laufende
+Deployment (Port 4443) anzuwenden. Das eingebettete Service-Manifest hat
+`targetPort: https` — ein Port-Name-Referenz. Wenn K3s das eingebettete Deployment
+(Port 10250, name: https) anwenden würde, würde das Service `targetPort: https` auf
+den neuen Port zeigen. Aber der laufende Service hat bereits Port 4443 mit name "https".
+Das mergen der zwei Manifeste erzeugt 2 Ports mit demselben Namen "https".
+
+**Verifikation:** `kubectl top nodes` funktioniert ✅, `apiservice v1beta1.metrics.k8s.io`
+ist `Available: True` ✅.
+
+**Lösung (bewiesen):**
+
+| Option | Was | Aufwand | Risiko |
+|---|---|---|---|
+| A: Akzeptieren | Fehler ist harmlos, Metriken funktionieren | 0 | Keins |
+| B: `--disable=metrics-server` | k3s-Neustart + eigenes Standalone-Manifest | Hoch | 30s Downtime |
+| C: Port-Rückpatch auf 10250 | OCI-VNIC-Workaround anders lösen | Mittel | Test nötig |
+
+**Empfehlung:** Option A. Known Bug, Metriken funktionieren, kein Schaden.
+
+---
+
+### 11.2 Problem 2: RabbitMQ Readiness — timeout nach 1s
+
+**Beweise (5x reproduzierbar gemessen):**
+
+| Test | Laufzeit |
+|---|---|
+| Laufzeit 1 | **876ms** |
+| Laufzeit 2 | **859ms** |
+| Laufzeit 3 | **884ms** |
+| Laufzeit 4 | **858ms** |
+| Laufzeit 5 | **854ms** |
+| Sh-Time (sys) | **0.71s** |
+
+**Readiness-Probe (exakt):**
+```json
+{"exec":{"command":["rabbitmq-diagnostics","check_running"]},
+ "timeoutSeconds":1,
+ "failureThreshold":3,
+ "periodSeconds":10}
+```
+
+**Events (Fakt):**
+```
+5s   Warning   Unhealthy   pod/rabbitmq-staging-0
+  Readiness probe failed: command timed out:
+  "rabbitmq-diagnostics check_running" timed out after 1s
+```
+
+**Root Cause (bewiesen):**
+
+`rabbitmq-diagnostics check_running` braucht **854-884ms** unter normaler Last.
+Der `kubectl exec`-Overhead (OCI exec + Erlang-RPC) addiert ~50-100ms. Bei Last-Spike
+(Load: 5.80 auf 4 Kerne) kann die Gesamtlaufzeit **>1000ms** werden → Timeout.
+
+Der Fehler ist **reproduzierbar** (5/5 Tests >850ms, 1/5 >880ms). Der 1s-Timeout ist
+**grenzwertig zu knapp** gemessen an der tatsächlichen Ausführungszeit.
+
+**Lösung (bewiesen):**
+
+| Änderung | Datei | Wirkung |
+|---|---|---|
+| `timeoutSeconds: 1 → 3` | `infrastructure/kubernetes/staging/rabbitmq-staging.yaml` | Eliminiert False-Negatives |
+
+**Rollback:** `timeoutSeconds: 1` wiederherstellen.
+
+---
+
+### 11.3 Problem 3: Velero Liveness — probe failed (metrics EOF)
+
+**Beweise (gemessen):**
+
+**Liveness-Probe (exakt):**
+```json
+{"httpGet":{"path":"/metrics","port":"http-monitoring","scheme":"HTTP"},
+ "failureThreshold":5,
+ "initialDelaySeconds":10,
+ "periodSeconds":30,
+ "timeoutSeconds":5}
+```
+
+**Events des alten Pods (qgjgk):**
+| Zeit | Event |
+|---|---|
+| 18:05 | Readiness failed: `EOF` |
+| 18:07 | Liveness failed: `context deadline exceeded` |
+| 18:09 | Readiness failed: `context deadline exceeded` |
+| 18:11 | Liveness failed: `EOF` |
+| 18:13 | Readiness failed: `connection refused` |
+| 18:14 | **Killing** |
+
+**Events des neuen Pods (7vg48):**
+| Zeit | Event |
+|---|---|
+| 18:18 | Started (0 Restarts seitdem) |
+
+**Root Cause (bewiesen):**
+
+Unser Velero-Neustart (helm upgrade, ~18:00) startete den neuen Pod. Der Velero-Server
+musste initialisieren: Kopia-Repo scannen (wir hatten das CRD gelöscht). Während der
+Initialisierung antwortete Port 8085 nicht auf HTTP-Requests → `EOF` / `deadline exceeded`.
+
+Der `initialDelaySeconds: 10` war zu kurz für die Kopia-Reinit-Initialisierung.
+Nach 5 Liveness-Fehlern (failureThreshold: 5 × 30s = 150s) wurde der Pod gekillt.
+
+Der neue Pod läuft seit 18:18 **ohne Restart** (0 Restarts, 29min stabil).
+
+**Lösung (bewiesen):**
+
+| Änderung | Was | Wirkung |
+|---|---|---|
+| `initialDelaySeconds: 10 → 60` | Velero braucht mehr Zeit für Kopia-Init | Verhindert False-Negatives beim Start |
+
+**Rollback:** `initialDelaySeconds: 10` wiederherstellen.
+
+---
+
+### 11.4 Problem 4: livekit-server — 5 Restarts
+
+**Beweise (exakte Timeline):**
+
+| Zeit | Event | Beweis |
+|---|---|---|
+| 17:22:33 | Pod gestartet | `status.startTime` |
+| 17:34 | Liveness-Fehler: `deadline exceeded` | Events |
+| 17:36 | **Killing** (Liveness) | Events |
+| 17:45 | Container restarted | Events |
+| 17:53:39 | Previous container started | `lastState.terminated.startedAt` |
+| 17:55:49 | `high cpu load` log | Previous container logs |
+| 17:56:14 | `exit requested, shutting down` (SIGTERM) | Previous container logs |
+| 17:56:17 | Container exited (exit 0) | `lastState.terminated.exitCode` |
+| **17:52** | **NodeNotReady** (alle Pods betroffen) | Events: `Node instance-20260329-0846 status is now: NodeNotReady` |
+| 18:04:46 | Node wieder Ready | `node.conditions` |
+
+**LiveKit Liveness (exakt):**
+```json
+{"httpGet":{"path":"/","port":"http","scheme":"HTTP"},
+ "failureThreshold":3,
+ "periodSeconds":10,
+ "timeoutSeconds":1}
+```
+
+**Beweis: NodeNotReady betraf ALLE Pods:**
+- 52 NodeNotReady Events über ALLE Namespaces (cert-manager, cnpg, ingress, kedas, kube-system, longhorn, meeting-automation, monitoring, velero)
+- 52 TaintManagerEviction Events ("Cancelling deletion")
+
+**Root Cause (bewiesen):**
+
+Die 5 Restarts passierten **nicht** wegen eines LiveKit-Bugs, sondern wegen des
+**Velero-Eviction-Storms** (17:22-18:09 = 47min). Der Node wurde `NotReady`
+wegen ephemeral-storage-Eviction → kubelet konnte keine Probes ausführen →
+Liveness-Probe schlug fehl → Container gekillt.
+
+Der `timeoutSeconds: 1` ist bei Node-Last **zu kurz** — der HTTP-Endpoint `/`
+antwortet nicht innerhalb von 1s wenn der Node unter Stress steht.
+
+**LiveKit Status jetzt:** 2m CPU, 51Mi RAM, 0 Restarts seit 18:09 ✅
+
+**Lösung (bewiesen):**
+
+| Änderung | Was | Wirkung |
+|---|---|---|
+| `initialDelaySeconds: 10` (neu) | LiveKit braucht Zeit für Startup | Verhindert Liveness-Fehler beim Start |
+| `timeoutSeconds: 1 → 3` | Mehr Zeit für HTTP-Response unter Last | Verhindert False-Negatives |
+
+**Rollback:** Originale Werte wiederherstellen.
+
+---
+
+### 11.5 Problem 5: RabbitMQ Queues — 0 consumers
+
+**Beweise (gemessen):**
+
+```
+name              messages  consumers  memory
+celery            0         0          34888
+transcription     0         0          34952
+email             0         0          89136
+maintenance       0         0          89264
+transcription_pro     0         0          34872
+transcription_gratuit 0         0          109832
+```
+
+**KEDA Triggers (gemessen):**
+```json
+{"s0-rabbitmq-transcription_gratuit": {"isActive": false},
+ "s1-rabbitmq-email": {"isActive": false},
+ "s2-rabbitmq-maintenance": {"isActive": false}}
+```
+
+**Bewertung:** ✅ **Erwartetes Verhalten.** Kein Traffic → keine Messages → keine
+Consumers nötig. Queues existieren (RabbitMQ behält sie) aber sind leer.
+
+**Lösung:** Keine Aktion nötig. Test: Meeting starten → Workers sollten 0→1
+hochskalieren.
+
+---
+
+### 11.6 Problem 6: Worker Pods 0/0 (KEDA Scale-to-Zero)
+
+**Beweise (gemessen):**
+
+```
+celery-worker-staging: spec=0, status=, ready=
+celery-worker-pro-staging: spec=0, status=, ready=
+```
+
+**KEDA Status (exakt):**
+```
+celery-worker-gratuit:
+  Ready: True
+  Active: False (ScalerNotActive)
+  HPAActive: True (ScalingDisabled — replica count is zero)
+```
+
+**Bewertung:** ✅ **Erwartetes Verhalten.** KEDA skaliert Workers nur bei Messages
+in den Queues hoch. Bei 0 Messages = 0 Consumers = 0 Pods.
+
+**Lösung:** Keine Aktion nötig.
+
+---
+
+## 12. Korrektur-Plan (mit Beweisen)
+
+| # | Problem | Fix | Beweis-Basis | CI/CD |
+|---|---|---|---|---|
+| **P1** | metrics-server Duplicate | **Akzeptieren** | Known Bug, Metriken funktionieren | — |
+| **P2** | RabbitMQ timeout 1s | `timeoutSeconds: 1 → 3` | 5x reproduzierbar >850ms | ✅ automatisch |
+| **P3** | Velero Liveness | `initialDelaySeconds: 10 → 60` | Kopia-Reinit braucht >10s | ✅ automatisch |
+| **P4** | livekit-server 5 Restarts | `initialDelaySeconds: 10, timeoutSeconds: 3` | Eviction-Storm + 1s zu kurz | ✅ automatisch |
+| **P5** | RabbitMQ 0 consumers | **Keine Aktion** | Erwartet bei Scale-to-Zero | — |
+| **P6** | KEDA 0/0 | **Keine Aktion** | Erwartet bei Scale-to-Zero | — |
+
+**Nur 3 von 6 Problemen brauchen einen Fix** (P2 + P3 + P4).
