@@ -223,12 +223,34 @@ Phase 1.1 (celery-beat Probe)  →  Phase 1.2 (KEDA-Trigger email/maintenance)
 Lösung: entweder Node-Kapazität erhöhen ODER Baseline-Requests senken (Longhorn 480m,
 KEDA 300m, meeting-automation 1900m). Kein Hardcoding — Kapazitätsentscheidung.
 
-### 6.2 metrics-server (Phase 2.2) — Wartungsfenster nötig
+### 6.2 metrics-server (Phase 2.2) — BEWIESEN (Test 2026-08-15)
 
-Der Fix (`--disable=metrics-server` + Standalone-Deployment) erfordert einen **k3s-Neustart**
-(kurzfristige Cluster-Unterbrechung). Das k3s-Embedded-Manifest (Port 10250, name `https`)
-kollidiert mit dem Patch (Port 4443, name `https`) → `Duplicate value "https"`.
-Standalone-Manifest muss die volle RBAC (ServiceAccount, ClusterRoles, APIService) enthalten.
+**Korrektur:** Meine frühere Formulierung „der Fehler ist Schutz" war eine unbewiesene
+Theorie und wurde verworfen. Die folgenden Fakten sind **durch Live-Tests bewiesen**:
+
+| # | Test (2026-08-15) | Ergebnis | Bedeutung |
+|---|---|---|---|
+| 1 | `nc 10.0.0.191:10250` aus einem Pod | `No route to host` | OCI-VNIC-Block existiert HEUTE noch |
+| 2 | `ss -tlnp` (Node) | `*:10250 → k3s-server` | kubelet belegt 10250 |
+| 3 | `ss -tlnp` (Node) | `*:4443 → metrics-server` | Patch-Port aktiv |
+| 4 | metrics-server Logs | `Serving securely on [::]:4443` | läuft auf 4443 |
+| 5 | `kubectl get apiservice v1beta1.metrics.k8s.io` | `AVAILABLE=True` | Metrics-API funktioniert |
+| 6 | `kubectl top node` | Werte vorhanden | funktional |
+
+**Schlussfolgerung (Fakt):** Der Patch (hostNetwork + 4443) ist **notwendig**:
+- VNIC blockiert Pod→Node 10250 (Test 1) → hostNetwork nötig.
+- Mit hostNetwork ist 10250 durch kubelet belegt (Test 2) → 4443 nötig.
+- Der `Duplicate value "https"` entsteht, weil das k3s-Embedded-Manifest `10250 (name: https)`
+  und der Patch `4443 (name: https)` denselben Port-Namen verwenden (Namenskollision).
+
+**Fehlerfreier Fix:** `--disable=metrics-server` (k3s verwaltet es nicht mehr) +
+eigenes Standalone-Manifest (4443 + hostNetwork + volle RBAC). Erfordert k3s-Neustart
+(da `--disable` nur beim Start gelesen wird).
+
+**WICHTIG — Production betrifft das NICHT:**
+Production (Contabo) läuft metrics-server **embedded** (Port 10250, kein hostNetwork),
+**keine** `ApplyManifestFailed`-Events, kein VNIC-Problem. Der Patch ist ein reiner
+OCI-Staging-Workaround. Phase 2.2 gilt daher **nur für Staging**.
 
 ### 6.3 Externes S3 (Phase 2.1) — Blockiert
 
@@ -237,4 +259,81 @@ Backups **in dieselbe MinIO** → selbst-referenzielles Wachstum (dokumentiert i
 `VELERO_BACKUP_PLAN.md §14/§15`). Dauer-Fix = externes S3. Benötigt: S3-Account
 (Wasabi/Backblaze) + Access-Key/Secret.
 
-**Nächster Schritt:** Phase 2.2 (metrics-server) im Wartungsfenster + Phase 2.1 (externes S3) nach Credential-Beschaffung.
+---
+
+## 7. Production-Untersuchung (2026-08-15) — gleiche Parameter wie Staging
+
+| Parameter | Staging | Production |
+|---|---|---|
+| Node CPU | 4 Kerne, **80%** Requests (3180m) | 8 Kerne, **53%** Requests (4260m) |
+| Disk | 183G, **84%** | 290G, **73%** (209G) |
+| **MinIO velero-backups** | **21G** | **92G + 25G „backups" = 117G** 🔴 |
+| metrics-server | Patch 4443 (Konflikt) | Embedded 10250 (kein Konflikt) |
+| KEDA Worker min | 0 (Scale-to-Zero) | **1** (live, Git sagt 0) ⚠️ |
+| KEDA gratuit Trigger | transcription + email + maintenance | nur transcription |
+| celery-beat Probe | pgrep (gefixt) | pgrep (war korrekt) |
+| Velero Schedule | 1 (dedupliziert) | 1 (war sauber) |
+| RabbitMQ Queues | email=1, maintenance=1, 0 Consumer | alle 0 Messages, Consumer da |
+| Pods | 51 Running, 0 Crash | 52 Running, 0 Crash |
+
+### 7.1 Production-Findings (Fakten)
+
+1. **Velero-Selbstreferenz VIEL schlimmer auf Production:** `velero-backups` = **92G** + ein
+   zweiter Ordner `backups` = **25G** = **117G** in MinIO (Staging nur 21G). Der 25G-Ordner
+   sieht nach einer **alten/doppelten Velero-Ablage** aus → separat analysieren.
+2. **KEDA-Divergenz:** Production-Worker live `min=1`, Git `minReplicaCount: 0`. Jemand hat
+   live manuell auf 1 gesetzt. Dadurch kein Stranding, aber auch kein Scale-to-Zero.
+3. **Production metrics-server + Velero sind sauber** (kein Konflikt, kein Doppel-Schedule).
+4. **CPU auf Production entspannt** (53%, 8 Kerne) — das CPU-Budget-Problem ist Staging-spezifisch.
+
+**Nächster Schritt:** Phase 2.2 (metrics-server, nur Staging) im Wartungsfenster +
+Phase 2.1 (externes S3) nach Credential-Beschaffung + Production Velero-117G/KEDA-min=1 separat.
+
+---
+
+## 8. Korrektur-Tests (2026-08-15) — gegen Fehler verifiziert
+
+### Test 1: celery-beat CrashLoop behoben
+
+| Metrik | Ergebnis |
+|---|---|
+| Pod-Status | `Running`, **0 Restarts** (35m stabil) |
+| Liveness-Probe | `pgrep -f "celery.*beat" || exit 1` |
+
+### Test 2: KEDA email/maintenance-Trigger (LIVE-Beweis)
+
+Ablauf (gemessen):
+```
+1. Task injiziert: celery call check_storage_quotas --queue=maintenance → ID b027ef45…
+2. maintenance Queue: 0 → 1 Message
+3. Nach 25s (KEDA-Polling 15s): Worker skaliert 0 → 1 (Pod age 22s)
+4. Worker Log: "Task check_storage_quotas received"
+5. Worker Log: "Storage quota check completed: 12 tenants, 0 alerts"
+6. maintenance Queue: 1 → 0 (verarbeitet), consumers=1
+```
+
+**Ergebnis:** ✅ Scale-up auf email/maintenance funktioniert, kein Stranding mehr.
+
+### Test 3: metrics-server (Fakten, siehe §6.2)
+
+| Test | Ergebnis |
+|---|---|
+| `nc 10.0.0.191:10250` aus Pod | `No route to host` (VNIC-Block vorhanden) |
+| kubelet Port | `*:10250 → k3s-server` |
+| metrics-server | `Serving securely on [::]:4443`, API `Available=True` |
+
+### Test 4: Velero dedupliziert
+
+| Metrik | Ergebnis |
+|---|---|
+| Schedules | nur `daily-backup` (Enabled) |
+| Backups | 4 (3× daily + 1× recovery-test) — 3 redundante gelöscht |
+
+### Gesamt-Ergebnis
+
+| Fix | Status | Beweis |
+|---|---|---|
+| 1.1 celery-beat Probe | ✅ | 0 Restarts / 35m |
+| 1.2 KEDA email/maintenance | ✅ | Worker 0→1 + Task completed |
+| 2.3 Velero dedup | ✅ | 1 Schedule |
+| 3 Postgres-PVC-Alerts | ✅ | Git (beide Umgebungen) |
