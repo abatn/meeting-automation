@@ -30,7 +30,7 @@ spec:
       containers:
       - name: onlyoffice
         image: onlyoffice/documentserver:9.4.0
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
           name: http
