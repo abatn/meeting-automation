@@ -42,7 +42,7 @@ metadata:
 spec:
   scaleTargetRef:
     name: celery-worker-pro
-  minReplicaCount: 0        # Scale-to-zero wenn Queue leer
+  minReplicaCount: 1        # Immer 1 Worker bereit (Pro-Kunden = kein Cold-Start)
   maxReplicaCount: 10       # Dynamisch basiert auf Queue-Tiefe
   pollingInterval: 15
   cooldownPeriod: 300
