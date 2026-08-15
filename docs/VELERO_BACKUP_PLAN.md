@@ -1,8 +1,9 @@
 # Velero Backup & Recovery Plan
 
-**Status:** IMPLEMENTIERT (Staging + Production)
+**Status:** IMPLEMENTIERT (Staging + Production) — Strategie-Korrektur erforderlich
 **Erstellt:** 2026-08-10
-**Aktualisiert:** 2026-08-12 (Staging FSB-Test: BackupRepository Namespace, Disk-Limits, MinIO-Separation Lektionen)
+**Aktualisiert:** 2026-08-15 (Strategie-Korrektur: Disk-Budget, Scope, Self-Referenz-Verhinderung)
+**Letzte Korrektur-Grundlage:** Live-Analyse beider Cluster (92GB Kopia auf Prod, 119GB MinIO)
 **Cluster:** Staging (OCI 158.180.18.110) + Production (Contabo 169.58.83.32)
 
 ---
@@ -187,15 +188,44 @@ Velero wurde **bereits am 2026-06-28 (Phase 92)** auf dem Staging-Cluster instal
 
 ---
 
-## 4. Backup-Strategie
+## 4. Backup-Strategie (KORRIGIERT 2026-08-15)
+
+> **Lektion:** Die ursprüngliche Strategie (§4) ignorierte Disk-Budgets, Self-Referenz und
+> Scope. Das führte zu einem 92GB Kopia-Repository auf Production (MinIO-PVC: 119GB, Claim: 10Gi)
+> und einem Cluster-Ausfall auf Staging durch Velero Eviction-Storm.
+> **Regel:** Jede Backup-Entcheidung muss das Disk-Budget respektieren.
+
+### Kernprinzipien (NEU)
+
+| # | Prinzip | Regel |
+|---|---------|-------|
+| 1 | **Disk-Budget** | Velero-Daten dürfen maximal **30%** des verfügbaren Disks belegen |
+| 2 | **Keine Self-Referenz** | Velero darf NIEMALS PVCs sichern, die Velero-Daten enthalten |
+| 3 | **Scoped Backup** | Nur PVCs sichern, die tatsächlich wiederhergestellt werden müssen |
+| 4 | **Priorisierung** | Nicht alle PVCs sind gleich — KRITISCH > HOCH > MITTEL > NIEDRIG |
+| 5 | **Separate Backup-Zyklen** | DB (pg_dump) ≠ Velero (Infra-State) — nicht vermischen |
+
+### Disk-Budget pro Cluster
+
+| Cluster | Disk Gesamt | Max Velero | Aktuell Velero | Status |
+|---------|------------|-----------|----------------|--------|
+| Staging (OCI) | 183G | **55G (30%)** | 0B (gestoppt) | ⚠️ muss neu initialisiert |
+| Production (Contabo) | 290G | **87G (30%)** | **92G** | 🔴 über Budget |
 
 ### RPO (Recovery Point Objective)
 
-| Backup-Typ | Häufigkeit | Aufbewahrung | Begründung |
-|------------|-----------|-------------|------------|
-| Voll-Backup | Täglich 02:00 | 7 Tage | Kritische Daten (Postgres, MinIO) |
-| Inkrementelles Backup | Alle 6 Stunden | 3 Tage | Für schnelle Recovery zwischen Voll-Backups |
-| Vor-Deploy-Backup | Manuell (bei jedem Deploy) | 14 Tage | Rollback nach fehlgeschlagenem Deploy |
+| Backup-Typ | Häufigkeit | Aufbewahrung | Begründung | TTL |
+|------------|-----------|-------------|------------|-----|
+| **Metadaten-Backup** | Täglich 02:00 | 7 Tage | Cluster-State (Deployments, Secrets, ConfigMaps) — KEINE PVCs | 168h |
+| **Scoped-Vol-Backup** | Täglich 03:00 | 3 Tage | Nur KRITISCHE PVCs (DB-Dump-Ziel, n8n) | 72h |
+| **Pre-Deploy-Backup** | Manuell (bei Deploy) | **48 Stunden** | Nur Cluster-Ressourcen, KEINE PVCs | 48h |
+| **DB-Dump** (pg_dump) | Täglich 03:00 | 14 Tage | Separater CronJob, KEIN Velero | — |
+
+**Geändert vs. ursprünglicher Plan:**
+- ❌ ~~Inkrementelles Backup alle 6 Stunden~~ → Entfernt (zu viel Overhead für lokale Disk)
+- ❌ ~~Voll-Backup mit allen PVCs~~ → Ersetzt durch Metadaten + Scoped-Volume separat
+- ✅ Pre-Deploy-Backup TTL von 14 Tagen auf **48h** reduziert (nur Rollback-Zweck)
+- ✅ Scoped-Volume-Backup als neuer Typ (nur KRITISCHE PVCs)
 
 ### RTO (Recovery Time Objective)
 
@@ -203,36 +233,70 @@ Velero wurde **bereits am 2026-06-28 (Phase 92)** auf dem Staging-Cluster instal
 |----------|---------|---------|
 | Kompletter Cluster-Verlust | < 60 Minuten | Velero restore + Helm reinstall |
 | Einzelner Namespace | < 15 Minuten | Velero restore (Namespace-spezifisch) |
-| Nur PVC-Daten | < 10 Minuten | Velero restore (nur PVs) |
-| PostgreSQL Point-in-Time | < 5 Minuten | CNPG Backup (separate Methode) |
+| Nur PVC-Daten | < 10 Minuten | Velero restore (nur PVs mit --selector) |
+| PostgreSQL Point-in-Time | < 5 Minuten | pg_dump Restore (separate Methode) |
 
-### Was MUSS gesichert werden
+### Scope-Priorisierung (NEU)
 
-| Ressource | Priorität | Begründung |
-|-----------|----------|------------|
-| PostgreSQL PVC (10Gi) | **KRITISCH** | Alle Kundendaten, Sessions, Transkripte |
-| MinIO PVC (10Gi) | **KRITISCH** | Meeting-Recordings, PDFs, Storage |
-| Sentinel Models PVC (2Gi) | **HOCH** | ML-Modelle für Speaker-Identification |
-| RabbitMQ PVC (5Gi) | **MITTEL** | Message-Queue-State (rekonstruierbar, aber aufwendig) |
-| n8n PVC (1Gi) | **MITTEL** | Workflow-Execution-State |
-| ConfigMaps | **HOCH** | LiveKit-Config, Nginx-Config, App-Config |
-| Secrets | **HOCH** | API-Keys, TLS-Certs, DB-Credentials |
-| CNPG Cluster CRDs | **HOCH** | PostgreSQL-Operator-State |
-| NetworkPolicies | **NIEDRIG** | Rekonstruierbar aus YAML |
-| CronJobs | **NIEDRIG** | Rekonstruierbar aus YAML |
+| Ressource | Priorität | Velero? | Selector | Begründung |
+|-----------|----------|---------|----------|------------|
+| ConfigMaps + Secrets | **KRITISCH** | ✅ Metadaten | — (immer) | Cluster-State |
+| CNPG Cluster CRDs | **HOCH** | ✅ Metadaten | — (immer) | Operator-State |
+| n8n PVC (1Gi) | **HOCH** | ✅ Volume | `app=n8n-staging` | Workflow-State |
+| sentinel-models (2Gi) | **HOCH** | ✅ Volume | `app=celery-worker-pro-staging` | ML-Modelle |
+| PostgreSQL (28G) | KRITISCH | ❌ **NICHT Velero** | — | läuft über pg_dump CronJob |
+| MinIO (Recording) | KRITISCH | ❌ **NICHT Velero** | — | Self-Referenz-Risiko |
+| RabbitMQ (5Gi) | MITTEL | ❌ NICHT Velero | — | rekonstruierbar |
+| Prometheus (5Gi) | NIEDRIG | ❌ NICHT Velero | — | Monitoring-Daten |
+| Alertmanager (5Gi) | NIEDRIG | ❌ NICHT Velero | — | Monitoring-Daten |
 
-### Was KANN weggelassen werden
+**Korrekter Scope-Selector für den `daily-backup` Schedule:**
+```bash
+velero schedule update daily-backup \
+  --selector='app in (n8n-staging,celery-worker-pro-staging)' \
+  --ttl=168h
+```
+→ Sichert nur n8n (1Gi) + sentinel-models (2Gi) = **~3-5GB Backup**
+→ KEIN MinIO, KEIN PostgreSQL (die laufen über pg_dump)
 
-| Ressource | Begründung |
-|-----------|------------|
-| kube-system Pods | k3s-managed, werden automatisch neu erstellt |
-| longhorn-system | StorageClass-Provider, reinstallierbar |
-| cert-manager | Helm-managed, reinstallierbar |
-| ingress-nginx | Helm-managed, reinstallierbar |
-| Prometheus/Alertmanager | Monitoring-Daten, nicht-kritisch |
-| Backend/Frontend Deployments | Stateless, werden aus Docker-Images neu erstellt |
-| Celery Worker/Beat | Stateless, werden aus Docker-Images neu erstellt |
-| Redis | Cache, wird bei Neustart neu befüllt |
+### Self-Referenz-Verhinderung (KRITISCH)
+
+| Aktion | Wann | Befehl |
+|--------|------|--------|
+| MinIO aus Velero ausschließen | Immer | `backup.velero.io/backup-volumes-excludes: "minio-data"` am minio-StatefulSet |
+| Prometheus aus Velero ausschließen | Immer | `--exclude-namespaces monitoring` beim Schedule |
+| DB-Volume ausschließen | Immer | per `--selector` (nur pods mit app=n8n/staging sichern) |
+
+**Warum:** Velero sichert MinIO → schreibt in MinIO → wächst → Velero sichert wieder.
+Bei 183G-Partition (Staging) oder 290G (Prod) füllt sich das alle paar Tage komplett.
+
+### Was MUSS gesichert werden (Velero)
+
+| Ressource | Priorität | Volume-Backup? | Begründung |
+|-----------|----------|---------------|------------|
+| ConfigMaps | **KRITISCH** | — (Metadaten) | LiveKit-Config, Nginx-Config, App-Config |
+| Secrets | **HOCH** | — (Metadaten) | API-Keys, TLS-Certs, DB-Credentials |
+| CNPG Cluster CRDs | **HOCH** | — (Metadaten) | PostgreSQL-Operator-State |
+| NetworkPolicies | **NIEDRIG** | — (Metadaten) | Rekonstruierbar aus YAML |
+| CronJobs | **NIEDRIG** | — (Metadaten) | Rekonstruierbar aus YAML |
+| n8n PVC (1Gi) | **HOCH** | ✅ Ja | Workflow-Execution-State |
+| Sentinel Models (2Gi) | **HOCH** | ✅ Ja | ML-Modelle für Speaker-ID |
+
+### Was NICHT per Velero gesichert wird
+
+| Ressource | Begründung | Alternative |
+|-----------|------------|-------------|
+| PostgreSQL PVC (28G) | Zu groß für lokale Disk + Velero | pg_dump CronJob (separat) |
+| MinIO PVC (10Gi) | Self-Referenz-Risiko | Aufnahmen sind reproduzierbar |
+| RabbitMQ PVC (5Gi) | Rekonstruierbar (Queues leer) | Neustart reicht |
+| Prometheus/Alertmanager | Monitoring-Daten, nicht-kritisch | — |
+| kube-system Pods | k3s-managed | — |
+| longhorn-system | StorageClass-Provider | Helm reinstall |
+| cert-manager | Helm-managed | Helm reinstall |
+| ingress-nginx | Helm-managed | Helm reinstall |
+| Backend/Frontend Deployments | Stateless | Docker-Images |
+| Celery Worker/Beat | Stateless | Docker-Images |
+| Redis | Cache | Neustart |
 
 ---
 
@@ -1330,6 +1394,45 @@ Disk: 82% (nach 15 Min)
 | 4 | **Velero BackupRepository CRD Recovery-Doku** — in CI/CD-Script einbauen | 15 Min |
 | 5 | **Velero Schedule mit kleinerem Scope** — nur kritische PVCs | 10 Min |
 
+### 🔴 Production-Fund (verifiziert 2026-08-15)
+
+**BEWEIS:** Kopia-Repository auf Production wächst exponentiell:
+
+| Datum | PVB-Wachstum (Kopia) | MinIO-PVC |
+|-------|---------------------|-----------|
+| 2026-08-12 | 46.5 GB | ~50 GB |
+| 2026-08-13 | 66.8 GB (+44%) | ~70 GB |
+| 2026-08-14 | 79.2 GB (+19%) | ~82 GB |
+| 2026-08-15 | **92.2 GB** (+16%) | **119 GB** |
+
+**Root Cause:** Production `daily-backup` hat **keinen labelSelector** → sichert ALLES
+im Namespace (DB 28G + MinIO 10G + RabbitMQ 5G + n8n 1G + sentinel 2G).
+Velero schreibt die Kopia-Daten in MinIO → MinIO-PVC wächst → Velero sichert
+die wachsende MinIO-PVC erneut → **exponentielles Wachstum**.
+
+**Daten pro Backup (PVBs, Fakt):**
+
+| Backup | Items | Geschätzte Größe |
+|--------|-------|-----------------|
+| daily-backup (02:00) | alle PVCs im Namespace | ~46-92 GB |
+| pre-deploy-* | alle PVCs im Namespace | ~46-92 GB |
+| **Gesamt pro Tag** | 2× Full-Backup | **~100-180 GB Kopia** |
+
+**Disk-Budget-Verletzung:**
+- Production Disk: 290G, belegt: 210G (73%)
+- Velero (Kopia): **92G = 32% des Disks**
+- Max empfohlen: 30% (87G) → **5G über Budget**
+- Trend: +16GB/Woche → in 2 Wochen: **124G = 43%** → 🔴
+
+**Korrekte Gegenmaßnahmen (nach Priorität):**
+1. **Scope korrigieren:** `--selector='app in (n8n-staging,celery-worker-pro-staging)'`
+   → nur 3-5GB Backup statt 92GB
+2. **Self-Referenz stoppen:** `backup.velero.io/backup-volumes-excludes: "minio-data"`
+3. **Pre-Deploy-Backup TTL kürzen:** 48h statt 14 Tage
+4. **PostgreSQL NICHT per Velero sichern** (läuft über pg_dump CronJob)
+
+**Lektion:** Ohne Scope + Disk-Budget wächst Velero bis zur Eviction-Storm.
+
 ---
 
 ## 13. Cluster-Rebuild Recovery (Lektion aus Phase 92)
@@ -1525,18 +1628,27 @@ spec:
 
 **Backup-Größe:** 20Gi (minio + postgres) → ~15-20GB Kopia → ~75% Disk (stabil)
 
-### Production-Vergleich
+### Production-Vergleich (AKTUALISIERT 2026-08-15)
 
 | Aspekt | Staging | Production |
 |--------|---------|------------|
-| Disk | 183GB (⚠️ knapp) | 290G (✅ genug) |
+| Disk | 183GB (⚠️ knapp) | 290G (⚠️ Velero frisst es) |
 | PVCs Gesamt | 43Gi | 58Gi |
-| Kopia-Backup | 30-50GB | 28.7GiB |
-| Disk nach Backup | 95% (⚠️) | 73% (✅) |
-| Disk-Pressure | ⚠️ Possible | ✅ Unwahrscheinlich |
-| FSB empfohlen | Nur Scoped (Selector) | Voll (alle PVCs) |
+| Kopia-Backup | 0B (gestoppt) | **92GB** 🔴 |
+| Disk nach Backup | — | 73% (steigend) |
+| Disk-Pressure | ✅ behoben | ⚠️ in 2 Wochen bei Velero-Wachstum |
+| FSB empfohlen | Scoped (Selector) | **Scoped (Selector)** |
+| Scope | `app in (minio,postgres)` | **keiner** (sichert ALLES) |
+| Self-Referenz | ✅ opt-out nötig | ❌ nicht gestoppt |
+| ephemeral-storage Limit | ❌ kein Velero | ❌ kein Limit |
 
-**Fazit:** Production hat genug Disk (290G) für FSB-Backups. Staging braucht Scoped Backups mit `--selector` und `--exclude-namespaces monitoring`.
+**KORREKTUR:** Production braucht KEIN Voll-Backup per Velero. Die 92GB Kopia-Daten sind
+unnötig, weil: (1) DB läuft über pg_dump, (2) MinIO ist Self-Referenz, (3) RabbitMQ
+ist rekonstruierbar. Richtiger Scope: nur n8n (1Gi) + sentinel (2Gi) = ~3-5GB.
+
+**Fazit:** BEIDE Cluster brauchen Scoped Backups mit `--selector` und
+`--exclude-namespaces monitoring`. Velero sichert NUR Cluster-Ressourcen (Metadaten)
++ kritische kleine PVCs (n8n, sentinel). PostgreSQL und MinIO werden NICHT per Velero gesichert.
 
 ---
 
@@ -1760,27 +1872,44 @@ velero schedule create weekly-external \
 **Aufwand:** ~1 Stunde
 **Status:** ⬜ Offen
 
-### Priorisierte Roadmap
+### Priorisierte Roadmap (AKTUALISIERT 2026-08-15)
 
 | # | Punkt | Priorität | Aufwand | Risiko | Status |
 |---|-------|-----------|---------|--------|--------|
-| 1 | CI/CD Pre-Deploy-Backup | P2 | 15 Min | Niedrig | ⬜ Offen |
-| 2 | Externes S3 (Wasabi/Backblaze) | P2 | 1 Std | Mittel | ⬜ Offen |
-| 3 | MinIO PVC Monitoring (Alert >80%) | P3 | 10 Min | Niedrig | ⬜ Offen |
-| 4 | Velero Backup-Retention auf 3 Tage (Staging) | P3 | 5 Min | Niedrig | ⬜ Offen |
-| 5 | Velero Upgrade auf v1.19.x (wenn verfügbar) | P3 | 30 Min | Mittel | ⬜ Offen |
-| 6 | Containerd Image Cleanup (systemd timer) | P2 | 30 Min | Niedrig | ✅ Erledigt (Staging) |
-| 7 | Production: Image-GC Threshold 75% | P2 | 5 Min | Niedrig | ⬜ Offen |
-| 8 | Production: Weekly Cleanup deployen | P2 | 30 Min | Niedrig | ⬜ Offen |
+| **1** | **Production: Velero Scope korrigieren** | 🔴 P0 | 10 Min | Niedrig | ⬜ Offen |
+| **2** | **Production: Self-Referenz stoppen** (opt-out Annotation) | 🔴 P0 | 5 Min | Niedrig | ⬜ Offen |
+| **3** | **Production: Pre-Deploy-Backup TTL 14 Tage → 48h** | 🔴 P0 | 5 Min | Niedrig | ⬜ Offen |
+| **4** | **Staging: Velero wiederherstellen** (Deployment + Kopia-Reinit) | 🔴 P0 | 30 Min | Mittel | ⬜ Offen |
+| 5 | Staging: Scope = nur n8n + sentinel | 🟡 P1 | 10 Min | Niedrig | ⬜ Offen |
+| 6 | Staging: Self-Referenz stoppen (opt-out Annotation) | 🟡 P1 | 5 Min | Niedrig | ⬜ Offen |
+| 7 | Beide: ephemeral-storage-Limits für Velero Node-Agent | 🟡 P1 | 15 Min | Niedrig | ⬜ Offen |
+| 8 | Externes S3 (Wasabi/Backblaze) | P2 | 1 Std | Mittel | ⬜ Offen (Credentials nötig) |
+| 9 | MinIO PVC Monitoring (Alert >80%) | P2 | 10 Min | Niedrig | ⬜ Offen |
+| 10 | Velero Upgrade auf v1.19.x | P3 | 30 Min | Mittel | ⬜ Offen |
 
-### Entscheidungen (offen)
+### Erklärung der Prioritätsänderung
 
-| Frage | Option A | Option B | Empfehlung |
-|-------|----------|----------|------------|
-| Pre-Deploy-Backup blockierend? | Ja (CI/CD stoppt) | Nein (Warning) | Ja für Prod, Nein für Staging |
-| Externes S3? | Wasabi ($7/TB) | Backblaze ($6/TB) | Wasabi (einfacher) |
-| Staging Retention? | 7 Tage | 3 Tage | 3 Tage (weniger Speicher) |
-| Production Retention? | 14 Tage | 7 Tage | 14 Tage (Sicherheit) |
+Die ursprüngliche Roadmap hatte CI/CD Pre-Deploy-Backup auf P2 und Externes S3 auf P2.
+Die Live-Analyse (2026-08-15) hat gezeigt, dass:
+
+1. **Production Kopia = 92GB** (exponentielles Wachstum, +16GB/Woche)
+2. **Production MinIO = 119GB** (davon 92G Velero)
+3. **Staging Velero = gestoppt** (kein Backup seit 4 Tagen)
+4. **Scope fehlt komplett** (Production sichert ALLES, inkl. 28G DB + 10G MinIO)
+
+Daher sind Scope-Fix + Self-Referenz-Stop **jetzt P0** (nicht P2 wie im ursprünglichen Plan).
+
+### Entscheidungen (AKTUALISIERT)
+
+| Frage | Option A | Option B | Empfehlung | Status |
+|-------|----------|----------|------------|--------|
+| Pre-Deploy-Backup blockierend? | Ja (CI/CD stoppt) | Nein (Warning) | Ja für Prod, Nein für Staging | ⬜ |
+| Externes S3? | Wasabi ($7/TB) | Backblaze ($6/TB) | Wasabi (einfacher) | ⬜ Credentials nötig |
+| Staging Retention? | 7 Tage | 3 Tage | 3 Tage (weniger Speicher) | ⬜ |
+| Production Retention? | 14 Tage | 7 Tage | 7 Tage (92GB ist zu viel) | ⬜ |
+| **Production Scope?** | ALLES sichern | Nur n8n + sentinel | **Nur n8n + sentinel (3-5GB)** | 🔴 dringend |
+| **PostgreSQL per Velero?** | Ja | **Nein (pg_dump)** | **Nein — zu groß, Self-Referenz** | ✅ Entscheidung getroffen |
+| **MinIO per Velero?** | Ja | **Nein (Self-Referenz)** | **Nein — schreibt in sich selbst** | ✅ Entscheidung getroffen |
 
 ---
 
@@ -1903,3 +2032,123 @@ sudo systemctl restart k3s
 **Empfehlung:** Production braucht ebenfalls:
 1. Image-GC Threshold auf 75% senken
 2. Weekly Cleanup (systemd timer) deployen
+
+---
+
+## 19. Strategie-Korrektur (2026-08-15) — Vollständiger Korrektur-Plan
+
+> **Grundlage:** Live-Analyse beider Cluster am 2026-08-15.
+> Production: 92GB Kopia, 119GB MinIO, 11 Backups ohne Scope.
+> Staging: Velero gestoppt, 0GB Kopia, Disk 73%.
+
+### Was必须 geändert werden (Priorität P0)
+
+| # | Änderung | Datei/Objekt | Staging | Production |
+|---|----------|-------------|---------|------------|
+| **C1** | `daily-backup` Schedule: `--selector='app in (n8n-staging,celery-worker-pro-staging)'` | Schedule CRD | ⬜ | ⬜ |
+| **C2** | minio-StatefulSet: `backup.velero.io/backup-volumes-excludes: "minio-data"` | StatefulSet Annotation | ⬜ | ⬜ |
+| **C3** | Pre-Deploy-Backup TTL: 14 Tage → **48 Stunden** | CI/CD Workflow | ✅ | ⬜ |
+| **C4** | Velero Node-Agent: `ephemeral-storage` Limit (5Gi) | Helm-Values | ⬜ | ⬜ |
+| **C5** | Velero Server: `ephemeral-storage` Limit (2Gi) | Helm-Values | ⬜ | ⬜ |
+| **C6** | Staging: Velero Deployment → replicas=1 | kubectl | ⬜ (gestoppt) | — |
+
+### Schritt-für-Schritt-Ausführung
+
+**Schritt 1: Production Scope korrigieren (10 Min)**
+```bash
+# Schedule updaten — nur n8n + sentinel sichern
+velero schedule update daily-backup \
+  --selector='app in (n8n-staging,celery-worker-pro-staging)' \
+  --ttl=168h
+
+# Verifikation
+velero schedule get
+# Erwartet: selector = map[matchExpressions:[map[key:app operator:In values:[n8n-staging celery-worker-pro-staging]]]]
+```
+
+**Schritt 2: Self-Referenz stoppen (5 Min)**
+```bash
+# MinIO Annotation setzen
+kubectl patch statefulset minio-staging -n meeting-automation-staging --type=json \
+  -p '[{"op":"add","path":"/spec/template/metadata/annotations","value":{"backup.velero.io/backup-volumes-excludes":"minio-data"}}]'
+
+# Verifikation
+kubectl get statefulset minio-staging -n meeting-automation-staging -o jsonpath='{.spec.template.metadata.annotations}'
+# Erwartet: backup.velero.io/backup-volumes-excludes: minio-data
+```
+
+**Schritt 3: Pre-Deploy-Backup TTL kürzen (5 Min)**
+```bash
+# In CI/CD: --ttl=48h statt --ttl=336h
+# Datei: .github/workflows/deploy-production.yml
+# Änderung: velero backup create pre-deploy-... --ttl=48h
+```
+
+**Schritt 4: Velero ephemeral-storage Limits (15 Min)**
+```bash
+# Helm-Upgrade mit Limits
+helm upgrade velero vmware-tanzu/velero -n velero --reuse-values \
+  --set 'nodeAgent.resources.limits.ephemeral-storage=5Gi' \
+  --set 'nodeAgent.resources.requests.ephemeral-storage=1Gi' \
+  --set 'server.resources.limits.ephemeral-storage=2Gi' \
+  --set 'server.resources.requests.ephemeral-storage=500Mi'
+```
+
+**Schritt 5: Staging Velero wiederherstellen (30 Min)**
+```bash
+# 1. Deployment starten
+kubectl scale deployment velero -n velero --replicas=1
+
+# 2. Node-Agent DaemonSet wiederherstellen
+helm upgrade velero vmware-tanzu/velero -n velero --reuse-values --set deployNodeAgent=true
+
+# 3. Kopia-Repo initialisieren (metadata-only)
+velero backup create init-meta-staging-$(date +%Y%m%d) \
+  --include-namespaces meeting-automation-staging \
+  --snapshot-volumes=false \
+  --wait
+
+# 4. Schedule korrigieren
+velero schedule update daily-backup \
+  --selector='app in (n8n-staging,celery-worker-pro-staging)' \
+  --ttl=168h
+```
+
+### Verifikationstabelle
+
+| Schritt | Befehl | Erwartung |
+|---------|--------|----------|
+| C1 | `velero schedule get` | Selector = n8n + sentinel |
+| C2 | `kubectl get statefulset minio -o jsonpath='{.spec.template.metadata.annotations}'` | backup.velero.io/backup-volumes-excludes = minio-data |
+| C3 | `grep ttl .github/workflows/deploy-production.yml` | ttl=48h |
+| C4 | `kubectl get ds node-agent -n velero -o jsonpath='{.spec.template.spec.containers[0].resources}'` | ephemeral-storage im Limit |
+| C5 | `kubectl get deploy velero -n velero -o jsonpath='{.spec.template.spec.containers[0].resources}'` | ephemeral-storage im Limit |
+| C6 | `kubectl get deploy velero -n velero` | READY 1/1 |
+
+### Erwartete Ergebnisse nach Korrektur
+
+| Metrik | Vorher | Nachher |
+|--------|--------|--------|
+| Production Kopia | 92GB (wachsend) | ~3-5GB (stabil) |
+| Production MinIO | 119GB | ~5GB (nur recordings + sentinel) |
+| Production Disk | 73% (steigend) | ~50% (stabil) |
+| Production Backups/Tag | 2× Full (180GB Kopia) | 1× Scoped (3-5GB) |
+| Staging Velero | 0/0 (gestoppt) | 1/1 (aktiv) |
+| Eviction-Risiko | 🔴 Hoch | ✅ Minimal |
+
+### Rollback
+
+Falls die Korrektur Probleme verursacht:
+```bash
+# Schedule zurücksetzen (ohne Selector)
+velero schedule update daily-backup --selector=''
+
+# Annotation entfernen
+kubectl patch statefulset minio-staging -n meeting-automation-staging --type=json \
+  -p '[{"op":"remove","path":"/spec/template/metadata/annotations/backup.velero.io~1backup-volumes-excludes"}]'
+
+# Helm zurücksetzen
+helm upgrade velero vmware-tanzu/velero -n velero --reuse-values \
+  --set 'nodeAgent.resources.limits.ephemeral-storage=' \
+  --set 'server.resources.limits.ephemeral-storage='
+```
