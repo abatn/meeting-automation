@@ -150,7 +150,7 @@ jobs:
         key: ${{ secrets.CONTABO_SSH_KEY }}
         source: "scripts/deploy-prod/"
         target: "/root/deploy-scripts"
-        strip_components: 3
+        strip_components: 2
 
     - name: Deploy to Contabo Production
       uses: appleboy/ssh-action@v1
