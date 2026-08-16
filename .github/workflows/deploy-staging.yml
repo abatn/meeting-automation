@@ -212,7 +212,7 @@ jobs:
         export KUBECONFIG=$(pwd)/kubeconfig-staging
         echo "=== Velero Scope Check ==="
         # Check 1: Schedule muss Selector haben
-        SELECTOR=$(kubectl get schedule daily-backup -n velero -o jsonpath='{.spec.template.spec.labelSelector}' 2>/dev/null || echo '')
+        SELECTOR=$(kubectl get schedule daily-backup -n velero -o jsonpath='{.spec.template.labelSelector}' 2>/dev/null || echo '')
         if [ -z "$SELECTOR" ] || echo "$SELECTOR" | grep -q 'minio'; then
           echo "❌ Velero Schedule hat keinen/falschen Selector!"
           echo "   Erwartet: app In [n8n-staging, celery-worker-pro-staging]"
