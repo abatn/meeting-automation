@@ -34,8 +34,17 @@ kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=keda-operator -
 echo "✅ KEDA installed"
 
 echo "=== Test KEDA → RabbitMQ Connectivity ==="
-kubectl run keda-nettest --rm -i --restart=Never --image=busybox:1.36 -n keda \
-  -- sh -c "nc -w5 rabbitmq-staging.meeting-automation-staging.svc.cluster.local 5672 && echo OK || echo FAIL" 2>&1 || true
+KEDA_TEST=$(kubectl run keda-nettest --rm -i --restart=Never --image=busybox:1.36 -n keda \
+  -- sh -c "nc -w5 rabbitmq-staging.meeting-automation-staging.svc.cluster.local 5672 && echo OK || echo FAIL" 2>&1 || true)
+echo "$KEDA_TEST"
+if echo "$KEDA_TEST" | grep -q "FAIL"; then
+  echo "⚠️ Cross-Namespace NetworkPolicy BLOCKS keda → rabbitmq"
+  echo "   Celery Worker ScaledObjects will NOT work (rabbitmq trigger)"
+  echo "   CPU-based ScaledObjects (backend, egress) will still work"
+  echo "   Fix: Deploy keda-rabbitmq-networkpolicy.yaml or use TriggerAuthentication"
+else
+  echo "✅ Cross-namespace connectivity OK"
+fi
 
 echo "=== Deploy KEDA ScaledObjects + NetworkPolicy ==="
 kubectl apply -f infrastructure/kubernetes/staging/keda-scaledobjects.yaml
