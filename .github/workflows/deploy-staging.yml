@@ -61,263 +61,72 @@ jobs:
           exit 1
         fi
 
-    - name: Configure K8s context for staging
+    - name: Configure K8s context
       run: |
         echo "${{ secrets.KUBE_CONFIG_STAGING }}" > kubeconfig-staging
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        CONTEXT=$(kubectl config get-contexts -o name | head -1)
-        if [ -z "$CONTEXT" ]; then
-          echo "❌ No contexts found in kubeconfig"
-          exit 1
-        fi
-        echo "Using context: $CONTEXT"
-        kubectl config use-context "$CONTEXT"
-        kubectl get namespace meeting-automation-staging || kubectl apply -f infrastructure/kubernetes/staging/namespace.yaml
 
-    - name: Create/Update Staging Secrets from GitHub Secrets
+    - name: Setup K8s + Secrets + Docker Hub
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        kubectl create secret generic e2e-test-user \
-          --namespace meeting-automation-staging \
-          --from-literal=E2E_TEST_USER_EMAIL="${{ secrets.STAGING_E2E_USER_EMAIL }}" \
-          --from-literal=E2E_TEST_USER_PASSWORD="${{ secrets.STAGING_E2E_USER_PASSWORD }}" \
-          --dry-run=client -o yaml | kubectl apply -f -
-        kubectl create secret generic backend-api-keys-staging \
-          --namespace meeting-automation-staging \
-          --from-literal=MISTRAL_API_KEY="${{ secrets.MISTRAL_API_KEY_STAGING }}" \
-          --from-literal=GLADIA_API_KEY="${{ secrets.GLADIA_API_KEY_STAGING }}" \
-          --dry-run=client -o yaml | kubectl apply -f -
-
-    - name: Ensure Docker Hub Pull Secret
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        kubectl create secret docker-registry dockerhub-pull-secret \
-          --namespace meeting-automation-staging \
-          --docker-server=https://index.docker.io/v1/ \
-          --docker-username=batnini \
-          --docker-password="${{ secrets.DOCKERHUB_TOKEN }}" \
-          --dry-run=client -o yaml | kubectl apply -f -
-        for deploy in $(kubectl get deploy -n meeting-automation-staging -o name 2>/dev/null); do
-          HAS_SECRET=$(kubectl get "$deploy" -n meeting-automation-staging -o jsonpath='{.spec.template.spec.imagePullSecrets[?(@.name=="dockerhub-pull-secret")].name}' 2>/dev/null)
-          if [ -z "$HAS_SECRET" ]; then
-            kubectl patch "$deploy" -n meeting-automation-staging --type=json \
-              -p='[{"op":"add","path":"/spec/template/spec/imagePullSecrets","value":[{"name":"dockerhub-pull-secret"}]}]' 2>&1 || true
-          fi
-        done
-        echo "✅ Docker Hub pull secret ready"
+        export NAMESPACE="meeting-automation-staging"
+        export E2E_TEST_USER_EMAIL="${{ secrets.STAGING_E2E_USER_EMAIL }}"
+        export E2E_TEST_USER_PASSWORD="${{ secrets.STAGING_E2E_USER_PASSWORD }}"
+        export MISTRAL_API_KEY="${{ secrets.MISTRAL_API_KEY_STAGING }}"
+        export GLADIA_API_KEY="${{ secrets.GLADIA_API_KEY_STAGING }}"
+        export DOCKERHUB_TOKEN="${{ secrets.DOCKERHUB_TOKEN }}"
+        bash scripts/deploy-staging/01-setup-k8s.sh
 
     - name: Cleanup completed pods
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        echo "Cleaning up completed/failed pods..."
         kubectl delete pods -n meeting-automation-staging --field-selector=status.phase=Succeeded --ignore-not-found 2>&1 || true
         kubectl delete pods -n meeting-automation-staging --field-selector=status.phase=Failed --ignore-not-found 2>&1 || true
 
     - name: Fix immutable PVCs if storageClass mismatch
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        echo "🔍 Checking PVC storageClasses..."
-        NEEDS_REAPPLY=false
         for pvc in postgres-backup-pvc postgres-data-postgres-staging-0; do
-          SC=$(kubectl get pvc "$pvc" -n meeting-automation-staging \
-            -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "none")
-          if [ "$SC" = "none" ]; then
-            echo "  ✅ PVC $pvc does not exist — will be created"
-          elif [ "$SC" != "local-path" ]; then
-            echo "  ⚠️  PVC $pvc has wrong storageClass: $SC — deleting..."
+          SC=$(kubectl get pvc "$pvc" -n meeting-automation-staging -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "none")
+          if [ "$SC" != "none" ] && [ "$SC" != "local-path" ]; then
+            echo "⚠️ PVC $pvc has wrong storageClass: $SC — deleting..."
             kubectl delete pvc "$pvc" -n meeting-automation-staging --ignore-not-found
-            NEEDS_REAPPLY=true
-          else
-            echo "  ✅ PVC $pvc already correct"
+            sleep 5
           fi
         done
-        if [ "$NEEDS_REAPPLY" = "true" ]; then
-          sleep 5
-        fi
 
-    - name: Install Longhorn if not present (skip-if-exists)
+    - name: Install infra (Longhorn + KEDA)
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        if kubectl get namespace longhorn-system &>/dev/null; then
-          echo "✅ longhorn-system already exists — skipping"
-        else
-          echo "📦 Installing Longhorn v1.12.0..."
-          helm repo add longhorn https://charts.longhorn.io 2>/dev/null || true
-          helm repo update
-          helm install longhorn longhorn/longhorn \
-            --namespace longhorn-system --create-namespace --version 1.12.0 \
-            --set defaultSettings.defaultReplicaCount=1 \
-            --set defaultSettings.createDefaultDiskLabeledNodes=true \
-            --set defaultSettings.defaultClass=false \
-            --set defaultSettings.guaranteedInstanceManagerCPU=200 \
-            --wait --timeout 10m || echo "⚠️ Warning: Longhorn install failed, continuing"
-        fi
+        export NAMESPACE="meeting-automation-staging"
+        bash scripts/deploy-staging/02-install-infra.sh
 
-    - name: Install KEDA (idempotent)
+    - name: Deploy all staging manifests
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        helm repo add kedacore https://kedacore.github.io/charts 2>/dev/null || true
-        helm repo update
-        helm upgrade --install keda kedacore/keda \
-          --namespace keda --create-namespace \
-          --set operator.replicaCount=1 \
-          --set metricsServer.replicaCount=1 \
-          --wait --timeout 5m || echo "⚠️ Warning: KEDA install failed"
-        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=keda-operator -n keda --timeout=120s || true
-        echo "✅ KEDA installed"
+        export NAMESPACE="meeting-automation-staging"
+        bash scripts/deploy-staging/03-deploy-manifests.sh
 
-    - name: Test KEDA → RabbitMQ Cross-Namespace Connectivity
+    - name: Velero scope check + patches
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        echo "Testing cross-namespace network: keda → rabbitmq-staging..."
-        kubectl run keda-nettest --rm -i --restart=Never --image=busybox:1.36 -n keda \
-          -- sh -c "nc -w5 rabbitmq-staging.meeting-automation-staging.svc.cluster.local 5672 && echo OK || echo FAIL" 2>&1 || true
-        # If FAIL: RabbitMQ NetworkPolicy must be fixed before ScaledObjects can work
-        # Production lesson: Cross-Namespace NetworkPolicy blocks KEDA on some k3s clusters
+        export NAMESPACE="meeting-automation-staging"
+        bash scripts/deploy-staging/04-velero-scope-check.sh
 
-    - name: Deploy KEDA ScaledObjects + NetworkPolicy
+    - name: Deploy system CronJobs + monitoring
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        kubectl apply -f infrastructure/kubernetes/staging/keda-scaledobjects.yaml
-        kubectl apply -f infrastructure/kubernetes/staging/keda-rabbitmq-networkpolicy.yaml
-        echo "✅ KEDA ScaledObjects + NetworkPolicy deployed"
-        kubectl get scaledobject -n meeting-automation-staging
+        bash scripts/deploy-staging/05-deploy-system.sh
 
-    - name: Delete hardcoded HPA (replaced by KEDA)
+    - name: Deploy apps (backend + frontend + celery + n8n)
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        kubectl delete hpa celery-worker-hpa -n meeting-automation-staging --ignore-not-found
-        echo "✅ Hardcoded HPA removed"
+        export NAMESPACE="meeting-automation-staging"
+        export IMAGE_NAME="${{ env.IMAGE_NAME }}"
+        export FRONTEND_IMAGE="${{ env.FRONTEND_IMAGE }}"
+        export TAG="${{ needs.pre-flight.outputs.image_tag }}"
+        bash scripts/deploy-staging/06-deploy-apps.sh
 
-    - name: Deploy All Staging Resources (idempotent, exclude Helm values)
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        # Deploy only k8s manifests (NOT Helm values files which lack apiVersion/kind,
-        # NOT livekit-*-deployment.yaml which are now Helm-managed)
-        for f in infrastructure/kubernetes/staging/*.yaml; do
-          fname=$(basename "$f")
-          # Skip Helm values (livekit-server-values.yaml, egress-values.yaml)
-          [[ "$fname" == *values*.yaml ]] && continue
-          # Skip old LiveKit deployment YAMLs (Helm-managed now)
-          [[ "$fname" == *livekit-*-deployment.yaml ]] && continue
-          # Skip hardcoded HPA (replaced by KEDA ScaledObjects)
-          [[ "$fname" == *hpa*.yaml ]] && continue
-          echo "Applying: $fname"
-          kubectl apply -f "$f" -n meeting-automation-staging || echo "Warning: Failed to apply $fname"
-        done
-        kubectl rollout restart deployment/onlyoffice-staging -n meeting-automation-staging 2>&1 || echo "Warning: OnlyOffice restart failed"
-
-    - name: Velero Scope Check + Patch (P2/P3/P4 Fixes)
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        echo "=== Velero Scope Check ==="
-        # Check 1: Schedule muss Selector haben
-        SELECTOR=$(kubectl get schedule daily-backup -n velero -o jsonpath='{.spec.template.labelSelector}' 2>/dev/null || echo '')
-        if [ -z "$SELECTOR" ] || echo "$SELECTOR" | grep -q 'minio'; then
-          echo "❌ Velero Schedule hat keinen/falschen Selector!"
-          echo "   Erwartet: app In [n8n-staging, celery-worker-pro-staging]"
-          echo "   Gefunden: $SELECTOR"
-          echo "   Deploy abgebrochen."
-          exit 1
-        fi
-        echo "✅ Velero Schedule Selector korrekt: $SELECTOR"
-        # Check 2: MinIO muss opt-out Annotation haben
-        MINIO_ANNOTATION=$(kubectl get statefulset minio-staging -n meeting-automation-staging -o jsonpath='{.spec.template.metadata.annotations.backup\.velero\.io/backup-volumes-excludes}' 2>/dev/null || echo '')
-        if [ "$MINIO_ANNOTATION" != "minio-data" ]; then
-          echo "❌ MinIO StatefulSet hat keine opt-out Annotation!"
-          echo "   Erwartet: backup.velero.io/backup-volumes-excludes: minio-data"
-          echo "   Gefunden: $MINIO_ANNOTATION"
-          echo "   Deploy abgebrochen."
-          exit 1
-        fi
-        echo "✅ MinIO opt-out Annotation korrekt: $MINIO_ANNOTATION"
-        echo "=== P3: Velero initialDelaySeconds 10→60 ==="
-        kubectl patch deployment velero -n velero --type=json -p='[
-          {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/initialDelaySeconds", "value": 60},
-          {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/initialDelaySeconds", "value": 60}
-        ]' 2>&1 || echo "Warning: Velero patch failed (not deployed yet?)"
-        echo "✅ Velero probes patched"
-
-    - name: Deploy System CronJobs + Monitoring Stack + Image-Cleanup
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        # System CronJobs
-        kubectl apply -f infrastructure/kubernetes/system/ephemeral-storage-cleanup-cronjob.yaml -n kube-system
-        kubectl apply -f infrastructure/kubernetes/system/pod-garbage-collector-cronjob.yaml -n kube-system
-        kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system 2>&1 || true
-        # Metrics-server
-        kubectl apply -f infrastructure/kubernetes/system/metrics-server-patch.yaml -n kube-system
-        # Monitoring
-        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
-        helm repo update
-        helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-          -n monitoring --reuse-values \
-          --set prometheus.prometheusSpec.hostNetwork=true \
-          --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
-          --set prometheus.service.port=9090 || true
-        kubectl apply -f infrastructure/kubernetes/staging/monitoring/ -n monitoring 2>&1 || true
-        # Image-Cleanup (systemd timer — requires SSH to node)
-        echo "=== Deploying Image-Cleanup ==="
-        # Note: systemd timer must be installed via SSH, not kubectl
-        # This is handled by the staging server setup script
-        echo "Image-Cleanup timer: manual install required (see infrastructure/kubernetes/system/image-cleanup-script.sh)"
-
-    - name: Deploy Backend to Staging
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        TAG=${{ needs.pre-flight.outputs.image_tag }}
-        kubectl set image deployment/backend \
-          backend=${{ env.IMAGE_NAME }}:$TAG \
-          alembic-migrate=${{ env.IMAGE_NAME }}:$TAG \
-          -n meeting-automation-staging --record
-        kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=600s
-
-    - name: Deploy Frontend to Staging
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        TAG=${{ needs.pre-flight.outputs.image_tag }}
-        kubectl set image deployment/frontend \
-          frontend=${{ env.FRONTEND_IMAGE }}:$TAG \
-          -n meeting-automation-staging --record
-        kubectl rollout status deployment/frontend -n meeting-automation-staging --timeout=120s
-
-    - name: Deploy Celery Workers to Staging
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        TAG=${{ needs.pre-flight.outputs.image_tag }}
-        BACKEND_IMAGE="${{ env.IMAGE_NAME }}:$TAG"
-        kubectl set image deployment/celery-worker-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
-        kubectl set image deployment/celery-worker-pro-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
-        kubectl set image deployment/celery-beat-staging celery-beat="$BACKEND_IMAGE" -n meeting-automation-staging --record
-        # Skip celery-worker rollout check — KEDA minReplicaCount=0 (Scale-to-Zero)
-        GRATUIT_MIN=$(kubectl get scaledobject celery-worker-gratuit -n meeting-automation-staging -o jsonpath='{.spec.minReplicaCount}' 2>/dev/null || echo "0")
-        if [ "$GRATUIT_MIN" = "0" ]; then
-          echo "⏭️ Skipping celery-worker-staging rollout (KEDA min=0, Scale-to-Zero)"
-        else
-          kubectl rollout status deployment/celery-worker-staging -n meeting-automation-staging --timeout=300s
-        fi
-        kubectl rollout status deployment/celery-beat-staging -n meeting-automation-staging --timeout=120s
-
-    - name: Import n8n Workflows to Staging (idempotent)
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        N8N_POD=$(kubectl get pods -n meeting-automation-staging -l app=n8n-staging -o jsonpath='{.items[0].metadata.name}')
-        WORKFLOW_COUNT=$(kubectl exec -n meeting-automation-staging meeting-db-1 -- psql -U postgres -d meeting_db_staging -t -c "SELECT count(*) FROM workflow_entity" 2>/dev/null | tr -d ' ')
-        if [ "$WORKFLOW_COUNT" = "0" ]; then
-          echo "No workflows — importing..."
-          kubectl exec -n meeting-automation-staging $N8N_POD -- mkdir -p /home/node/.n8n/workflows
-          for f in n8n/workflows/*.json; do
-            name=$(basename $f)
-            cat $f | kubectl exec -i -n meeting-automation-staging $N8N_POD -- tee /home/node/.n8n/workflows/$name > /dev/null
-            kubectl exec -n meeting-automation-staging $N8N_POD -- n8n import:workflow --input=/home/node/.n8n/workflows/$name 2>&1 | tail -1 || true
-          done
-          kubectl rollout restart deployment/n8n-staging -n meeting-automation-staging
-        else
-          echo "✅ n8n workflows exist ($WORKFLOW_COUNT) — skipping"
-        fi
-
-    - name: Validate required AI API keys
+    - name: Validate AI API keys
       run: |
         if [ -z "${{ secrets.MISTRAL_API_KEY_STAGING }}" ]; then
           echo "❌ MISTRAL_API_KEY_STAGING not set"
@@ -329,52 +138,12 @@ jobs:
         fi
         echo "✅ AI API keys present"
 
-    - name: Ensure E2E Test User Exists in Staging
+    - name: Smoke tests (E2E user + health check)
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        STAGING_URL="https://staging.meeting-automation.com"
-        for i in {1..30}; do
-          if curl -s -f "$STAGING_URL/health" > /dev/null; then
-            echo "Backend is ready"
-            break
-          fi
-          echo "Waiting for backend..."
-          sleep 2
-        done
-        REGISTER_PAYLOAD=$(jq -n \
-          --arg email "${{ secrets.STAGING_E2E_USER_EMAIL }}" \
-          --arg password "${{ secrets.STAGING_E2E_USER_PASSWORD }}" \
-          --arg name "E2E Tester" \
-          '{
-            email: $email,
-            password: $password,
-            full_name: $name,
-            company_name: "E2E Tests"
-          }')
-        RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$STAGING_URL/api/v1/auth/register" \
-          -H "Content-Type: application/json" \
-          -d "$REGISTER_PAYLOAD")
-        if [ "$RESPONSE" = "201" ] || [ "$RESPONSE" = "200" ]; then
-          echo "✅ Test user created or already exists"
-        else
-          echo "⚠️ Could not create test user (HTTP $RESPONSE)"
-        fi
-
-    - name: Wait for Staging Health Endpoint
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        STAGING_URL="https://staging.meeting-automation.com"
-        echo "Waiting for $STAGING_URL/health..."
-        for i in {1..60}; do
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL/health 2>/dev/null || echo "000")
-          if [ "$STATUS" = "200" ]; then
-            echo "Staging is healthy"
-            break
-          fi
-          echo "Health check returned $STATUS, waiting... (attempt $i)"
-          sleep 5
-        done
-        curl -f $STAGING_URL/health || (echo "Staging health check failed" && exit 1)
+        export E2E_TEST_USER_EMAIL="${{ secrets.STAGING_E2E_USER_EMAIL }}"
+        export E2E_TEST_USER_PASSWORD="${{ secrets.STAGING_E2E_USER_PASSWORD }}"
+        bash scripts/deploy-staging/07-smoke-tests.sh
 
   # ============================================
   # E2E TESTS (gegen Staging)
