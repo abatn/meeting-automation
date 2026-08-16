@@ -247,6 +247,30 @@ jobs:
           echo "✅ LiveKit deployed via Helm (wie Staging)"
           
           # ============================================
+          # Velero Scope Check (Self-Referenz-Verhinderung)
+          # ============================================
+          echo "=== Velero Scope Check ==="
+          # Check 1: Schedule muss Selector haben (kein MinIO, kein PostgreSQL)
+          SELECTOR=$(kubectl get schedule daily-backup -n velero -o jsonpath='{.spec.template.spec.labelSelector}' 2>/dev/null || echo '')
+          if [ -z "$SELECTOR" ] || echo "$SELECTOR" | grep -q 'minio'; then
+            echo "❌ Velero Schedule hat keinen/falschen Selector!"
+            echo "   Erwartet: app In [n8n, celery-worker-pro]"
+            echo "   Gefunden: $SELECTOR"
+            echo "   Deploy abgebrochen."
+            exit 1
+          fi
+          echo "✅ Velero Schedule Selector korrekt: $SELECTOR"
+          # Check 2: MinIO muss opt-out Annotation haben
+          MINIO_ANNOTATION=$(kubectl get statefulset minio -n meeting-automation -o jsonpath='{.spec.template.metadata.annotations.backup\.velero\.io/backup-volumes-excludes}' 2>/dev/null || echo '')
+          if [ "$MINIO_ANNOTATION" != "minio-data" ]; then
+            echo "❌ MinIO StatefulSet hat keine opt-out Annotation!"
+            echo "   Erwartet: backup.velero.io/backup-volumes-excludes: minio-data"
+            echo "   Gefunden: $MINIO_ANNOTATION"
+            echo "   Deploy abgebrochen."
+            exit 1
+          fi
+          echo "✅ MinIO opt-out Annotation korrekt: $MINIO_ANNOTATION"
+          # ============================================
           # P3 Fix: Velero Liveness/Readiness Probe
           # initialDelaySeconds 10→60 (Kopia-Reinit braucht >10s)
           # ============================================

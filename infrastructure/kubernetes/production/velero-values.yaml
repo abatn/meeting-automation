@@ -1,4 +1,4 @@
-# Velero Helm Values — Staging
+# Velero Helm Values — Production
 # Chart: vmware-tanzu/velero v12.1.0
 # App Version: v1.18.1
 # Install: helm upgrade velero vmware-tanzu/velero -n velero -f velero-values.yaml --install
@@ -6,9 +6,14 @@
 # Strategie (§4 korrigiert 2026-08-15):
 # - Velero sichert NUR: ConfigMaps, Secrets, CNPG CRDs + n8n (1Gi) + sentinel (2Gi)
 # - Velero sichert NICHT: PostgreSQL (pg_dump), MinIO (Self-Ref), RabbitMQ, Prometheus
-# - Selector: app in (n8n-staging, celery-worker-pro-staging)
-# - Disk-Budget: max 30% (55G auf 183G Disk)
+# - Selector: app in (n8n, celery-worker-pro)
+# - Disk-Budget: max 30% (87G auf 290G Disk)
 # - Self-Referenz-Verhinderung: backup.velero.io/backup-volumes-excludes: minio-data
+#
+# PRODUCTION UNTERSCHIED:
+# - MinIO-Passwort: 3Bsd1nsvjsnkCzcPvB96ew (NICHT minio_password!)
+# - MinIO DNS: minio.meeting-automation.svc (NICHT minio-staging.meeting-automation-staging.svc!)
+# - Namespace: meeting-automation (NICHT meeting-automation-staging!)
 
 configuration:
   # Kopia als Upload-Type (statt Restic)
@@ -27,7 +32,7 @@ configuration:
       config:
         region: minio
         s3ForcePathStyle: "true"
-        s3Url: "http://minio-staging.meeting-automation-staging.svc:9000"
+        s3Url: "http://minio.meeting-automation.svc:9000"
 
   # Keine Volume Snapshot Locations (MinIO hat keine CSI-Snapshots)
   volumeSnapshotLocation: []
@@ -36,6 +41,7 @@ configuration:
   features: ""
 
 # Credentials für MinIO
+# WICHTIG: Production MinIO-Passwort ist 3Bsd1nsvjsnkCzcPvB96ew (anders als Staging!)
 credentials:
   useSecret: true
   name: velero-s3-credentials
@@ -43,7 +49,7 @@ credentials:
     cloud: |
       [default]
       aws_access_key_id = minio_user
-      aws_secret_access_key = minio_password
+      aws_secret_access_key = 3Bsd1nsvjsnkCzcPvB96ew
 
 # Velero Server
 image:
@@ -61,11 +67,9 @@ initContainers:
         name: plugins
 
 # Keine Resource Limits (verhindert OOM-Kill des Plugin-Prozesses)
-# Das ist BEWUSST — file already closed Error wird dadurch vermieden
 resources: {}
 
-# Node-Agent: CPU Request reduzieren (200m → 100m)
-# Statt Default 200m nur 100m — Velero ist meist idle
+# Node-Agent
 nodeAgent:
   resources:
     requests:
@@ -88,17 +92,18 @@ metrics:
 
 # Schedules
 # Selector: NUR n8n + sentinel (kein MinIO, kein PostgreSQL, kein Prometheus)
-# TTL: 168h (7 Tage) — Disk-Budget max 55G auf 183G Disk
-# Self-Referenz: minio-data ausgeschlossen via Annotation am StatefulSetschedules:
+# TTL: 168h (7 Tage) — Disk-Budget max 87G auf 290G Disk
+# Self-Referenz: minio-data ausgeschlossen via Annotation am StatefulSet
+schedules:
   daily-backup:
     disabled: false
     schedule: "0 2 * * *"
     useOwnerReferencesInBackup: false
     template:
       includedNamespaces:
-        - meeting-automation-staging
+        - meeting-automation
       excludedNamespaces:
-        - monitoring  # Prometheus erzeugt 44GB Kopia-Daten aus 5Gi PVC
+        - monitoring  # Prometheus erzeugt große Kopia-Daten
       ttl: 168h0m0s  # 7 Tage
       storageLocation: default
       defaultVolumesToFsBackup: true
@@ -109,5 +114,5 @@ metrics:
           - key: app
             operator: In
             values:
-              - n8n-staging
-              - celery-worker-pro-staging
+              - n8n
+              - celery-worker-pro
