@@ -290,7 +290,13 @@ jobs:
         kubectl set image deployment/celery-worker-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
         kubectl set image deployment/celery-worker-pro-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
         kubectl set image deployment/celery-beat-staging celery-beat="$BACKEND_IMAGE" -n meeting-automation-staging --record
-        kubectl rollout status deployment/celery-worker-staging -n meeting-automation-staging --timeout=300s
+        # Skip celery-worker rollout check — KEDA minReplicaCount=0 (Scale-to-Zero)
+        GRATUIT_MIN=$(kubectl get scaledobject celery-worker-gratuit -n meeting-automation-staging -o jsonpath='{.spec.minReplicaCount}' 2>/dev/null || echo "0")
+        if [ "$GRATUIT_MIN" = "0" ]; then
+          echo "⏭️ Skipping celery-worker-staging rollout (KEDA min=0, Scale-to-Zero)"
+        else
+          kubectl rollout status deployment/celery-worker-staging -n meeting-automation-staging --timeout=300s
+        fi
         kubectl rollout status deployment/celery-beat-staging -n meeting-automation-staging --timeout=120s
 
     - name: Import n8n Workflows to Staging (idempotent)

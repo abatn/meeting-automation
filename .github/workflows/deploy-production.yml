@@ -411,7 +411,14 @@ jobs:
           echo "=== Waiting for rollout ==="
           kubectl rollout status deployment/backend -n meeting-automation --timeout=300s || true
           kubectl rollout status deployment/frontend -n meeting-automation --timeout=120s || true
-          kubectl rollout status deployment/celery-worker -n meeting-automation --timeout=300s || true
+          # Skip celery-worker rollout check — KEDA minReplicaCount=0 (Scale-to-Zero)
+          # When no messages in queue, KEDA scales to 0 pods → rollout never completes
+          GRATUIT_MIN=$(kubectl get scaledobject celery-worker-gratuit -n meeting-automation -o jsonpath='{.spec.minReplicaCount}' 2>/dev/null || echo "0")
+          if [ "$GRATUIT_MIN" = "0" ]; then
+            echo "⏭️ Skipping celery-worker rollout (KEDA min=0, Scale-to-Zero)"
+          else
+            kubectl rollout status deployment/celery-worker -n meeting-automation --timeout=300s || true
+          fi
           kubectl rollout status deployment/celery-beat -n meeting-automation --timeout=120s || true
           
           # Import n8n workflows (idempotent: only if DB is empty)
@@ -498,6 +505,14 @@ jobs:
           for deploy in backend frontend celery-worker celery-worker-pro celery-beat; do
             READY=$(kubectl get deploy "$deploy" -n meeting-automation -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
             DESIRED=$(kubectl get deploy "$deploy" -n meeting-automation -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+            # celery-worker with KEDA min=0 → 0/0 is OK (Scale-to-Zero)
+            if [ "$deploy" = "celery-worker" ]; then
+              GRATUIT_MIN=$(kubectl get scaledobject celery-worker-gratuit -n meeting-automation -o jsonpath='{.spec.minReplicaCount}' 2>/dev/null || echo "0")
+              if [ "$GRATUIT_MIN" = "0" ] && [ "$READY" = "0" ]; then
+                echo "  ✅ $deploy: 0/0 ready (KEDA Scale-to-Zero)"
+                continue
+              fi
+            fi
             if [ "$READY" = "$DESIRED" ] && [ "$READY" != "0" ]; then
               echo "  ✅ $deploy: $READY/$DESIRED ready"
             else
