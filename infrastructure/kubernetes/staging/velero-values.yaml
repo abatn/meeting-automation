@@ -89,7 +89,9 @@ metrics:
 # Schedules
 # Selector: NUR n8n + sentinel (kein MinIO, kein PostgreSQL, kein Prometheus)
 # TTL: 168h (7 Tage) — Disk-Budget max 55G auf 183G Disk
-# Self-Referenz: minio-data ausgeschlossen via Annotation am StatefulSetschedules:
+# Self-Referenz: minio-data ausgeschlossen via Annotation am StatefulSet
+
+schedules:
   daily-backup:
     disabled: false
     schedule: "0 2 * * *"
