@@ -20,18 +20,13 @@ for f in infrastructure/kubernetes/staging/*.yaml; do
 done
 kubectl rollout restart deployment/onlyoffice-staging -n "$NAMESPACE" 2>&1 || echo "Warning: OnlyOffice restart failed"
 
-# Restart StatefulSets (probes may have changed — kubectl apply alone doesn't roll them out)
-echo "Restarting StatefulSets (RabbitMQ, MinIO, Postgres)..."
+# Restart StatefulSets SEQUENTIALLY (probes may have changed — kubectl apply alone doesn't roll them out)
+# IMPORTANT: Do NOT restart all at once — simultaneous restarts destabilize k3s DNS/CNI
 for STS in rabbitmq-staging minio-staging postgres-staging meeting-db; do
   if kubectl get statefulset "$STS" -n "$NAMESPACE" &>/dev/null; then
-    echo "  Restarting $STS..."
+    echo "Restarting $STS..."
     kubectl rollout restart statefulset/"$STS" -n "$NAMESPACE"
-  fi
-done
-echo "Waiting 30s for StatefulSet rollouts..."
-sleep 30
-for STS in rabbitmq-staging minio-staging postgres-staging meeting-db; do
-  if kubectl get statefulset "$STS" -n "$NAMESPACE" &>/dev/null; then
+    echo "Waiting for $STS rollout..."
     kubectl rollout status statefulset/"$STS" -n "$NAMESPACE" --timeout=120s || echo "⚠️ $STS rollout timed out"
   fi
 done
