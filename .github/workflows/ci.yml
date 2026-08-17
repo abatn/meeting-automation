@@ -7,6 +7,7 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - 'infrastructure/**'
+      - 'scripts/**'
       - '.github/workflows/**'
   pull_request:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - 'backend/**'
       - 'frontend/**'
       - 'infrastructure/**'
+      - 'scripts/**'
       - '.github/workflows/**'
 
 permissions:
