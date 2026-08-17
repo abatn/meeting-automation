@@ -56,11 +56,18 @@ spec:
             memory: "2Gi"
             cpu: "1"
             ephemeral-storage: "1Gi"
+        startupProbe:
+          httpGet:
+            path: /healthcheck
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 10
+          failureThreshold: 30
         livenessProbe:
           httpGet:
             path: /healthcheck
             port: 80
-          initialDelaySeconds: 60
           periodSeconds: 30
           timeoutSeconds: 10
           failureThreshold: 3
