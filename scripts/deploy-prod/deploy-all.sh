@@ -38,6 +38,24 @@ echo ">>> Step 2/7: Apply manifests"
 bash "$SCRIPT_DIR/02-apply-manifests.sh"
 echo ""
 
+# Step 2b: Restart StatefulSets (probes may have changed)
+echo ">>> Step 2b: Restart StatefulSets (RabbitMQ, MinIO, Postgres)"
+for STS in rabbitmq minio meeting-db; do
+  if kubectl get statefulset "$STS" -n "$NAMESPACE" &>/dev/null; then
+    echo "  Restarting $STS..."
+    kubectl rollout restart statefulset/"$STS" -n "$NAMESPACE"
+  fi
+done
+echo "Waiting 60s for StatefulSet rollouts..."
+sleep 60
+for STS in rabbitmq minio meeting-db; do
+  if kubectl get statefulset "$STS" -n "$NAMESPACE" &>/dev/null; then
+    kubectl rollout status statefulset/"$STS" -n "$NAMESPACE" --timeout=120s || echo "⚠️ $STS rollout timed out"
+  fi
+done
+echo "✅ StatefulSet rollouts complete"
+echo ""
+
 # Step 3: Deploy LiveKit
 echo ">>> Step 3/7: Deploy LiveKit"
 bash "$SCRIPT_DIR/03-deploy-livekit.sh"

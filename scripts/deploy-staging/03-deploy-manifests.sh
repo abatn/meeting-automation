@@ -19,4 +19,20 @@ for f in infrastructure/kubernetes/staging/*.yaml; do
   kubectl apply -f "$f" -n "$NAMESPACE" || echo "Warning: Failed to apply $fname"
 done
 kubectl rollout restart deployment/onlyoffice-staging -n "$NAMESPACE" 2>&1 || echo "Warning: OnlyOffice restart failed"
-echo "✅ All staging manifests applied"
+
+# Restart StatefulSets (probes may have changed — kubectl apply alone doesn't roll them out)
+echo "Restarting StatefulSets (RabbitMQ, MinIO, Postgres)..."
+for STS in rabbitmq-staging minio-staging postgres-staging meeting-db; do
+  if kubectl get statefulset "$STS" -n "$NAMESPACE" &>/dev/null; then
+    echo "  Restarting $STS..."
+    kubectl rollout restart statefulset/"$STS" -n "$NAMESPACE"
+  fi
+done
+echo "Waiting 30s for StatefulSet rollouts..."
+sleep 30
+for STS in rabbitmq-staging minio-staging postgres-staging meeting-db; do
+  if kubectl get statefulset "$STS" -n "$NAMESPACE" &>/dev/null; then
+    kubectl rollout status statefulset/"$STS" -n "$NAMESPACE" --timeout=120s || echo "⚠️ $STS rollout timed out"
+  fi
+done
+echo "✅ All staging manifests applied + StatefulSets restarted"
