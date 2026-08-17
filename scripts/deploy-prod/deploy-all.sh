@@ -17,6 +17,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NAMESPACE="${NAMESPACE:-meeting-automation}"
 MANIFESTS_DIR="${MANIFESTS_DIR:-/root/production-manifests}"
+export KUBECONFIG="/etc/rancher/k3s/k3s.yaml"
 export NAMESPACE MANIFESTS_DIR
 
 echo "============================================="
@@ -40,7 +41,11 @@ echo ""
 
 # Step 2b: Restart StatefulSets SEQUENTIALLY (probes may have changed)
 # IMPORTANT: Do NOT restart all at once — simultaneous restarts destabilize k3s DNS/CNI
-echo ">>> Step 2b: Restart StatefulSets (RabbitMQ, MinIO, Postgres)"
+echo ">>> Step 2b: Restart OnlyOffice + StatefulSets"
+kubectl rollout restart deployment/onlyoffice -n "$NAMESPACE" 2>&1 || echo "Warning: OnlyOffice restart failed"
+
+# Restart StatefulSets SEQUENTIALLY (probes may have changed — kubectl apply alone doesn't roll them out)
+# IMPORTANT: Do NOT restart all at once — simultaneous restarts destabilize k3s DNS/CNI
 for STS in rabbitmq minio meeting-db; do
   if kubectl get statefulset "$STS" -n "$NAMESPACE" &>/dev/null; then
     echo "Restarting $STS..."
