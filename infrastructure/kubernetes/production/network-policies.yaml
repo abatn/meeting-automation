@@ -160,6 +160,9 @@ spec:
     - podSelector:
         matchLabels:
           app.kubernetes.io/name: egress        # Helm-Label (Transition) - Egress lädt Recordings hoch
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: velero   # Velero BSL → MinIO Zugriff
     ports:
     - protocol: TCP
       port: 9000

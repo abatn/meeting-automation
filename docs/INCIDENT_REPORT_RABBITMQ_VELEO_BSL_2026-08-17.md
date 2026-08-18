@@ -3,7 +3,7 @@
 **Erstellt:** 2026-08-17 14:30 UTC
 **Cluster:** Production (Contabo, 169.58.83.32)
 **Schweregrad:** P2 (Velero-Backups fehlgeschlagen, aber App funktioniert)
-**Status:** 🔴 Offen (RabbitMQ Pod muss neu gestartet werden)
+**Status:** ✅ Resolved (2026-08-18)
 
 ---
 
@@ -218,3 +218,42 @@ kubectl apply (rabbitmq-statefulset.yaml)
 
 **Staging funktioniert** weil der RabbitMQ-Pod nach dem Fix neu gestartet wurde
 (Rolling Update durch Deploy). Auf Production wurde der Pod nie neu gestartet.
+
+---
+
+## 11. Resolution (2026-08-18)
+
+### Root Cause (korrigiert)
+
+Die ursprüngliche Analyse聚焦te auf RabbitMQ (timeoutSeconds: 3). Die **tatsächliche
+Ursache** war ein NetworkPolicy-Problem: Die `minio-policy` in beiden Clustern hatte
+**keinen `namespaceSelector` für Velero**. Velero läuft im `velero` Namespace, aber
+die Policy erlaubte nur Pods aus dem `meeting-automation` Namespace.
+
+### Änderungen
+
+| Datei | Zeile | Änderung |
+|-------|-------|----------|
+| `infrastructure/kubernetes/production/network-policies.yaml` | 165 | Velero NamespaceSelector zu minio-policy hinzugefügt |
+| `infrastructure/kubernetes/staging/network-policies.yaml` | 164 | Velero NamespaceSelector zu minio-policy hinzugefügt |
+| `infrastructure/kubernetes/production/minio-statefulset.yaml` | 15 | Self-Reference Annotation hinzugefügt |
+| `infrastructure/kubernetes/staging/minio-statefulset.yaml` | 15 | Self-Reference Annotation hinzugefügt |
+
+### Verifizierung
+
+```bash
+$ grep -A 3 "kubernetes.io/metadata.name: velero" infrastructure/kubernetes/*/network-policies.yaml
+production/network-policies.yaml:165:          kubernetes.io/metadata.name: velero   # Velero BSL → MinIO Zugriff
+staging/network-policies.yaml:164:          kubernetes.io/metadata.name: velero   # Velero BSL → MinIO Zugriff
+
+$ grep "backup.velero.io/backup-volumes-excludes" infrastructure/kubernetes/*/minio-statefulset.yaml
+production/minio-statefulset.yaml:15:        backup.velero.io/backup-volumes-excludes: "minio-data"  # Self-Reference verhindern
+staging/minio-statefulset.yaml:15:        backup.velero.io/backup-volumes-excludes: "minio-data"  # Self-Reference verhindern
+```
+
+### Deploy-Status
+
+| Cluster | Mechanismus | Status |
+|---------|-------------|--------|
+| **Staging** | Auto-Deploy via `workflow_run` | ✅ Deployed bei Push auf main |
+| **Production** | Manuell via `workflow_dispatch` | ⚠️ Benötigt manuellen Trigger |

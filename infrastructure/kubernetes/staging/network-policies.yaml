@@ -159,6 +159,9 @@ spec:
       podSelector:
         matchLabels:
           app.kubernetes.io/name: prometheus
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: velero   # Velero BSL → MinIO Zugriff
     ports:
     - protocol: TCP
       port: 9000

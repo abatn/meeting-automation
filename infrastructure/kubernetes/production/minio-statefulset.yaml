@@ -11,6 +11,8 @@ spec:
       app: minio
   template:
     metadata:
+      annotations:
+        backup.velero.io/backup-volumes-excludes: "minio-data"  # Self-Reference verhindern
       labels:
         app: minio
     spec:
