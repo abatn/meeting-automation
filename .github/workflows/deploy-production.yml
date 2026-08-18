@@ -122,6 +122,24 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Pre-Deploy Health Check
+      run: |
+        # Disk-Space prüfen
+        DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
+        if [ "$DISK_USAGE" -gt 80 ]; then
+          echo "❌ Disk usage ${DISK_USAGE}% > 80% — deploy blocked"
+          exit 1
+        fi
+
+        # Eviction-History prüfen
+        EVICTIONS=$(kubectl get pods -A --field-selector=status.phase=Failed -o name | grep -c eviction || true)
+        if [ "$EVICTIONS" -gt 10 ]; then
+          echo "❌ ${EVICTIONS} evicted pods — deploy blocked"
+          exit 1
+        fi
+
+        echo "✅ Pre-deploy health check passed (Disk: ${DISK_USAGE}%)"
+
     - name: Copy production manifests to Contabo
       uses: appleboy/scp-action@v0.1.7
       with:

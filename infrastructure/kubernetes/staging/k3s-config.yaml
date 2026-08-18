@@ -1,5 +1,4 @@
-# k3s configuration — Meeting Automation Production
-# Identical to Staging config
+# k3s configuration — Meeting Automation Staging
 
 write-kubeconfig-mode: "644"
 
@@ -7,11 +6,11 @@ disable:
   - traefik
   - metrics-server  # F7: k3s-embedded deaktivieren, eigenes Standalone-Manifest nutzen
 
-node-name: contabo-prod
+node-name: oci-staging
 
 tls-san:
-  - 169.58.83.32
-  - meeting-automation.com
+  - 158.180.18.110
+  - staging.meeting-automation.com
 
 kubelet-arg:
   - "image-gc-high-threshold=75"

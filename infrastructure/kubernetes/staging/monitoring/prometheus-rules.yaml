@@ -78,6 +78,18 @@ spec:
 
     - name: meeting-automation-infrastructure
       rules:
+        # Ephemeral Storage High (< 20% free) — general node filesystem alert
+        - alert: EphemeralStorageHigh
+          expr: |
+            node_filesystem_avail_bytes{mountpoint="/"}
+            / node_filesystem_size_bytes{mountpoint="/"} < 0.2
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Disk space < 20% free"
+            description: "Only {{ $value | humanizePercentage }} of disk space is available"
+
         # High Memory Usage (> 80% of limit)
         - alert: ContainerHighMemory
           expr: |
@@ -252,6 +264,41 @@ spec:
           annotations:
             summary: "Recording spike detected"
             description: "{{ $value }} recordings in 5min (2x hourly average)"
+
+    - name: meeting-automation-velero
+      rules:
+        # Velero Backup FailedValidation
+        - alert: VeleroBackupFailedValidation
+          expr: |
+            velero_backup_failure_reason{reason="BackupFailedValidation"} > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Velero backup failed validation"
+            description: "Backup {{ $labels.name }} failed validation — check BSL status and NetworkPolicy"
+
+        # Velero BSL Unavailable
+        - alert: VeleroBSLUnavailable
+          expr: |
+            velero_backup_storage_location_last_validation_result{phase!="Available"} > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Velero BackupStorageLocation unavailable"
+            description: "BSL {{ $labels.name }} is {{ $labels.phase }} — backups will fail"
+
+        # Velero Node Eviction Rate
+        - alert: VeleroHighEvictionRate
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="velero"}[1h]) > 10
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Velero pod restarts > 10/hour"
+            description: "Velero pods restarting at {{ $value }}/hour — check ephemeral-storage limits"
 
     - name: meeting-automation-storage-quota
       rules:
