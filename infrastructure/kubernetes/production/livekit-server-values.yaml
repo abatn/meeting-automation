@@ -5,12 +5,12 @@
 #
 # Fixes (gegenüber der ersten Version):
 # 1. `config:` -> `livekit:` (Chart-Schema: {{ toYaml .Values.livekit }})
-# 2. Nicht unterstützte Chart-Keys ENTFERNT: service:, livenessProbe:, readinessProbe:,
-#    dnsPolicy:, force_tcp, allow_tcp_fallback, tcp_fallback_rtt_threshold, ping_interval
+# 2. Nicht unterstützte Chart-Keys ENTFERNT: service:, livenessProbe:, readinessProbe:, dnsPolicy:
 # 3. turn.enabled: false (TURN ohne TLS-Cert verursacht 403 CreatePermission — Staging-Lesson)
 # 4. CPU-Limit 1000m (wie Staging; Nutzung ~6m)
 # 5. loadBalancer.servicePort = 7880 (= livekit.port)
 # 6. nodeSelector auf Production-Node (contabo-prod)
+# 7. room-Section + rtc.allow_tcp_fallback hinzugefügt (2026-08-19: Chrome WebSocket-Timeout-Fix)
 
 replicaCount: 1
 
@@ -28,10 +28,19 @@ fullnameOverride: livekit-server
 livekit:
   port: 7880
   log_level: info
+  room:
+    departure_timeout: 60
+    empty_timeout: 600
+    max_participants: 10
   rtc:
+    allow_tcp_fallback: true
+    force_tcp: false
+    ping_interval: 5
+    ping_timeout: 60
     tcp_port: 7881
     port_range_start: 50000
     port_range_end: 60000
+    tcp_fallback_rtt_threshold: 0
     use_external_ip: true
   redis:
     address: redis.meeting-automation.svc.cluster.local:6379

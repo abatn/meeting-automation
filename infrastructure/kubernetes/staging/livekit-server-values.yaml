@@ -7,12 +7,11 @@
 # 1. nameOverride = livekit-server-staging (Labels: app.kubernetes.io/name)
 # 2. fullnameOverride = livekit-server-staging (Service/Deployment Name)
 # 3. loadBalancer.servicePort = 7880 (Service Port)
-# 4. force_tcp / allow_tcp_fallback / tcp_fallback_rtt_threshold ENTFERNT
-#    (keine gueltigen LiveKit-Chart-Keys — RTC-Ports via port_range_start/end)
-# 5. turn.enabled: false (TURN ohne TLS-Cert verursacht 403 CreatePermission)
+# 4. turn.enabled: false (TURN ohne TLS-Cert verursacht 403 CreatePermission)
 #    Beweis: Egress-Log "CreatePermission error response (error 403:)"
-# 6. UDP-Range 50000-60000 + hostNetwork sind OFFIZIELLE CHART-DEFAULTS
+# 5. UDP-Range 50000-60000 + hostNetwork sind OFFIZIELLE CHART-DEFAULTS
 #    (keine hostPorts noetig — bei hostNetwork werden hostPorts ignoriert)
+# 6. room-Section + rtc.allow_tcp_fallback hinzugefügt (2026-08-19: Chrome WebSocket-Timeout-Fix)
 
 replicaCount: 1
 
@@ -29,10 +28,19 @@ fullnameOverride: livekit-server-staging
 livekit:
   port: 7880
   log_level: info
+  room:
+    departure_timeout: 60
+    empty_timeout: 600
+    max_participants: 10
   rtc:
+    allow_tcp_fallback: true
+    force_tcp: false
+    ping_interval: 5
+    ping_timeout: 60
     tcp_port: 7881
     port_range_start: 50000
     port_range_end: 60000
+    tcp_fallback_rtt_threshold: 0
     use_external_ip: true
   redis:
     address: redis-staging.meeting-automation-staging.svc.cluster.local:6379
