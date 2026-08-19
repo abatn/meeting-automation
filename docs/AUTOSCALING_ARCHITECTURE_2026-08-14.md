@@ -483,3 +483,51 @@ spec:
 | Scale-up | Workers = N bei N Messages |
 | Parallele Recordings | 2+ Egress Pods bei Last |
 | Rollback funktioniert | Hardcoded HPA wiederherstellbar |
+
+---
+
+## 11. Longhorn CSI Auto-Scaling (2026-08-19)
+
+**Status:** ✅ IMPLEMENTIERT
+**Datei:** `docs/LONGHORN_CSI_AUTOSCALING_2026-08-19.md`
+
+### 11.1 Überblick
+
+Longhorn CSI-Components (attacher, provisioner, resizer, snapshotter) skaliert automatisch basierend auf Node-Count:
+
+| Nodes | CSI-Replicas | Pods gesamt |
+|-------|-------------|-------------|
+| 1 | 1 | 41 |
+| 2 | 2 | 49 |
+| 3+ | 3 | 57 |
+
+### 11.2 Mechanismus
+
+CronJob (`*/5 * * * *`) prüft Node-Count und skaliert CSI-Deployments:
+
+```bash
+NODE_COUNT=$(kubectl get nodes --no-headers | grep -c " Ready")
+if [ "$NODE_COUNT" -ge 3 ]; then TARGET=3
+elif [ "$NODE_COUNT" -ge 2 ]; then TARGET=2
+else TARGET=1; fi
+
+for DEPLOY in csi-attacher csi-provisioner csi-resizer csi-snapshotter; do
+  kubectl scale deployment $DEPLOY -n longhorn-system --replicas=$TARGET
+done
+```
+
+### 11.3 Ergebnis
+
+- Pod-Count: 51 → 41 (−20%)
+- Longhorn CPU: 205m → 122m (−40%)
+- Longhorn RAM: 398Mi → 267Mi (−33%)
+
+### 11.4 Zusammenhang mit KEDA
+
+| Komponente | Scaling-Trigger | Mechanismus |
+|------------|-----------------|-------------|
+| celery-worker-pro | RabbitMQ Queue Depth | KEDA ScaledObject |
+| celery-worker-gratuit | RabbitMQ Queue Depth | KEDA ScaledObject |
+| livekit-egress | CPU Usage | KEDA ScaledObject |
+| backend | CPU Usage | KEDA ScaledObject |
+| **longhorn-csi-*** | **Node Count** | **CronJob** |
