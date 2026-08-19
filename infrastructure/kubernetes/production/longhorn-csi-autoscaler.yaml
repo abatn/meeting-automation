@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: longhorn-csi-autoscaler
+  namespace: longhorn-system
+  labels:
+    app: longhorn-csi-autoscaler
+spec:
+  schedule: "*/5 * * * *"  # Every 5 minutes
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: longhorn-csi-autoscaler
+        spec:
+          serviceAccountName: default
+          containers:
+          - name: autoscaler
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(date): Checking node count for CSI scaling..."
+              
+              # Count ready nodes
+              NODE_COUNT=$(kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready" || echo "1")
+              NODE_COUNT=${NODE_COUNT:-1}
+              
+              echo "Ready nodes: $NODE_COUNT"
+              
+              # Target replicas = min(node_count, 3)
+              if [ "$NODE_COUNT" -ge 3 ]; then
+                TARGET=3
+              elif [ "$NODE_COUNT" -ge 2 ]; then
+                TARGET=2
+              else
+                TARGET=1
+              fi
+              
+              echo "Target CSI replicas: $TARGET"
+              
+              # Scale CSI deployments
+              for DEPLOY in csi-attacher csi-provisioner csi-resizer csi-snapshotter; do
+                CURRENT=$(kubectl get deployment "$DEPLOY" -n longhorn-system -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+                if [ "$CURRENT" != "$TARGET" ]; then
+                  kubectl scale deployment "$DEPLOY" -n longhorn-system --replicas="$TARGET"
+                  echo "Scaled $DEPLOY: $CURRENT → $TARGET"
+                else
+                  echo "$DEPLOY already at $TARGET replicas"
+                fi
+              done
+              
+              # Scale longhorn-ui (always 1)
+              UI_CURRENT=$(kubectl get deployment longhorn-ui -n longhorn-system -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+              if [ "$UI_CURRENT" != "1" ]; then
+                kubectl scale deployment longhorn-ui -n longhorn-system --replicas=1
+                echo "Scaled longhorn-ui: $UI_CURRENT → 1"
+              fi
+              
+              echo "$(date): CSI scaling complete"
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+            requests:
+              cpu: 50m
+              memory: 32Mi
+          restartPolicy: OnFailure
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
