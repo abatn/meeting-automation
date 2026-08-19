@@ -40,18 +40,18 @@ egress:
   template_port: 7980
   prometheus_port: 7002
   cpu_cost:
-    room_composite_cpu_cost: 1.5
+    room_composite_cpu_cost: 2.0
     web_cpu_cost: 1.5
     track_composite_cpu_cost: 1.0
     track_cpu_cost: 0.5
 
-# Resource Limits (identisch zu Staging)
+# Resource Limits (2026-08-19: CPU 1→2 gegen Chrome-Startup-Timeout)
 resources:
   limits:
-    cpu: "1"
+    cpu: "2"
     memory: 2Gi
   requests:
-    cpu: 200m
+    cpu: 500m
     memory: 512Mi
 
 # Graceful Shutdown
