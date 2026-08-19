@@ -592,7 +592,120 @@ kubectl rollout restart deployment/livekit-server -n meeting-automation
 
 ---
 
+---
+
+## 12. Production LiveKit Config-Differenzen (Vollständiger Vergleich, 2026-08-19 04:00 UTC)
+
+### 12.1 LiveKit Server — Staging vs Production (VOLLSTÄNDIG)
+
+| Setting | Staging ✅ | Production ✅ (nach Fix) |
+|---------|-----------|--------------------------|
+| `keys` | `meeting-api-key: meeting-api-secret-2026-...` | `prod-9a4ac9f989143b65: prod-8f8b7b4...` |
+| `log_level` | info | info |
+| `port` | 7880 | 7880 |
+| `redis.address` | `redis-staging.meeting-automation-staging.svc.cluster.local:6379` | `redis.meeting-automation.svc.cluster.local:6379` |
+| `redis.password` | `redis_password` | `flgyEhZKHVyMBge1QkdKtA` |
+| **`room.departure_timeout`** | **60** | **60** (vorher: FEHLT) |
+| **`room.empty_timeout`** | **600** | **600** (vorher: FEHLT) |
+| **`room.max_participants`** | **10** | **10** (vorher: FEHLT) |
+| **`rtc.allow_tcp_fallback`** | **true** | **true** (vorher: FEHLT) |
+| **`rtc.force_tcp`** | **false** | **false** (vorher: FEHLT) |
+| **`rtc.ping_interval`** | **5** | **5** (vorher: FEHLT) |
+| **`rtc.ping_timeout`** | **60** | **60** (vorher: FEHLT) |
+| `rtc.port_range_start` | 50000 | 50000 |
+| `rtc.port_range_end` | 60000 | 60000 |
+| `rtc.tcp_port` | 7881 | 7881 |
+| **`rtc.tcp_fallback_rtt_threshold`** | **0** | **0** (vorher: FEHLT) |
+| `rtc.use_external_ip` | true | true |
+| **`turn.enabled`** | — (nicht gesetzt) | **false** |
+| `webhook.api_key` | `meeting-api-key` | `prod-9a4ac9f989143b65` |
+| `webhook.urls` | `http://backend.meeting-automation-staging.svc...` | `http://backend.meeting-automation.svc...` |
+
+### 12.2 LiveKit Egress — Staging vs Production
+
+| Setting | Staging | Production |
+|---------|---------|------------|
+| `api_key` | `meeting-api-key` | `prod-9a4ac9f989143b65` |
+| `api_secret` | `meeting-api-secret-2026-...` | `prod-8f8b7b4...` |
+| `ws_url` | `ws://livekit-server-staging:7880` | `ws://livekit-server:7880` |
+| `template_port` | 7980 | 7980 |
+| `redis.address` | `redis-staging.meeting-automation-staging.svc...` | `redis.meeting-automation.svc...` |
+| `s3.endpoint` | `http://minio-staging:9000` | `http://minio:9000` |
+| `s3.bucket` | `meeting-recordings-staging` | `meeting-recordings` |
+| **Image** | `livekit/egress:v1.8.4` | `livekit/egress:v1.8.4` ✅ |
+| **Replicas** | 2 | 1 |
+| **hostNetwork** | true | true |
+| **CPU Limit** | 1 | 1 |
+| **Memory Limit** | 2Gi | 2Gi |
+
+### 12.3 Image-Versions (beide identisch)
+
+| Komponente | Staging | Production |
+|------------|---------|------------|
+| LiveKit Server | v1.9.0 | v1.9.0 ✅ |
+| LiveKit Egress | v1.8.4 | v1.8.4 ✅ |
+
+---
+
+## 13. Production CPU-Analyse (2026-08-19 04:00 UTC)
+
+### 13.1 Load-Verlauf
+
+| Zeit | Load Average | %CPU (8 Cores) | Kontext |
+|------|-------------|-----------------|---------|
+| 19:20 UTC (vorher) | 18.47 / 17.85 / 14.41 | **231%** 🔴 | Während Egress-Fehlversuch |
+| 04:00 UTC (jetzt) | 8.17 / 8.72 / 9.01 | **102%** ⚠️ | Nachts, Idle |
+
+### 13.2 Top CPU-Verbraucher
+
+| # | Prozess | %CPU | %MEM | Bemerkung |
+|---|---------|------|------|-----------|
+| 1 | **k3s server** | **103%** 🔴 | 5.9% | Dauerhaft 100% — 51 Pods verwalten |
+| 2 | **51× containerd-shim-runc-v2** | **57%** ⚠️ | 1.0GB | Je 1 Shim pro Pod |
+| 3 | **containerd (k3s)** | **31%** ⚠️ | 1.0% | Container-Runtime |
+| 4 | **Prometheus** | **24%** | 5.8% | Monitoring, 15s Scrape |
+| 5 | **Grafana** | **7%** | 1.0% | Dashboard |
+| 6 | **Longhorn Manager** | **5%** | 0.5% | Storage |
+| 7 | **Velero** | **3%** | 0.3% | Backup |
+| 8 | **KEDA** | **3%** | 0.2% | Autoscaling |
+| 9 | **RabbitMQ** | **3%** | 0.6% | Message Broker |
+| 10 | **MinIO** | **3%** | 0.7% | S3 Storage |
+
+### 13.3 Pods pro Namespace
+
+| Namespace | Pods | CPU-Beitrag |
+|-----------|------|-------------|
+| longhorn-system | **19** | Hoch |
+| meeting-automation | **15** | Mittel |
+| monitoring | **6** | Prometheus dominant |
+| kube-system | **4** | k3s dominant |
+| keda | **3** | Niedrig |
+| velero | **2** | Niedrig |
+| **GESAMT** | **51 Pods** | **57% CPU nur für Shims** |
+
+### 13.4 Egress CPU während Recording (vorher)
+
+| Zeit | Egress CPU-Load | Kontext |
+|------|----------------|---------|
+| 01:30:03 | 0.97 | Chrome startet |
+| 01:30:04 | 1.33 | Chrome lädt Template |
+| 01:30:05 | 1.45 | WebSocket-Handshake |
+| 01:30:06 | **1.60** 🔴 | **Timeout** |
+| 01:30:17 | — | ❌ `websocket url timeout reached` |
+
+### 13.5 Empfehlungen
+
+| # | Maßnahme | Aufwand | CPU-Ersparnis |
+|---|----------|---------|---------------|
+| 1 | Longhorn-Replicas reduzieren (19→weniger) | Niedrig | -10% |
+| 2 | Prometheus Scrape-Intervall erhöhen (15s→30s) | Niedrig | -5% |
+| 3 | Unused Pods entfernen | Niedrig | -3% |
+| 4 | k3s Version upgraden | Mittel | -20% |
+| 5 | Node erweitern (8→16 Cores) | Hoch | -50% |
+
+---
+
 **Erstellt:** 2026-08-15
-**LIVE-Verifikation:** 2026-08-19 01:56 UTC (Production)
-**Status:** ✅ **LiveKit Server Config gefixt** — room + rtc.allow_tcp_fallback hinzugefügt
+**LIVE-Verifikation:** 2026-08-19 04:00 UTC (Production)
+**Status:** ✅ **LiveKit Server Config gefixt** + CPU-Analyse abgeschlossen
 **Nächster Schritt:** Recording-Test auf Production (test 0427 erneut ausführen)
