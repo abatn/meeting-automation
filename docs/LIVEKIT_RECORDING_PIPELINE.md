@@ -234,8 +234,27 @@ req.file.CopyFrom(file_output)
 
 ## Stage 5: ONNX Segment Reassignment
 
-- **Nach Speaker-ID:** ONNX re-assignet einzelne Segmente (fixt Gladia-Diarization-Bugs)
-- **Text-Fallback:** Erwähnt ein Segment einen anderen Speaker-Name?
+**Zweck:** Fixt Gladia-Diarization-Bugs — wenn Gladia alle Segmente unter einem Speaker gruppiert, re-assignet ONNX einzelne Segmente an den korrekten Sprecher.
+
+**Voraussetzung:** Speaker Identification (Stage 4) abgeschlossen + enrolled Profiles mit ONNX-Embeddings vorhanden.
+
+**Flow pro Segment:**
+1. Audio-Segment extrahieren via ffmpeg (`audio_segment_service._extract_single_segment()`)
+2. ONNX Embedding extrahieren (192-dim ECAPA-TDNN via `speaker_embedding_service`)
+3. Gegen enrolled Profiles matchen (`profile_service.match_speaker_from_list()`)
+4. Confidence = high/medium UND anderer Speaker → Segment reassignen
+
+**Text-Fallback** (wenn ONNX low/no match):
+- Prüfe ob Segment-Text einen anderen Speaker-Name erwähnt (Lateinisch oder transliteriertes Arabisch)
+- Nur wenn mehrere Speaker vorhanden (`len(all_names) > 1`)
+
+**Skip-Bedingungen:**
+- Keine `speaker_mappings` vorhanden
+- ONNX nicht verfügbar (`speaker_embedding_service.is_available = False`)
+- Keine enrolled Profiles mit Embeddings (`profiles_with_emb` leer)
+
+**Performance:** ~1s pro Segment (ARM64), ~60s für 62 Segmente
+**Datei:** `transcription_tasks.py:243-328`
 
 ---
 

@@ -117,13 +117,26 @@ curl -X POST http://localhost:8000/api/v1/meetings/{meeting_id}/livekit/token \
 - **Auto-Enrollment:** Embeddings stored for future matching
 - **Tier 2.3:** `file_size` + `duration` persisted
 
-### Stage 5: PV Generation (Mistral Large)
+### Stage 5: ONNX Segment Reassignment
+- **Purpose:** Fix Gladia diarization bugs (segments grouped under wrong speaker)
+- **Prerequisite:** Speaker Identification (Stage 4) completed + enrolled profiles with embeddings
+- **Flow per segment:**
+  1. Extract audio segment via ffmpeg (`audio_segment_service._extract_single_segment()`)
+  2. Extract ONNX embedding (192-dim ECAPA-TDNN via `speaker_embedding_service`)
+  3. Match against enrolled profiles (`profile_service.match_speaker_from_list()`)
+  4. If confidence = high/medium AND different speaker → reassign segment
+- **Text-Fallback:** If ONNX confidence = low/no match AND multiple speakers → check if segment text mentions another speaker name (Latin or transliterated Arabic)
+- **Skip conditions:** No speaker mappings, ONNX unavailable, no enrolled profiles with embeddings
+- **Performance:** ~1s per segment (ARM64), ~60s for 62 segments
+- **File:** `transcription_tasks.py:243-328`
+
+### Stage 6: PV Generation (Mistral Large)
 - **Input:** Transcription + speaker mappings + participant list
 - **Output:** Structured PV (summary, decisions, actions)
 - **Tier 2.2:** Persist to `pv_sections` (summary/decision/action, ordered)
 - **Actions:** Created with assignee resolution (speaker → participant → user)
 
-### Stage 6: Completion
+### Stage 7: Completion
 - **DB:** `recording.status = "completed"`
 - **Audit:** `PV_CREATED`, `ACTION_ASSIGNED` events
 - **n8n Webhooks:** `meeting-created`, `transcription-completed` (if workflows active)
