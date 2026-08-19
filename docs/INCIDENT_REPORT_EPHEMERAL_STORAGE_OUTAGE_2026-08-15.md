@@ -705,7 +705,85 @@ kubectl rollout restart deployment/livekit-server -n meeting-automation
 
 ---
 
+## 14. Helm Values Git-Source korrigiert (2026-08-19 04:15 UTC)
+
+**Problem:** Der kubectl-patch in §11 hat die Live ConfigMap gefixt, aber die Git-Source-Dateien waren nicht konsistent. Bei nächstem Helm-Upgrade wären die Fixes verloren gegangen.
+
+### 14.1 Befund
+
+| Datei | `room` | `rtc.allow_tcp_fallback` | Status |
+|-------|--------|--------------------------|--------|
+| `livekit-server-values.yaml` (Prod) | ❌ **FEHLT** | ❌ **FEHLT** | Nicht gepatcht |
+| `livekit-configmap.yaml` (Prod) | ✅ Vorhanden | ✅ Vorhanden | Dead Code (wird nicht genutzt) |
+| `livekit-server-values.yaml` (Staging) | ❌ **FEHLT** | ❌ **FEHLT** | Nicht gepatcht |
+| `livekit-configmap.yaml` (Staging) | ✅ Vorhanden | ✅ Vorhanden | Dead Code (wird nicht genutzt) |
+| **Live ConfigMap** (Cluster) | ✅ Gefixt | ✅ Gefixt | Via `kubectl patch` |
+
+### 14.2 Root Cause
+
+Kommentar in `livekit-server-values.yaml`:
+```yaml
+# 2. Nicht unterstützte Chart-Keys ENTFERNT: force_tcp, allow_tcp_fallback,
+#    tcp_fallback_rtt_threshold, ping_interval
+```
+
+Dieser Kommentar war **falsch** — diese Settings sind gültige LiveKit Server Config Keys und werden vom Helm Chart durchgereicht (`{{ toYaml .Values.livekit }}`). Sie wurden fälschlicherweise als "nicht unterstützte Chart-Keys" markiert und entfernt.
+
+### 14.3 Architektur-Problem: Dead Code
+
+```
+Helm Values → livekit-server ConfigMap (GENERIERT) → wird vom Deployment genutzt ✅
+livekit-configmap.yaml → livekit-config ConfigMap (MANUELL) → wird NICHT genutzt ❌
+```
+
+Die `livekit-configmap.yaml`-Dateien in Git enthielten die korrekten Settings, aber das Deployment nutzt die Helm-generierte ConfigMap (`livekit-server`), nicht die manuelle (`livekit-config`).
+
+### 14.4 Fix — Geänderte Dateien
+
+| Datei | Änderung |
+|-------|----------|
+| `infrastructure/kubernetes/production/livekit-server-values.yaml` | `room` + `rtc.allow_tcp_fallback` + 6 weitere Settings |
+| `infrastructure/kubernetes/staging/livekit-server-values.yaml` | `room` + `rtc.allow_tcp_fallback` + 6 weitere Settings |
+
+### 14.5 Vorher/Nachher
+
+```yaml
+# VORHER (fehlte)
+livekit:
+  rtc:
+    tcp_port: 7881
+    port_range_start: 50000
+    # Kein room, kein allow_tcp_fallback!
+
+# NACHHER (jetzt komplett)
+livekit:
+  room:
+    departure_timeout: 60
+    empty_timeout: 600
+    max_participants: 10
+  rtc:
+    allow_tcp_fallback: true
+    force_tcp: false
+    ping_interval: 5
+    ping_timeout: 60
+    tcp_port: 7881
+    port_range_start: 50000
+    port_range_end: 60000
+    tcp_fallback_rtt_threshold: 0
+    use_external_ip: true
+```
+
+### 14.6 Git Status
+
+| Commit | Inhalt |
+|--------|--------|
+| `62c728a7` | kubectl-patch auf Cluster + Incident-Report §11 |
+| `0a93b53a` | Incident-Report §12+13 (Config-Differenzen + CPU-Analyse) |
+| `f36b2598` | Helm Values korrigiert (Prod + Staging) |
+
+---
+
 **Erstellt:** 2026-08-15
-**LIVE-Verifikation:** 2026-08-19 04:00 UTC (Production)
-**Status:** ✅ **LiveKit Server Config gefixt** + CPU-Analyse abgeschlossen
+**LIVE-Verifikation:** 2026-08-19 04:15 UTC (Production)
+**Status:** ✅ **Git-Source konsistent** — Helm Values + Cluster-ConfigMap identisch
 **Nächster Schritt:** Recording-Test auf Production (test 0427 erneut ausführen)
