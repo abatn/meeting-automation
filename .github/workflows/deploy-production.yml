@@ -176,7 +176,7 @@ jobs:
         host: 169.58.83.32
         username: root
         key: ${{ secrets.CONTABO_SSH_KEY }}
-        command_timeout: 20m
+        command_timeout: 30m
         script: |
           set -e
           export TAG="${{ inputs.image_tag }}"
