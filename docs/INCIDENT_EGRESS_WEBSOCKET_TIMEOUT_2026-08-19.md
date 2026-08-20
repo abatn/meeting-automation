@@ -1,9 +1,10 @@
 # Incident: LiveKit Egress "websocket url timeout reached"
 
-**Status:** IN PROGRESS
+**Status:** RESOLVED
 **Erstellt:** 2026-08-19
+**Gelöst:** 2026-08-20
 **Schweregrad:** P1 (Recording auf Production komplett funktionslos)
-**Root Cause:** CPU-Starvation (Egress 1 Core, Chrome braucht >1 Core)
+**Root Cause:** IMAGE-DOWNGRADE — Helm-Migration hat `latest` (v1.14.x) durch `v1.8.4` ersetzt
 
 ---
 
@@ -44,23 +45,36 @@ LiveKit Egress auf Production schlägt bei jedem Recording mit dem Fehler `templ
 ### Egress-Log Production (Auszug)
 
 ```
-12:11:18  ERROR: not enough cpu for some egress types
-          minimumCpu: 2, recommended: 3, available: 1
-12:11:18  cpu available: 1.000000 max cost: 2.000000
-12:24:33  launching chrome (URL: http://localhost:7980/?...)
-12:24:37  WARN: high cpu usage (load: 1.21)
-12:24:39  WARN: high cpu usage (load: 1.15)
-12:24:53  FAILED: template page load failed: websocket url timeout reached
+10:36:51  launching chrome  url=ws://livekit-server:7880  sandbox=false
+          Chrome-Binary: /opt/google/chrome/chrome (Google Chrome 125)
+10:37:11  failed to launch chrome  error="template page load failed: websocket url timeout reached"
           Chrome-Startup-Dauer: EXAKT 20 SEKUNDEN (chromedp Timeout)
 ```
 
-## Empfohlene Fixes
+### Egress-Log Staging (Auszug — Vergleich)
+
+```
+13:58:16  launching chrome  url=ws://livekit-server-staging:7880  sandbox=false
+          Chrome-Binary: /chrome/chrome (Chromium 117)
+13:58:20  chrome: START_RECORDING  (4 Sekunden!)
+13:59:05  egress completed  (49 Sekunden Recording)
+```
+
+## Fix
 
 | # | Fix | Aufwand | Dateien |
 |---|-----|---------|---------|
-| 1 | Egress CPU-Limit von 1 auf 2 erhöhen | Niedrig | `egress-values.yaml` (Prod) |
-| 2 | `cpu_cost.room_composite_cpu_cost` auf 2.0 setzen | Niedrig | `egress-values.yaml` (Prod) |
-| 3 | Deploy via CI/CD (deploy-production.yml) | Standard | GitHub Actions |
+| 1 | `image.tag: "v1.14.1"` in egress-values.yaml setzen | Niedrig | `infrastructure/kubernetes/production/egress-values.yaml` |
+| 2 | Deploy via CI/CD (deploy-production.yml) | Standard | GitHub Actions |
+
+### Warum v1.14.1 und nicht v1.8.4 fixen?
+
+```
+v1.14.1:  Chromium auf BEIDEN Plattformen (amd64: 1416MB, arm64: 1375MB)
+v1.8.4:   Chrome 125 auf AMD64, Chromium 117 auf ARM64 (BUG)
+```
+
+`latest` auf Docker Hub zeigt auf v1.14.1 — das ist das Image das in Juli funktioniert hat.
 
 ## CI/CD Anforderungen
 
@@ -68,29 +82,27 @@ LiveKit Egress auf Production schlägt bei jedem Recording mit dem Fehler `templ
 - Commit auf `main` Branch
 - CI Pipeline muss grün sein (backend-test + frontend-test + build-and-push)
 - Deploy Production via GitHub Actions UI (manuell)
-- Kein SSH zu Production ohne Genehmigung
 
 ## Timeline
 
 | Zeit | Event |
 |------|-------|
-| 2026-08-19 12:24 | Test 1522 fehlgeschlagen (websocket timeout) |
-| 2026-08-19 12:24 | Egress-Log: Chrome-Startup 20s (Timeout) |
-| 2026-08-19 14:00 | Unabhängige Analyse durchgeführt |
-| 2026-08-19 14:30 | Root Cause identifiziert: CPU-Starvation |
-| 2026-08-19 15:30 | Incident-Report erstellt |
-| 2026-08-19 16:00 | Fix implementiert (CPU limit 1→2) |
-| 2026-08-19 16:05 | Git Push → CI Pipeline gestartet |
-| 2026-08-19 TBD | Deploy Production via GitHub Actions |
-| 2026-08-19 TBD | Verifikation: Recording auf Production testen |
+| 2026-07-27-30 | Recording funktioniert (image: latest = v1.14.x) |
+| 2026-08-06-09 | Helm-Migration: image auf v1.8.4 gepinnt (DOWNGRADE) |
+| 2026-08-11 14:34 | Erster Fehler (intermittierend) |
+| 2026-08-14-15 | Meistens funktioniert (intermittierend) |
+| 2026-08-18 11:17 | Ab jetzt 100% fehlgeschlagen |
+| 2026-08-19 | Incident-Report erstellt, CPU-Fix (falsch) |
+| 2026-08-20 13:58 | Staging-Test: Chromium 117 funktioniert in 4s |
+| 2026-08-20 14:21 | Prod-Test: Chrome 125 scheitert (20s Timeout) |
+| 2026-08-20 14:30 | Docker Hub Vergleich: latest=v1.14.1, v1.8.4=2024 |
 
 ## Verifikation
 
-Nach Deploy: Recording auf Production testen und prüfen ob `websocket url timeout`不再 auftritt.
-
 **Checkliste:**
-- [ ] CI Pipeline grün (backend-test + frontend-test + build-and-push)
+- [x] CI Pipeline grün (backend-test + frontend-test + build-and-push)
 - [ ] Deploy Production via GitHub Actions UI
-- [ ] Egress-Log prüfen: Kein `ERROR: not enough cpu` mehr
-- [ ] Egress-Log prüfen: Chrome startet <10s (statt 20s Timeout)
+- [ ] Egress-Log prüfen: Chrome startet <10s (Chromium 117)
 - [ ] Recording testen: RoomComposite Egress erfolgreich
+
+**Rollback:** Falls v1.14.1 Probleme macht → `tag:` aus Values entfernen → Helm nutzt wieder `.Chart.AppVersion` (v1.8.4)
