@@ -265,13 +265,72 @@ kubectl rollout status deployment/livekit-server deployment/livekit-egress -n me
 
 ## 6. Rollback
 
+### 6.1 Helm-Rollback (Server)
+
 ```bash
-helm rollback livekit-server livekit-egress -n meeting-automation
-# oder: OLD-YAMLs wieder anwenden (falls Helm zurueckgebaut werden muss)
-kubectl apply -f production/livekit-server-deployment.yaml -f production/livekit-egress-deployment.yaml
+# Server auf vorherige Revision zurücksetzen
+helm rollback livekit-server <REVISION> -n meeting-automation
+kubectl rollout restart deployment/livekit-server -n meeting-automation
 ```
 
-> **Hinweis nach Migration:** Helm ist jetzt die aktive Quelle. Rollback via `helm rollback` (Release-Revision). Die OLD-YAMLs sind nur noch Referenz.
+### 6.2 Egress: Helm → kubectl apply (Reverse-Migration)
+
+**Problem:** Production Egress nutzt Helm (13 Revisions in 10 Tagen) statt kubectl apply. Staging funktioniert stabil mit kubectl apply. Das muss konsistent sein.
+
+**Grund:** Die 10 Helm-Upgrades zwischen 15.–19. August haben die Egress-Konfiguration instabil gemacht. Staging funktioniert weil es kein Helm nutzt — stabil, unverändert, nur kubectl apply.
+
+#### Phase R1 — Git-Dateien vorbereiten (kein Cluster-Eingriff)
+
+| # | Datei | Änderung |
+|---|---|---|
+| R1.1 | `livekit-egress-configmap.yaml` | `ws_url`, `api_key`, `api_secret` aus aktueller Helm-ConfigMap übernehmen |
+| R1.2 | `livekit-egress-deployment.yaml` | Image-Tag `v1.8.4` (statt `latest`), CPU `1` (statt `2`), Env-Vars `LIVEKIT_API_KEY`/`SECRET`/`WS_URL` aus Helm-Deployment übernehmen |
+| R1.3 | `03-deploy-livekit.sh` | Helm-Block für Egress entfernen (nur noch Server via Helm) |
+| R1.4 | `02-apply-manifests.sh` | `livekit-egress-deployment.yaml` zu kubectl apply hinzufügen |
+
+#### Phase R2 — Helm entfernen + kubectl apply (Wartungsfenster, ~1 Min)
+
+```bash
+# 1. Helm Release für Egress entfernen
+helm uninstall livekit-egress -n meeting-automation
+
+# 2. Helm-ConfigMap löschen (nicht mehr referenziert)
+kubectl delete configmap livekit-egress -n meeting-automation
+
+# 3. kubectl apply der stabilen YAML-Dateien
+kubectl apply -f livekit-egress-configmap.yaml -f livekit-egress-deployment.yaml -n meeting-automation
+
+# 4. Verifizieren
+kubectl rollout status deployment/livekit-egress -n meeting-automation --timeout=60s
+kubectl get pods -n meeting-automation | grep egress
+```
+
+#### Phase R3 — Verifikation
+
+| Check | Befehl | Erwartung |
+|---|---|---|
+| Pod Running | `kubectl get pods -l app=livekit-egress` | 1/1 Running |
+| ConfigMap | `kubectl get configmap livekit-egress-config` | Vorhanden |
+| Config-Inhalt | `kubectl get configmap livekit-egress-config -o jsonpath='{.data.config\.yaml}'` | `ws_url` + `api_key` vorhanden |
+| Helm Release | `helm list -n meeting-automation` | Kein `livekit-egress` Eintrag |
+| Recording | Test-Meeting starten | Status `completed` |
+
+#### Rollback (falls kubectl apply fehlschlägt)
+
+```bash
+# Helm-Release wiederherstellen
+helm upgrade --install livekit-egress infrastructure/kubernetes/production/charts/egress-1.8.4.tgz \
+  -n meeting-automation \
+  --values infrastructure/kubernetes/production/egress-values.yaml
+
+# hostNetwork-Patch
+kubectl patch deployment livekit-egress -n meeting-automation --type='json' \
+  -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},{"op":"replace","path":"/spec/template/spec/dnsPolicy","value":"ClusterFirstWithHostNet"},{"op":"replace","path":"/spec/strategy","value":{"type":"Recreate"}}]'
+
+kubectl rollout restart deployment/livekit-egress -n meeting-automation
+```
+
+> **Hinweis:** Nach der Reverse-Migration ist kubectl apply die aktive Quelle für Egress. Helm wird nur noch für den Server genutzt.
 
 ---
 
@@ -287,7 +346,97 @@ kubectl apply -f production/livekit-server-deployment.yaml -f production/livekit
 | 6 | OLD-`app:`-Policies entfernen | Nach Stabilitätswoche (optional, additiv harmlos) |
 | 7 | `backend:latest`/`frontend:latest` im Docker-Store (5,5 GB) | ✅ **Freigegeben** (2026-08-09, gezieltes `docker rmi`, ~3 GB — k3s-Kopien blieben unberührt) |
 | 8 | Disk-Wachstum Staging überwachen | Empfehlung: > 15% frei halten; alte Build-Tags nicht auf dem Node ansammeln |
+| 9 | **Egress: Helm → kubectl apply Reverse-Migration** | ⚠️ **Offen** — Production Egress nutzt Helm (13 Revisions), Staging nutzt kubectl apply. Recording funktioniert nicht auf Prod. Fix: Helm entfernen, kubectl apply nutzen (wie Staging). Siehe Abschnitt 6.2. |
+| 10 | **Egress CPU 1→2 Revert** | ⚠️ **Offen** — Commit `2a4a9b61` hat CPU von 1 auf 2 erhöht. Staging hat 1. Nach Reverse-Migration muss CPU wieder auf 1 sein. |
+
+---
+
+## 8. Chrome-Binary Root Cause (2026-08-20)
+
+### 8.1 Das Problem
+
+Production Egress schlägt bei JEDEM Recording mit `websocket url timeout reached` (20s) fehl. Staging funktioniert einwandfrei.
+
+### 8.2 Root Cause — 100% bewiesen
+
+**Das Docker Hub Image `livekit/egress:v1.8.4` enthält auf AMD64 ein KOMPLETT ANDERES Image als auf ARM64:**
+
+| Eigenschaft | Staging (ARM64) ✅ | Production (AMD64) ❌ |
+|---|---|---|
+| **Browser** | Chromium 117.0.5874.0 | Google Chrome 125.0.6422.60 |
+| **Binary-Pfad** | `/chrome/chrome` (366MB) | `/opt/google/chrome/chrome` (241MB) |
+| **chrome-devel-sandbox** | ✅ `/usr/local/sbin/chrome-devel-sandbox` (351KB SUID) | ❌ **FEHLT** |
+| **chrome_sandbox** | `/chrome/chrome_sandbox` (351KB) | `/opt/google/chrome/chrome-sandbox` (212KB) |
+| **Egress Binary MD5** | `0ef247884e...` (63.7MB) | `5303c1c294...` (65.4MB) |
+| **apt installiert** | ❌ | ✅ `google-chrome-stable 125.0.6422.60-1` |
+| **chromedriver** | ❌ | ✅ `/usr/local/bin/chromedriver` |
+
+### 8.3 Die Kette des Fehlers
+
+```
+1. Docker Hub Image livekit/egress:v1.8.4 (AMD64) enthält Google Chrome 125
+2. ENV: CHROME_DEVEL_SANDBOX=/usr/local/sbin/chrome-devel-sandbox
+3. Auf AMD64: Datei FEHLT → Chrome findet Sandbox NICHT
+4. Chrome crasht beim Start → wird Zombie-Prozess
+5. Egress bekommt keine DevTools-WebSocket-URL
+6. chromedp Timeout: 20 Sekunden
+7. Fehler: "template page load failed: websocket url timeout reached"
+```
+
+### 8.4 Der Fix
+
+**Chrome sandbox binary EXISTIERT auf Production** unter `/opt/google/chrome/chrome-sandbox` (212KB, SUID). Die Env-Var zeigt nur auf den FALSCHEN Pfad.
+
+#### Schritt 1: CHROME_DEVEL_SANDBOX korrigieren
+
+```bash
+kubectl patch deployment livekit-egress -n meeting-automation --type='json' \
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/env/-","value":{"name":"CHROME_DEVEL_SANDBOX","value":"/opt/google/chrome/chrome-sandbox"}}]'
+```
+
+#### Schritt 2: imagePullPolicy: Always setzen (verhindert Cached-Image-Corruption)
+
+```bash
+kubectl patch deployment livekit-egress -n meeting-automation --type='json' \
+  -p='[{"op":"replace","path":"/spec/template/spec/containers/0/imagePullPolicy","value":"Always"}]'
+```
+
+#### Schritt 3: Pod neustarten + verifizieren
+
+```bash
+kubectl rollout restart deployment/livekit-egress -n meeting-automation
+kubectl rollout status deployment/livekit-egress -n meeting-automation --timeout=60s
+
+# Verifizieren:
+CONTAINER_ID=$(crictl ps -q --name egress)
+crictl exec $CONTAINER_ID env | grep CHROME_DEVEL_SANDBOX
+crictl exec $CONTAINER_ID ls -la /opt/google/chrome/chrome-sandbox
+```
+
+#### Schritt 4: Recording testen
+
+### 8.5 Warum das funktioniert
+
+```
+VORHER:
+  CHROME_DEVEL_SANDBOX=/usr/local/sbin/chrome-devel-sandbox → FEHLT → Chrome crasht
+
+NACHHER:
+  CHROME_DEVEL_SANDBOX=/opt/google/chrome/chrome-sandbox → EXISTIERT → Chrome startet
+```
+
+### 8.6 Langfristiger Fix
+
+| Fix | Aufwand | Risiko |
+|---|---|---|
+| `CHROME_DEVEL_SANDBOX` korrigieren (sofort) | 2 Min | Niedrig |
+| `imagePullPolicy: Always` | 2 Min | Niedrig |
+| `imagePullSecrets: dockerhub-pull-secret` hinzufügen | 5 Min | Niedrig |
+| Post-Deploy-Verification im CI/CD | 30 Min | Niedrig |
+| Offizielles LiveKit Image bug melden | 10 Min | Kein Risiko |
 
 ---
 
 *Dieses Dokument dient als verbindlicher Migrationsplan. **Phasen 0–4c sind durchgeführt und verifiziert (2026-08-09).** Gate 4 (E2E-Recording) ist bestanden. Production läuft auf Helm wie Staging; Staging-DiskPressure-Krise behoben und dokumentiert.*
+
+**Aktueller Stand (2026-08-20):** Chrome-Binary Root Cause identifiziert (Abschnitt 8). Production Image enthält Google Chrome 125 statt Chromium 117. Fix: `CHROME_DEVEL_SANDBOX` auf korrekten Pfad setzen + `imagePullPolicy: Always`.

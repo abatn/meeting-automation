@@ -1,8 +1,4 @@
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: livekit-egress-config
-  namespace: meeting-automation
 data:
   config.yaml: |
     log_level: debug
@@ -26,3 +22,10 @@ data:
       web_cpu_cost: 1.5
       track_composite_cpu_cost: 1.0
       track_cpu_cost: 0.5
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2026-07-27T20:40:57Z"
+  name: livekit-egress-config
+  namespace: meeting-automation
+  resourceVersion: "982"
+  uid: 007b1865-26fe-4596-ad6e-55565424f8af

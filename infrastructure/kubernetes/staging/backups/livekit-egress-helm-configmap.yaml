@@ -1,0 +1,39 @@
+apiVersion: v1
+data:
+  config.yaml: |
+    api_key: meeting-api-key
+    api_secret: meeting-api-secret-2026-minimum-32-chars!
+    cpu_cost:
+      room_composite_cpu_cost: 1.5
+      track_composite_cpu_cost: 1
+      track_cpu_cost: 0.5
+      web_cpu_cost: 1.5
+    health_port: 7000
+    insecure: true
+    log_level: debug
+    prometheus_port: 7002
+    redis:
+      address: redis-staging.meeting-automation-staging.svc.cluster.local:6379
+      db: 0
+      password: redis_password
+    s3:
+      access_key: minio_user
+      bucket: meeting-recordings-staging
+      endpoint: http://minio-staging:9000
+      force_path_style: true
+      region: us-east-1
+      secret: minio_password
+    template_port: 7980
+    ws_url: ws://livekit-server-staging:7880
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: livekit-egress
+    meta.helm.sh/release-namespace: meeting-automation-staging
+  creationTimestamp: "2026-08-19T15:06:31Z"
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: livekit-egress
+  namespace: meeting-automation-staging
+  resourceVersion: "4102187"
+  uid: 1f6a60e3-d6e3-4771-b8fe-6f37519fbd12
