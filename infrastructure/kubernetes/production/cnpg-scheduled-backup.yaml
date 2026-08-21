@@ -1,0 +1,16 @@
+# CloudNativePG ScheduledBackup — aktiviert retentionPolicy: "7d"
+# Erstellt Base-Backups → retentionPolicy löscht alte WALs automatisch
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: daily-backup
+  namespace: meeting-automation
+spec:
+  schedule: "0 3 * * *"          # Täglich um 03:00 UTC
+  backupOwnerReference: self
+  cluster:
+    name: meeting-db
+  retentionPolicy: "7d"           # 7 Tage aufbewahren
+  method: barmanObjectStore
+  imagePullSecrets:
+    - name: cnpg-pull-secret

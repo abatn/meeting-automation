@@ -20,6 +20,7 @@ done
 kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml
 kubectl apply -f redis-deployment.yaml -f rabbitmq-statefulset.yaml -f minio-statefulset.yaml
 kubectl apply -f cnpg-cluster.yaml
+kubectl apply -f cnpg-scheduled-backup.yaml 2>/dev/null || echo "⚠️ ScheduledBackup already exists or CRD missing"
 kubectl apply -f backend-deployment.yaml -f frontend-deployment.yaml -f onlyoffice-deployment.yaml -f n8n-deployment.yaml
 kubectl apply -f celery-worker-deployment.yaml -f celery-worker-pro-deployment.yaml -f celery-beat-deployment.yaml
 kubectl apply -f network-policies.yaml

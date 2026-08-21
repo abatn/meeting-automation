@@ -33,6 +33,8 @@ celery_app.conf.update(
         'send_reminder_via_n8n': {'queue': 'email'},
         'daily_reminder_task': {'queue': 'email'},
         'send_invitation_email': {'queue': 'email'},
+        'send_admin_new_tenant_notification': {'queue': 'email'},
+        'send_customer_activated_email': {'queue': 'email'},
         'cleanup_old_data_task': {'queue': 'maintenance'},
         'check_storage_quotas': {'queue': 'maintenance'},
     },

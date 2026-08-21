@@ -23,6 +23,11 @@ fi
 kubectl apply -f "$MANIFESTS_DIR/system/ephemeral-storage-cleanup-cronjob.yaml" -n kube-system || echo "Warning: ephemeral-storage-cleanup failed"
 kubectl apply -f "$MANIFESTS_DIR/system/pod-garbage-collector-cronjob.yaml" -n kube-system || echo "Warning: pod-garbage-collector failed"
 
+# Deploy Longhorn CSI Autoscaler (reduced interval: 5min → 15min)
+if kubectl get namespace longhorn-system &>/dev/null; then
+  kubectl apply -f "$MANIFESTS_DIR/longhorn-csi-autoscaler.yaml" -n longhorn-system 2>/dev/null || echo "⚠️ CSI autoscaler already exists"
+fi
+
 # Deploy Image-Cleanup (systemd timer)
 echo "=== Deploying Image-Cleanup ==="
 cp "$MANIFESTS_DIR/system/image-cleanup-script.sh" /usr/local/bin/image-cleanup.sh
