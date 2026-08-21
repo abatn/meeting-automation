@@ -44,7 +44,7 @@ spec:
         secretAccessKey:
           name: minio-secrets
           key: MINIO_SECRET_KEY
-    retentionPolicy: "90d"
+    retentionPolicy: "7d"
   
   monitoring:
     enablePodMonitor: false
