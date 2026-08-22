@@ -8,16 +8,16 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 echo "=== Velero Scope Check ==="
 
-# Check 1: Schedule muss Selector haben (kein MinIO, kein PostgreSQL)
-SELECTOR=$(kubectl get schedule daily-backup -n velero -o jsonpath='{.spec.template.labelSelector}' 2>/dev/null || echo '')
-if [ -z "$SELECTOR" ] || echo "$SELECTOR" | grep -q 'minio'; then
-  echo "❌ Velero Schedule hat keinen/falschen Selector!"
-  echo "   Erwartet: app In [n8n, celery-worker-pro]"
-  echo "   Gefunden: $SELECTOR"
+# Check 1: Schedule muss existieren + excludedNamespaces haben (kein monitoring)
+EXCLUDED=$(kubectl get schedule daily-backup -n velero -o jsonpath='{.spec.template.excludedNamespaces}' 2>/dev/null || echo '')
+if [ -z "$EXCLUDED" ] || ! echo "$EXCLUDED" | grep -q 'monitoring'; then
+  echo "❌ Velero Schedule hat keine excludedNamespaces!"
+  echo "   Erwartet: monitoring in excludedNamespaces"
+  echo "   Gefunden: $EXCLUDED"
   echo "   Deploy abgebrochen."
   exit 1
 fi
-echo "✅ Velero Schedule Selector korrekt: $SELECTOR"
+echo "✅ Velero Schedule excludedNamespaces korrekt: $EXCLUDED"
 
 # Check 2: MinIO muss opt-out Annotation haben
 MINIO_ANNOTATION=$(kubectl get statefulset minio -n "$NAMESPACE" -o jsonpath='{.spec.template.metadata.annotations.backup\.velero\.io/backup-volumes-excludes}' 2>/dev/null || echo '')
