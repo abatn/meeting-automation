@@ -1,0 +1,42 @@
+# Longhorn Settings — Single-Node Optimierungen
+# Reduziert Backup/Restore Parallelität und deaktiviert unnötige Features
+# Wird bei jedem CI/Deploy automatisch angewendet
+apiVersion: longhorn.io/v1beta1
+kind: Setting
+metadata:
+  name: upgrade-checker
+  namespace: longhorn-system
+spec:
+  value: "false"
+---
+apiVersion: longhorn.io/v1beta1
+kind: Setting
+metadata:
+  name: kubernetes-metrics-server-metrics-enabled
+  namespace: longhorn-system
+spec:
+  value: "false"
+---
+apiVersion: longhorn.io/v1beta1
+kind: Setting
+metadata:
+  name: backup-concurrent-limit
+  namespace: longhorn-system
+spec:
+  value: "1"
+---
+apiVersion: longhorn.io/v1beta1
+kind: Setting
+metadata:
+  name: restore-concurrent-limit
+  namespace: longhorn-system
+spec:
+  value: "1"
+---
+apiVersion: longhorn.io/v1beta1
+kind: Setting
+metadata:
+  name: snapshot-heavy-task-concurrent-limit
+  namespace: longhorn-system
+spec:
+  value: "1"

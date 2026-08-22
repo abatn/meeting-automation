@@ -1,0 +1,19 @@
+# CloudNativePG Operator — max-concurrent-reconciles Patch
+# Reduziert parallele Reconcile-Vorgänge von 10 auf 2 (Single-Node Optimierung)
+# Wird bei jedem CI/Deploy automatisch angewendet
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cnpg-cloudnative-pg
+  namespace: cnpg-system
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        args:
+        - controller
+        - --leader-elect
+        - --max-concurrent-reconciles=2
+        - --config-map-name=cnpg-controller-manager-config
+        - --webhook-port=9443

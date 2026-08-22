@@ -27,4 +27,8 @@ kubectl apply -f network-policies.yaml
 kubectl apply -f ingress-prod.yaml
 kubectl apply -f n8n-ingress.yaml
 
+# Operator-Patches (widerstehen Helm-Upgrade/CI-Deploy Verlust)
+kubectl apply -f cnpg-operator-patch.yaml
+kubectl apply -f longhorn-settings-patch.yaml
+
 echo "✅ Manifests applied"
