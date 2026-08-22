@@ -48,13 +48,13 @@ echo "✅ Manifests applied"
 echo ""
 echo "=== Verifikation: Operator-Patches ==="
 
-# CNPG Operator — max-concurrent-reconciles prüfen
+# CNPG Operator — max-concurrent-reconciles prüfen (dynamisch, kein hardcoded Index)
 if kubectl get deployment cnpg-cloudnative-pg -n cnpg-system &>/dev/null; then
-  CNPG_ARG=$(kubectl get deploy -n cnpg-system cnpg-cloudnative-pg -o jsonpath='{.spec.template.spec.containers[0].args[2]}' 2>/dev/null || echo "")
-  if echo "$CNPG_ARG" | grep -q "max-concurrent-reconciles=2"; then
+  CNPG_ALL_ARGS=$(kubectl get deploy -n cnpg-system cnpg-cloudnative-pg -o jsonpath='{.spec.template.spec.containers[0].args}' 2>/dev/null || echo "[]")
+  if echo "$CNPG_ALL_ARGS" | grep -q "max-concurrent-reconciles=2"; then
     echo "  ✅ CNPG Operator: max-concurrent-reconciles=2"
   else
-    echo "  ⚠️ CNPG Operator: max-concurrent-reconciles not set (got: $CNPG_ARG)"
+    echo "  ⚠️ CNPG Operator: max-concurrent-reconciles=2 not found in args: $CNPG_ALL_ARGS"
   fi
 else
   echo "  ⚠️ CNPG Operator deployment not found — verification skipped"
