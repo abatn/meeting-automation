@@ -40,13 +40,6 @@ else
   echo "⚠️ CNPG Operator deployment not found — skipping patch"
 fi
 
-# Longhorn Settings — nur anwenden wenn CRD existiert
-if kubectl get crd settings.longhorn.io &>/dev/null; then
-  kubectl apply -f longhorn-settings-patch.yaml 2>/dev/null || echo "⚠️ Longhorn Settings patch failed (CRD may have changed)"
-else
-  echo "⚠️ Longhorn Settings CRD not found — skipping patch"
-fi
-
 echo "✅ Manifests applied"
 
 # Post-Deploy Verifikation der Operator-Patches
@@ -79,30 +72,4 @@ if kubectl get deployment cnpg-cloudnative-pg -n cnpg-system &>/dev/null; then
   fi
 else
   echo "  ⚠️ CNPG Operator deployment not found — verification skipped"
-fi
-
-# Longhorn Settings — 5 Werte prüfen
-if kubectl get crd settings.longhorn.io &>/dev/null; then
-  LH_ERRORS=0
-  for setting in upgrade-checker kubernetes-metrics-server-metrics-enabled backup-concurrent-limit restore-concurrent-limit snapshot-heavy-task-concurrent-limit; do
-    value=$(kubectl get settings.longhorn.io "$setting" -n longhorn-system -o jsonpath='{.value}' 2>/dev/null || echo "NOT_FOUND")
-    case "$setting" in
-      upgrade-checker)                           expected="false" ;;
-      kubernetes-metrics-server-metrics-enabled) expected="false" ;;
-      backup-concurrent-limit)                   expected="1" ;;
-      restore-concurrent-limit)                  expected="1" ;;
-      snapshot-heavy-task-concurrent-limit)      expected="1" ;;
-    esac
-    if [ "$value" = "$expected" ]; then
-      echo "  ✅ Longhorn $setting: $value"
-    else
-      echo "  ⚠️ Longhorn $setting: expected=$expected got=$value"
-      LH_ERRORS=$((LH_ERRORS + 1))
-    fi
-  done
-  if [ "$LH_ERRORS" -gt 0 ]; then
-    echo "  ⚠️ $LH_ERRORS Longhorn setting(s) have unexpected values"
-  fi
-else
-  echo "  ⚠️ Longhorn CRD not found — verification skipped"
 fi

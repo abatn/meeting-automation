@@ -1,30 +1,10 @@
 #!/bin/bash
-# 05-install-infra.sh — Install Longhorn + KEDA + NetworkPolicy
+# 05-install-infra.sh — Install KEDA + NetworkPolicy
 # Env: NAMESPACE (default: meeting-automation)
 set -e
 
 NAMESPACE="${NAMESPACE:-meeting-automation}"
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-
-# Install Longhorn if not present (skip-if-exists)
-echo "=== Checking Longhorn ==="
-if kubectl get namespace longhorn-system &>/dev/null; then
-  echo "✅ longhorn-system namespace already exists — skipping Longhorn install"
-else
-  echo "📦 Installing Longhorn v1.12.0 on production..."
-  helm repo add longhorn https://charts.longhorn.io 2>/dev/null || true
-  helm repo update
-  helm install longhorn longhorn/longhorn \
-    --namespace longhorn-system \
-    --create-namespace \
-    --version 1.12.0 \
-    --set defaultSettings.defaultReplicaCount=1 \
-    --set defaultSettings.createDefaultDiskLabeledNodes=true \
-    --set defaultSettings.defaultClass=true \
-    --set defaultSettings.guaranteedInstanceManagerCPU=200 \
-    --wait --timeout 10m || echo "⚠️ Warning: Longhorn install failed, continuing deployment"
-  echo "✅ Longhorn v1.12.0 installed on production"
-fi
 
 # Install KEDA (skip if already running)
 echo "=== Checking KEDA ==="

@@ -8,25 +8,9 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 echo "=== Deploying System CronJobs ==="
 
-# longhorn-cleanup CronJob (only if longhorn-system namespace exists)
-if kubectl get namespace longhorn-system &>/dev/null; then
-  echo "longhorn-system namespace found — applying longhorn-cleanup CronJob"
-  kubectl apply -f "$MANIFESTS_DIR/system/longhorn-cleanup-cronjob.yaml" -n longhorn-system || {
-    echo "Warning: longhorn-cleanup CronJob failed (namespace may not have Longhorn installed yet)"
-  }
-else
-  echo "longhorn-system namespace not found — skipping longhorn-cleanup CronJob"
-  echo "To enable: install Longhorn first, then re-run this deployment"
-fi
-
 # Deploy System CronJobs (kube-system)
 kubectl apply -f "$MANIFESTS_DIR/system/ephemeral-storage-cleanup-cronjob.yaml" -n kube-system || echo "Warning: ephemeral-storage-cleanup failed"
 kubectl apply -f "$MANIFESTS_DIR/system/pod-garbage-collector-cronjob.yaml" -n kube-system || echo "Warning: pod-garbage-collector failed"
-
-# Deploy Longhorn CSI Autoscaler (reduced interval: 5min → 15min)
-if kubectl get namespace longhorn-system &>/dev/null; then
-  kubectl apply -f "$MANIFESTS_DIR/longhorn-csi-autoscaler.yaml" -n longhorn-system 2>/dev/null || echo "⚠️ CSI autoscaler already exists"
-fi
 
 # Deploy Image-Cleanup (systemd timer)
 echo "=== Deploying Image-Cleanup ==="
