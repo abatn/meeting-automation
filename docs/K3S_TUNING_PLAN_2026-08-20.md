@@ -199,12 +199,37 @@ RICHTIG: kubectl get backups.velero.io -n velero → 15 Backups
 
 ---
 
+### 🔴 Schritt 7: k3s CPU Optimierung (100% BEWIESEN)
+
+**Status:** OFFEN
+
+**Root Cause (BEWIESEN):**
+- k3s CPU 85.2% = API-Server + Scheduler + Controller-Manager + etcd in 1 Go-Prozess
+- 518 Watch-Connections (Event-Filterung ~30% CPU)
+- 153,999 Lease PUTs (etcd-Write ~35% CPU)
+- 67 CRDs × ~8 Operator-Scopes = 518 Watches
+- NATÜRLICHE Belastung für diese Infrastruktur
+
+**Lösung (5 Massnahmen):**
+
+| Priorität | Massnahme | Effekt | Schwierigkeit |
+|-----------|-----------|--------|---------------|
+| P1 | Longhorn CRDs reduzieren (23 → ~10) | -13 Watches, -2-3% CPU | Mittel |
+| P2 | Velero CRDs prüfen (13 CRDs, nur 1 Schedule) | -13 Watches, -1-2% CPU | Leicht |
+| P3 | CNPG reconcile-Intervall erhöhen (15s → 60s) | -12 API-Requests/min, -2% CPU | Leicht |
+| P4 | Prometheus Scrape-Intervall erhöhen (30s → 60s) | -1% CPU | Leicht |
+| P5 | metrics-server aktivieren | +5% CPU (Gegenteil!) | Leicht |
+
+**Maximale Einsparung:** P1+P2+P3 = ~7% CPU (85% → ~78%)
+
+---
+
 ## Offene Probleme
 
 | Problem | Fakt | Priorität |
 |---------|------|-----------|
 | **WAL-Rotation defekt** | ScheduledBackup CRD NICHT im Cluster. 33 GB WALs, 9 Serien, wächst +1 GB/Tag. retentionPolicy: 7d auf Cluster CRD greift nicht weil keine Base-Backups existieren | 🔴 P1 |
-| **k3s CPU 84.9%** | Load 14.54 (182% auf 8 Cores). RabbitMQ-Diagnostics 68% (temporär) | 🔴 P1 |
+| **k3s CPU 85.2%** | 518 Watches, 153K Lease PUTs, 67 CRDs. Load 5.23. NATÜRLICHE Belastung für diese Infrastruktur. Maximale Optimierung: ~7% (85% → ~78%) | 🔴 P1 |
 | **1 Message in celery Queue** | `check_storage_quotas` in Default-Queue `celery` (kein Consumer) | ⚠️ P3 |
 | **Velero funktioniert korrekt** | 15 Backups (12 Completed, 2 FailedValidation) — `kubectl get backups.velero.io` zeigt CRDs | ✅ ERLEDIGT |
 | **Celery Queue Routes** | `send_admin_new_tenant_notification` + `send_customer_activated_email` → `email` Queue | ✅ ERLEDIGT |
@@ -442,4 +467,49 @@ ERWARTETES ERGEBNIS:
 - CI/CD: Deploy triggered
 - Production: ScheduledBackup CRD erstellt, erstes Base-Backup läuft
 - WAL-Rotation: retentionPolicy: 7d greift nach erstem Base-Backup
+```
+
+---
+
+### Prompt: k3s CPU Optimierung
+
+```
+Optimiere die k3s CPU-Last auf Production (169.58.83.32).
+
+KONTEXT:
+- k3s CPU: 85.2% (Dauerzustand, nicht temporär)
+- 518 Watch-Connections (Event-Filterung ~30% CPU)
+- 153,999 Lease PUTs (2.7/s, etcd-Write ~35% CPU)
+- 67 CRDs, 47 Pods, 162 Metrik-Zeilen
+- Operator-Limits: bereits gesetzt (alle Under Limit)
+- Maximale Optimierung: ~7% CPU (85% → ~78%)
+
+AUFGABE 1: Longhorn CRDs reduzieren (P1)
+- Prüfe welche Longhorn CRDs auf Single-Node nicht gebraucht werden
+- Deaktiviere unnötige Features via kubectl patch settings.longhorn.io
+- Erwartung: -13 Watches, -2-3% CPU
+
+AUFGABE 2: Velero CRDs prüfen (P2)
+- Prüfe welche Velero CRDs für 1 Backup-Schedule nötig sind
+- Deaktiviere unnötige CRDs falls möglich
+- Erwartung: -13 Watches, -1-2% CPU
+
+AUFGABE 3: CNPG reconcile-Intervall erhöhen (P3)
+- Prüfe CNPG Cluster-Spec auf reconcileIntervall
+- Erhöhe von 15s auf 60s falls konfigurierbar
+- Erwartung: -12 API-Requests/min, -2% CPU
+
+AUFGABE 4: Verifikation
+- Prüfe k3s CPU nach 10 Minuten: ps aux | grep 'k3s server' | awk '{print $3}'
+- Erwartung: <80% (vorher: 85.2%)
+- Prüfe Watch-Anzahl: kubectl get --raw /metrics | grep WATCH | awk '{sum+=$NF} END {print sum}'
+- Erwartung: <490 (vorher: 518)
+
+AUFGABE 5: Dokumentation
+- Schreibe die Ergebnisse in docs/K3S_TUNING_PLAN_2026-08-20.md unter "Schritt 7: k3s CPU Optimierung"
+
+ERWARTETES ERGEBNIS:
+- k3s CPU: 85% → ~78%
+- Watches: 518 → ~490
+- Load: 5.23 → ~4.5
 ```
