@@ -1,0 +1,25 @@
+# Velero Schedule — Production
+# Sichert ALLE Ressourcen in meeting-automation (inkl. PVCs via Kopia FS-Backup)
+# MinIO-PVC ausgeschlossen (Self-Referenz-Verhinderung)
+# PostgreSQL → wird separat via pg_dump CronJob gesichert
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily-backup
+  namespace: velero
+spec:
+  schedule: "0 2 * * *"
+  useOwnerReferencesInBackup: false
+  template:
+    includedNamespaces:
+      - meeting-automation
+    excludedNamespaces:
+      - monitoring
+    ttl: 168h0m0s  # 7 Tage
+    storageLocation: default
+    defaultVolumesToFsBackup: true
+    excludedResources:
+      - events
+      - events.events.k8s.io
+    excludedVolumeAnnotations:
+      - backup.velero.io/backup-volumes-excludes
