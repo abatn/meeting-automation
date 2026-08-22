@@ -20,7 +20,7 @@ done
 kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml
 kubectl apply -f redis-deployment.yaml -f rabbitmq-statefulset.yaml -f minio-statefulset.yaml
 kubectl apply -f cnpg-cluster.yaml
-kubectl apply -f cnpg-scheduled-backup.yaml 2>/dev/null || echo "⚠️ ScheduledBackup already exists or CRD missing"
+kubectl apply --server-side -f cnpg-scheduled-backup.yaml 2>/dev/null || echo "⚠️ ScheduledBackup already exists or CRD missing"
 kubectl apply -f backend-deployment.yaml -f frontend-deployment.yaml -f onlyoffice-deployment.yaml -f n8n-deployment.yaml
 kubectl apply -f celery-worker-deployment.yaml -f celery-worker-pro-deployment.yaml -f celery-beat-deployment.yaml
 kubectl apply -f network-policies.yaml
@@ -46,7 +46,15 @@ echo "✅ Manifests applied"
 
 # Post-Deploy Verifikation der Operator-Patches
 echo ""
-echo "=== Verifikation: Operator-Patches ==="
+echo "=== Verifikation: Operator-Patches + ScheduledBackup ==="
+
+# CNPG ScheduledBackup — prüfe ob ScheduledBackup existiert
+if kubectl get scheduledbackup daily-backup -n meeting-automation &>/dev/null; then
+  SCHED=$(kubectl get scheduledbackup daily-backup -n meeting-automation -o jsonpath='{.spec.schedule}' 2>/dev/null)
+  echo "  ✅ CNPG ScheduledBackup: schedule=$SCHED"
+else
+  echo "  ⚠️ CNPG ScheduledBackup not found"
+fi
 
 # CNPG Operator — max-concurrent-reconciles prüfen (dynamisch, kein hardcoded Index)
 if kubectl get deployment cnpg-cloudnative-pg -n cnpg-system &>/dev/null; then
