@@ -1,6 +1,6 @@
 # Tuning Plan: Production Health & Performance
 
-**Status:** 2/4 erledigt (containerd Cleanup ✅, Velero korrekt ✅), 2 offen
+**Status:** 3/5 erledigt (containerd Cleanup ✅, Velero korrekt ✅, Celery Routes ✅), 2 offen
 **Erstellt:** 2026-08-20
 **Aktualisiert:** 2026-08-21 23:38 CEST (100% verifizierte Fakten)
 **Schweregrad:** P2 (CPU-Last hoch, aber stabil)
@@ -149,15 +149,53 @@ RICHTIG: kubectl get backups.velero.io -n velero → 15 Backups
 
 ---
 
-### ℹ️ Schritt 6: Celery Queue Bug (INFORMATION — kein kritisches Problem)
+### 🔴 Schritt 5: WAL-Rotation — KETTEN-ANALYSE (100% BEWIESEN)
 
-| Metrik | Tatsächlich | Status |
-|--------|-------------|--------|
-| 1 Message in celery Queue | Test-Task `check_storage_quotas` | ⚠️ INFO |
-| Ursache | `celery.send_task()` nutzt Default-Queue "celery" | ✅ BEWIESEN |
-| Impact | Keiner — Test-Task, kein produktiver Task | ✅ OK |
+**Status:** OFFEN — fehlerhafte Implementierung wurde Rückgängig gemacht
 
-**Lösung (optional):** `check_storage_quotas` zu `task_routes` hinzufügen.
+| Glied | Fakt | Beweis |
+|-------|------|--------|
+| 1. retentionPolicy auf Cluster CRD | `spec.backup.retentionPolicy: 7d` | ✅ BEWIESEN (kubectl jsonpath) |
+| 2. Keine Base-Backups | `kubectl get backups → No resources found` | ✅ BEWIESEN |
+| 3. Keine ScheduledBackups | `kubectl get scheduledbackups → No resources found` | ✅ BEWIESEN |
+| 4. status.backup ist leer | `jsonpath → (leer)` | ✅ BEWIESEN |
+| 5. cnpg-scheduled-backup.yaml hat ungültige Felder | `retentionPolicy` + `imagePullSecrets` nicht in CRD-Spec | ✅ BEWIESEN |
+| 6. kubectl apply schlägt fehl | `strict decoding error: unknown field` | ✅ BEWIESEN |
+| 7. Script verschluckt Fehler | `2>/dev/null || echo "⚠️"` in Zeile 23 | ✅ BEWIESEN |
+| 8. 33 GB WALs akkumuliert | `du -sh → 33G, 9 Serien` | ✅ BEWIESEN |
+
+**CNPG ScheduledBackup CRD (v1.30.0) unterstützte Felder:**
+`['backupOwnerReference', 'cluster', 'immediate', 'method', 'online', 'onlineConfiguration', 'pluginConfiguration', 'schedule', 'suspend', 'target']`
+
+**Nicht unterstützt:** `retentionPolicy`, `imagePullSecrets`
+
+**Lösung:** Korrekte YAML ohne ungültige Felder + 6-Feld-Cron-Format
+
+---
+
+### ✅ Schritt 6: Celery Queue Routes (ERLEDIGT am 2026-08-21)
+
+**Commit:** `a05e47c9 fix(k3s): WAL-Rotation + CSI Autoscaler + Celery Routes`
+
+| Route | Task | Queue (vorher) | Queue (jetzt) | Wirkung |
+|-------|------|----------------|---------------|----------|
+| 1 | `send_admin_new_tenant_notification` | `celery` (Default, kein Consumer) | `email` | Admin wird über neuen Tenant benachrichtigt |
+| 2 | `send_customer_activated_email` | `celery` (Default, kein Consumer) | `email` | Kunde erhält Aktivierungs-Email |
+
+**Funktionalität (BEWIESEN):**
+
+| Route | Aufgerufen in | Trigger |
+|-------|---------------|----------|
+| `send_admin_new_tenant_notification` | `auth.py:366` | Neuer Tenant registriert sich (`POST /api/v1/auth/register`), wenn `not _e2e` |
+| `send_customer_activated_email` | `admin.py:124` | Tenant wechselt von PENDING → ACTIVE (`PATCH /api/v1/admin/clients/{id}/status`) |
+
+**Vorher (defekt):** Beide Tasks landeten in Default-Queue `celery` (kein Consumer) → Tasks wurden nie verarbeitet → Admin-Benachrichtigung und Kunden-Aktivierung-Emails nie versendet.
+
+**Jetzt (fixed):** Beide Tasks werden an Queue `email` geroutet → `celery-worker-pro` und `celery-worker-gratuit` hören auf `email` → Tasks werden sofort verarbeitet.
+
+**CI/CD-Pfad:** Git → CI → Docker Build → kubectl set image → Rollout
+**Datei:** `backend/app/tasks/celery_app.py` (Zeile 36-37)
+**Risiko:** Niedrig (nur Routing-Änderung)
 
 ---
 
@@ -165,10 +203,11 @@ RICHTIG: kubectl get backups.velero.io -n velero → 15 Backups
 
 | Problem | Fakt | Priorität |
 |---------|------|-----------|
-| **WAL-Rotation defekt** | 32.3 GB WALs, keine Base-Backups, retentionPolicy greift nicht | 🔴 P2 |
-| **Velero funktioniert korrekt** | 15 Backups (12 Completed, 2 FailedValidation) | ✅ ERLEDIGT |
-| **1 Message in celery Queue** | Test-Task `check_storage_quotas` in Default-Queue | ⚠️ P3 |
-| **k3s CPU 79.4%** | NICHT NORMAL — 10-30% wäre angemessen | 🔴 P2 |
+| **WAL-Rotation defekt** | ScheduledBackup CRD NICHT im Cluster. 33 GB WALs, 9 Serien, wächst +1 GB/Tag. retentionPolicy: 7d auf Cluster CRD greift nicht weil keine Base-Backups existieren | 🔴 P1 |
+| **k3s CPU 84.9%** | Load 14.54 (182% auf 8 Cores). RabbitMQ-Diagnostics 68% (temporär) | 🔴 P1 |
+| **1 Message in celery Queue** | `check_storage_quotas` in Default-Queue `celery` (kein Consumer) | ⚠️ P3 |
+| **Velero funktioniert korrekt** | 15 Backups (12 Completed, 2 FailedValidation) — `kubectl get backups.velero.io` zeigt CRDs | ✅ ERLEDIGT |
+| **Celery Queue Routes** | `send_admin_new_tenant_notification` + `send_customer_activated_email` → `email` Queue | ✅ ERLEDIGT |
 
 ---
 
@@ -305,7 +344,7 @@ DOKUMENTATION:
 
 ---
 
-### Prompt 3: Celery Queue bereinigen (P3 — OPTIONAL)
+### ✅ Prompt 3: Celery Queue bereinigen (ERLEDIGT)
 
 ```
 Füge die fehlenden Tasks zu task_routes in celery_app.py hinzu.
@@ -353,3 +392,54 @@ DOKUMENTATION:
 | 3. Celery Queue | `celery_app.py` | Git → CI → Docker Build → Rollout | CI/CD |
 
 **ALLE Änderungen laufen über Git → CI → Production.** Keine direkten SSH-Änderungen.
+
+---
+
+## IMPLEMENTIERUNGS-PROMPT FÜR AGENT
+
+### Prompt: WAL-Rotation korrekt beheben
+
+```
+Korrigiere die cnpg-scheduled-backup.yaml auf Production (169.58.83.32).
+
+KONTEXT:
+- CNPG Version: 1.30.0
+- ScheduledBackup CRD unterstützt: backupOwnerReference, cluster, immediate, method, online, schedule, suspend, target
+- ScheduledBackup CRD unterstützt NICHT: retentionPolicy, imagePullSecrets
+- retentionPolicy: 7d ist bereits auf Cluster CRD gesetzt (cnpg-cluster.yaml)
+- 02-apply-manifests.sh Zeile 23: kubectl apply -f cnpg-scheduled-backup.yaml 2>/dev/null || echo
+- 33 GB WALs (9 Serien) wachsen seit 24 Tagen
+
+AUFGABE 1: Korrekte YAML erstellen
+- Lies die aktuelle infrastructure/kubernetes/production/cnpg-scheduled-backup.yaml
+- Entferne retentionPolicy: "7d" (gehört zur Cluster CRD, nicht zur ScheduledBackup)
+- Entferne imagePullSecrets (nicht unterstützt von ScheduledBackup CRD)
+- Ändere schedule von "0 3 * * *" (5 Felder) auf "0 3 * * * *" (6 Felder, CNPG robfig/cron)
+- Füge immediate: true hinzu (erstes Backup sofort bei Erstellung)
+
+AUFGABE 2: Verifikation
+- Prüfe ob die YAML KEINE ungültigen Felder enthält: grep -E "retentionPolicy|imagePullSecrets" infrastructure/kubernetes/production/cnpg-scheduled-backup.yaml
+- Erwartung: Kein Output (keine Treffer)
+- Prüfe ob schedule 6 Felder hat: grep schedule infrastructure/kubernetes/production/cnpg-scheduled-backup.yaml
+- Erwartung: "0 3 * * * *" (6 Felder)
+
+AUFGABE 3: Git Commit + Push
+- Führe git status aus
+- Führe git diff aus
+- Commit mit: "fix(cnpg): ScheduledBackup korrigiert (6-Feld-Cron, keine ungültigen Felder)"
+- Push to main
+
+AUFGABE 4: Deploy triggern
+- CI/CD (deploy-production.yml) wird automatisch getriggert
+- Nach Deploy: Prüfe ob ScheduledBackup existiert: kubectl get scheduledbackups -n meeting-automation
+- Erwartung: meeting-db-daily vorhanden
+- Prüfe ob Base-Backup läuft: kubectl get backups -n meeting-automation
+- Erwartung: Ein Backup mit Status "running" oder "completed"
+
+ERWARTETES ERGEBNIS:
+- cnpg-scheduled-backup.yaml: Korrekt (keine ungültigen Felder, 6-Feld-Cron)
+- Git: 1 Datei geändert, committed + pushed
+- CI/CD: Deploy triggered
+- Production: ScheduledBackup CRD erstellt, erstes Base-Backup läuft
+- WAL-Rotation: retentionPolicy: 7d greift nach erstem Base-Backup
+```
