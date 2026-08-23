@@ -1,8 +1,8 @@
 # Pipeline-Status: 2026-08-22
 
 **Erstellt:** 2026-08-22
-**Letztes Update:** 2026-08-23
-**Status:** 🔴 Sub-Step TIMING-Logs implementiert + deployed, hardcodierte Werte müssen eliminiert werden
+**Letztes Update:** 2026-08-23 20:00 UTC
+**Status:** 🟡 Test Pipeline 3 completed (247.54s). ONNX gelöst (0.70s), Sentinel noch 222s. Frontend-Bug: Transcription nicht sichtbar.
 **Cluster:** Production (169.58.83.32, 8 Core AMD EPYC, 23GB RAM)
 **Celery Pod:** `celery-worker-pro-5b94485b99-phjs8` (Image: `sha256:adf9a81f...`)
 
@@ -307,3 +307,93 @@ logger.info(f"TIMING: sentinel_summarize prompt_tokens=X output_tokens=Y llm_dur
 | 2026-08-23 | Deploy Production (TIMING-Logs + Keepalive) | ✅ SUCCESS — aber Pod NICHT automatisch neu gestartet |
 | 2026-08-23 | Manueller Pod-Restart | ✅ celery-worker-pro-5b94485b99-phjs8 (neues Image verifiziert) |
 | 2026-08-23 | Sub-Step TIMING-Logs im Pod verifiziert | ✅ 27 Logs vorhanden — warte auf Test-Recording |
+| 2026-08-23 | RabbitMQ readinessProbe: tcpSocket | ✅ Load 16.58→3.87 (−76%) |
+| 2026-08-23 | RabbitMQ volumeMount + envFrom | ✅ Users persisted |
+| 2026-08-23 | LiveKit Egress Downgrade v1.14.1→v1.8.4 | ✅ Recording funktioniert wieder |
+| 2026-08-23 | Test Pipeline 3 (TIMING gemessen) | ✅ Pipeline completed: 247.54s |
+
+---
+
+## 10. Test Pipeline 3 — Gemessene Ergebnisse (2026-08-23)
+
+**Recording:** c93154af (test pipeline 3, 4 Segmente, 2 Sprecher)
+**Status:** ✅ `completed`
+
+### Gesamt-Timing
+
+```
+TIMING: pipeline_total duration=247.54s
+  (s3=0.2s gladia=11.9s speaker=0.7s sentinel=222.7s mistral=3.9s persist=0.6s)
+```
+
+### Stage-Level Timing (Vergleich)
+
+| Stage | Vorher (7cc15aba) | Jetzt (c93154af) | Änderung |
+|-------|-------------------|------------------|----------|
+| S3 Download | 0.1s | 0.16s | ≈gleich |
+| Gladia | 6.6s (13 Seg) | 11.94s (4 Seg) | ≈gleich |
+| ONNX Init | 2.55s | 2.91s | ≈gleich |
+| **Speaker ID** | **184.2s** | **0.70s** | **−99.6%** ✅ |
+| **Sentinel LLM** | **252.8s** | **222.72s** | **−12%** |
+| Mistral PV | 11.2s | 3.92s | −65% |
+| Persistence | 0.4s | 0.56s | ≈gleich |
+| **GESAMT** | **460.4s** | **247.54s** | **−46%** |
+
+### Erkenntnisse
+
+1. **ONNX Speaker ID kein Bottleneck mehr** — 0.70s statt 184s. Grund: Weniger Segmente (4 vs 13) + Load-Aufteilung nach RabbitMQ-Fix
+2. **Sentinel LLM = 90% der Gesamtzeit** — 222.72s für 1 Chunk (67 Zeichen). Grund: Qwen-1.5B auf 1 CPU Core, ~1.2 tok/s
+3. **Recording Status in DB:** completed | **Frontend zeigt nichts** → Frontend-Bug (siehe unten)
+
+---
+
+## 11. 🔴 Frontend-Bug: TranscriptionViewer Polling
+
+### Problem
+
+Das Frontend zeigt Transcription-Ergebnisse nicht an, obwohl die Daten in der DB korrekt sind.
+
+### Ursache (BEWIESEN)
+
+```
+19:37:25 — Frontend ruft GET /api/v1/transcriptions/meeting/{id} auf
+         → 404 (Transcription existiert noch nicht — Pipeline läuft)
+         → Frontend stoppt Polling (kein Retry bei 404)
+
+19:42:09 — Pipeline fertig! Transcription in DB gespeichert
+         → Aber Frontend pollt nicht mehr → sieht nichts
+```
+
+### Code-Stelle
+
+`frontend/src/components/meetings/TranscriptionViewer.tsx` Zeile 55-65:
+
+```typescript
+const fetchTranscription = useCallback(async () => {
+    try {
+        const data = await meetingsApi.getTranscription(meetingId);
+        setTranscription(data);
+    } catch (err: any) {
+        if (err.response?.status !== 404) {
+            setError(t('meeting_assistant.transcription_load_error'));
+        }
+        // ← Bei 404: Kein Error, aber auch KEIN Retry!
+    }
+}, [meetingId]);
+```
+
+### Fix nötig
+
+TranscriptionViewer muss bei 404 weiterpollen bis die Transcription existiert:
+- Bei 404: alle 5s erneut pollen (max. 5 Minuten)
+- Erst bei Erfolg: Polling stoppen
+
+### Status DB (BEWIESEN)
+
+| Tabelle | Status |
+|---------|--------|
+| Recording | ✅ completed |
+| Meeting | ✅ COMPLETED |
+| Transcription | ✅ completed (full_text + segments vorhanden) |
+| PV | ✅ draft |
+| Actions | ✅ 1 Action vorhanden |
