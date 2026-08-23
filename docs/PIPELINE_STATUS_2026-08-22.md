@@ -122,22 +122,22 @@ _process_recording_pipeline (transcription_tasks.py)
 │   └── speaker_embedding_service.initialize()
 │
 ├── 4. Speaker ID (_identify_speakers)                  ~184s ← KRITISCH
+│   ├── TIMING: speaker_id_profile_load                ~0.1s (DB Query)
 │   ├── process_single_speaker() (pro Sprecher)
-│   │   ├── _extract_speaker_embedding()
-│   │   │   ├── ffmpeg extract + concat (13 Segmente)   ~???
-│   │   │   └── extract_embedding()
-│   │   │       ├── librosa.load()                      ~???
-│   │   │       ├── _extract_fbank_features()           ~??? (Python-Loop)
-│   │   │       └── ONNX session.run()                  ~??? (8 Threads → thrashing)
+│   │   ├── TIMING: speaker_{label}_embedding          ~???s
+│   │   │   ├── TIMING: ffmpeg_extract_concat          ~???s (13 Segmente parallel)
+│   │   │   └── TIMING: onnx_embed                     ~???s (librosa + fbank + ONNX)
 │   │   ├── Signal Collection
 │   │   │   ├── LiveKit Identity (String-Match)         ~0s
 │   │   │   ├── Heuristic (_match_speaker_to_participant) ~0s
 │   │   │   ├── ONNX Audio Matching (cosine distance)   ~0.1s
 │   │   │   ├── Regex Self-Introduction                 ~0s
 │   │   │   └── Mistral Fusion (HTTP API)               ~???
-│   │   └── Aggregation + Validation                    ~0.1s
-│   ├── Exclusivity Check                               ~0.1s
-│   └── Enrollment (DB Write)                           ~1s
+│   │   └── TIMING: speaker_{label}_signals            ~???s (inkl. Mistral)
+│   ├── TIMING: speaker_id_process_speakers            ~???s (Gesamt)
+│   ├── TIMING: speaker_id_exclusivity                 ~0.01s
+│   └── TIMING: speaker_id_enrollment                  ~1s (DB Write + Audit)
+│   └── TIMING: speaker_id_total                       ~184s
 │
 ├── 5. ONNX Segment Reassignment (13× sequentiell)     ~???
 │   └── for seg in segments:
@@ -146,11 +146,13 @@ _process_recording_pipeline (transcription_tasks.py)
 │       └── match_speaker_from_list                     ~0.1s
 │
 ├── 6. Sentinel LLM (MAP Phase)                         ~252s ← KRITISCH
-│   ├── Cold Start (Qwen-1.5B laden)                    ~0-3s
-│   ├── Chunking (3000 chars)                            ~0s
-│   └── summarize_chunk()
-│       ├── Prompt Prefill                               ~39s
-│       └── Token Generation (256 tokens)               ~213s
+│   ├── TIMING: sentinel_plan_check                     ~0.1s (DB Query)
+│   ├── TIMING: sentinel_chunks count=1 text_len=785    ~0s (Chunking)
+│   ├── TIMING: sentinel_cold_start                     ~0-3s (Qwen-1.5B laden)
+│   ├── TIMING: sentinel_summarize                      ~???s (pro Chunk)
+│   │   ├── Prompt Prefill                              ~39s
+│   │   └── Token Generation (256 tokens)               ~213s
+│   └── TIMING: sentinel_gather                         ~???s (Gesamt)
 │
 ├── 7. Mistral PV (REDUCE Phase)                        ~11.2s
 │   └── PVService.generate_pv()
@@ -209,18 +211,36 @@ logger.info(f"TIMING: persistence duration={persist_duration:.2f}s")
 logger.info(f"TIMING: pipeline_total duration={duration:.2f}s")
 ```
 
-### Sub-Step Level (NEU — 2026-08-22)
+### Sub-Step Level — Speaker ID (NEU — 2026-08-22)
 
 ```python
-# transcription_tasks.py — Speaker ID
-logger.info(f"TIMING: speaker_{speaker_label}_embedding duration={_emb_dur:.2f}s")
-logger.info(f"TIMING: ffmpeg_extract_concat duration={_ffmpeg_dur:.2f}s segments={len(segments_for_service)}")
-logger.info(f"TIMING: onnx_embed duration={_onnx_dur:.2f}s")
-logger.info(f"TIMING: speaker_{speaker_label}_signals duration=...s mistral_triggered={_mistral_triggered} mistral_dur={_mistral_dur:.2f}s")
+# _identify_speakers (transcription_tasks.py)
+logger.info(f"TIMING: speaker_id_profile_load duration=...s profiles=N with_embeddings=N candidates=[...]")  # DB Query
+logger.info(f"TIMING: speaker_id_process_speakers duration=...s speakers=N")                               # Gesamt für alle Speaker
+logger.info(f"TIMING: speaker_id_exclusivity duration=...s assigned=N")                                     # Name-Assignment
+logger.info(f"TIMING: speaker_id_enrollment duration=...s enrolled=N consent=yes/no")                      # DB Write + Audit
+logger.info(f"TIMING: speaker_id_total duration=184.2s speakers=1 resolved=N")                             # Gesamt
 
-# sentinel_service.py — Sentinel LLM
-logger.info(f"TIMING: sentinel_cold_start duration={_init_dur:.2f}s model={self.model_path}")
-logger.info(f"TIMING: sentinel_summarize prompt_tokens={_prompt_tokens} output_tokens={_output_tokens} llm_dur={_llm_dur:.2f}s tok_per_sec={_tok_per_sec:.1f}")
+# process_single_speaker (pro Sprecher)
+logger.info(f"TIMING: speaker_{label}_embedding duration=...s")                                             # ffmpeg + librosa + fbank + ONNX
+logger.info(f"TIMING: speaker_{label}_signals duration=...s mistral_triggered=True mistral_dur=...s")       # Signals + Mistral Fusion
+
+# _extract_speaker_embedding
+logger.info(f"TIMING: ffmpeg_extract_concat duration=...s segments=13")                                     # ffmpeg alone
+logger.info(f"TIMING: onnx_embed duration=...s")                                                           # librosa + fbank + ONNX alone
+```
+
+### Sub-Step Level — Sentinel LLM (NEU — 2026-08-22)
+
+```python
+# _process_recording_pipeline (transcription_tasks.py)
+logger.info(f"TIMING: sentinel_plan_check duration=...s plan=PRO")                                          # DB Query
+logger.info(f"TIMING: sentinel_chunks count=1 text_len=785")                                                # Chunking
+logger.info(f"TIMING: sentinel_gather duration=...s chunks=1 summaries=1")                                  # Gesamt Gather
+
+# sentinel_service.py
+logger.info(f"TIMING: sentinel_cold_start duration=...s model=...")                                         # Qwen-1.5B Laden (1. Mal)
+logger.info(f"TIMING: sentinel_summarize prompt_tokens=X output_tokens=Y llm_dur=...s tok_per_sec=Z")      # Pro Chunk
 ```
 
 ---
@@ -229,12 +249,12 @@ logger.info(f"TIMING: sentinel_summarize prompt_tokens={_prompt_tokens} output_t
 
 | Frage | Status |
 |-------|--------|
-| Wie viel von den 184s kommt von ffmpeg vs ONNX vs Mistral Fusion? | ⏳ Warte auf Sub-Step TIMING Logs |
-| Wie viel von den 252s kommt von Cold Start vs Prefill vs Token Gen? | ⏳ Warte auf Sub-Step TIMING Logs |
+| Wie viel von den 184s kommt von ffmpeg vs ONNX vs Mistral Fusion? | ⏳ Warte auf Test-Recording (TIMING-Logs implementiert) |
+| Wie viel von den 252s kommt von Cold Start vs Prefill vs Token Gen? | ⏳ Warte auf Test-Recording (TIMING-Logs implementiert) |
 | ONNX Thread-Thrashing: Lohnt sich `intra_op_num_threads=1`? | ⏳ Warte auf Benchmark |
 | Sentinel: Lohnt sich `n_threads=1` + `max_tokens=128`? | ⏳ Warte auf Benchmark |
 | Celery Concurrency 8→1: Reduziert CPU-Kontention? | ⏳ Warte auf Test |
-| Mistral Fusion: Wird sie überhaupt getriggert? (score < 0.65?) | ⏳ Warte auf TIMING Logs |
+| Mistral Fusion: Wird sie überhaupt getriggert? (score < 0.65?) | ⏳ Warte auf Test-Recording (TIMING-Logs implementiert) |
 
 ---
 
@@ -250,4 +270,7 @@ logger.info(f"TIMING: sentinel_summarize prompt_tokens={_prompt_tokens} output_t
 | 2026-08-12 | Early S3 Download | ❌ NICHT implementiert |
 | 2026-08-12 | Speaker Batch sleep(0.1) entfernen | ❌ NICHT implementiert |
 | 2026-08-22 | Celery prefetch_multiplier=1 + task_acks_late=True | ✅ Implementiert |
-| 2026-08-22 | Sub-Step TIMING-Logs (Speaker ID + Sentinel) | ✅ Implementiert (commit baa9239d) |
+| 2026-08-22 | Sub-Step TIMING-Logs (Speaker ID + Sentinel) | ✅ Implementiert |
+| 2026-08-22 | Speaker ID Sub-Step TIMING komplett | ✅ Implementiert (commit d52b1c14) |
+| 2026-08-22 | Sentinel Sub-Step TIMING komplett | ✅ Implementiert (commit 14738738) |
+| 2026-08-22 | Pipeline-Status Dokumentation | ✅ Implementiert (commit c987c67a) |
