@@ -1,9 +1,9 @@
 # Tuning Plan: Production Health & Performance
 
-**Status:** 3/5 erledigt (containerd Cleanup ✅, Velero korrekt ✅, Celery Routes ✅), 2 offen
+**Status:** 4/8 erledigt (containerd Cleanup ✅, Operator Limits ✅, Celery Routes ✅, CNPG/Longhorn Patches ✅), 4 offen
 **Erstellt:** 2026-08-20
-**Aktualisiert:** 2026-08-21 23:38 CEST (100% verifizierte Fakten)
-**Schweregrad:** P2 (CPU-Last hoch, aber stabil)
+**Aktualisiert:** 2026-08-22 13:12 CEST (100% verifizierte Fakten)
+**Schweregrad:** P1 (Velero PVCs NICHT gesichert — kritisches Sicherheitsloch)
 
 ---
 
@@ -129,23 +129,60 @@ GESAMT:        ~219%  (17.6 Cores)  → Load 4.59 auf 8 Cores
 
 ---
 
-### ✅ Schritt 5: Velero Backups (ERLEDIGT — funktioniert korrekt!)
+### 🔴 Schritt 5: Velero Backups (KRITISCH — PVCs werden NICHT gesichert!)
+
+**Status:** OFFEN — Velero läuft, aber schützt NICHT die wichtigsten Daten
 
 | Metrik | Erwartung | Tatsächlich | Status |
 |--------|-----------|-------------|--------|
-| Backup-CRDs | >0 | **15** | ✅ BEWIESEN |
-| Completed | >0 | **12** | ✅ BEWIESEN |
-| FailedValidation | 0 | **2** | ⚠️ INFO |
-| Heutiges Backup | — | **daily-backup-20260821020000 Completed** | ✅ BEWIESEN |
+| Backup-CRDs | >0 | **17** | ✅ BEWIESEN |
+| Daily-Backup Items | Alle Pods | **20** (nur n8n + celery-worker-pro) | ⚠️ EINGESCHRÄNKT |
+| Pre-Deploy Items | Alle Pods | **212** (alle Ressourcen) | ✅ OK |
+| snapshotVolumes | true | **false** (nicht gesetzt) | ❌ PVCs NICHT gesichert |
+| VolumeSnapshotClasses | >0 | **KEINE** | ❌ Kein CSI-Snapshot |
 | BSL Status | Available | **Available** | ✅ BEWIESEN |
 
-**Bewertung:** Velero funktioniert KORREKT. Das "0 Backups" Problem lag an einem API-Gruppen-Bug:
+**🔴 KRITISCHER FEHLER: PVCs werden NICHT gesichert**
+
 ```
-FALSCH: kubectl get backups → 0 Ergebnisse
-RICHTIG: kubectl get backups.velero.io -n velero → 15 Backups
+snapshotVolumes: false (nicht gesetzt)
+VolumeSnapshotClasses: KEINE im Cluster
+→ Velero macht KEIN PVC-Backup!
+→ Bei Node-Fail: Alle PVCs verloren
 ```
 
-**Empfehlung:** Monitoring/Alerting für FailedValidation einrichten.
+**Was tatsächlich gesichert wird:**
+
+| Backup-Typ | Items | Enthalten |
+|------------|-------|----------|
+| Daily-Backup | 20 | n8n + celery-worker-pro Pods + Services + ConfigMaps + Secrets |
+| Pre-Deploy | 212 | ALLE Ressourcen im Namespace (Deployments, Services, etc.) |
+| PostgreSQL | pg_dump | Nur DB-Daten (kein WAL-Archiv) |
+
+**Was NICHT gesichert wird:**
+
+| Ressource | Grund | Risiko |
+|-----------|-------|--------|
+| ❌ PVCs (MinIO, RabbitMQ, Prometheus, Alertmanager) | Keine CSI-Snapshots, `snapshotVolumes: false` | Bei Node-Fail → Daten verloren |
+| ❌ 33 GB WAL-Archiv | Kein Cleanup, kein Backup | Bei Node-Fail → WAL-Archiv verloren |
+| ⚠️ Backend/Frontend Deployments | Kein `app=n8n` oder `celery-worker-pro` Label | Aus Git wiederherstellbar |
+| ⚠️ Redis, LiveKit | Kein passendes Label | Aus Git wiederherstellbar |
+
+**Velero Label Selector (BEWIESEN):**
+```yaml
+labelSelector:
+  matchExpressions:
+  - key: app
+    operator: In
+    values:
+    - n8n
+    - celery-worker-pro
+```
+
+**Empfehlung:**
+1. **SOFORT:** VolumeSnapshotClass für Longhorn erstellen + `snapshotVolumes: true` in Velero Schedule setzen
+2. **Kürzlich:** ScheduledBackup für CNPG erstellen (WAL-Rotation)
+3. **Optional:** Offsite-Backup (externes S3) einrichten
 
 ---
 
@@ -228,11 +265,12 @@ RICHTIG: kubectl get backups.velero.io -n velero → 15 Backups
 
 | Problem | Fakt | Priorität |
 |---------|------|-----------|
-| **WAL-Rotation defekt** | ScheduledBackup CRD NICHT im Cluster. 33 GB WALs, 9 Serien, wächst +1 GB/Tag. retentionPolicy: 7d auf Cluster CRD greift nicht weil keine Base-Backups existieren | 🔴 P1 |
-| **k3s CPU 85.2%** | 518 Watches, 153K Lease PUTs, 67 CRDs. Load 5.23. NATÜRLICHE Belastung für diese Infrastruktur. Maximale Optimierung: ~7% (85% → ~78%) | 🔴 P1 |
-| **1 Message in celery Queue** | `check_storage_quotas` in Default-Queue `celery` (kein Consumer) | ⚠️ P3 |
-| **Velero funktioniert korrekt** | 15 Backups (12 Completed, 2 FailedValidation) — `kubectl get backups.velero.io` zeigt CRDs | ✅ ERLEDIGT |
-| **Celery Queue Routes** | `send_admin_new_tenant_notification` + `send_customer_activated_email` → `email` Queue | ✅ ERLEDIGT |
+| **🔴 Velero PVCs NICHT gesichert** | `snapshotVolumes: false`, keine VolumeSnapshotClasses. Daily-Backup nur 20 Items (n8n + celery-worker-pro). Bei Node-Fail: Alle PVCs verloren (MinIO 37GB, RabbitMQ, Prometheus, Alertmanager) | 🔴 P1 |
+| **🔴 WAL-Rotation defekt** | ScheduledBackup CRD NICHT im Cluster. 33 GB WALs, 9 Serien, wächst +1 GB/Tag. retentionPolicy: 7d auf Cluster CRD greift nicht weil keine Base-Backups existieren | 🔴 P1 |
+| **🟡 k3s CPU 85.2%** | 518 Watches, 153K Lease PUTs, 67 CRDs. NATÜRLICHE Belastung für diese Infrastruktur. Maximale Optimierung: ~7% (85% → ~78%) | 🟡 P2 |
+| **🟡 Kein Offsite-Backup** | MinIO Single-Node + Velero → MinIO. Bei Node-Fail: App + Backups verloren | 🟡 P2 |
+| **⚠️ 1 Message in celery Queue** | `check_storage_quotas` in Default-Queue `celery` (kein Consumer) | ⚠️ P3 |
+| **✅ Celery Queue Routes** | `send_admin_new_tenant_notification` + `send_customer_activated_email` → `email` Queue | ✅ ERLEDIGT |
 
 ---
 
@@ -240,12 +278,13 @@ RICHTIG: kubectl get backups.velero.io -n velero → 15 Backups
 
 | Ziel | Aktuell | Status |
 |------|---------|--------|
+| PVCs gesichert | `snapshotVolumes: false` | ❌ NICHT ERREICHT |
+| WAL-Rotation | defekt (33 GB) | ❌ NICHT ERREICHT |
+| Disk < 60% | 41% | ✅ ERREICHT |
+| Velero Backups | 17 (aber ohne PVCs) | ⚠️ TEILWEISE |
 | Load Average < 5 | 9.63 | ❌ HOCH |
-| k3s CPU < 30% | 79.4% | ❌ NICHT NORMAL |
-| Watches < 100 | 160+ | ❌ HOCH |
-| Disk < 60% | 38% | ✅ ERREICHT |
-| WAL-Retention | defekt | ❌ NICHT ERREICHT |
-| Velero Backups | 15 | ✅ FUNKTIONIERT |
+| k3s CPU < 30% | 85.2% | ❌ NICHT NORMAL |
+| Watches < 100 | 518 | ❌ HOCH |
 | Pipeline < 180s | unbekannt | ❓ ZU TESTEN |
 
 ---
@@ -260,37 +299,90 @@ RICHTIG: kubectl get backups.velero.io -n velero → 15 Backups
 | 2026-08-21 | ✅ Schritt 2: WAL-Retention 7d (aber Rotation defekt!) |
 | 2026-08-21 | ✅ Schritt 3: Operator Limits (4x) |
 | 2026-08-21 21:17 | ❌ k3s-Restart → KEIN EFFEKT auf CPU |
-| 2026-08-21 23:38 | ✅ Velero: 15 Backups gefunden (API-Gruppen-Bug behoben) |
-| 2026-08-21 23:38 | Messung: Load 4.59, k3s 80.0%, Watches 160 |
+| 2026-08-21 23:38 | ✅ Velero: 17 Backups gefunden (API-Gruppen-Bug behoben) |
+| 2026-08-22 13:12 | 🔴 **KRITISCH:** Velero PVCs NICHT gesichert (`snapshotVolumes: false`) |
+| 2026-08-22 13:12 | 🔴 **KRITISCH:** Keine VolumeSnapshotClasses im Cluster |
+| 2026-08-22 13:12 | 🔴 **KRITISCH:** Daily-Backup nur 20 Items (nur n8n + celery-worker-pro) |
 
 ---
 
 ## Fazit
 
 ```
-ERGEBNIS: k3s CPU 79.4% ist NICHT NORMAL (erwartet: 10-30%)
+ERGEBNIS: Velero schützt PVCs NICHT — kritisches Sicherheitsloch!
 
 BESTÄTIGT:
 1. containerd Cleanup ✅ (-88 GB)
-2. Velero funktioniert korrekt ✅ (15 Backups)
-3. Operator Limits gesetzt ✅
+2. Operator Limits gesetzt ✅
+3. Celery Queue Routes ✅
+4. CNPG updateInterval 60 ✅
+5. Longhorn Settings ✅
 
 OFFENE PROBLEME:
-1. WAL-Rotation defekt (32.3 GB) → P2 (ScheduledBackup fehlt)
-2. k3s CPU 79.4% → P2 (Prometheus + CSI Optimierung)
-3. 1 Message in celery Queue → P3 (Test-Task, kein Bug)
+1. 🔴 Velero PVCs NICHT gesichert → P1 (VolumeSnapshot fehlt)
+2. 🔴 WAL-Rotation defekt (33 GB) → P1 (ScheduledBackup fehlt)
+3. 🟡 k3s CPU 85.2% → P2 (Prometheus + CSI Optimierung)
+4. 🟡 Kein Offsite-Backup → P2 (Single-Point-of-Failure)
+5. ⚠️ 1 Message in celery Queue → P3 (Test-Task, kein Bug)
 
 EMPFEHLUNG:
-1. Sofort: ScheduledBackup erstellen → WAL-Rotation aktivieren
-2. Kürzlich: Prometheus Scrape 60s + CSI Autoscaler 15 Min
-3. Optional: Longhorn CRDs reduzieren
+1. SOFORT: Velero PVC-Backup aktivieren (VolumeSnapshotClass + snapshotVolumes: true)
+2. SOFORT: ScheduledBackup erstellen → WAL-Rotation aktivieren
+3. Kürzlich: Prometheus Scrape 60s + CSI Autoscaler 15 Min
+4. Optional: Offsite-Backup (externes S3) einrichten
 ```
 
 ---
 
 ## IMPLEMENTIERUNGS-PROMPTS FÜR AGENT (mit CI/CD-Pfad)
 
-### Prompt 1: WAL-Rotation fixen (P2 — SOFORT)
+### Prompt 1: Velero PVC-Backup aktivieren (P1 — SOFORT)
+
+```
+Aktiviere PVC-Backups in Velero auf Production (169.58.83.32) via Git → CI/CD.
+
+KONTEXT:
+- Velero läuft mit daily-backup Schedule (0 2 * * *)
+- snapshotVolumes: false (nicht gesetzt) → PVCs werden NICHT gesichert
+- Keine VolumeSnapshotClasses im Cluster
+- MinIO PVC (37GB), RabbitMQ, Prometheus, Alertmanager → bei Node-Fail verloren
+- StorageClass: rancher.io/local-path (k3s built-in)
+
+AUFGABE 1: VolumeSnapshotClass für Longhorn erstellen
+- Erstelle infrastructure/kubernetes/production/longhorn-snapshot-class.yaml
+- Inhalt: VolumeSnapshotClass mit driver: driver.longhorn.io, deletionPolicy: Delete
+- Prüfe ob Longhorn CSI-Snapshot-Feature aktiv ist: kubectl get settings.longhorn.io -n longhorn-system | grep snapshot
+
+AUFGABE 2: Velero Schedule anpassen
+- Prüfe ob CSI-Snapshots unterstützt werden: kubectl get volumesnapshotclasses
+- Falls JA: Setze snapshotVolumes: true im daily-backup Schedule via kubectl patch
+- Falls NEIN: Erstelle VolumeSnapshotClass zuerst
+- Optional: Entferne labelSelector oder erweitere auf alle Pods
+
+AUFGABE 3: Git Commit + Push
+- Erstelle die YAML-Datei in infrastructure/kubernetes/production/
+- Commit mit: "fix(velero): Enable PVC backups via CSI snapshots"
+- Push to main
+
+AUFGABE 4: Verifikation
+- Prüfe ob VolumeSnapshotClass existiert: kubectl get volumesnapshotclasses
+- Prüfe ob Velero Schedule snapshotVolumes: true hat: kubectl get schedules.velero.io -n velero -o jsonpath='{.items[0].spec.template.snapshotVolumes}'
+- Erwartung: true
+- Erstelle ein manuelles Backup und prüfe ob PVCs gesichert werden
+
+ERWARTETES ERGEBNIS:
+- VolumeSnapshotClass vorhanden
+- Velero sichert PVCs via CSI-Snapshots
+- Bei Node-Fail: PVCs können wiederhergestellt werden
+```
+
+**CI/CD-Pfad:** Git → CI → kubectl apply (VolumeSnapshotClass) + kubectl patch (Velero Schedule)
+**Dateien:** `infrastructure/kubernetes/production/longhorn-snapshot-class.yaml` (NEU)
+**Risiko:** Niedrig (nur Backup-Feature, kein Restart)
+
+---
+
+### Prompt 2: WAL-Rotation fixen (P1 — SOFORT)
 
 ```
 Erstelle ein ScheduledBackup für CNPG auf Production damit die retentionPolicy: "7d" greift.
@@ -326,7 +418,7 @@ DOKUMENTATION:
 
 ---
 
-### Prompt 2: k3s CPU optimieren (P2 — KÜRZLICH)
+### Prompt 3: k3s CPU optimieren (P2 — KÜRZLICH)
 
 ```
 Optimiere die k3s CPU-Last durch Prometheus Scrape-Intervall und CSI Autoscaler.
@@ -369,7 +461,7 @@ DOKUMENTATION:
 
 ---
 
-### ✅ Prompt 3: Celery Queue bereinigen (ERLEDIGT)
+### ✅ Prompt 4: Celery Queue bereinigen (ERLEDIGT)
 
 ```
 Füge die fehlenden Tasks zu task_routes in celery_app.py hinzu.
@@ -408,13 +500,44 @@ DOKUMENTATION:
 
 ---
 
+### 🔴 Schritt 8: Velero PVC-Backup (KRITISCH — OFFEN)
+
+**Status:** OFFEN — Velero läuft, aber schützt NICHT die wichtigsten Daten
+
+| Metrik | Erwartung | Tatsächlich | Status |
+|--------|-----------|-------------|--------|
+| snapshotVolumes | true | **false** (nicht gesetzt) | ❌ PVCs NICHT gesichert |
+| VolumeSnapshotClass | Longhorn | **KEINE** | ❌ Kein CSI-Snapshot |
+| Daily-Backup Items | Alle Pods | **20** (nur n8n + celery-worker-pro) | ⚠️ EINGESCHRÄNKT |
+
+**Lösung (2 Schritte):**
+
+```
+Schritt 1: VolumeSnapshotClass für Longhorn erstellen
+  → Erstelle VolumeSnapshotClass mit driver: driver.longhorn.io
+  → Erstelle in infrastructure/kubernetes/production/longhorn-snapshot-class.yaml
+
+Schritt 2: Velero Schedule anpassen
+  → Setze snapshotVolumes: true im daily-backup Schedule
+  → Entferne labelSelector (oder erweitere auf alle Pods)
+  → CI/CD-Pfad: Git → CI → kubectl patch
+```
+
+**Erwartetes Ergebnis:**
+- Velero sichert PVCs via CSI-Snapshots
+- Bei Node-Fail: PVCs können wiederhergestellt werden
+- MinIO, RabbitMQ, Prometheus, Alertmanager geschützt
+
+---
+
 ## CI/CD-Zusammenfassung
 
 | Prompt | Datei | CI/CD-Pfad | Deploy-Methode |
 |--------|-------|------------|----------------|
-| 1. WAL-Rotation | `cnpg-scheduled-backup.yaml` (NEU) | Git → CI → kubectl apply | CI/CD |
-| 2. k3s CPU | `prometheus-values.yaml` + CSI YAML | Git → CI → kubectl apply | CI/CD |
-| 3. Celery Queue | `celery_app.py` | Git → CI → Docker Build → Rollout | CI/CD |
+| 1. Velero PVC-Backup | `longhorn-snapshot-class.yaml` (NEU) + Velero Schedule Patch | Git → CI → kubectl apply | CI/CD |
+| 2. WAL-Rotation | `cnpg-scheduled-backup.yaml` (NEU) | Git → CI → kubectl apply | CI/CD |
+| 3. k3s CPU | `prometheus-values.yaml` + CSI YAML | Git → CI → kubectl apply | CI/CD |
+| 4. Celery Queue | `celery_app.py` | Git → CI → Docker Build → Rollout | CI/CD |
 
 **ALLE Änderungen laufen über Git → CI → Production.** Keine direkten SSH-Änderungen.
 
@@ -512,4 +635,45 @@ ERWARTETES ERGEBNIS:
 - k3s CPU: 85% → ~78%
 - Watches: 518 → ~490
 - Load: 5.23 → ~4.5
+```
+
+---
+
+## UNIFIED IMPLEMENTIERUNGS-PROMPT (ALLE 3 PROBLEME)
+
+**5. Diskussion — 22.08.2026 13:15 CEST**
+
+```
+Löse die 3 offenen Probleme auf Production (169.58.83.32) via Git → CI/CD.
+
+PROBLEM 1: Velero PVCs NICHT gesichert (🔴 P1)
+- Velero Schedule hat snapshotVolumes: false → PVCs werden NICHT gesichert
+- Keine VolumeSnapshotClasses im Cluster
+- MinIO (37GB), RabbitMQ, Prometheus, Alertmanager → bei Node-Fail verloren
+- FIX: VolumeSnapshotClass für Longhorn erstellen + snapshotVolumes: true im Velero Schedule setzen
+
+PROBLEM 2: WAL-Rotation defekt (🔴 P1)
+- cnpg-scheduled-backup.yaml existiert im Git Repo (commit 3ccdee54)
+- ABER: ScheduledBackup CRD existiert NICHT im Cluster (kubectl get scheduledbackups → No resources found)
+- retentionPolicy: "7d" auf Cluster CRD greift nicht weil keine Base-Backups existieren
+- 33 GB WALs wachsen endlos (9 Serien, +1 GB/Tag)
+- FIX: Prüfe warum kubectl apply der YAML fehlschlägt. Korrigiere die YAML falls nötig. Deploy via CI/CD.
+
+PROBLEM 3: k3s CPU 85.2% (🟡 P2)
+- 518 Watch-Connections, 67 CRDs, 153K Lease PUTs
+- Operator-Patches (CNPG maxConcurrentReconciles=2, Longhorn Settings) sind persistent via Git (commit 5a80ea3e)
+- ABER: cnpg-operator-patch.yaml ist ein PARTIALS Deployment-Spec (fehlende spec.selector, spec.replicas)
+- FIX: Prüfe ob der CNPG Operator Patch via kubectl apply funktioniert. Falls nicht: Korrigiere die YAML.
+
+REIHENFOLGE:
+1. Problem 2 zuerst (WAL-Rotation) — smaller scope, schneller deploy
+2. Problem 1 danach (Velero PVC-Backup) — braucht VolumeSnapshotClass
+3. Problem 3 als letztes (k3s CPU) — Operator-Patches bereits deployt
+
+FUER JEDES PROBLEM:
+- Prüfe den aktuellen Stand auf Production (kubectl commands)
+- Analysiere die Ursache (nicht annehmen!)
+- Implementiere die Lösung via Git → CI/CD
+- Verifiziere das Ergebnis auf Production
+- Dokumentiere im K3S_TUNING_PLAN_2026-08-20.md
 ```
