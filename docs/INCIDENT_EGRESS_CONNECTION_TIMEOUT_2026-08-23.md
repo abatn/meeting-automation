@@ -189,7 +189,62 @@ Egress startet
 
 ---
 
-## 5. Offene Fragen
+## 5. Staging vs Production Vergleich
+
+### 5.1 Kritische Unterschiede
+
+| Eigenschaft | Staging ✅ (funktioniert) | Production ❌ (kaputt) |
+|-------------|--------------------------|------------------------|
+| **Egress Image** | **`v1.8.4`** (Chart-Default) | **`v1.14.1`** (explizit gesetzt) |
+| **Server Image** | `v1.9.0` | `v1.9.0` |
+| **Egress CPU Limit** | **1 Core** | **2 Cores** |
+| **Pod-Restart bei Deploy** | **NEIN** (Skip in `03-deploy-manifests.sh`) | **IMMER** (`kubectl rollout restart`) |
+| **Egress Pod Age** | **3 Tage 20 Stunden** | **1 Stunde** |
+| **Server Pod Age** | **5 Tage 1 Stunde** | **1 Stunde** |
+| **Server Deployment** | `livekit-server-staging` | `livekit-server` |
+| **Recording Status** | ✅ `14ddd793` completed (14:28 UTC) | ❌ `6b96c1af` failed (14:02 UTC) |
+| **Helm Charts** | Nicht im Git-Repo | `livekit-server-1.9.0.tgz`, `egress-1.8.4.tgz` |
+| **Deploy-Script** | `03-deploy-manifests.sh` (skip LiveKit) | `03-deploy-livekit.sh` (immer restart) |
+
+### 5.2 WICHTIGSTER UNTERSCHIED: Egress Image Version
+
+```
+Staging:     livekit/egress:v1.8.4  ← KEIN Tag in Values → Chart-Default
+Production:  livekit/egress:v1.14.1 ← EXPLIZIT in egress-values.yaml: tag: "v1.14.1"
+```
+
+**Das ist der wahrscheinlichste Root Cause.** Die Egress-Version v1.14.1 wurde am 20.08. in Production eingeführt (Commit `11fa7e7b`), aber NICHT in Staging.
+
+### 5.3 Deploy-Strategie
+
+**Staging:** LiveKit wird bei CI/CD-NIEMALS neu gestartet:
+```bash
+# scripts/deploy-staging/03-deploy-manifests.sh
+[[ "$fname" == *livekit-*-deployment.yaml ]] && continue  # ← SKIP!
+# Kein helm upgrade, kein rollout restart
+```
+
+**Production:** LiveKit wird bei JEDEM Deploy neu gestartet:
+```bash
+# scripts/deploy-prod/03-deploy-livekit.sh
+helm upgrade --install livekit-server ...
+kubectl rollout restart deployment/livekit-server  # ← IMMER!
+helm upgrade --install livekit-egress ...
+kubectl rollout restart deployment/livekit-egress  # ← IMMER!
+```
+
+### 5.4 Hypothesen (nach Staging-Vergleich)
+
+| # | Hypothese | Wahrscheinlichkeit | Beweis |
+|---|-----------|-------------------|--------|
+| **H1** | **Egress v1.14.1 hat ICE-Regression** (WebRTC-Verbindung scheitert nach Pod-Restart) | 🔴 HOCH | Staging v1.8.4 funktioniert, Production v1.14.1 nicht |
+| **H2** | **Frischer Pod hat ICE-Timing-Problem** (Startup-Phase, CPU-Last, Network-Init) | 🟡 MITTEL | Production-Pods sind 1h alt, Staging-Pods 3-5 Tage |
+| **H3** | **CPU-Last 85% verursacht ICE-Timeout** (Production: 85%, Staging: wahrscheinlich weniger) | 🟡 MITTEL | ICE-Timeout 4.5s = knapp unter 5s ConnectTimeout |
+| **H4** | **Helm-Rollback ändert Secret-Inhalt** (`helm upgrade --install` könnte Secret neu rendern) | 🟢 NIEDRIG | ConfigMaps identisch, aber Secret-Inhalt unbekannt |
+
+---
+
+## 6. Offene Fragen (aktualisiert)
 
 | # | Frage | Warum wichtig |
 |---|-------|---------------|
@@ -203,7 +258,7 @@ Egress startet
 
 ---
 
-## 6. Dokumentierte Infrastruktur
+## 7. Dokumentierte Infrastruktur
 
 ### 6.1 LiveKit Server
 
@@ -266,7 +321,7 @@ User startet Meeting
 
 ---
 
-## 7. Vorgeschlagener Plan (keine Änderungen)
+## 8. Vorgeschlagener Plan (keine Änderungen)
 
 ### Sofort (P0)
 
@@ -307,7 +362,7 @@ User startet Meeting
 
 ---
 
-## 8. Betroffene Systeme
+## 9. Betroffene Systeme
 
 | System | Auswirkung |
 |--------|-----------|
@@ -324,7 +379,7 @@ User startet Meeting
 
 ---
 
-## 9. Metriken
+## 10. Metriken
 
 | Metrik | Wert |
 |--------|------|
@@ -338,7 +393,7 @@ User startet Meeting
 
 ---
 
-## 10. Änderungshistorie
+## 11. Änderungshistorie
 
 | Datum | Änderung | Autor |
 |-------|----------|-------|
