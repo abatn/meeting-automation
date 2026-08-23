@@ -167,22 +167,66 @@ jobs:
         export KUBECONFIG=$(pwd)/kubeconfig-staging
         export DATABASE_URL="postgresql+asyncpg://meeting_user:meeting_password@localhost:5433/meeting_db_staging"
 
-        # Port-forward DB + Backend + MinIO
-        kubectl port-forward -n meeting-automation-staging svc/meeting-db-rw 5433:5432 &
-        PF_PID_DB=$!
-        kubectl port-forward -n meeting-automation-staging svc/backend 8080:8000 &
-        PF_PID_BACKEND=$!
-        kubectl port-forward -n meeting-automation-staging svc/minio-staging 9002:9000 &
-        PF_PID_MINIO=$!
+        # --- Port-Forward Manager (keepalive + auto-restart) ---
+        start_port_forward() {
+          local name=$1 local_port=$2 remote_svc=$3 remote_port=$4
+          kubectl port-forward -n meeting-automation-staging "$remote_svc" "${local_port}:${remote_port}" &
+          eval "PF_PID_${name}=$!"
+          echo "Started port-forward $name: localhost:$local_port -> $remote_svc:$remote_port (PID=$(eval echo \$PF_PID_${name}))"
+        }
+
+        restart_port_forward() {
+          local name=$1 local_port=$2 remote_svc=$3 remote_port=$4
+          local old_pid=$(eval echo \$PF_PID_${name} 2>/dev/null)
+          kill "$old_pid" 2>/dev/null || true
+          sleep 1
+          start_port_forward "$name" "$local_port" "$remote_svc" "$remote_port"
+        }
+
+        check_port_forward() {
+          local name=$1 local_port=$2 remote_svc=$3 remote_port=$4
+          local pid=$(eval echo \$PF_PID_${name} 2>/dev/null)
+          if ! kill -0 "$pid" 2>/dev/null; then
+            echo "⚠️ Port-forward $name (PID=$pid) DIED — restarting..."
+            restart_port_forward "$name" "$local_port" "$remote_svc" "$remote_port"
+            return 1
+          fi
+          if ! nc -z localhost "$local_port" 2>/dev/null; then
+            echo "⚠️ Port-forward $name port $local_port unreachable — restarting..."
+            restart_port_forward "$name" "$local_port" "$remote_svc" "$remote_port"
+            return 1
+          fi
+          return 0
+        }
+
+        # Start all port-forwards
+        start_port_forward "DB" 5433 svc/meeting-db-rw 5432
+        start_port_forward "BACKEND" 8080 svc/backend 8000
+        start_port_forward "MINIO" 9002 svc/minio-staging 9000
+
+        # Cleanup on exit
         trap "kill $PF_PID_DB $PF_PID_BACKEND $PF_PID_MINIO 2>/dev/null || true" EXIT
 
+        # Wait for all ports to be ready
         for i in {1..30}; do
           if nc -z localhost 5433 && nc -z localhost 8080 && nc -z localhost 9002; then
-            echo "Port forwards ready"
+            echo "✅ All port forwards ready"
             break
           fi
           sleep 1
         done
+
+        # Keepalive loop — runs in background, checks every 30s
+        (
+          while true; do
+            sleep 30
+            check_port_forward "DB" 5433 svc/meeting-db-rw 5432
+            check_port_forward "BACKEND" 8080 svc/backend 8000
+            check_port_forward "MINIO" 9002 svc/minio-staging 9000
+          done
+        ) &
+        KEEPALIVE_PID=$!
+        trap "kill $PF_PID_DB $PF_PID_BACKEND $PF_PID_MINIO $KEEPALIVE_PID 2>/dev/null || true" EXIT
 
         cd backend
         pip install -q -r requirements.txt -r requirements-dev.txt
