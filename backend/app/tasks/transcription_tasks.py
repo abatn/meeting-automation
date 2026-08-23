@@ -669,8 +669,15 @@ async def _identify_speakers(
     # Create tasks for parallel processing
     async def process_single_speaker(speaker_index: int, speaker_label: str, speaker_segments: List[Dict]) -> Dict[str, Any]:
         try:
+            import time as _time
+            _spk_t0 = _time.time()
             text_context = " ".join(seg.get("text", "") for seg in speaker_segments)
+
+            # --- TIMING: Embedding extraction (ffmpeg + librosa + fbank + ONNX) ---
+            _emb_t0 = _time.time()
             embedding = await _extract_speaker_embedding(temp_path, speaker_segments)
+            _emb_dur = _time.time() - _emb_t0
+            logger.info(f"TIMING: speaker_{speaker_label}_embedding duration={_emb_dur:.2f}s")
 
             # Collect ALL signals (no short-circuit)
             signals = []
@@ -762,7 +769,10 @@ async def _identify_speakers(
             # Optimized threshold: skip Mistral if we have good confidence from other sources
             mistral_name = None
             mistral_score = 0.0
+            _mistral_t0 = _time.time()
+            _mistral_triggered = False
             if not signals or all(s["score"] < 0.65 for s in signals):  # Lowered threshold from 0.70 to 0.65
+                _mistral_triggered = True
                 mistral_name, mistral_score, _ = await mistral_fusion_service.fuse_speaker_mapping(
                     speaker_label=speaker_label,
                     text_context=text_context,
@@ -775,6 +785,8 @@ async def _identify_speakers(
                     logger.info(
                         f"Speaker {speaker_label} LLM signal: {mistral_name} (score={mistral_score:.2f})"
                     )
+            _mistral_dur = _time.time() - _mistral_t0
+            logger.info(f"TIMING: speaker_{speaker_label}_signals duration={_time.time() - _spk_t0:.2f}s mistral_triggered={_mistral_triggered} mistral_dur={_mistral_dur:.2f}s")
 
             # AGGREGATE: weighted consensus across sources
             resolved_name = None
@@ -964,6 +976,7 @@ async def _extract_speaker_embedding(
         return None
 
     try:
+        import time as _emb_time
         from app.services.audio_segment_service import audio_segment_service
 
         # Convert segments to format expected by AudioSegmentService
@@ -972,10 +985,14 @@ async def _extract_speaker_embedding(
             for seg in speaker_segments
         ]
 
+        # --- TIMING: ffmpeg extract + concat ---
+        _ffmpeg_t0 = _emb_time.time()
         speaker_files = await audio_segment_service.extract_speaker_segments(
             audio_file_path=audio_path,
             segments=segments_for_service,
         )
+        _ffmpeg_dur = _emb_time.time() - _ffmpeg_t0
+        logger.info(f"TIMING: ffmpeg_extract_concat duration={_ffmpeg_dur:.2f}s segments={len(segments_for_service)}")
 
         if not speaker_files:
             return None
@@ -985,7 +1002,11 @@ async def _extract_speaker_embedding(
         if not target_audio or not os.path.exists(target_audio):
             return None
 
+        # --- TIMING: ONNX embedding (librosa + fbank + session.run) ---
+        _onnx_t0 = _emb_time.time()
         embedding = await speaker_embedding_service.extract_embedding(target_audio)
+        _onnx_dur = _emb_time.time() - _onnx_t0
+        logger.info(f"TIMING: onnx_embed duration={_onnx_dur:.2f}s")
 
         # Cleanup temp file
         if os.path.exists(target_audio):
