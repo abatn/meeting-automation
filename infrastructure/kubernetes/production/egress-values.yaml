@@ -13,7 +13,6 @@ replicaCount: 1
 
 image:
   repository: livekit/egress
-  tag: "v1.14.1"
   pullPolicy: IfNotPresent
 
 # ---------------------------------------------------------------------------

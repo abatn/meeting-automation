@@ -28,7 +28,6 @@ kubectl patch deployment livekit-server -n "$NAMESPACE" --type='json' \
     {"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/timeoutSeconds","value":3},
     {"op":"replace","path":"/spec/template/spec/containers/0/readinessProbe/failureThreshold","value":3}
   ]' 2>/dev/null || true
-kubectl rollout restart deployment/livekit-server -n "$NAMESPACE" 2>/dev/null || true
 
 # LiveKit Egress via Helm
 echo "--- LiveKit Egress ---"
@@ -37,9 +36,12 @@ helm upgrade --install livekit-egress "$MANIFESTS_DIR/charts/egress-1.8.4.tgz" \
   --values "$MANIFESTS_DIR/egress-values.yaml" \
   --wait --timeout 10m || echo "⚠️ Warning: LiveKit Egress Helm upgrade failed"
 
+# imagePullSecrets setzen (identisch zu Staging)
+kubectl patch deployment livekit-egress -n "$NAMESPACE" --type='json' \
+  -p='[{"op":"add","path":"/spec/template/spec/imagePullSecrets","value":[{"name":"dockerhub-pull-secret"}]}]' 2>/dev/null || true
+
 # hostNetwork + Recreate Strategy Patch
 kubectl patch deployment livekit-egress -n "$NAMESPACE" --type='json' \
   -p='[{"op":"add","path":"/spec/template/spec/hostNetwork","value":true},{"op":"replace","path":"/spec/template/spec/dnsPolicy","value":"ClusterFirstWithHostNet"},{"op":"replace","path":"/spec/strategy","value":{"type":"Recreate"}}]' 2>/dev/null || true
-kubectl rollout restart deployment/livekit-egress -n "$NAMESPACE" 2>/dev/null || true
 
 echo "✅ LiveKit deployed via Helm"
