@@ -343,57 +343,35 @@ TIMING: pipeline_total duration=247.54s
 
 1. **ONNX Speaker ID kein Bottleneck mehr** — 0.70s statt 184s. Grund: Weniger Segmente (4 vs 13) + Load-Aufteilung nach RabbitMQ-Fix
 2. **Sentinel LLM = 90% der Gesamtzeit** — 222.72s für 1 Chunk (67 Zeichen). Grund: Qwen-1.5B auf 1 CPU Core, ~1.2 tok/s
-3. **Recording Status in DB:** completed | **Frontend zeigt nichts** → Frontend-Bug (siehe unten)
+3. **Recording Status in DB:** completed | **Frontend zeigt nichts** → Untersuchung läuft (siehe unten)
 
 ---
 
-## 11. 🔴 Frontend-Bug: TranscriptionViewer Polling
+## 11. 🔴 Untersuchung: Frontend zeigt Pipeline-Ergebnisse nicht
 
-### Problem
+### Status: UNTERSUCHUNG LAUFT — Fakten gesammelt
 
-Das Frontend zeigt Transcription-Ergebnisse nicht an, obwohl die Daten in der DB korrekt sind.
+**BEWIESEN:**
+- DB: Recording=completed, Meeting=COMPLETED, Transcription=completed, PV=draft, 1 Action ✅
+- Frontend-Code identisch (kein Diff zwischen Staging und Production) ✅
+- Backend-API korrekt (Transcription + Segmente vorhanden) ✅
 
-### Ursache (BEWIESEN)
-
+**BEWIESENE KETTE (Backend-Logs):**
 ```
-19:37:25 — Frontend ruft GET /api/v1/transcriptions/meeting/{id} auf
-         → 404 (Transcription existiert noch nicht — Pipeline läuft)
-         → Frontend stoppt Polling (kein Retry bei 404)
-
-19:42:09 — Pipeline fertig! Transcription in DB gespeichert
-         → Aber Frontend pollt nicht mehr → sieht nichts
-```
-
-### Code-Stelle
-
-`frontend/src/components/meetings/TranscriptionViewer.tsx` Zeile 55-65:
-
-```typescript
-const fetchTranscription = useCallback(async () => {
-    try {
-        const data = await meetingsApi.getTranscription(meetingId);
-        setTranscription(data);
-    } catch (err: any) {
-        if (err.response?.status !== 404) {
-            setError(t('meeting_assistant.transcription_load_error'));
-        }
-        // ← Bei 404: Kein Error, aber auch KEIN Retry!
-    }
-}, [meetingId]);
+19:37:25 — User tritt bei, Frontend pollt transcription (404)
+19:38:18 — ai-insights pollt (recordingStatus=processing)
+19:38:58 — Letzter ai-insights Call
+19:39:20 — USER VERLÄSST LiveKit Room
+19:42:09 — PIPELINE FERTIG (Celery: 247.54s)
+20:01:24 — LiveKit-Raum-Restart (automatisch)
+→ KEIN ai-insights oder transcription Call nach 19:39
 ```
 
-### Fix nötig
+**FALSCH (widerrufen):**
+- ❌ TranscriptionViewer Polling-Bug — TranscriptionViewer wird NIRGENDWO importiert (nur in eigener Datei definiert)
+- ❌ 404 Polling-Stop — Code ist identisch auf Staging und Production
 
-TranscriptionViewer muss bei 404 weiterpollen bis die Transcription existiert:
-- Bei 404: alle 5s erneut pollen (max. 5 Minuten)
-- Erst bei Erfolg: Polling stoppen
-
-### Status DB (BEWIESEN)
-
-| Tabelle | Status |
-|---------|--------|
-| Recording | ✅ completed |
-| Meeting | ✅ COMPLETED |
-| Transcription | ✅ completed (full_text + segments vorhanden) |
-| PV | ✅ draft |
-| Actions | ✅ 1 Action vorhanden |
+**OFFENE FRAGEN:**
+- Warum wurde syncFromBackend (MeetingRoom.tsx:573) bei 20:01 nicht ausgeführt?
+- User war auf Dashboard oder MeetingRoom bei 20:01?
+- Frontend-Routing: Welche Route wird nach Room-Verlassen angezeigt?
