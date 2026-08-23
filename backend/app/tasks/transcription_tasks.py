@@ -648,13 +648,17 @@ async def _identify_speakers(
         logger.warning("No segments found for speaker identification")
         return []
 
+    import time as _sid_time
+    _sid_t0 = _sid_time.time()
+
     # Build candidate list: participants + enrolled profiles (including text-only)
+    _prof_t0 = _sid_time.time()
     profile_service = SpeakerProfileService(db)
     enrolled_profiles = await profile_service.get_profiles(client_id, include_text_only=True)
     profiles_with_embeddings = [p for p in enrolled_profiles if p.embedding is not None]
     profile_names = [p.resolved_name or p.name for p in enrolled_profiles if p.resolved_name or p.name]
     candidates = list(set(participant_names + profile_names))
-    logger.info(f"Speaker ID candidates: {candidates}")
+    logger.info(f"TIMING: speaker_id_profile_load duration={_sid_time.time() - _prof_t0:.2f}s profiles={len(enrolled_profiles)} with_embeddings={len(profiles_with_embeddings)} candidates={candidates}")
 
     # Group segments by speaker label
     speaker_groups = {}
@@ -878,6 +882,7 @@ async def _identify_speakers(
     
     total_speakers = len(speaker_list)
     all_mappings = []
+    _process_t0 = _sid_time.time()
     
     if total_speakers >= 5:
         # Large meeting: process sequentially to avoid memory spikes
@@ -895,8 +900,10 @@ async def _identify_speakers(
             all_mappings.extend(batch_results)
             if i + batch_size < total_speakers:
                 await asyncio.sleep(0.1)
+    logger.info(f"TIMING: speaker_id_process_speakers duration={_sid_time.time() - _process_t0:.2f}s speakers={total_speakers}")
 
     # EXCLUSIVITY: each name can only be assigned to ONE speaker (highest confidence wins)
+    _excl_t0 = _sid_time.time()
     assigned_names = {}
     for mapping in all_mappings:
         name = mapping.get("resolved_name")
@@ -914,6 +921,7 @@ async def _identify_speakers(
                     mapping["method"] = "exclusivity_lost"
             else:
                 assigned_names[name] = mapping
+    logger.info(f"TIMING: speaker_id_exclusivity duration={_sid_time.time() - _excl_t0:.2f}s assigned={len(assigned_names)}")
 
     # ENROLLMENT: after exclusivity, only enroll speakers with resolved names
     # Phase 163/185: C2 (VOICE) consent gate — biometric enrollment only if granted
@@ -934,6 +942,8 @@ async def _identify_speakers(
         )
 
     enrollment_service = AutoEnrollmentService(db)
+    _enroll_t0 = _sid_time.time()
+    _enrolled_count = 0
     if voice_consent is not None:
         for mapping in all_mappings:
             if mapping.get("resolved_name"):
@@ -956,6 +966,7 @@ async def _identify_speakers(
                         resolved_name=resolved_name, confidence=confidence,
                         method=method, meeting_id=meeting_id, candidates=candidates,
                     )
+                _enrolled_count += 1
 
                 await AuditService.log_action(
                     db=db, client_id=client_id, action="SPEAKER_IDENTIFIED",
@@ -965,7 +976,9 @@ async def _identify_speakers(
                     ip_address="internal", user_agent="celery",
                 )
                 logger.info(f"Enrolled: {speaker_label} → {resolved_name} (conf={confidence:.2f}, method={method})")
+    logger.info(f"TIMING: speaker_id_enrollment duration={_sid_time.time() - _enroll_t0:.2f}s enrolled={_enrolled_count} consent={'yes' if voice_consent else 'no'}")
 
+    logger.info(f"TIMING: speaker_id_total duration={_sid_time.time() - _sid_t0:.2f}s speakers={total_speakers} resolved={sum(1 for m in all_mappings if m.get('resolved_name'))}")
     return all_mappings
 
 
