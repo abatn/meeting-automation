@@ -347,9 +347,11 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             # GRATUIT: skip Sentinel LLM (no memory overhead, faster pipeline)
             # PRO/ENTREPRISE: full Sentinel summarization
             sentinel_start = time.time()
+            _plan_t0 = time.time()
             client_result = await db.execute(select(Client).where(Client.id == client_id))
             client = client_result.scalar_one_or_none()
             plan = client.subscription_plan if client else None
+            logger.info(f"TIMING: sentinel_plan_check duration={time.time() - _plan_t0:.2f}s plan={plan}")
 
             if plan == SubscriptionPlan.GRATUIT:
                 logger.info(f"GRATUIT plan detected — skipping Sentinel LLM for recording {recording_id}")
@@ -365,10 +367,13 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 logger.info(f"TIMING: sentinel_chunks count={len(chunks)} text_len={len(display_text)}")
 
                 # Parallel Map execution
+                _gather_t0 = time.time()
                 map_tasks = [get_sentinel_service().summarize_chunk(chunk) for chunk in chunks]
                 partial_summaries = await asyncio.gather(*map_tasks)
+                _gather_dur = time.time() - _gather_t0
 
                 sentinel_summary = "\n---\n".join(partial_summaries)
+                logger.info(f"TIMING: sentinel_gather duration={_gather_dur:.2f}s chunks={len(chunks)} summaries={len(partial_summaries)}")
             sentinel_duration = time.time() - sentinel_start
             PIPELINE_STAGE_DURATION.labels(stage="sentinel_llm").observe(sentinel_duration)
             logger.info(f"TIMING: sentinel_llm duration={sentinel_duration:.2f}s plan={plan}")
