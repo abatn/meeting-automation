@@ -1,8 +1,10 @@
 # Pipeline-Status: 2026-08-22
 
 **Erstellt:** 2026-08-22
-**Status:** 🔴 Performance-Problem identifiziert
+**Letztes Update:** 2026-08-23
+**Status:** 🔴 Sub-Step TIMING-Logs implementiert + deployed, hardcodierte Werte müssen eliminiert werden
 **Cluster:** Production (169.58.83.32, 8 Core AMD EPYC, 23GB RAM)
+**Celery Pod:** `celery-worker-pro-5b94485b99-phjs8` (Image: `sha256:adf9a81f...`)
 
 ---
 
@@ -31,15 +33,27 @@ TIMING: pipeline_total duration=460.4s
 | Persistence | 0.4s | 0% | ✅ OK |
 | **GESAMT** | **460.4s** | **100%** | 🔴 Ziel: 90s |
 
-### Sub-Step Timing (NEU — 2026-08-22 implementiert)
+### Sub-Step Timing (NEU — 2026-08-22 implementiert, 2026-08-23 deployed)
+
+**Status: ✅ ALLE 27 TIMING-Logs im Pod verifiziert**
 
 ```
-TIMING: speaker_Speaker 0_embedding duration=Xs     ← Gesamt embedding (ffmpeg + fbank + ONNX)
+# Speaker ID Sub-Steps (9 Logs)
+TIMING: speaker_id_profile_load duration=Xs profiles=N with_embeddings=N candidates=[...]
+TIMING: speaker_{label}_embedding duration=Xs
 TIMING: ffmpeg_extract_concat duration=Xs segments=13
-TIMING: onnx_embed duration=Xs                      ← librosa + fbank + ONNX inference
-TIMING: speaker_Speaker 0_signals duration=Xs mistral_triggered=True mistral_dur=Xs
-TIMING: sentinel_cold_start duration=Xs             ← Qwen-1.5B Ladezeit
+TIMING: onnx_embed duration=Xs
+TIMING: speaker_{label}_signals duration=Xs mistral_triggered=True mistral_dur=Xs
+TIMING: speaker_id_process_speakers duration=Xs speakers=N
+TIMING: speaker_id_exclusivity duration=Xs assigned=N
+TIMING: speaker_id_enrollment duration=Xs enrolled=N consent=yes/no
+TIMING: speaker_id_total duration=184.2s speakers=1 resolved=N
+
+# Sentinel Sub-Steps (5 Logs)
+TIMING: sentinel_plan_check duration=Xs plan=PRO
+TIMING: sentinel_cold_start duration=Xs model=...
 TIMING: sentinel_summarize prompt_tokens=X output_tokens=Y llm_dur=Xs tok_per_sec=Z
+TIMING: sentinel_gather duration=Xs chunks=1 summaries=1
 ```
 
 ---
@@ -249,16 +263,30 @@ logger.info(f"TIMING: sentinel_summarize prompt_tokens=X output_tokens=Y llm_dur
 
 | Frage | Status |
 |-------|--------|
-| Wie viel von den 184s kommt von ffmpeg vs ONNX vs Mistral Fusion? | ⏳ Warte auf Test-Recording (TIMING-Logs implementiert) |
-| Wie viel von den 252s kommt von Cold Start vs Prefill vs Token Gen? | ⏳ Warte auf Test-Recording (TIMING-Logs implementiert) |
+| Wie viel von den 184s kommt von ffmpeg vs ONNX vs Mistral Fusion? | ⏳ Warte auf Test-Recording (TIMING-Logs deployed) |
+| Wie viel von den 252s kommt von Cold Start vs Prefill vs Token Gen? | ⏳ Warte auf Test-Recording (TIMING-Logs deployed) |
 | ONNX Thread-Thrashing: Lohnt sich `intra_op_num_threads=1`? | ⏳ Warte auf Benchmark |
 | Sentinel: Lohnt sich `n_threads=1` + `max_tokens=128`? | ⏳ Warte auf Benchmark |
 | Celery Concurrency 8→1: Reduziert CPU-Kontention? | ⏳ Warte auf Test |
-| Mistral Fusion: Wird sie überhaupt getriggert? (score < 0.65?) | ⏳ Warte auf Test-Recording (TIMING-Logs implementiert) |
+| Mistral Fusion: Wird sie überhaupt getriggert? (score < 0.65?) | ⏳ Warte auf Test-Recording |
 
 ---
 
-## 8. Pipeline-Optimierungs-Historie
+## 8. 🔴 HARDCODIERTE WERTE — MÜSSEN ELIMINIERT WERDEN
+
+**Regel: Hardcoded ist verboten.** Alle Werte müssen aus Environment-Variablen gelesen werden.
+
+| Wert | Aktuell (hardcoded) | Datei | Zeile | Muss geändert werden |
+|------|---------------------|-------|-------|---------------------|
+| `n_threads=2` | Sentinel LLM Threads | sentinel_service.py | 96 | ✅ JA — Env-Var `SENTINEL_N_THREADS` |
+| `n_ctx=2048` | Sentinel LLM Context Window | sentinel_service.py | 95 | ✅ JA — Env-Var `SENTINEL_N_CTX` |
+| `max_tokens=256` | Sentinel Max Output Tokens | sentinel_service.py | 134 | ✅ JA — Env-Var `SENTINEL_MAX_TOKENS` |
+| `intra_op_num_threads=0` | ONNX Auto-Threads | speaker_embedding_service.py | 58 | ✅ JA — Env-Var `ONNX_NUM_THREADS` |
+| `concurrency=8` | Celery Workers | celery_app.py | — | ✅ JA — Env-Var `CELERY_CONCURRENCY` |
+
+**Nächster Schritt:** Alle hardcoded Werte durch `os.environ.get()` mit sinnvollen Defaults ersetzen → dann Deployment via CI/CD.
+
+## 9. Pipeline-Optimierungs-Historie
 
 | Datum | Fix | Ergebnis |
 |-------|-----|----------|
@@ -274,3 +302,8 @@ logger.info(f"TIMING: sentinel_summarize prompt_tokens=X output_tokens=Y llm_dur
 | 2026-08-22 | Speaker ID Sub-Step TIMING komplett | ✅ Implementiert (commit d52b1c14) |
 | 2026-08-22 | Sentinel Sub-Step TIMING komplett | ✅ Implementiert (commit 14738738) |
 | 2026-08-22 | Pipeline-Status Dokumentation | ✅ Implementiert (commit c987c67a) |
+| 2026-08-22 | CI/CD Deploy (TIMING-Logs) | ✅ SUCCESS — CI Pipeline + Deploy Staging |
+| 2026-08-23 | Port-Forward Keepalive (E2E-Test Fix) | ✅ Implementiert (commit cd0116d6) |
+| 2026-08-23 | Deploy Production (TIMING-Logs + Keepalive) | ✅ SUCCESS — aber Pod NICHT automatisch neu gestartet |
+| 2026-08-23 | Manueller Pod-Restart | ✅ celery-worker-pro-5b94485b99-phjs8 (neues Image verifiziert) |
+| 2026-08-23 | Sub-Step TIMING-Logs im Pod verifiziert | ✅ 27 Logs vorhanden — warte auf Test-Recording |
