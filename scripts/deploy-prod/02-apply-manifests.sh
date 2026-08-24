@@ -27,6 +27,9 @@ kubectl apply -f network-policies.yaml
 kubectl apply -f ingress-prod.yaml
 kubectl apply -f n8n-ingress.yaml
 
+# Metrics-Server (v1beta1.metrics.k8s.io for HPA CPU scaling)
+kubectl apply -f metrics-server.yaml 2>/dev/null || echo "⚠️ Metrics-Server apply failed"
+
 # Velero Schedule (PVC-Backup via Kopia FS)
 if kubectl get namespace velero &>/dev/null; then
   kubectl apply -f velero-schedule.yaml 2>/dev/null || echo "⚠️ Velero Schedule apply failed (CRD may be missing)"
