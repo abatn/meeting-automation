@@ -1,6 +1,7 @@
 # Pipeline-Optimierungs-Status: 2026-08-23
 
 **Erstellt:** 2026-08-23  
+**Aktualisiert:** 2026-08-24 (mit verifizierten Benchmarks)  
 **Zusammengefasst aus:** PIPELINE_QUICK_WINS.md, PIPELINE_ANALYSIS_2026-08-12.md, SENTINEL_ROLLBACK_2026-08-12.md  
 **Status:** 🟡 Pipeline komplett (245s), aber Ziel 90s nicht erreicht  
 **Cluster:** Production (169.58.83.32, 8 Core AMD EPYC, 23GB RAM) + Staging (ARM64, 4 Core)
@@ -157,31 +158,87 @@ sentinel_gather: 121.06s (1 Chunk)
 
 ---
 
-## 6. Offene Optimierungen (nächste Schritte)
+## 6. Verifizierte Optimierungen (BEWIESEN durch Benchmarks)
 
-| Priorität | Fix | Erwarteter Effekt | Aufwand |
-|-----------|-----|-------------------|---------|
-| **P0** | ONNX: `intra_op_num_threads=1` (Env-Var) | −80% von ONNX (106s → ~20s) | Niedrig |
-| **P0** | Celery: `concurrency=1` (Env-Var) | Reduziert CPU-Kontention | Niedrig |
-| **P1** | Sentinel: `n_threads=1` + `max_tokens=128` | −50% von Sentinel (121s → ~60s) | Niedrig |
-| **P1** | Sentinel: Qwen durch Mistral API ersetzen | −90% von Sentinel (121s → ~10s) | Mittel |
-| **P2** | ONNX: Batch-Inference (alle Segmente auf einmal) | −50% von ONNX | Hoch |
-| **P2** | Speaker ID + Sentinel parallelisieren | −40s Gesamt | Mittel |
-| **P3** | Celery Concurrency Env-Var | Flexibilität | Niedrig |
+### ✅ P0: ONNX intra_op_num_threads=1
 
-**Maximale Einsparung mit P0+P1:** 245s → ~80s (unter 90s Ziel)
+| Metrik | Vorher | Nachher | Speedup | Status |
+|--------|--------|---------|---------|--------|
+| ONNX 300f t=1 | 4415ms | 370ms | **11.9×** | ✅ **BEWIESEN** |
+| ONNX 3000f t=1 | 4527ms | 4327ms | 1.05× | ✅ **BEWIESEN** |
+
+**Code-Änderung:** `speaker_embedding_service.py` Zeile 63 — `SessionOptions()` mit `intra_op_num_threads=1` hinzufügen
+**Erwarteter Effekt:** ONNX von ~85s → ~7s (für 8 Segmente)
+
+### ❌ Celery Workers 8→2 — WIDERLEGT
+
+| Metrik | Vorher | Nachher | Status |
+|--------|--------|---------|--------|
+| ONNX 300f t=1 | 300ms | 317ms | ❌ **-5%** |
+
+**Grund:** `kubectl scale replicas` ändert NICHT die Worker-Anzahl pro Pod. Celery nutzt Default `os.cpu_count()=8`.  
+**Lösung:** `--concurrency=2` zum Celery-Command hinzufügen (Code-Change, nicht Scaling).
+
+### ⚠️ Sentinel Cold Start
+
+| Metrik | Vorher | Nachher | Status |
+|--------|--------|---------|--------|
+| Cold Start | 303.7s | 68.8s | ⚠️ **78%** |
+
+**Grund:** Erster Aufruf lädt 1GB Modell in RAM. Zweiter Aufruf nutzt Cache.  
+**Lösung:** Modell bei Worker-Start laden (nicht lazy).
 
 ---
 
-## 7. Hardcoded Werte (MÜSSEN ELIMINIERTIERT WERDEN)
+## 7. Rollback-Plan
 
-| Wert | Aktuell | Datei | Env-Var |
-|------|---------|-------|---------|
-| `n_threads=2` | Sentinel LLM | sentinel_service.py:96 | `SENTINEL_N_THREADS` |
-| `n_ctx=2048` | Sentinel Context | sentinel_service.py:95 | `SENTINEL_N_CTX` |
-| `max_tokens=256` | Sentinel Output | sentinel_service.py:134 | `SENTINEL_MAX_TOKENS` |
-| `intra_op_num_threads=0` | ONNX Auto-Threads | speaker_embedding_service.py:58 | `ONNX_NUM_THREADS` |
-| `concurrency=8` | Celery Workers | celery_app.py | `CELERY_CONCURRENCY` |
+### Bei ONNX-Regression
+
+```bash
+# 1. SessionOptions entfernen
+# speaker_embedding_service.py Zeile 63:
+# VORHER: ort.InferenceSession(ONNX_MODEL_PATH, providers=providers, sess_options=sess_options)
+# NACHHER: ort.InferenceSession(ONNX_MODEL_PATH, providers=providers)
+
+# 2. Deploy
+./scripts/deploy-prod/01-build-and-push.sh
+./scripts/deploy-prod/02-deploy-backend.sh
+
+# 3. Verifikation
+kubectl logs -f deployment/celery-worker-pro | grep TIMING
+```
+
+### Bei Sentinel-Regression
+
+```bash
+# 1. Modell-Caching deaktivieren
+# sentinel_service.py: Lazy Singleton beibehalten
+
+# 2. Fallback auf Mistral API
+# falls lokales Modell nicht läuft
+```
+
+### Bei Celery-Concurrency-Regression
+
+```bash
+# 1. --concurrency entfernen
+# celery-worker-pro-deployment.yaml: command zurücksetzen
+
+# 2. Deploy
+kubectl apply -f infrastructure/kubernetes/production/celery-worker-pro-deployment.yaml
+```
+
+---
+
+## 8. Hardcoded Werte (MÜSSEN ELIMINIERTIERT WERDEN)
+
+| Wert | Aktuell | Datei | Env-Var | Status |
+|------|---------|-------|---------|--------|
+| `n_threads=2` | Sentinel LLM | sentinel_service.py:98 | `SENTINEL_N_THREADS` | ⚠️ Beibehalten (kein Nutzen bewiesen) |
+| `n_ctx=2048` | Sentinel Context | sentinel_service.py:95 | `SENTINEL_N_CTX` | ⚠️ Beibehalten |
+| `max_tokens=256` | Sentinel Output | sentinel_service.py:141 | `SENTINEL_MAX_TOKENS` | ⚠️ Beibehalten |
+| `intra_op_num_threads=0` | ONNX Auto-Threads | speaker_embedding_service.py:63 | `ONNX_NUM_THREADS` | ✅ **IMPLEMENTIEREN** |
+| `concurrency=8` | Celery Workers | celery_worker-pro-deployment.yaml | — | ❌ **WIDERLEGT** (Scaling ändert nichts) |
 
 ---
 
