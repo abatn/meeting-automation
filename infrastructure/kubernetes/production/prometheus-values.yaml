@@ -8,8 +8,8 @@
 # =============================================================================
 prometheus:
   prometheusSpec:
-    scrapeInterval: 90s           # Global Default (vorher: 30s)
-    evaluationInterval: 30s       # Alerts bleiben bei 30s (unverändert)
+    scrapeInterval: "90s"         # Global Default (vorher: 30s) — WICHTIG: in Anführungszeichen!
+    evaluationInterval: "30s"     # Alerts bleiben bei 30s (unverändert)
     hostNetwork: true             # Bereits gesetzt (bleibt)
     dnsPolicy: ClusterFirstWithHostNet  # Bereits gesetzt (bleibt)
     retention: 15d                # Bereits gesetzt (bleibt)
