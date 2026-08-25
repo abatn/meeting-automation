@@ -165,30 +165,6 @@ k3s = All-in-One (API Server + Controller + Scheduler + kubelet in EINEM Prozess
 
 ---
 
-## Realistisches Einsparpotenzial
-
-| Aktion | CRDs weg | Watch-Connections weg | CPU-Effekt |
-|--------|---------|----------------------|------------|
-| eventing.keda.sh entfernen | −2 | −4 | ~1% |
-| helm.cattle.io prüfen | −2? | −4? | ~1%? |
-| **Gesamt** | **−4** | **−8** | **~2%** |
-
-**Fazit:** Maximal 4 CRDs (8 Watch-Connections) können sicher entfernt werden. Das senkt die CPU von 80% auf ~78%.
-
----
-
-## Könnte man es unter 50% bringen?
-
-| Lösung | CPU-Einsparung | Aufwand | Risiko |
-|--------|---------------|---------|--------|
-| GOGC + Prometheus 60s + k3s Upgrade | ~4% (80→76%) | Niedrig | Niedrig |
-| KEDA entfernen | ~3% (76→73%) | Niedrig | Niedrig |
-| eventing.keda.sh + helm.cattle.io CRDs | ~2% (73→71%) | Niedrig | Niedrig |
-| CRDs entfernen (CNPG, Velero, Prometheus) | ~20% (71→51%) | HOCH | HOCH (Operator geht kaputt) |
-| **Zweiter Node** | **~50% (71→40%)** | **Mittel** | **Mittel** |
-
----
-
 ## Plan — Maßnahmen mit Vor-/Nachteilen und Service-Auswirkung
 
 ### MAßNAHME 1: GOGC=50 + GOMEMLIMIT=1500Mi
@@ -248,106 +224,12 @@ k3s = All-in-One (API Server + Controller + Scheduler + kubelet in EINEM Prozess
 
 ---
 
-### MAßNAHME 3: eventing.keda.sh CRDs entfernen
-
-| Eigenschaft | Details |
-|-------------|--------|
-| **Was** | 2 leere CRDs (cloudeventsources, clustercloudeventsources) |
-| **Status** | ⏳ Noch nicht umgesetzt |
-| **CPU-Effekt** | −4 Watch-Connections, ~1% CPU |
-
-| Vorteil | Nachteil |
-|---------|----------|
-| ✅ −4 Watch-Connections | ⚠️ KEDA Eventing nicht mehr verfügbar |
-| ✅ ~1% CPU-Einsparung | ⚠️ Nicht rückgängig machbar ohne CRD-Neuerstellung |
-| ✅ Kein Service-Ausfall | ⚠️ Falls Cloud-Events später gebraucht → CRDs neu erstellen |
-| ✅ Sofort umsetzbar | |
-
-| Service | Auswirkung |
-|---------|------------|
-| Backend API | ✅ Keine Auswirkung |
-| Celery Workers | ✅ Keine Auswirkung |
-| LiveKit Server | ✅ Keine Auswirkung |
-| PostgreSQL | ✅ Keine Auswirkung |
-| Frontend | ✅ Keine Auswirkung |
-| KEDA | ✅ Läuft weiter (nutzt nur keda.sh CRDs, nicht eventing.keda.sh) |
-| **k3s** | ✅ −1% CPU |
-
-**Fazit:** Null Risiko, keine Service-Auswirkung. Kann sofort umgesetzt werden.
-
----
-
-### MAßNAHME 4: KEDA komplett entfernen
-
-| Eigenschaft | Details |
-|-------------|--------|
-| **Was** | KEDA Operator + metrics-apiserver + webhooks + 6 CRDs + 4 HPAs |
-| **Status** | ⏳ Noch nicht umgesetzt |
-| **CPU-Effekt** | −12 Watch-Connections, −3 Pods, ~3-5% CPU |
-
-| Vorteil | Nachteil |
-|---------|----------|
-| ✅ −12 Watch-Connections | ❌ Keine Queue-basierte Skalierung mehr |
-| ✅ −3 Pods (CPU + RAM frei) | ❌ Keine RabbitMQ-Trigger mehr |
-| ✅ ~3-5% CPU-Einsparung | ❌ External-HPAs weg (celery-worker-pro, celery-worker-gratuit) |
-| ✅ 807 ERROR-Logs/24h weg | ❌ CPU-basierte HPAs (backend, livekit-egress) auch weg |
-| | ❌ Manuelle Skalierung nötig |
-
-| Service | Auswirkung |
-|---------|------------|
-| Backend API | ⚠️ Kein Auto-Scaling (min=2 fixed) |
-| Celery Workers | ❌ Kein Queue-basierte Skalierung (min=1 fixed, manuell) |
-| LiveKit Server | ⚠️ Kein Auto-Scaling (min=1 fixed) |
-| PostgreSQL | ✅ Keine Auswirkung |
-| Frontend | ✅ Keine Auswirkung |
-| RabbitMQ | ✅ Läuft weiter (KEDA war nur Client) |
-| **k3s** | ✅ −3-5% CPU |
-
-**Fazit:** Mittleres Risiko. Nur entfernen wenn Auto-Scaling nicht kritisch ist.
-
----
-
-### MAßNAHME 5: Zweiter Node (Oracle OCI)
-
-| Eigenschaft | Details |
-|-------------|--------|
-| **Was** | Oracle OCI Instance (ARM64, 4 OCPUs) als zweiter k3s-Node |
-| **Status** | ⏳ Langfristig |
-| **CPU-Effekt** | −50% (80% → ~40%) |
-
-| Vorteil | Nachteil |
-|---------|----------|
-| ✅ −50% CPU-Last | ⚠️ Monatliche Kosten (~€20-40) |
-| ✅ HA (hohe Verfügbarkeit) | ⚠️ Netzwerk-Latenz zwischen Nodes |
-| ✅ Rolling Updates möglich | ⚠️ PVCs müssen auf local-path bleiben (kein Storage-Backend) |
-| ✅ Last-Verteilung | ⚠️ Aufwand: k3s join + Helm-Release迁移 |
-| ✅ Production-reif | ⚠️ Velero Backups müssen angepasst werden |
-
-| Service | Auswirkung |
-|---------|------------|
-| Backend API | ✅ Bessere Performance (weniger CPU-Kontention) |
-| Celery Workers | ✅ Können auf Node 2 verschoben werden |
-| LiveKit Server | ✅ Kann auf Node 2 laufen |
-| PostgreSQL | ✅ Bleibt auf Node 1 (StatefulSet) |
-| Frontend | ✅ Bessere Performance |
-| **k3s** | ✅ −50% CPU |
-
-**Fazit:** Beste Lösung für <50%. Aufwand mittel, Kosten moderat.
-
----
-
 ## Reihenfolge der Maßnahmen
 
-```
-HEUTE:     [1] GOGC=50 + GOMEMLIMIT=1500Mi
-           [2] eventing.keda.sh CRDs entfernen
-
-Cette SEMAINE: [3] k3s Upgrade v1.36.2 → v1.36.3 (nachts)
-
-OPTIONAL:  [4] KEDA entfernen (wenn Auto-Scaling nicht nötig)
-
-LANGFRISTIG: [5] Zweiter Node (Oracle OCI)
-```
+| Reihenfolge | Maßnahme | Status |
+|-------------|----------|--------|
+| **1** | GOGC=50 + GOMEMLIMIT=1500Mi | ⏳ Noch nicht umgesetzt |
+| **2** | k3s Upgrade v1.36.2 → v1.36.3 | ⏳ Noch nicht umgesetzt |
 
 ---
 
