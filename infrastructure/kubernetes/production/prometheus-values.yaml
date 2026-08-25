@@ -1,0 +1,126 @@
+# Prometheus Helm Values — Production (169.58.83.32)
+# kube-prometheus-stack v88.1.5 / app v0.93.0
+# Erstellt: 2026-08-25
+# Deploy: helm upgrade kube-prometheus-stack ... -n monitoring --reuse-values --values prometheus-values.yaml
+
+# =============================================================================
+# GLOBAL DEFAULT
+# =============================================================================
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 90s           # Global Default (vorher: 30s)
+    evaluationInterval: 30s       # Alerts bleiben bei 30s (unverändert)
+    hostNetwork: true             # Bereits gesetzt (bleibt)
+    dnsPolicy: ClusterFirstWithHostNet  # Bereits gesetzt (bleibt)
+    retention: 15d                # Bereits gesetzt (bleibt)
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 10Gi
+          storageClassName: local-path
+  service:
+    port: 9090                    # Bereits gesetzt (bleibt)
+
+# =============================================================================
+# PER-TARGET SCRAPE INTERVALS
+# =============================================================================
+
+# k3s API-Server (port 6443)
+kubeApiServer:
+  enabled: true
+  serviceMonitor:
+    interval: 90s                 # War: GLOBAL (30s)
+    scrapeTimeout: 30s
+
+# Kubelet + Cadvisor + Resource Metrics (port 10250)
+kubelet:
+  enabled: true
+  namespace: kube-system
+  serviceMonitor:
+    interval: 120s                # War: GLOBAL (30s) + 10s (Cadvisor)
+    scrapeTimeout: 30s
+    metricRelabelings:
+      - action: drop
+        sourceLabels: [__name__]
+        regex: "cadvisor_(container_cpu_cfs_throttled_seconds_total|container_memory_failures_total)"
+
+# Node Exporter (port 9100)
+nodeExporter:
+  enabled: true
+  serviceMonitor:
+    interval: 120s                # War: GLOBAL (30s)
+    scrapeTimeout: 30s
+
+# CoreDNS (port 9153)
+coreDns:
+  enabled: true
+  serviceMonitor:
+    interval: 60s                 # War: GLOBAL (30s)
+    scrapeTimeout: 15s
+
+# kube-controller-manager (port 10257)
+kubeControllerManager:
+  enabled: true
+  serviceMonitor:
+    interval: 60s                 # War: GLOBAL (30s)
+    scrapeTimeout: 15s
+
+# kube-scheduler (port 10259)
+kubeScheduler:
+  enabled: true
+  serviceMonitor:
+    interval: 60s                 # War: GLOBAL (30s)
+    scrapeTimeout: 15s
+
+# kube-proxy (port 10249)
+kubeProxy:
+  enabled: true
+  serviceMonitor:
+    interval: 120s                # War: GLOBAL (30s)
+    scrapeTimeout: 30s
+
+# kube-state-metrics (port 8080)
+kubeStateMetrics:
+  enabled: true
+  serviceMonitor:
+    interval: 60s                 # War: GLOBAL (30s)
+    scrapeTimeout: 15s
+
+# Alertmanager (port 9093)
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 5Gi
+          storageClassName: local-path
+  serviceMonitor:
+    interval: 60s                 # War: GLOBAL (30s)
+    scrapeTimeout: 15s
+
+# Prometheus Self-Monitoring (port 9090)
+prometheus:
+  serviceMonitor:
+    interval: 60s                 # War: GLOBAL (30s)
+    scrapeTimeout: 15s
+
+# Prometheus Operator (port 8443)
+prometheusOperator:
+  enabled: true
+  serviceMonitor:
+    interval: 60s                 # War: GLOBAL (30s)
+    scrapeTimeout: 15s
+
+# Grafana (port 3000)
+grafana:
+  enabled: true
+  persistence:
+    enabled: false                # Bereits gesetzt (bleibt)
+  serviceMonitor:
+    interval: 120s                # War: GLOBAL (30s)
+    scrapeTimeout: 30s
