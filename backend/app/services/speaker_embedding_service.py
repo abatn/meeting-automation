@@ -60,13 +60,7 @@ class SpeakerEmbeddingService:
                 return False
 
             providers = ["CPUExecutionProvider"]
-            sess_options = ort.SessionOptions()
-            sess_options.intra_op_num_threads = int(os.environ.get("ONNX_NUM_THREADS", "1"))
-            self._session = ort.InferenceSession(
-                ONNX_MODEL_PATH,
-                providers=providers,
-                sess_options=sess_options
-            )
+            self._session = ort.InferenceSession(ONNX_MODEL_PATH, providers=providers)
             logger.info(f"ONNX model loaded: {self._session.get_inputs()[0].name} -> {self._session.get_outputs()[0].name}")
 
             self._fbank_filters = self._load_fbank_filters()
