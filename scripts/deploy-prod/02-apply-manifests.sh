@@ -17,6 +17,15 @@ for secret in backend-secrets postgres-secrets redis-secrets minio-secrets rabbi
     kubectl apply -f "${secret}.yaml" -n meeting-automation
 done
 
+# OnlyOffice Secrets (gitignored — created manually if missing)
+if ! kubectl get secret onlyoffice-secrets -n meeting-automation >/dev/null 2>&1; then
+  echo "⚠️ onlyoffice-secrets not found — creating with defaults"
+  kubectl create secret generic onlyoffice-secrets -n meeting-automation \
+    --from-literal=jwt-secret="tHjRho7Mrgicb9g09trClzCPt9X5OI48ZIfGWILLnkQ" \
+    --from-literal=secure-link-secret="prod-onlyoffice-secure-link-2026" \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
+
 kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml
 kubectl apply -f redis-deployment.yaml -f rabbitmq-statefulset.yaml -f minio-statefulset.yaml
 kubectl apply -f cnpg-cluster.yaml

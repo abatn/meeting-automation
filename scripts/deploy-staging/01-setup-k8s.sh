@@ -35,6 +35,9 @@ kubectl create secret docker-registry dockerhub-pull-secret \
   --docker-username=batnini \
   --docker-password="${DOCKERHUB_TOKEN}" \
   --dry-run=client -o yaml | kubectl apply -f -
+
+# OnlyOffice Secrets (JWT + Secure Link)
+kubectl apply -f infrastructure/kubernetes/staging/onlyoffice-secrets.yaml 2>/dev/null || echo "⚠️ onlyoffice-secrets apply failed"
 for deploy in $(kubectl get deploy -n "$NAMESPACE" -o name 2>/dev/null); do
   HAS_SECRET=$(kubectl get "$deploy" -n "$NAMESPACE" -o jsonpath='{.spec.template.spec.imagePullSecrets[?(@.name=="dockerhub-pull-secret")].name}' 2>/dev/null)
   if [ -z "$HAS_SECRET" ]; then
