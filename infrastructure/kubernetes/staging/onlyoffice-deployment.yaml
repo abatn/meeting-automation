@@ -38,13 +38,19 @@ spec:
         - name: JWT_ENABLED
           value: "true"
         - name: JWT_SECRET
-          value: "staging-onlyoffice-secret-jwt-key-2026"
+          valueFrom:
+            secretKeyRef:
+              name: onlyoffice-secrets
+              key: jwt-secret
         - name: JWT_HEADER
           value: "Authorization"
         - name: ALLOW_PRIVATE_IP_ADDRESS
           value: "true"
         - name: SECURE_LINK_SECRET
-          value: "gy3MA8R33ojtIGfXYq37"
+          valueFrom:
+            secretKeyRef:
+              name: onlyoffice-secrets
+              key: secure-link-secret
         - name: SERVER_NAME
           value: "staging.meeting-automation.com"
         resources:
