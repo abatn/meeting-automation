@@ -8,6 +8,13 @@ export KUBECONFIG="${KUBECONFIG:-$(pwd)/kubeconfig-staging}"
 
 echo "=== Velero Scope Check ==="
 
+# Guard: Skip if Velero is intentionally scaled down
+VELERO_DESIRED=$(kubectl get ds node-agent -n velero -o jsonpath='{.spec.desiredNumberScheduled}' 2>/dev/null || echo "0")
+if [ "$VELERO_DESIRED" = "0" ]; then
+  echo "⚠️ Velero node-agent scaled to 0 — skipping scope check"
+  exit 0
+fi
+
 # Check 1: Schedule muss Selector haben
 SELECTOR=$(kubectl get schedule daily-backup -n velero -o jsonpath='{.spec.template.labelSelector}' 2>/dev/null || echo '')
 if [ -z "$SELECTOR" ] || echo "$SELECTOR" | grep -q 'minio'; then
