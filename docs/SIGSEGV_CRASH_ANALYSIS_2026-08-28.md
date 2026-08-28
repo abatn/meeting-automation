@@ -63,8 +63,8 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 | **OS** | Oracle Linux Server 9.7 | Ubuntu 24.04.4 LTS | ✅ |
 | **k3s Version** | v1.36.2+k3s1 | v1.36.2+k3s1 | ✅ Identisch |
 | **RAM total** | 22Gi | 23Gi | ✅ |
-| **RAM used** | 10Gi (45%) | 5.7Gi (25%) | ✅ |
-| **Swap** | 5GB (2.3GB used) | 0B (kein Swap) | ❌ |
+| **RAM used** | 11Gi (50%) | 5.7Gi (25%) | ✅ |
+| **Swap** | 5GB (3.4GB used) | 0B (kein Swap) | ❌ |
 | **Disk** | 183G, 120G (66%) | 290G, 89G (31%) | ✅ |
 | **Load Average** | 1.07, 1.20, 1.30 | 1.56, 2.30, 2.80 | ⚠️ Prod höher |
 | **k3s CPU** | 17.9% | 70.0% | ❌ KRITISCH |
@@ -113,7 +113,7 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 | **S3_ENDPOINT** | http://minio-staging:9000 | http://minio:9000 | Service-Name |
 | **LIVEKIT_URL** | ws://livekit-server-staging:7880 | ws://livekit-server:7880 | Service-Name |
 | **LIVEKIT_PUBLIC_URL** | wss://staging.meeting-automation.com | wss://meeting-automation.com | Domain |
-| **DEBUG** | false | false | — |
+| **DEBUG** | true | false | ⚠️ Staging=Debug |
 | **envFrom** | backend-secrets-staging + backend-config | backend-secrets + backend-config | Secret-Name |
 
 ### 4. Sentinel Model
@@ -145,7 +145,7 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 | **redis password (server)** | redis_password | flgyEhZKHVyMBge1QkdKtA | — |
 | **redis password (egress)** | redis_password | flgyEhZKHVyMBge1QkdKtA | ✅ Match |
 | **webhook URL** | http://backend.meeting-automation-staging... | http://backend.meeting-automation... | ✅ |
-| **room_composite_cpu_cost** | 1.5 | 1.5 | ✅ Identisch |
+| **room_composite_cpu_cost** | 1.5 | 2.0 | ⚠️ Prod höher |
 
 ### 6. CNPG PostgreSQL
 
@@ -161,9 +161,9 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 | **backup retention** | 30d | 7d | ✅ |
 | **backup target** | prefer-standby | prefer-standby | ✅ |
 | **Backup endpoint** | http://minio-staging...:9000 | http://minio...:9000 | ✅ |
-| **archived_count** | 28 | 607 | ✅ |
-| **failed_count** | 849 | 0 | ⚠️ Staging hat Fehler (gewachsen) |
-| **minio-secrets keys** | MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD | MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_ROOT_USER, MINIO_SECRET_KEY | ✅ GEFIXT |
+| **archived_count** | 28 | 648 | ✅ |
+| **failed_count** | 2271 | 0 | ⚠️ Staging hat Fehler (gewachsen) |
+| **minio-secrets keys** | MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_ROOT_USER (TYPO: mino_user) | MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_ROOT_USER, MINIO_SECRET_KEY | ⚠️ TYPO |
 | **CNPG s3Credentials key** | MINIO_ACCESS_KEY | MINIO_ACCESS_KEY | ✅ |
 | **Key-Mismatch?** | ✅ NEIN (gepatcht) | ✅ Nein | ✅ GEFIXT |
 
@@ -230,8 +230,8 @@ Versuch 2 (00:41:52 → 00:44:29):
 | **SoftTimeLimit tötet Worker** | Logs: `00:41:51 Soft time limit (540s) exceeded` |
 | **GLEICHER Worker wird wiederverwendet** | Beide Versuche zeigen `ForkPoolWorker-8` |
 | **SIGSEGV 6s nach sentinel_chunks** | 00:44:23 → 00:44:29 |
-| **CNPG minio-secrets gepatcht** | MINIO_ACCESS_KEY + MINIO_SECRET_KEY vorhanden |
-| **room_composite_cpu_cost identisch** | Beide 1.5 |
+| **CNPG minio-secrets** | MINIO_ACCESS_KEY vorhanden, aber TYPO (mino_user statt minio_user) |
+| **room_composite_cpu_cost unterschiedlich** | Staging=1.5, Prod=2.0 |
 | **dmesg-Buffer rotiert** | Segfault-Einträge nicht mehr sichtbar |
 
 ### Kausalkette (bewiesen)
@@ -251,13 +251,14 @@ Versuch 2 (00:41:52 → 00:44:29):
 
 ## Empfohlene Fixes
 
-| Prio | Fix | Effekt | Aufwand | Befehl |
+| Prio | Fix | Effekt | Aufwand | Status |
 |------|-----|--------|---------|--------|
-| **P0** | `max_tasks_per_child=1` in Celery Config | Jeder Task bekommt fresh Worker (kein korrupter State) | Niedrig | In `celery_app.py` oder `celeryconfig.py` setzen, NICHT als CLI-Parameter |
-| **P1** | `task_soft_time_limit=900` | Verhindert vorzeitigen Kill | Niedrig | In Celery Config setzen, NICHT als Env-Var |
-| **P2** | CNPG minio-secrets Key-Mismatch | ✅ BEREITS GEFIXT | ✅ | MINIO_ACCESS_KEY + MINIO_SECRET_KEY vorhanden |
-| **P3** | cert-manager auf Prod | Origin-TLS für meeting-automation.com | Mittel | `helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true` |
-| **P4** | production-tls Secret für Prod | n8n Ingress TLS | Niedrig | Secret manuell erstellen oder cert-manager ausstellen lassen |
+| **P0** | `task_soft_time_limit=900` | Verhindert vorzeitigen Kill | Niedrig | ⏳ Offen |
+| **P1** | cert-manager auf Prod | Origin-TLS für meeting-automation.com | Mittel | ⏳ Offen |
+| **P1** | production-tls Secret für Prod | n8n Ingress TLS | Niedrig | ⏳ Offen |
+| **P2** | CNPG minio-secrets TYPO korrigieren | mino_user → minio_user | Niedrig | ⏳ Offen |
+| **P2** | room_composite_cpu_cost Prod=2.0 | Staging=1.5, Prod=2.0 — unterschiedlich | Niedrig | ⏳ Offen |
+| ✅ | CNPG minio-secrets Key-Mismatch | MINIO_ACCESS_KEY vorhanden | ✅ | ✅ GEFIXT |
 
 ### Offene Fragen
 
@@ -266,6 +267,7 @@ Versuch 2 (00:41:52 → 00:44:29):
 | **Warum dauert Sentinel LLM 5m38s?** (zu lang für 796 Text) | Offen |
 | **Warum ist ONNX 4x langsamer auf Prod?** (115s vs 27s auf Staging) | Offen |
 | **Warum hat die Pipeline vorher funktioniert?** (letzte successful Recording Aug 14) | Offen |
+| **Funktioniert max_tasks_per_child in dieser Celery-Version?** (nicht als CLI-Parameter getestet) | Offen |
 
 ---
 
