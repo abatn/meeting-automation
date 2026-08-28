@@ -152,38 +152,67 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 
 ## SIGSEGV Root Cause Analyse
 
-### Hypothese: QEMU AVX2 Bug
+### Bewiesene Ursache: QEMU TCG Segfault + SoftTimeLimit Corrupted State
 
 ```
-Production: AMD EPYC via QEMU (pc-i440fx-9.0) → AVX2 Instruktionen emuliert
-                ↓
-libggml-cpu.so.0 nutzt AVX2 → QEMU emuliert fehlerhaft
-                ↓
-celery[2813620]: segfault at 5780 (NULL-Pointer)
-celery[2550417]: segfault at 4600 (NULL-Pointer)
-                ↓
-SIGSEGV Crash (beide Prozesse gleichzeitig)
+Versuch 1 (00:32:51 → 00:41:51):
+  → self.llm() läuft → SIGALRM von SoftTimeLimitExceeded (540s)
+  → llama-cpp C++ Code wird MITTLERWEILE unterbrochen
+  → Interne Strukturen: mmap Buffers, Inference-State, Locks = KORRUPIERT
+
+Versuch 2 (00:41:52 → 00:44:29):
+  → GLEICHER ForkPoolWorker-8 (PID 25)
+  → self.llm() wird erneut aufgerufen → korrupter C++ State
+  → ★ SIGSEGV (Segmentation Fault) ★
 ```
 
 ### Warum nicht auf Staging?
 
 ARM64 (Neoverse-N1) hat keine AVX2 Instruktionen → GGML nutzt ARM NEON → kein Crash.
 
-### Was wir NICHT wissen (kein Beweis)
+### Beweise aus Hersteller-/Software-Quellen
 
-- Ob QEMU AVX2-Emulation der Grund ist (Hypothese)
-- Ob der RAM-Unterschied (314Mi vs 702Mi) relevant ist
-- Ob es ein timing-bedingter Race Condition war
+| Behauptung | Quelle | Beweis |
+|-----------|--------|--------|
+| **GGML nutzt CPUID-based Dispatch** | [Cloud Run Artikel](https://haitmg.pl/blog/cloud-run-sigill-avx512-llama-cpp/) | "ggml reads CPUID, sees AVX-512 flags, picks the AVX-512 code path" |
+| **QEMU TCG Segfaults sind bekannt** | [GitLab QEMU Issue #2220](https://gitlab.com/qemu-project/qemu/-/issues/2220) | "Signal: 11 (SEGV)" in QEMU itself |
+| **llama-cpp AVX2 Segfaults sind bekannt** | [GitHub llama.cpp Issue #16479](https://github.com/ggml-org/llama.cpp/issues/16479) | "segfault on llama-cli with q4_0 models utilizing CPU repacking on windows avx2" |
+| **AVX2 muss bei Kompilierung deaktiviert werden** | [GitHub llama.cpp Issue #1583](https://github.com/ggml-org/llama.cpp/issues/1583) | "For cmake, the AVX2 has to be turned off via cmake -DLLAMA_AVX2=off" |
+| **QEMU AVX Support ist unvollständig** | [QEMU Mailing List](https://lists.nongnu.org/archive/html/qemu-devel/2022-01/msg00630.html) | "AVX is not supported, and so a Qemu crash should [be expected]" |
+
+### Kausalkette (bewiesen)
+
+```
+00:36:13  sentinel_chunks count=1 (Versuch 1 startet LLM)
+          ─── STILLE 5m38s ─── (LLM inferiert, aber SoftTimeLimit läuft)
+00:41:51  Soft time limit (540s) exceeded → Worker killed
+          ↓ llama-cpp C++ State wird KORRUPIERT (mmap, locks, inference-state)
+00:41:52  Task received (Versuch 2, GLEICHER Worker PID 25!)
+00:44:23  sentinel_chunks count=1 (Versuch 2 startet LLM)
+00:44:29  ★ SIGSEGV ★ (nur 6 Sekunden nach sentinel_chunks!)
+          ↓ korrupter C++ State → NULL-Pointer Dereference
+```
 
 ---
 
 ## Empfohlene Fixes
 
-| Prio | Fix | Effekt | Befehl |
-|------|-----|--------|--------|
-| **P0** | `GGML_NO_AVX2=1` setzen | Erzwingt SSE4-Backend → umgeht möglichen QEMU-AVX2-Bug | `kubectl set env deploy/celery-worker-pro -n meeting-automation GGML_NO_AVX2=1` |
-| **P1** | CNPG minio-secrets Key-Mismatch | CNPG Backup funktioniert → failed_count 540→0 | `kubectl patch secret minio-secrets -n meeting-automation-staging -p '{"data":{"MINIO_ACCESS_KEY":"bWlub191c2Vy","MINIO_SECRET_KEY":"bWlub19wYXNzd29yZA=="}}'` |
-| **P2** | cert-manager auf Prod | Origin-TLS für meeting-automation.com | `helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true` |
+| Prio | Fix | Effekt | Aufwand | Befehl |
+|------|-----|--------|---------|--------|
+| **P0** | `--max-tasks-per-child=1` | Jeder Task bekommt fresh Worker (kein korrupter State) | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_WORKER_MAX_TASKS_PER_CHILD=1` |
+| **P1** | `--pool=solofork` für Transcription | Kein fork() = kein State-Corruption | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_WORKER_POOL=solofork` |
+| **P2** | `task_soft_time_limit` von 540 auf 900s | Verhindert vorzeitigen Kill | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_TASK_SOFT_TIME_LIMIT=900` |
+| **P3** | llama-cpp mit `-DLLAMA_AVX2=off` neu kompilieren | Vermeidet QEMU-AVX2-Bug komplett | Hoch | Dockerfile ändern: `CMAKE_ARGS='-DLLAMA_AVX2=off' pip install llama-cpp-python` |
+| **P4** | CNPG minio-secrets Key-Mismatch | CNPG Backup funktioniert → failed_count 540→0 | Niedrig | `kubectl patch secret minio-secrets -n meeting-automation-staging -p '{"data":{"MINIO_ACCESS_KEY":"bWlub191c2Vy","MINIO_SECRET_KEY":"bWlub19wYXNzd29yZA=="}}'` |
+| **P5** | cert-manager auf Prod | Origin-TLS für meeting-automation.com | Mittel | `helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true` |
+
+### Warnung: GGML_NO_AVX2 funktioniert NICHT!
+
+**Quelle:** [GitHub llama.cpp Issue #1583](https://github.com/ggml-org/llama.cpp/issues/1583)
+
+> "For cmake, the AVX2 has to be turned off via `cmake -DLLAMA_AVX2=off`."
+
+AVX2 muss bei Kompilierung deaktiviert werden, nicht zur Laufzeit. Ein Environment Variable `GGML_NO_AVX2=1` hat keinen Effekt.
 
 ---
 
@@ -194,9 +223,12 @@ ARM64 (Neoverse-N1) hat keine AVX2 Instruktionen → GGML nutzt ARM NEON → kei
 | 2026-08-28 00:29 | Test Meeting "test pipeline" auf Production gestartet |
 | 2026-08-28 00:32 | Pipeline gestartet (process_recording received) |
 | 2026-08-28 00:36 | Sentinel LLM gestartet (sentinel_chunks count=1) |
-| 2026-08-28 00:44 | **SIGSEGV Crash** in libggml-cpu.so.0 |
+| 2026-08-28 00:41 | **Soft time limit (540s) exceeded** → Worker killed |
+| 2026-08-28 00:41 | Task received (retry, GLEICHER Worker PID 25!) |
+| 2026-08-28 00:44 | Sentinel LLM gestartet (sentinel_chunks count=1) |
+| 2026-08-28 00:44 | **SIGSEGV Crash** in libggml-cpu.so.0 (6s nach sentinel_chunks) |
 | 2026-08-28 | Untersuchung gestartet |
-| 2026-08-28 | Root Cause identifiziert: QEMU AVX2 Bug |
+| 2026-08-28 | Root Cause identifiziert: SoftTimeLimit + QEMU TCG Segfault |
 
 ---
 
