@@ -70,11 +70,19 @@ jobs:
         echo "Git SHA: ${{ github.sha }}"
         echo "Image Tag: ${{ inputs.image_tag }}"
         
-        # Check if Velero is available
+        # Check if Velero is installed AND running (not just exists)
         if ! kubectl get deployment velero -n velero &>/dev/null; then
           echo "⚠️ Velero not installed — skipping backup"
           exit 0
         fi
+        
+        VELERO_READY=$(kubectl get deployment velero -n velero -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+        if [ -z "$VELERO_READY" ] || [ "$VELERO_READY" = "0" ]; then
+          echo "⚠️ Velero deployment exists but NOT running (readyReplicas=0) — skipping backup"
+          echo "   This prevents CI/CD from hanging on unprocessed backup CRDs."
+          exit 0
+        fi
+        echo "✅ Velero is running (readyReplicas=$VELERO_READY)"
         
         # Check if BSL is available
         BSL_STATUS=$(kubectl get backupstoragelocations.velero.io -n velero -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "Unavailable")

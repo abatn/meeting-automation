@@ -88,6 +88,32 @@ bash scripts/deploy-prod/04-velero-scope-check.sh     # muss exit 0
 
 ---
 
+## Problem 3: CI/CD Backup-Job hängt wenn Velero auf 0 ist
+
+### Symptom
+- Deploy Production `pre-deploy-backup` Job hängt 10+ Minuten
+- Velero Backup CRD `pre-deploy-cb787c39` wird erstellt aber nie verarbeitet
+- Kein Velero Server da (0/0) → `--wait` wartet endlos
+
+### Ursache
+`deploy-production.yml` prüft nur ob Velero Deployment **existiert** (`kubectl get deployment`), nicht ob es **readyReplicas > 0** hat. Bei 0/0 existiert die Deployment-Resource trotzdem → Check besteht → Backup CRD wird erstellt → kein Server → Hängt.
+
+### Lösung
+Zusätzliche Prüfung auf `readyReplicas` in `deploy-production.yml`:
+```bash
+VELERO_READY=$(kubectl get deployment velero -n velero -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+if [ -z "$VELERO_READY" ] || [ "$VELERO_READY" = "0" ]; then
+  echo "⚠️ Velero deployment exists but NOT running — skipping backup"
+  exit 0
+fi
+```
+
+### Verifikation
+- Deploy Production mit gestopptem Velero → Backup wird übersprungen (exit 0)
+- Deploy Production mit laufendem Velero → Backup wird ausgeführt
+
+---
+
 ## Timeline
 
 | Zeit | Aktion |
@@ -95,8 +121,10 @@ bash scripts/deploy-prod/04-velero-scope-check.sh     # muss exit 0
 | 2026-08-27 | Incident identifiziert |
 | 2026-08-27 | Staging Verifikation abgeschlossen |
 | 2026-08-27 | Production Verifikation abgeschlossen |
-| 2026-08-27 | Fix implementiert |
+| 2026-08-27 | Fix implementiert (Problem 1+2) |
 | 2026-08-27 | Verifikation auf beiden Clustern |
+| 2026-08-27 | Problem 3 identifiziert (Backup-Job hängt) |
+| 2026-08-27 | Fix implementiert (Problem 3: readyReplicas Check) |
 
 ---
 
@@ -125,10 +153,13 @@ bash scripts/deploy-prod/04-velero-scope-check.sh     # muss exit 0
 
 ## Root Cause
 
-Die Velero-Skalierungsstrategie (Velero gestoppt spart Ressourcen wenn keine Backups benötigt werden) wurde nicht in die CI/CD-Pipeline integriert. Die Deploy-Scripts prüfen Velero-Konfiguration ohne Guard-Clause für gestoppten Zustand.
+Die Velero-Skalierungsstrategie (Velero gestoppt spart Ressourcen wenn keine Backups benötigt werden) wurde nicht in die CI/CD-Pipeline integriert. Zwei Probleme:
+1. Deploy-Scripts prüfen Velero-Konfiguration ohne Guard-Clause für gestoppten Zustand
+2. Deploy-Workflow prüft Velero-Existenz, nicht Velero-Readiness → Backup-Job hängt endlos
 
 ## Lessons Learned
 
 1. **Skalierungsstrategie muss in CI/CD integriert sein** — Jede Komponente die gestoppt werden kann braucht Guard-Clauses in abhängigen Scripts
 2. **DaemonSets brauchen explizite Skalierung** — Deployments auf 0 zu setzen reicht nicht wenn DaemonSets existieren
 3. **Guard-Clauses vor kubectl-Befehlen** — Prüfen ob Ressource existiert bevor Config abgefragt wird
+4. **Deployment-Existenz ≠ Deployment-Bereitschaft** — `kubectl get deployment` prüft Existenz, `readyReplicas` prüft ob der Server tatsächlich läuft. Für `--wait` Befehle muss beides geprüft werden
