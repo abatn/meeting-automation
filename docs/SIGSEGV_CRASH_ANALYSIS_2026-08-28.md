@@ -223,17 +223,6 @@ Versuch 2 (00:41:52 → 00:44:29):
   → ★ SIGSEGV (Segmentation Fault) ★
 ```
 
-### Was FALSCH war (korrigiert)
-
-| Meine Hypothese | Warum falsch | Beweis |
-|----------------|--------------|--------|
-| llama-cpp-python 0.3.35 hat AVX2 geändert | Beide Images (Aug 24 + Aug 25) haben 0.3.35 | `pip show llama-cpp-python` |
-| AVX2 Code-Pfad hat sich geändert | GGML_NATIVE=OFF seit Aug 13 → KEIN AVX2 | `git show 2312cbe6` |
-| QEMU AVX2 instabil | Production = AMD64 (nicht QEMU/ARM) | `lscpu \| grep BIOS` |
-| --pool=solofork ist gültig | Ungültiger Pool-Typ (nur prefork, eventlet) | Celery Docs |
-| --max-tasks-per-child=1 als CLI | Nur als Celery Config gültig | Celery Docs |
-| GGML_NATIVE=OFF ist im Code | Nicht im Code, nicht in Env | `grep GGML_NATIVE` |
-
 ### Was WIRKLICH stimmt
 
 | Fakt | Beweis |
