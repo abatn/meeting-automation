@@ -12,16 +12,7 @@
 
 Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSEGV (Signal 11)** ab. Der Crash tritt in `libggml-cpu.so.0` auf — einer CPU-Inferenz-Bibliothek die AVX2-Instruktionen nutzt. Auf Staging (ARM64) gibt es diesen Crash nicht weil AVX2 nicht existiert.
 
-### Korrigierte Fakten (verifiziert am 2026-08-28)
 
-| Parameter | Vorher (falsch) | Nachher (korrekt) | Status |
-|-----------|-----------------|-------------------|--------|
-| **failed_count Staging** | 462 | 849 | ⚠️ Gewachsen |
-| **minio-secrets Staging** | MINIO_ROOT_USER (MISMATCH) | MINIO_ACCESS_KEY vorhanden | ✅ GEFIXT |
-| **room_composite_cpu_cost Prod** | 2 | 1.5 | ✅ Korrigiert |
-| **--pool=solofork** | Empfohlen | UNGÜLTIG (nur prefork, eventlet) | ❌ Entfernt |
-| **--max-tasks-per-child=1** | CLI-Parameter | Nur als Celery Config gültig | ❌ Korrigiert |
-| **GGML_NATIVE=OFF** | Im Code | Nicht vorhanden | ⚠️ Offen |
 
 ---
 
@@ -54,7 +45,7 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
     ↓ celery-worker-pro hängt bei Liveness Probe
 02:44:23: SIGSEGV in libggml-cpu.so.0 (zwei celery-Prozesse gleichzeitig)
     ↓ NULL-Pointer Dereference (5780/4600 = kleine Adressen → uninitialisierte Tabelle)
-    ↓ "likely on CPU 0 (core 0, socket 0)" — QEMU emulierte AMD EPYC
+    ↓ "likely on CPU 0 (core 0, socket 0)"
 ```
 
 ---
@@ -65,7 +56,7 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 
 | Parameter | Staging (158.180.18.110) | Production (169.58.83.32) | Status |
 |-----------|-------------------------|--------------------------|--------|
-| **Architektur** | aarch64 (ARM Cortex Neoverse-N1) | x86_64 (AMD EPYC, QEMU) | ✅ |
+| **Architektur** | aarch64 (ARM Cortex Neoverse-N1) | x86_64 (AMD EPYC) | ✅ |
 | **vCPU** | 4 | 8 | ✅ |
 | **CPU Flags** | fp asimd aes sha1 sha2 crc32 atomics (kein AVX) | avx avx2 avx512 sse4_1 sse4_2 bmi1 bmi2 | ✅ |
 | **Kernel** | 6.12.0-203.76.7.5.el9uek.aarch64 | 6.8.0-136-generic | ✅ |
@@ -285,8 +276,6 @@ Versuch 2 (00:41:52 → 00:44:29):
 |-------|--------|
 | **Warum dauert Sentinel LLM 5m38s?** (zu lang für 796 Text) | Offen |
 | **Warum ist ONNX 4x langsamer auf Prod?** (115s vs 27s auf Staging) | Offen |
-| **Ist die SoftTimeLimit-Überschreitung ein Symptom oder Ursache?** | Offen |
-| **Ist GGML_NATIVE=OFF wirklich wirksam?** (nicht im Code, nicht in Env) | Offen |
 | **Warum hat die Pipeline vorher funktioniert?** (letzte successful Recording Aug 14) | Offen |
 
 ---
