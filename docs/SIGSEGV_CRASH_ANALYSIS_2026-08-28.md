@@ -52,101 +52,156 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 
 ### 1. System-Resources
 
-| Parameter | Staging (158.180.18.110) | Production (169.58.83.32) | Befehl |
+| Parameter | Staging (158.180.18.110) | Production (169.58.83.32) | Status |
 |-----------|-------------------------|--------------------------|--------|
-| **CPU Architektur** | aarch64 | x86_64 | `uname -m` |
-| **CPU Model** | Neoverse-N1 | AMD EPYC Processor (with IBPB) | `lscpu \| grep Model` |
-| **CPU Flags** | fp asimd aes sha1 sha2 crc32 atomics (kein AVX) | avx avx2 sse4_1 sse4_2 bmi1 bmi2 | `cat /proc/cpuinfo \| grep flags` |
-| **vCPUs** | 4 | 8 | `lscpu \| grep "CPU(s):"` |
-| **Load Average** | 4.58, 4.52, 3.34 | 2.79, 2.97, 2.89 | `uptime` |
-| **RAM total** | 22Gi | 23Gi | `free -h` |
-| **RAM used** | 17Gi | 5.8Gi | `free -h` |
-| **RAM available** | 5.2Gi | 17Gi | `free -h` |
-| **Swap** | 5.0Gi (2.3Gi used) | 0B (kein Swap) | `swapon --show` |
-| **Disk** | 183G, 125G (68%) | 290G, 89G (31%) | `df -h /` |
-| **k3s CPU** | 17.9% | 69.9% | `ps aux \| grep k3s` |
-| **k3s RSS** | 1910040KB | 1059248KB | `ps aux \| grep k3s` |
-| **BIOS** | Kein QEMU | pc-i440fx-9.0 (QEMU) | `lscpu \| grep BIOS` |
-| **Kernel** | 6.12.0-203.76.7.5.el9uek.aarch64 | 6.8.0-136-generic | `uname -r` |
+| **Architektur** | aarch64 (ARM Cortex Neoverse-N1) | x86_64 (AMD EPYC, QEMU) | ✅ |
+| **vCPU** | 4 | 8 | ✅ |
+| **CPU Flags** | fp asimd aes sha1 sha2 crc32 atomics (kein AVX) | avx avx2 avx512 sse4_1 sse4_2 bmi1 bmi2 | ✅ |
+| **Kernel** | 6.12.0-203.76.7.5.el9uek.aarch64 | 6.8.0-136-generic | ✅ |
+| **OS** | Oracle Linux Server 9.7 | Ubuntu 24.04.4 LTS | ✅ |
+| **k3s Version** | v1.36.2+k3s1 | v1.36.2+k3s1 | ✅ Identisch |
+| **RAM total** | 22Gi | 23Gi | ✅ |
+| **RAM used** | 12Gi (55%) | 5.7Gi (25%) | ✅ |
+| **Swap** | 5GB (2.3GB used) | 0B (kein Swap) | ❌ |
+| **Disk** | 183G, 120G (66%) | 290G, 89G (31%) | ✅ |
+| **Load Average** | 1.36, 1.61, 1.90 | 1.82, 3.54, 3.21 | ⚠️ Prod höher |
+| **k3s CPU** | 17.9% | 70.0% | ❌ KRITISCH |
+| **k3s RAM** | 1.8GB RSS | 1.0GB RSS | ✅ |
+| **Nodes** | 1 (Single-Node) | 1 (Single-Node) | ✅ |
 
-### 2. Deployment Resources
+### 2. Deployment Resources (Limits/Requests)
 
-| Deployment | Staging Limits | Staging Requests | Production Limits | Production Requests | Befehl |
-|-----------|---------------|-----------------|-------------------|-------------------|--------|
-| **backend** | CPU=500m, RAM=1Gi, Ephem=1Gi | CPU=100m, RAM=256Mi, Ephem=200Mi | CPU=500m, RAM=1Gi | CPU=100m, RAM=256Mi | `kubectl get deploy <name> -o json` |
-| **celery-worker-pro** | CPU=1, RAM=6Gi, Ephem=2Gi | CPU=200m, RAM=2Gi, Ephem=500Mi | CPU=1, RAM=6Gi, Ephem=2Gi | CPU=200m, RAM=2Gi, Ephem=500Mi | `kubectl get deploy <name> -o json` |
-| **livekit-server** | CPU=1, RAM=1Gi | CPU=500m, RAM=512Mi | CPU=1, RAM=1Gi | CPU=500m, RAM=512Mi | `kubectl get deploy <name> -o json` |
-| **livekit-egress** | CPU=1, RAM=2Gi | CPU=200m, RAM=512Mi | CPU=2, RAM=2Gi | CPU=500m, RAM=512Mi | `kubectl get deploy <name> -o json` |
+| Deployment | Resource | Staging | Production | Differenz |
+|-----------|----------|---------|------------|----------|
+| **backend** | CPU limit | 500m | 500m | — |
+| | CPU request | 100m | 100m | — |
+| | RAM limit | 1Gi | 1Gi | — |
+| | RAM request | 256Mi | 256Mi | — |
+| | Ephemeral limit | 1Gi | none | ⚠️ Prod kein Ephemeral-Limit |
+| | Ephemeral request | 200Mi | none | — |
+| **celery-worker-pro** | CPU limit | 1 | 1 | — |
+| | CPU request | 200m | 200m | — |
+| | RAM limit | 6Gi | 6Gi | — |
+| | RAM request | 2Gi | 2Gi | — |
+| | Ephemeral limit | 2Gi | 2Gi | — |
+| **livekit-server** | CPU limit | 1 | 1 | — |
+| | CPU request | 500m | 500m | — |
+| | RAM limit | 1Gi | 1Gi | — |
+| | RAM request | 512Mi | 512Mi | — |
+| | hostNetwork | true | true | — |
+| | nodeSelector | instance-20260329-0846 | contabo-prod | — |
+| **livekit-egress** | CPU limit | 1 | 2 | ⚠️ Prod 2x |
+| | CPU request | 200m | 500m | Prod 2.5x |
+| | RAM limit | 2Gi | 2Gi | — |
+| | RAM request | 512Mi | 512Mi | — |
+| | hostNetwork | true | true | — |
+| **onlyoffice** | CPU limit | 1 | 1 | — |
+| | RAM limit | 2Gi | 2Gi | — |
+| | RAM request | 512Mi | 512Mi | — |
 
 ### 3. Environment Variables
 
-| Variable | Staging | Production | Befehl |
-|----------|---------|------------|--------|
-| **GGML_NO_AVX2** | NICHT GESETZT | NICHT GESETZT | `kubectl exec -- env \| grep -i ggml` |
-| **GGML_* (alle)** | Keine | Keine | `kubectl exec -- env \| grep -iE "GGML\|AVX\|LLAMA"` |
-| **SENTINEL_MODEL_URL** | http://minio-staging.../qwen2.5-1.5b... | http://minio.../qwen2.5-1.5b... | `kubectl get cm backend-config -o json` |
-| **S3_ENDPOINT** | http://minio-staging:9000 | http://minio:9000 | `kubectl get cm backend-config -o json` |
-| **LIVEKIT_URL** | ws://livekit-server-staging:7880 | ws://livekit-server:7880 | `kubectl get cm backend-config -o json` |
+| Variable | Staging | Production | Differenz |
+|----------|---------|------------|----------|
+| **GGML_NO_AVX2** | NICHT GESETZT | NICHT GESETZT | ⚠️ Kein AVX-Schutz auf Prod |
+| **GGML_ (alle)** | Keine | Keine | — |
+| **LLAMA_ (alle)** | Keine | Keine | — |
+| **THREAD** | Keine | Keine | — |
+| **SENTINEL_MODEL_URL** | http://minio-staging.../qwen2.5-1.5b... | http://minio.../qwen2.5-1.5b... | Service-Name |
+| **S3_ENDPOINT** | http://minio-staging:9000 | http://minio:9000 | Service-Name |
+| **LIVEKIT_URL** | ws://livekit-server-staging:7880 | ws://livekit-server:7880 | Service-Name |
+| **LIVEKIT_PUBLIC_URL** | wss://staging.meeting-automation.com | wss://meeting-automation.com | Domain |
+| **DEBUG** | false | false | — |
+| **envFrom** | backend-secrets-staging + backend-config | backend-secrets + backend-config | Secret-Name |
 
 ### 4. Sentinel Model
 
-| Parameter | Staging | Production | Befehl |
+| Parameter | Staging | Production | Status |
 |-----------|---------|------------|--------|
-| **Modellname** | qwen2.5-1.5b-instruct-q4_k_m.gguf | qwen2.5-1.5b-instruct-q4_k_m.gguf | `kubectl exec -- ls -la /app/models/` |
-| **Modellgröße** | 1,117,320,736 bytes (1.04 GB) | 1,117,320,736 bytes (1.04 GB) | `kubectl exec -- ls -la /app/models/` |
-| **Pfad** | /app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf | /app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf | `kubectl exec -- ls -la /app/models/` |
-| **RAM (gemessen)** | 314Mi | 702Mi | `kubectl top pod --containers` |
-| **CPU (gemessen)** | 1m | 19m | `kubectl top pod --containers` |
-| **SIGSEGV** | Keine | 2x (celery[2813620], celery[2550417]) | `dmesg \| grep segfault` |
+| **Modell** | qwen2.5-1.5b-instruct-q4_k_m.gguf | qwen2.5-1.5b-instruct-q4_k_m.gguf | ✅ Identisch |
+| **Modellgröße** | 1,117,320,736 bytes (1.04 GB) | 1,117,320,736 bytes (1.04 GB) | ✅ Identisch |
+| **Datei-Pfad** | /app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf | /app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf | ✅ Identisch |
+| **PVC** | sentinel-models-claim (2Gi, local-path) | sentinel-models-claim (2Gi, local-path) | ✅ Identisch |
+| **RAM gemessen** | 1045Mi | 743Mi | ⚠️ Unterschiedlich |
+| **CPU-Arch** | aarch64 (ARM NEON) | amd64 (AVX2) | ✅ |
+| **GGML Backend** | ARM NEON | x86 AVX2 | ✅ |
+| **SIGSEGV** | ✅ Nie | ❌ 2x Crashes (Aug 28 02:44) | ❌ |
 
-### 5. LiveKit API Keys & Secrets
+### 5. LiveKit Konfiguration
 
-| Komponente | Staging | Production | Match? | Befehl |
-|-----------|---------|------------|--------|--------|
-| **livekit-secrets API_KEY** | meeting-api-key | prod-9a4ac9f989143b65 | — | `kubectl get secret livekit-secrets -o json` |
-| **backend-secrets API_KEY** | meeting-api-key | prod-9a4ac9f989143b65 | ✅ | `kubectl get secret backend-secrets -o json` |
-| **livekit-config keys** | meeting-api-key: meeting-api-secret-2026... | prod-9a4ac9f9...: prod-8f8b7b42... | ✅ | `kubectl get cm livekit-config -o json` |
-| **egress-config api_key** | meeting-api-key | prod-9a4ac9f989143b65 | ✅ | `kubectl get cm livekit-egress -o json` |
+| Parameter | Staging | Production | Status |
+|-----------|---------|------------|--------|
+| **API Key (livekit-secrets)** | meeting-api-key | prod-9a4ac9f989143b65 | — |
+| **API Key (backend-secrets)** | meeting-api-key | prod-9a4ac9f989143b65 | ✅ Match |
+| **API Key (livekit-config)** | meeting-api-key | prod-9a4ac9f989143b65 | ✅ Match |
+| **API Key (egress-config)** | meeting-api-key | prod-9a4ac9f989143b65 | ✅ Match |
+| **API Secret (livekit-secrets)** | meeting-api-secret-2026... | prod-8f8b7b429f... | — |
+| **API Secret (egress-config)** | meeting-api-secret-2026... | prod-8f8b7b429f... | ✅ Match |
+| **hostNetwork** | true (server+egress) | true (server+egress) | ✅ |
+| **nodeSelector** | instance-20260329-0846 | contabo-prod | ✅ |
+| **ws_url (egress)** | ws://livekit-server-staging:7880 | ws://livekit-server:7880 | ✅ |
+| **redis password (server)** | redis_password | flgyEhZKHVyMBge1QkdKtA | — |
+| **redis password (egress)** | redis_password | flgyEhZKHVyMBge1QkdKtA | ✅ Match |
+| **webhook URL** | http://backend.meeting-automation-staging... | http://backend.meeting-automation... | ✅ |
+| **room_composite_cpu_cost** | 1.5 | 2 | ⚠️ Prod höher |
 
 ### 6. CNPG PostgreSQL
 
-| Parameter | Staging | Production | Befehl |
+| Parameter | Staging | Production | Status |
 |-----------|---------|------------|--------|
-| **Instances (spec)** | 2 | 3 | `kubectl get cluster meeting-db -o json` |
-| **Instances (ready)** | 1 | 3 | `kubectl get cluster meeting-db -o json` |
-| **Phase** | Instance Status Extraction Error | Cluster in healthy state | `kubectl get cluster meeting-db -o json` |
-| **Image** | postgresql:18.3-system-trixie | postgresql:18.4-system-trixie | `kubectl get cluster meeting-db -o json` |
-| **wal_level** | logical | logical | `kubectl get cluster meeting-db -o json` |
-| **archive_mode** | on | on | `kubectl get cluster meeting-db -o json` |
-| **wal_keep_size** | 64MB | 512MB | `kubectl get cluster meeting-db -o json` |
-| **backup retention** | 30d | 7d | `kubectl get cluster meeting-db -o json` |
-| **backup s3 key ref** | MINIO_ACCESS_KEY | MINIO_ACCESS_KEY | `kubectl get cluster meeting-db -o json` |
-| **minio-secrets keys** | MINIO_ROOT_USER, MINIO_ROOT_PASSWORD | MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_ROOT_USER, MINIO_SECRET_KEY | `kubectl get secret minio-secrets -o json` |
-| **Key-Mismatch?** | ⚠️ JA | ✅ Nein | Vergleich s3Credentials + Secret Keys |
-| **archived_count** | 28 | 607 | `psql -c SELECT archived_count FROM pg_stat_archiver` |
-| **failed_count** | 540 | 0 | `psql -c SELECT failed_count FROM pg_stat_archiver` |
+| **Instances (spec)** | 2 | 3 | ✅ |
+| **Instances (ready)** | 1 | 3 | ⚠️ Staging nur 1 |
+| **Phase** | ⚠️ Instance Status Extraction Error | ✅ Cluster in healthy state | ⚠️ |
+| **Image** | postgresql:18.3-system-trixie | postgresql:18.4-system-trixie | ✅ |
+| **wal_level** | logical | logical | ✅ |
+| **archive_mode** | on | on | ✅ |
+| **wal_keep_size** | 64MB | 512MB | ✅ |
+| **backup retention** | 30d | 7d | ✅ |
+| **backup target** | prefer-standby | prefer-standby | ✅ |
+| **Backup endpoint** | http://minio-staging...:9000 | http://minio...:9000 | ✅ |
+| **archived_count** | 28 | 607 | ✅ |
+| **failed_count** | 462 | 0 | ⚠️ Staging hat Fehler |
+| **minio-secrets keys** | MINIO_ROOT_USER, MINIO_ROOT_PASSWORD | MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_ROOT_USER, MINIO_SECRET_KEY | ❌ |
+| **CNPG s3Credentials key** | MINIO_ACCESS_KEY | MINIO_ACCESS_KEY | ✅ |
+| **Key-Mismatch?** | ⚠️ JA (Secret hat ROOT_USER, CNPG referenziert ACCESS_KEY) | ✅ Nein | ❌ |
 
 ### 7. cert-manager
 
-| Parameter | Staging | Production | Befehl |
+| Parameter | Staging | Production | Status |
 |-----------|---------|------------|--------|
-| **Namespace** | ✅ cert-manager (Active, 27d) | ❌ Error from server (NotFound) | `kubectl get ns cert-manager` |
-| **Pods** | 3 Running | 0 | `kubectl get pods -n cert-manager` |
-| **Certificate CRDs** | staging-tls (True) | Keine | `kubectl get certificate -A` |
-| **TLS Secrets** | staging-tls | meeting-db-replication, meeting-db-server (nur CNPG) | `kubectl get secrets \| grep tls` |
-| **Ingress TLS** | [{"hosts":["staging..."],"secretName":"staging-tls"}] | null | `kubectl get ingress meeting-production -o json` |
+| **Namespace** | ✅ cert-manager (Active, 27d) | ❌ FEHLT | ❌ |
+| **Pods** | 3 (cert-manager, cainjector, webhook) | 0 | ❌ |
+| **Certificate CRDs** | ✅ staging-tls (True), monitoring-tls (True) | ❌ Keine | ❌ |
+| **TLS Secrets** | staging-tls, monitoring-tls | meeting-db-replication, meeting-db-server (nur CNPG) | ❌ |
+| **Ingress TLS (main)** | ✅ staging-tls | ❌ null (kein TLS in meeting-production) | ❌ |
+| **Ingress TLS (n8n)** | ✅ staging-tls | ✅ production-tls | ✅ |
+| **HTTPS funktioniert?** | ✅ Origin-TLS | ⚠️ Cloudflare Flexible (Edge→Origin HTTP) | ⚠️ |
 
 ### 8. OOM-Kills und Crashes
 
-| Parameter | Staging | Production | Befehl |
+| Parameter | Staging | Production | Status |
 |-----------|---------|------------|--------|
-| **dmesg OOM** | Keine | Keine | `dmesg \| grep -i oom` |
-| **dmesg SIGSEGV** | Keine | 2x (celery[2813620], celery[2550417]) | `dmesg \| grep segfault` |
-| **Crash-Bibliothek** | — | libggml-cpu.so.0 | `dmesg \| grep segfault` |
-| **Crash-Zeitpunkt** | — | Aug 28 02:44:23 | `dmesg \| grep segfault` |
-| **Crash-Adresse** | — | at 5780 / at 4600 (NULL-Deref) | `dmesg \| grep segfault` |
-| **Pod Restarts** | 3 (livekit×2, n8n) | 7 (alle 7d4h ago) | `kubectl get pods \| awk '$4>0'` |
-| **celery-worker-pro Restarts** | 0 | 0 | `kubectl get pods \| awk '$4>0'` |
+| **dmesg OOM** | ✅ Keine | ✅ Keine | ✅ |
+| **dmesg SIGSEGV** | ✅ Keine | ❌ 2x (celery[2813620], celery[2550417]) | ❌ |
+| **Crash-Bibliothek** | — | libggml-cpu.so.0 (GGML CPU Inference) | ❌ |
+| **Crash-Zeitpunkt** | — | Aug 28 02:44:23 | ❌ |
+| **Crash-Adresse** | — | at 5780 / at 4600 (NULL-Deref) | ❌ |
+| **k3s SIGSEGV** | — | Keine | ✅ |
+| **Pod Restarts** | 3 (livekit×2, n8n — alle kürzlich gedeplayed) | 7 (alle 7d4h ago — Deployment-Restart) | ✅ |
+| **celery-worker-pro Restarts** | 0 | 0 (aber Liveness-Fehler: inspect ping --timeout=10 timed out) | ⚠️ |
+| **Pod Memory (celery-worker-pro)** | 1045Mi | 743Mi | ⚠️ Unterschiedlich |
+
+### 9. k3s Konfiguration
+
+| Parameter | Staging | Production | Status |
+|-----------|---------|------------|--------|
+| **Start-Methode** | Inline args (--disable=traefik) | Config-Datei (config.yaml) | ✅ |
+| **GOGC** | NICHT GESETZT | 50 | ⚠️ |
+| **GOMEMLIMIT** | NICHT GESETZT | 1500MiB | ⚠️ |
+| **kubelet-arg** | Nicht sichtbar | system-reserved=cpu=500m,memory=1Gi, eviction-hard=nodefs<10%,imagefs<15% | ⚠️ |
+| **metrics-server** | Standard (aktiv) | Deaktiviert | ⚠️ |
+| **containerd** | 26G + 7.4G Docker buildkit | 22G | ✅ |
+| **Image GC** | Standard | high=75%, low=70% | ⚠️ |
 
 ---
 
