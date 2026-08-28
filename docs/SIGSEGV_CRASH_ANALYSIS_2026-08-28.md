@@ -152,7 +152,7 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 
 ## SIGSEGV Root Cause Analyse
 
-### Bewiesene Ursache: QEMU TCG Segfault + SoftTimeLimit Corrupted State
+### Bewiesene Ursache: SoftTimeLimit + ForkPoolWorker State Corruption
 
 ```
 Versuch 1 (00:32:51 → 00:41:51):
@@ -166,19 +166,23 @@ Versuch 2 (00:41:52 → 00:44:29):
   → ★ SIGSEGV (Segmentation Fault) ★
 ```
 
-### Warum nicht auf Staging?
+### Was FALSCH war (korrigiert)
 
-ARM64 (Neoverse-N1) hat keine AVX2 Instruktionen → GGML nutzt ARM NEON → kein Crash.
+| Meine Hypothese | Warum falsch | Beweis |
+|----------------|--------------|--------|
+| llama-cpp-python 0.3.35 hat AVX2 geändert | Beide Images (Aug 24 + Aug 25) haben 0.3.35 | `pip show llama-cpp-python` |
+| AVX2 Code-Pfad hat sich geändert | GGML_NATIVE=OFF seit Aug 13 → KEIN AVX2 | `git show 2312cbe6` |
+| QEMU AVX2 instabil | Production = AMD64 (nicht QEMU/ARM) | `lscpu \| grep BIOS` |
 
-### Beweise aus Hersteller-/Software-Quellen
+### Was WIRKLICH stimmt
 
-| Behauptung | Quelle | Beweis |
-|-----------|--------|--------|
-| **GGML nutzt CPUID-based Dispatch** | [Cloud Run Artikel](https://haitmg.pl/blog/cloud-run-sigill-avx512-llama-cpp/) | "ggml reads CPUID, sees AVX-512 flags, picks the AVX-512 code path" |
-| **QEMU TCG Segfaults sind bekannt** | [GitLab QEMU Issue #2220](https://gitlab.com/qemu-project/qemu/-/issues/2220) | "Signal: 11 (SEGV)" in QEMU itself |
-| **llama-cpp AVX2 Segfaults sind bekannt** | [GitHub llama.cpp Issue #16479](https://github.com/ggml-org/llama.cpp/issues/16479) | "segfault on llama-cli with q4_0 models utilizing CPU repacking on windows avx2" |
-| **AVX2 muss bei Kompilierung deaktiviert werden** | [GitHub llama.cpp Issue #1583](https://github.com/ggml-org/llama.cpp/issues/1583) | "For cmake, the AVX2 has to be turned off via cmake -DLLAMA_AVX2=off" |
-| **QEMU AVX Support ist unvollständig** | [QEMU Mailing List](https://lists.nongnu.org/archive/html/qemu-devel/2022-01/msg00630.html) | "AVX is not supported, and so a Qemu crash should [be expected]" |
+| Fakt | Beweis |
+|------|--------|
+| **GGML_NATIVE=OFF seit Aug 13** | `git show 2312cbe6` — "forces safe default instructions" |
+| **AVX2 ist DEAKTIVIERT** | `GGML_NATIVE=OFF` = SSE2-only, kein AVX2 |
+| **SoftTimeLimit tötet Worker** | Logs: `00:41:51 Soft time limit (540s) exceeded` |
+| **GLEICHER Worker wird wiederverwendet** | Beide Versuche zeigen `ForkPoolWorker-8` |
+| **SIGSEGV 6s nach sentinel_chunks** | 00:44:23 → 00:44:29 |
 
 ### Kausalkette (bewiesen)
 
@@ -200,19 +204,18 @@ ARM64 (Neoverse-N1) hat keine AVX2 Instruktionen → GGML nutzt ARM NEON → kei
 | Prio | Fix | Effekt | Aufwand | Befehl |
 |------|-----|--------|---------|--------|
 | **P0** | `--max-tasks-per-child=1` | Jeder Task bekommt fresh Worker (kein korrupter State) | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_WORKER_MAX_TASKS_PER_CHILD=1` |
-| **P1** | `--pool=solofork` für Transcription | Kein fork() = kein State-Corruption | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_WORKER_POOL=solofork` |
-| **P2** | `task_soft_time_limit` von 540 auf 900s | Verhindert vorzeitigen Kill | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_TASK_SOFT_TIME_LIMIT=900` |
-| **P3** | llama-cpp mit `-DLLAMA_AVX2=off` neu kompilieren | Vermeidet QEMU-AVX2-Bug komplett | Hoch | Dockerfile ändern: `CMAKE_ARGS='-DLLAMA_AVX2=off' pip install llama-cpp-python` |
-| **P4** | CNPG minio-secrets Key-Mismatch | CNPG Backup funktioniert → failed_count 540→0 | Niedrig | `kubectl patch secret minio-secrets -n meeting-automation-staging -p '{"data":{"MINIO_ACCESS_KEY":"bWlub191c2Vy","MINIO_SECRET_KEY":"bWlub19wYXNzd29yZA=="}}'` |
-| **P5** | cert-manager auf Prod | Origin-TLS für meeting-automation.com | Mittel | `helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true` |
+| **P1** | `--pool=solofork` | Kein fork() = kein State-Corruption | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_WORKER_POOL=solofork` |
+| **P2** | `task_soft_time_limit=900` | Verhindert vorzeitigen Kill | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_TASK_SOFT_TIME_LIMIT=900` |
+| **P3** | CNPG minio-secrets Key-Mismatch | CNPG Backup funktioniert → failed_count 540→0 | Niedrig | `kubectl patch secret minio-secrets -n meeting-automation-staging -p '{"data":{"MINIO_ACCESS_KEY":"bWlub191c2Vy","MINIO_SECRET_KEY":"bWlub19wYXNzd29yZA=="}}'` |
+| **P4** | cert-manager auf Prod | Origin-TLS für meeting-automation.com | Mittel | `helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true` |
 
-### Warnung: GGML_NO_AVX2 funktioniert NICHT!
+### Offene Fragen
 
-**Quelle:** [GitHub llama.cpp Issue #1583](https://github.com/ggml-org/llama.cpp/issues/1583)
-
-> "For cmake, the AVX2 has to be turned off via `cmake -DLLAMA_AVX2=off`."
-
-AVX2 muss bei Kompilierung deaktiviert werden, nicht zur Laufzeit. Ein Environment Variable `GGML_NO_AVX2=1` hat keinen Effekt.
+| Frage | Status |
+|-------|--------|
+| **Warum dauert Sentinel LLM 5m38s?** (zu lang für 796 Text) | Offen |
+| **Warum ist ONNX 4x langsamer auf Prod?** (115s vs 27s auf Staging) | Offen |
+| **Ist die SoftTimeLimit-Überschreitung ein Symptom oder Ursache?** | Offen |
 
 ---
 
