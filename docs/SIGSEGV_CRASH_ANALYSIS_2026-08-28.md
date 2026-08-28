@@ -12,6 +12,17 @@
 
 Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSEGV (Signal 11)** ab. Der Crash tritt in `libggml-cpu.so.0` auf — einer CPU-Inferenz-Bibliothek die AVX2-Instruktionen nutzt. Auf Staging (ARM64) gibt es diesen Crash nicht weil AVX2 nicht existiert.
 
+### Korrigierte Fakten (verifiziert am 2026-08-28)
+
+| Parameter | Vorher (falsch) | Nachher (korrekt) | Status |
+|-----------|-----------------|-------------------|--------|
+| **failed_count Staging** | 462 | 849 | ⚠️ Gewachsen |
+| **minio-secrets Staging** | MINIO_ROOT_USER (MISMATCH) | MINIO_ACCESS_KEY vorhanden | ✅ GEFIXT |
+| **room_composite_cpu_cost Prod** | 2 | 1.5 | ✅ Korrigiert |
+| **--pool=solofork** | Empfohlen | UNGÜLTIG (nur prefork, eventlet) | ❌ Entfernt |
+| **--max-tasks-per-child=1** | CLI-Parameter | Nur als Celery Config gültig | ❌ Korrigiert |
+| **GGML_NATIVE=OFF** | Im Code | Nicht vorhanden | ⚠️ Offen |
+
 ---
 
 ## SIGSEGV Details (verifiziert)
@@ -61,10 +72,10 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 | **OS** | Oracle Linux Server 9.7 | Ubuntu 24.04.4 LTS | ✅ |
 | **k3s Version** | v1.36.2+k3s1 | v1.36.2+k3s1 | ✅ Identisch |
 | **RAM total** | 22Gi | 23Gi | ✅ |
-| **RAM used** | 12Gi (55%) | 5.7Gi (25%) | ✅ |
+| **RAM used** | 10Gi (45%) | 5.7Gi (25%) | ✅ |
 | **Swap** | 5GB (2.3GB used) | 0B (kein Swap) | ❌ |
 | **Disk** | 183G, 120G (66%) | 290G, 89G (31%) | ✅ |
-| **Load Average** | 1.36, 1.61, 1.90 | 1.82, 3.54, 3.21 | ⚠️ Prod höher |
+| **Load Average** | 1.07, 1.20, 1.30 | 1.56, 2.30, 2.80 | ⚠️ Prod höher |
 | **k3s CPU** | 17.9% | 70.0% | ❌ KRITISCH |
 | **k3s RAM** | 1.8GB RSS | 1.0GB RSS | ✅ |
 | **Nodes** | 1 (Single-Node) | 1 (Single-Node) | ✅ |
@@ -143,7 +154,7 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 | **redis password (server)** | redis_password | flgyEhZKHVyMBge1QkdKtA | — |
 | **redis password (egress)** | redis_password | flgyEhZKHVyMBge1QkdKtA | ✅ Match |
 | **webhook URL** | http://backend.meeting-automation-staging... | http://backend.meeting-automation... | ✅ |
-| **room_composite_cpu_cost** | 1.5 | 2 | ⚠️ Prod höher |
+| **room_composite_cpu_cost** | 1.5 | 1.5 | ✅ Identisch |
 
 ### 6. CNPG PostgreSQL
 
@@ -160,10 +171,10 @@ Test Meeting "test pipeline" auf Production stürzt bei Sentinel LLM mit **SIGSE
 | **backup target** | prefer-standby | prefer-standby | ✅ |
 | **Backup endpoint** | http://minio-staging...:9000 | http://minio...:9000 | ✅ |
 | **archived_count** | 28 | 607 | ✅ |
-| **failed_count** | 462 | 0 | ⚠️ Staging hat Fehler |
-| **minio-secrets keys** | MINIO_ROOT_USER, MINIO_ROOT_PASSWORD | MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_ROOT_USER, MINIO_SECRET_KEY | ❌ |
+| **failed_count** | 849 | 0 | ⚠️ Staging hat Fehler (gewachsen) |
+| **minio-secrets keys** | MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD | MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_ROOT_USER, MINIO_SECRET_KEY | ✅ GEFIXT |
 | **CNPG s3Credentials key** | MINIO_ACCESS_KEY | MINIO_ACCESS_KEY | ✅ |
-| **Key-Mismatch?** | ⚠️ JA (Secret hat ROOT_USER, CNPG referenziert ACCESS_KEY) | ✅ Nein | ❌ |
+| **Key-Mismatch?** | ✅ NEIN (gepatcht) | ✅ Nein | ✅ GEFIXT |
 
 ### 7. cert-manager
 
@@ -228,16 +239,20 @@ Versuch 2 (00:41:52 → 00:44:29):
 | llama-cpp-python 0.3.35 hat AVX2 geändert | Beide Images (Aug 24 + Aug 25) haben 0.3.35 | `pip show llama-cpp-python` |
 | AVX2 Code-Pfad hat sich geändert | GGML_NATIVE=OFF seit Aug 13 → KEIN AVX2 | `git show 2312cbe6` |
 | QEMU AVX2 instabil | Production = AMD64 (nicht QEMU/ARM) | `lscpu \| grep BIOS` |
+| --pool=solofork ist gültig | Ungültiger Pool-Typ (nur prefork, eventlet) | Celery Docs |
+| --max-tasks-per-child=1 als CLI | Nur als Celery Config gültig | Celery Docs |
+| GGML_NATIVE=OFF ist im Code | Nicht im Code, nicht in Env | `grep GGML_NATIVE` |
 
 ### Was WIRKLICH stimmt
 
 | Fakt | Beweis |
 |------|--------|
-| **GGML_NATIVE=OFF seit Aug 13** | `git show 2312cbe6` — "forces safe default instructions" |
-| **AVX2 ist DEAKTIVIERT** | `GGML_NATIVE=OFF` = SSE2-only, kein AVX2 |
 | **SoftTimeLimit tötet Worker** | Logs: `00:41:51 Soft time limit (540s) exceeded` |
 | **GLEICHER Worker wird wiederverwendet** | Beide Versuche zeigen `ForkPoolWorker-8` |
 | **SIGSEGV 6s nach sentinel_chunks** | 00:44:23 → 00:44:29 |
+| **CNPG minio-secrets gepatcht** | MINIO_ACCESS_KEY + MINIO_SECRET_KEY vorhanden |
+| **room_composite_cpu_cost identisch** | Beide 1.5 |
+| **dmesg-Buffer rotiert** | Segfault-Einträge nicht mehr sichtbar |
 
 ### Kausalkette (bewiesen)
 
@@ -258,11 +273,11 @@ Versuch 2 (00:41:52 → 00:44:29):
 
 | Prio | Fix | Effekt | Aufwand | Befehl |
 |------|-----|--------|---------|--------|
-| **P0** | `--max-tasks-per-child=1` | Jeder Task bekommt fresh Worker (kein korrupter State) | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_WORKER_MAX_TASKS_PER_CHILD=1` |
-| **P1** | `--pool=solofork` | Kein fork() = kein State-Corruption | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_WORKER_POOL=solofork` |
-| **P2** | `task_soft_time_limit=900` | Verhindert vorzeitigen Kill | Niedrig | `kubectl set env deploy/celery-worker-pro -n meeting-automation CELERY_TASK_SOFT_TIME_LIMIT=900` |
-| **P3** | CNPG minio-secrets Key-Mismatch | CNPG Backup funktioniert → failed_count 540→0 | Niedrig | `kubectl patch secret minio-secrets -n meeting-automation-staging -p '{"data":{"MINIO_ACCESS_KEY":"bWlub191c2Vy","MINIO_SECRET_KEY":"bWlub19wYXNzd29yZA=="}}'` |
-| **P4** | cert-manager auf Prod | Origin-TLS für meeting-automation.com | Mittel | `helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true` |
+| **P0** | `max_tasks_per_child=1` in Celery Config | Jeder Task bekommt fresh Worker (kein korrupter State) | Niedrig | In `celery_app.py` oder `celeryconfig.py` setzen, NICHT als CLI-Parameter |
+| **P1** | `task_soft_time_limit=900` | Verhindert vorzeitigen Kill | Niedrig | In Celery Config setzen, NICHT als Env-Var |
+| **P2** | CNPG minio-secrets Key-Mismatch | ✅ BEREITS GEFIXT | ✅ | MINIO_ACCESS_KEY + MINIO_SECRET_KEY vorhanden |
+| **P3** | cert-manager auf Prod | Origin-TLS für meeting-automation.com | Mittel | `helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true` |
+| **P4** | production-tls Secret für Prod | n8n Ingress TLS | Niedrig | Secret manuell erstellen oder cert-manager ausstellen lassen |
 
 ### Offene Fragen
 
@@ -271,6 +286,8 @@ Versuch 2 (00:41:52 → 00:44:29):
 | **Warum dauert Sentinel LLM 5m38s?** (zu lang für 796 Text) | Offen |
 | **Warum ist ONNX 4x langsamer auf Prod?** (115s vs 27s auf Staging) | Offen |
 | **Ist die SoftTimeLimit-Überschreitung ein Symptom oder Ursache?** | Offen |
+| **Ist GGML_NATIVE=OFF wirklich wirksam?** (nicht im Code, nicht in Env) | Offen |
+| **Warum hat die Pipeline vorher funktioniert?** (letzte successful Recording Aug 14) | Offen |
 
 ---
 
@@ -286,7 +303,8 @@ Versuch 2 (00:41:52 → 00:44:29):
 | 2026-08-28 00:44 | Sentinel LLM gestartet (sentinel_chunks count=1) |
 | 2026-08-28 00:44 | **SIGSEGV Crash** in libggml-cpu.so.0 (6s nach sentinel_chunks) |
 | 2026-08-28 | Untersuchung gestartet |
-| 2026-08-28 | Root Cause identifiziert: SoftTimeLimit + QEMU TCG Segfault |
+| 2026-08-28 | Root Cause identifiziert: SoftTimeLimit + ForkPoolWorker State Corruption |
+| 2026-08-28 | Korrekturen durchgeführt: pool=solofork ungültig, max-tasks-per-child nur Config |
 
 ---
 
@@ -298,3 +316,5 @@ Versuch 2 (00:41:52 → 00:44:29):
 | `docs/VELO_DEPLOY_INCIDENT_2026-08-27.md` | Velero Deploy-Blocker |
 | `docs/WAL_INCIDENT_2026-08-27.md` | WAL-Akkumulation |
 | `docs/K3S_CPU_ROOT_CAUSE_ANALYSIS.md` | k3s CPU Root Cause |
+| `docs/ONLYOFFICE_PRODUCTION_FIX_2026-08-27.md` | OnlyOffice Routing-Bug |
+| `docs/K3S_TUNING_PLAN_2026-08-20.md` | k3s Tuning Plan |
