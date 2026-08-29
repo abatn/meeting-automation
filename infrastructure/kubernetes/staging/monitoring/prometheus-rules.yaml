@@ -78,18 +78,6 @@ spec:
 
     - name: meeting-automation-infrastructure
       rules:
-        # Ephemeral Storage High (< 20% free) — general node filesystem alert
-        - alert: EphemeralStorageHigh
-          expr: |
-            node_filesystem_avail_bytes{mountpoint="/"}
-            / node_filesystem_size_bytes{mountpoint="/"} < 0.2
-          for: 5m
-          labels:
-            severity: critical
-          annotations:
-            summary: "Disk space < 20% free"
-            description: "Only {{ $value | humanizePercentage }} of disk space is available"
-
         # High Memory Usage (> 80% of limit)
         - alert: ContainerHighMemory
           expr: |
@@ -102,18 +90,6 @@ spec:
             summary: "Container memory > 80% of limit"
             description: "Container {{ $labels.name }} is using {{ $value | humanizePercentage }} of memory limit"
 
-        # Disk Space Warning (> 70% used)
-        - alert: DiskSpaceWarning
-          expr: |
-            node_filesystem_avail_bytes{mountpoint="/"}
-            / node_filesystem_size_bytes{mountpoint="/"} < 0.3
-          for: 5m
-          labels:
-            severity: warning
-          annotations:
-            summary: "Disk space < 30% free"
-            description: "Only {{ $value | humanizePercentage }} of disk space is available"
-
         # Disk Space Low (< 20% free)
         - alert: DiskSpaceLow
           expr: |
@@ -125,89 +101,6 @@ spec:
           annotations:
             summary: "Disk space < 20% free"
             description: "Only {{ $value | humanizePercentage }} of disk space is available"
-
-        # Disk Space Critical (< 15% free)
-        - alert: DiskSpaceCritical
-          expr: |
-            node_filesystem_avail_bytes{mountpoint="/"}
-            / node_filesystem_size_bytes{mountpoint="/"} < 0.15
-          for: 2m
-          labels:
-            severity: critical
-          annotations:
-            summary: "Disk space < 15% free"
-            description: "Only {{ $value | humanizePercentage }} of disk space is available — immediate action required"
-
-        # Disk Space Emergency (< 5% free)
-        - alert: DiskSpaceEmergency
-          expr: |
-            node_filesystem_avail_bytes{mountpoint="/"}
-            / node_filesystem_size_bytes{mountpoint="/"} < 0.05
-          for: 0m
-          labels:
-            severity: critical
-          annotations:
-            summary: "Disk space < 5% free — EMERGENCY"
-            description: "Only {{ $value | humanizePercentage }} of disk space is available — system may crash"
-
-        # MinIO PVC Usage > 80% (Warning)
-        - alert: MinIOPvcHighUsage
-          expr: |
-            kubelet_volume_stats_used_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"minio.*"}
-            / kubelet_volume_stats_capacity_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"minio.*"} > 0.8
-          for: 5m
-          labels:
-            severity: warning
-          annotations:
-            summary: "MinIO PVC usage > 80%"
-            description: "MinIO PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full"
-
-        # MinIO PVC Usage > 90% (Critical)
-        - alert: MinIOPvcCriticalUsage
-          expr: |
-            kubelet_volume_stats_used_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"minio.*"}
-            / kubelet_volume_stats_capacity_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"minio.*"} > 0.9
-          for: 2m
-          labels:
-            severity: critical
-          annotations:
-            summary: "MinIO PVC usage > 90%"
-            description: "MinIO PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full — disk-pressure imminent!"
-
-        # PostgreSQL / DB PVC Usage > 80% (Warning) — Haupt-Disk-Verbraucher (CNPG)
-        - alert: PostgresPvcHighUsage
-          expr: |
-            kubelet_volume_stats_used_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"meeting-db.*|postgres.*"}
-            / kubelet_volume_stats_capacity_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"meeting-db.*|postgres.*"} > 0.8
-          for: 5m
-          labels:
-            severity: warning
-          annotations:
-            summary: "PostgreSQL PVC usage > 80%"
-            description: "PostgreSQL PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full"
-
-        # PostgreSQL / DB PVC Usage > 90% (Critical)
-        - alert: PostgresPvcCriticalUsage
-          expr: |
-            kubelet_volume_stats_used_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"meeting-db.*|postgres.*"}
-            / kubelet_volume_stats_capacity_bytes{namespace="meeting-automation-staging", persistentvolumeclaim=~"meeting-db.*|postgres.*"} > 0.9
-          for: 2m
-          labels:
-            severity: critical
-          annotations:
-            summary: "PostgreSQL PVC usage > 90%"
-            description: "PostgreSQL PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full — disk-pressure imminent!"
-
-        # Velero Backup Size > 30GB (Warning)
-        - alert: VeleroBackupSizeHigh
-          expr: |
-            velero_backup_attempted_bytes > 32212254720
-          for: 5m
-          labels:
-            severity: warning
-          annotations:
-            summary: "Velero backup size > 30GB"
-            description: "Velero backup size is {{ $value | humanize1024 }}B — consider using scoped backups"
 
         # Gladia API Errors
         - alert: GladiaHighErrorRate
@@ -264,41 +157,6 @@ spec:
           annotations:
             summary: "Recording spike detected"
             description: "{{ $value }} recordings in 5min (2x hourly average)"
-
-    - name: meeting-automation-velero
-      rules:
-        # Velero Backup FailedValidation
-        - alert: VeleroBackupFailedValidation
-          expr: |
-            velero_backup_failure_reason{reason="BackupFailedValidation"} > 0
-          for: 1m
-          labels:
-            severity: critical
-          annotations:
-            summary: "Velero backup failed validation"
-            description: "Backup {{ $labels.name }} failed validation — check BSL status and NetworkPolicy"
-
-        # Velero BSL Unavailable
-        - alert: VeleroBSLUnavailable
-          expr: |
-            velero_backup_storage_location_last_validation_result{phase!="Available"} > 0
-          for: 5m
-          labels:
-            severity: critical
-          annotations:
-            summary: "Velero BackupStorageLocation unavailable"
-            description: "BSL {{ $labels.name }} is {{ $labels.phase }} — backups will fail"
-
-        # Velero Node Eviction Rate
-        - alert: VeleroHighEvictionRate
-          expr: |
-            rate(kube_pod_container_status_restarts_total{namespace="velero"}[1h]) > 10
-          for: 10m
-          labels:
-            severity: warning
-          annotations:
-            summary: "Velero pod restarts > 10/hour"
-            description: "Velero pods restarting at {{ $value }}/hour — check ephemeral-storage limits"
 
     - name: meeting-automation-storage-quota
       rules:

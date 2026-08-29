@@ -10,11 +10,11 @@ metadata:
   name: pod-gc
 rules:
 - apiGroups: [""]
-  resources: ["pods", "namespaces"]
-  verbs: ["list", "delete", "get"]
+  resources: ["pods"]
+  verbs: ["list", "delete"]
 - apiGroups: ["apps"]
   resources: ["replicasets"]
-  verbs: ["list", "delete", "get"]
+  verbs: ["list", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -57,6 +57,7 @@ spec:
             - /bin/sh
             - -c
             - |
+              set -e
               TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
               DELETED=0
 
@@ -64,24 +65,20 @@ spec:
               echo "[$TIMESTAMP] === Pod GC: Phase 1 — Cleaning failed/evicted pods ==="
 
               for ns in $(kubectl get namespaces -o jsonpath='{.items[*].metadata.name}'); do
-                # Skip kube-system and kube-public for FAILED pods (prevent breaking cluster components)
-                # But DO clean Completed pods in kube-system (they're harmless)
-                is_system_ns=false
-                case "$ns" in kube-system|kube-public) is_system_ns=true ;; esac
+                # Skip kube-system and kube-public (prevent breaking cluster components)
+                case "$ns" in kube-system|kube-public) continue ;; esac
 
-                # Delete pods with terminal states (skip in kube-system for safety)
-                if [ "$is_system_ns" = false ]; then
-                  pods=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | \
-                    awk '$3 ~ /^(Error|Evicted|ContainerStatusUnknown|CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerConfigError|RunContainerError|Init:Error|Init:ContainerStatusUnknown|Init:ErrImagePull|Unknown|DeadlineExceeded)$/ {print $1}')
+                # Delete pods with terminal states
+                pods=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | \
+                  awk '$4 ~ /^(Error|Evicted|ContainerStatusUnknown|CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerConfigError|RunContainerError|Init:Error|Init:ContainerStatusUnknown|Init:ErrImagePull|Unknown|DeadlineExceeded)$/ {print $2}')
 
-                  for pod in $pods; do
-                    kubectl delete pod "$pod" -n "$ns" --grace-period=0 --force 2>/dev/null && DELETED=$((DELETED+1)) || true
-                  done
-                fi
+                for pod in $pods; do
+                  kubectl delete pod "$pod" -n "$ns" --grace-period=0 --force 2>/dev/null && DELETED=$((DELETED+1)) || true
+                done
 
-                # Delete Completed pods older than 1 hour (ALL namespaces including kube-system)
+                # Delete Completed pods older than 1 hour (prevent accumulation)
                 completed=$(kubectl get pods -n "$ns" --no-headers 2>/dev/null | \
-                  awk '$3 == "Completed" {print $1}')
+                  awk '$4 == "Completed" {print $2}')
                 for pod in $completed; do
                   age=$(kubectl get pod "$pod" -n "$ns" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null)
                   if [ -n "$age" ]; then

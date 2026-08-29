@@ -11,13 +11,13 @@
 LiveKit Egress → MinIO/S3 → Celery Task "process_recording"
   → S3 Download (_download_audio, Zeile 751)
   → Gladia V2 3-Step (transcribe_and_diarize, Zeile 175)
-  → Speaker Identification (_identify_speakers, Zeile 578)
-    → Heuristic (_match_speaker_to_participant, Zeile 453)
+  → Speaker Identification (_identify_speakers, Zeile 381)
+    → Heuristic (_match_speaker_to_participant, Zeile 299)
     → ONNX Embedding (speaker_embedding_service, Zeile 179)
-    → Regex Self-Introduction (detect_self_introduction, Zeile 719)
-    → Mistral Fusion (mistral_fusion_service, Zeile 735)
+    → Regex Self-Introduction (detect_self_introduction, Zeile 480)
+    → Mistral Fusion (mistral_fusion_service, Zeile 492)
   → Display Transcript: "Speaker 0" → "Name" (Zeile 200-213)
-  → Sentinel MAP (sentinel.summarize_chunk, Zeile 385-388)
+  → Sentinel MAP (sentinel.summarize_chunk, Zeile 222-225)
   → Mistral PV REDUCE (PVService.generate_pv, Zeile 230-237)
   → Assignee Resolution (AssigneeResolver, Zeile 882-886)
   → Auto-Enrollment (enrollment_service, Zeile 557-577)
@@ -28,7 +28,7 @@ LiveKit Egress → MinIO/S3 → Celery Task "process_recording"
 - **Datei:** `backend/app/tasks/transcription_tasks.py:1102-1112`
 - **Task-Name:** `process_recording`
 - **Retry:** `autoretry_for=(Exception,)`, `max_retries=3`, `retry_backoff_max=600`
-- **Entry:** `_run_async(_process_recording_pipeline(recording_id, client_id))` (Zeile 1398)
+- **Entry:** `_run_async(_process_recording_pipeline(recording_id, client_id))` (Zeile 1112)
 
 ### Pipeline Status-Tracking
 - **Redis Pub/Sub:** `publish_status()` (Zeile 70-77)
@@ -42,13 +42,13 @@ LiveKit Egress → MinIO/S3 → Celery Task "process_recording"
 ### Pipeline-Orchestrierung
 | Datei | Zeilen | Funktion |
 |-------|--------|----------|
-| `backend/app/tasks/transcription_tasks.py` | 1412 | `_process_recording_pipeline()` (Zeile 141), `_identify_speakers()` (Zeile 578), `_save_pv_and_actions()` (Zeile 1114) |
+| `backend/app/tasks/transcription_tasks.py` | 1116 | `_process_recording_pipeline()` (Zeile 139), `_identify_speakers()` (Zeile 381), `_save_pv_and_actions()` (Zeile 834) |
 
 ### Transkription
 | Datei | Zeilen | Funktion |
 |-------|--------|----------|
 | `backend/app/services/gladia_service.py` | 149 | `transcribe_and_diarize()` — 3-Step: Upload → Request → Polling (Zeile 28) |
-| `backend/app/services/sentinel_service.py` | 161 | `summarize_chunk()` — Qwen-1.5B lokales SLM (Zeile 118) |
+| `backend/app/services/sentinel_service.py` | 76 | `summarize_chunk()` — Qwen-1.5B lokales SLM (Zeile 41) |
 
 ### Speaker Identification
 | Datei | Zeilen | Funktion |
@@ -62,7 +62,7 @@ LiveKit Egress → MinIO/S3 → Celery Task "process_recording"
 ### PV-Generierung
 | Datei | Zeilen | Funktion |
 |-------|--------|----------|
-| `backend/app/services/pv_service.py` | 395 | `generate_pv()` Dual-Context (Zeile 56), `translate_content()` (Zeile 279) |
+| `backend/app/services/pv_service.py` | 354 | `generate_pv()` Dual-Context (Zeile 56), `translate_content()` (Zeile 254) |
 
 ### Assignee Resolution
 | Datei | Zeilen | Funktion |
@@ -79,7 +79,7 @@ LiveKit Egress → MinIO/S3 → Celery Task "process_recording"
 
 ## 3. Speaker Identification Pipeline (Detail)
 
-### 5-Signal-Aggregation (`_identify_speakers`, Zeile 578-840)
+### 5-Signal-Aggregation (`_identify_speakers`, Zeile 381-643)
 
 | Signal | Quelle | Score | Zeile |
 |--------|--------|-------|-------|
@@ -94,7 +94,7 @@ LiveKit Egress → MinIO/S3 → Celery Task "process_recording"
 - Conflict-Penalty: `confidence *= max(1.0 - conflict_ratio * 0.5, 0.3)` (Zeile 532-535)
 - **Validierung:** Name MUSS in candidates sein (Zeile 544-552)
 
-### Heuristic-Logik (`_match_speaker_to_participant`, Zeile 453-532)
+### Heuristic-Logik (`_match_speaker_to_participant`, Zeile 299-378)
 1. Single Participant → return participant (Zeile 322-323)
 2. Main Speaker = Creator Heuristic (Zeile 326-353)
 3. Text Reference Matching: "wie X", "danke X" (Zeile 355-371)
@@ -139,8 +139,8 @@ LiveKit Egress → MinIO/S3 → Celery Task "process_recording"
 - `handlePauseRecording()` — nur lokaler State (LiveKit Egress hat kein native Pause) (Zeile 741-746)
 
 ### Polling (Zeile 594-701)
-- Transkription: alle 5s (`pollTranscriptionData`, Zeile 634)
-- AI Insights: alle 8s (`pollAIInsights`, Zeile 671)
+- Transkription: alle 5s (`pollTranscriptionData`, Zeile 592)
+- AI Insights: alle 8s (`pollAIInsights`, Zeile 694)
 - Suggestions: alle 30s (Zeile 540)
 
 ### State Machine (Zeile 405)

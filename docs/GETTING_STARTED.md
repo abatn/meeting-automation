@@ -71,9 +71,9 @@ clients (Organisation)
             └── actions → assignments
 ```
 
-**RBAC**: DG (Admin) → Manager → Participant | System Admin | Tech Admin | Admin
+**RBAC**: DG (Admin) → Manager → Participant | System Admin | Tech Admin
 
-## 6. ISO 27001 Compliance (9/10 Controls)
+## 6. ISO 27001 Compliance (6/10 Controls)
 
 | Control | Status |
 |---------|--------|
@@ -81,7 +81,7 @@ clients (Organisation)
 | A.8.24 Encryption at Rest | ✅ Fernet AES-128 |
 | A.8.26 Tenant Isolation | ✅ client_id Filter |
 | A.12.4.1 Audit Logging | ✅ 118+ Logs |
-| A.5.17 Auth & RBAC | ✅ JWT + 6 Rollen |
+| A.5.17 Auth & RBAC | ✅ JWT + 5 Rollen |
 | A.8.20 Network Policies | ✅ 14 Policies deployt |
 
 ## 7. Infrastruktur
@@ -89,7 +89,7 @@ clients (Organisation)
 ### Lokal (Docker Compose)
 ```bash
 ./setup-system.sh
-# Frontend: http://localhost:3001 (dev server)
+# Frontend: http://localhost:3000
 # Backend: http://localhost:8000
 # Login: dg@meeting.tn / Password123!
 ```

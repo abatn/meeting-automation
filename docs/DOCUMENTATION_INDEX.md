@@ -69,7 +69,7 @@
 | `production/sprint-02-tls-registry.md` | Sprint 2: TLS + Registry |
 | `production/sprint-03-storage-backups.md` | Sprint 3: Storage + HA + Backups |
 | `production/sprint-04-monitoring-hpa.md` | Sprint 4: Monitoring + HPA |
-| `production/sprint-05-gitops-secrets.md` | Sprint 5: GitOps + Secrets |
+| `production/sprint-5-gitops-secrets.md` | Sprint 5: GitOps + Secrets |
 | `STAGING_DB_SCHEMA_DRIFT_2026-06-22.md` | DB Schema Drift (Alembic) |
 | `STAGING_ENUM_DRIFT_2026-06-22.md` | Enum Drift (meetingstatus) |
 | `STAGING_PIPELINE_TEST_RESULTS_2026-06-22.md` | Pipeline Test-Ergebnisse |

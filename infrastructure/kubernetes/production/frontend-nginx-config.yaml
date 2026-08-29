@@ -15,26 +15,14 @@ data:
       add_header X-Frame-Options "SAMEORIGIN" always;
       add_header X-Content-Type-Options "nosniff" always;
       add_header X-XSS-Protection "1; mode=block" always;
-
       client_max_body_size 100M;
 
       gzip on;
       gzip_types text/plain application/json application/javascript text/css application/xml;
       gzip_min_length 256;
 
-      location = /index.html {
-        add_header Cache-Control "no-cache, no-store, must-revalidate";
-        add_header Pragma "no-cache";
-        add_header Expires "0";
-      }
-
       location / {
         try_files $uri $uri/ /index.html;
-      }
-
-      location /assets/ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
       }
 
       location /api/v1/websockets/ {
@@ -55,57 +43,21 @@ data:
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header X-Forwarded-Prefix "";
         proxy_read_timeout 600s;
-      }
-
-      location /cache/ {
-        proxy_pass http://onlyoffice.meeting-automation.svc.cluster.local:80;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_read_timeout 600s;
-      }
-
-      location ~ ^/[0-9]+\.[0-9]+\.[0-9]+[-.] {
-        proxy_pass http://onlyoffice.meeting-automation.svc.cluster.local:80;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header X-Forwarded-Host $http_host;
-        proxy_set_header X-Forwarded-Prefix "";
-        proxy_read_timeout 600s;
-      }
-
-      location /healthcheck {
-        proxy_pass http://onlyoffice.meeting-automation.svc.cluster.local:80;
       }
 
       location /api/ {
         resolver kube-dns.kube-system.svc.cluster.local valid=30s;
         set $backend_upstream http://backend.meeting-automation.svc.cluster.local:8000;
         proxy_pass $backend_upstream;
-
         proxy_http_version 1.1;
         proxy_set_header Connection "";
-
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 300s;
-
         proxy_buffer_size 16k;
         proxy_buffers 8 16k;
         proxy_busy_buffers_size 32k;
-
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

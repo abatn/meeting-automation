@@ -4,7 +4,7 @@
 
 **Status**: ✅ **COMPLETE & VERIFIED**
 
-All 3 critical security fixes from Phase 1 have been implemented, tested, and verified in the PostgreSQL Docker container (E2E_TEST=true).
+All 3 critical security fixes from Phase 1 have been implemented, tested, and verified in the PostgreSQL Docker container (E2E_MODE=true).
 
 ### Fixes Implemented
 
@@ -251,7 +251,7 @@ async def get_current_user(
 ### Test Command
 ```bash
 cd /home/opc/meeting-automation
-E2E_TEST=true docker compose exec -T backend pytest tests/e2e/test_phase1_working.py -v -s
+E2E_MODE=true docker compose exec -T backend pytest tests/e2e/test_phase1_working.py -v -s
 ```
 
 ### Test Results
@@ -297,7 +297,7 @@ PASSED [100%]
 
 ### Test Environment
 - **Database**: PostgreSQL 15 (Docker container)
-- **Mode**: E2E_TEST=true (uses production database, not SQLite)
+- **Mode**: E2E_MODE=true (uses production database, not SQLite)
 - **Duration**: 1.36s
 - **Warnings**: 24 (non-blocking deprecation warnings from dependencies)
 

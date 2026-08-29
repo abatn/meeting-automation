@@ -1,58 +1,54 @@
 #!/bin/bash
 # Velero Installation für Meeting Automation Staging
-# Installiert via Helm (v12.1.0, App v1.18.1)
 # Voraussetzung: MinIO läuft bereits im Cluster
-#
-# AKTUELLER STAND (2026-08-11):
-#   - Velero v1.18.1 via Helm v12.1.0
-#   - Kopia als Uploader (nicht Restic)
-#   - --default-volumes-to-fs-backup aktiviert
-#   - BackupRepository: meeting-automation-staging-default-kopia
-#   - Schedule: daily-backup (0 2 * * *)
-#
-# WARNUNG: Dieses Script ist VERALTET und nur als Referenz!
-# Aktuelle Installation via:
-#   helm upgrade velero vmware-tanzu/velero -n velero -f velero-values.yaml --install
 
 set -e
 
 NAMESPACE="meeting-automation-staging"
+VELERO_VERSION="v1.14.0"
 
-echo "=== Velero Installation (Helm-basiert) ==="
+echo "=== Velero Installation ==="
 
-# 1. Helm Repository hinzufügen
-helm repo add vmware-tanzu https://vmware-tanzu.github.io/helm-charts 2>/dev/null || true
-helm repo update
-
-# 2. Velero Credentials Secret erstellen
-kubectl create secret generic velero-s3-credentials \
-  -n velero \
-  --from-literal=cloud='[default]
-aws_access_key_id = minio_user
-aws_secret_access_key = minio_password' \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-# 3. Velero via Helm installieren/upgraden
-helm upgrade velero vmware-tanzu/velero \
-  -n velero \
-  -f velero-values.yaml \
-  --install \
-  --wait
-
-# 4. BackupRepository CRD prüfen (wird automatisch erstellt)
-echo "Warte 30s für Repository-Init..."
-sleep 30
-REPO_PHASE=$(kubectl get backuprepositories.velero.io meeting-automation-staging-default-kopia \
-  -n velero -o jsonpath='{.status.phase}' 2>/dev/null || echo "nicht vorhanden")
-echo "BackupRepository Phase: $REPO_PHASE"
-
-# 5. Falls nicht vorhanden: Manuell erstellen
-if [ "$REPO_PHASE" != "Ready" ]; then
-  echo "Erstelle BackupRepository CRD..."
-  kubectl apply -f velero-backup-repository.yaml
+# 1. Velero CLI installieren (falls nicht vorhanden)
+if ! command -v velero &> /dev/null; then
+    echo "Installing Velero CLI..."
+    wget -q https://github.com/vmware-tanzu/velero/releases/download/${VELERO_VERSION}/velero-${VELERO_VERSION}-linux-arm64.tar.gz
+    tar xzf velero-${VELERO_VERSION}-linux-arm64.tar.gz
+    sudo mv velero-${VELERO_VERSION}-linux-arm64/velero /usr/local/bin/
+    rm -rf velero-${VELERO_VERSION}-linux-arm64*
 fi
 
+echo "Velero CLI: $(velero version --client-only)"
+
+# 2. MinIO Credentials für Velero
+cat > /tmp/credentials-velero <<EOF
+[default]
+aws_access_key_id = minio_user
+aws_secret_access_key = minio_password
+EOF
+
+# 3. Velero installieren
+velero install \
+  --provider aws \
+  --bucket velero-backups \
+  --secret-file /tmp/credentials-velero \
+  --backup-location-config \
+    region=minio,s3ForcePathStyle="true",s3Url=http://minio-staging.${NAMESPACE}.svc.cluster.local:9000 \
+  --plugins velero/velero-plugin-for-aws:v1.9.2 \
+  --use-volume-snapshots=false \
+  --wait
+
+# 4. Backup-Schedule erstellen (täglich 2 Uhr)
+velero schedule create daily-backup \
+  --schedule="0 2 * * *" \
+  --include-namespaces ${NAMESPACE} \
+  --ttl 720h
+
+# 5. Erstes Backup erstellen
+velero backup create initial-backup-$(date +%Y%m%d) \
+  --include-namespaces ${NAMESPACE}
+
 echo "=== Velero Installation abgeschlossen ==="
-echo "Version: velero version"
-echo "Backups: velero backup get"
-echo "Repository: kubectl get backuprepositories.velero.io -n velero"
+echo "Backup-Schedule: daily-backup (täglich 2 Uhr)"
+echo "Backup-Liste: velero backup get"
+echo "Backup-Details: velero backup describe daily-backup --details"

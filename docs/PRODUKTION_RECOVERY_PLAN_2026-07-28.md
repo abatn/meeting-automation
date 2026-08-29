@@ -229,7 +229,7 @@ systemctl is-active docker  # inactive = gut
 ## Step 7: KUBE_CONFIG_PRODUCTION Secret Fix (2026-07-29)
 
 ### Problem
-E2E Pipeline `deploy-production` Job in `e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — renamed to `e2e-tests.yml.disabled`, replaced by `ci.yml`) (Job 3) schlägt fehl mit:
+E2E Pipeline `deploy-production` Job in `e2e-tests.yml` (Job 3) schlägt fehl mit:
 ```
 Get "https://127.0.0.1:6443/api?timeout=32s": dial tcp 127.0.0.1:6443: connect: connection refused
 ```
@@ -241,7 +241,7 @@ Get "https://127.0.0.1:6443/api?timeout=32s": dial tcp 127.0.0.1:6443: connect: 
 | Pipeline | Methode | Status |
 |----------|---------|--------|
 | `deploy-production.yml` (standalone) | SSH → Contabo → `kubectl` lokal | ✅ Funktioniert |
-| `e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — renamed to `e2e-tests.yml.disabled`, replaced by `ci.yml`) (Job 3) | Kubeconfig direkt von GitHub Runner | ❌ `127.0.0.1:6443` → connection refused |
+| `e2e-tests.yml` (Job 3) | Kubeconfig direkt von GitHub Runner | ❌ `127.0.0.1:6443` → connection refused |
 
 ### Immediate Fix
 ```bash
@@ -279,7 +279,7 @@ git push
 ```
 
 ### Langfristig professionelle Lösung
-`e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — renamed to `e2e-tests.yml.disabled`, replaced by `ci.yml`) deploy-production Job auf SSH-Ansatz umstellen (wie `deploy-production.yml`):
+`e2e-tests.yml` deploy-production Job auf SSH-Ansatz umstellen (wie `deploy-production.yml`):
 - Kein k3s API auf public IP nötig
 - Konsistenter Ansatz in beiden Pipelines
 - `KUBE_CONFIG_PRODUCTION` Secret wird überflüssig

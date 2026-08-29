@@ -147,7 +147,7 @@ Infrastructure: Docker (Real PostgreSQL, Redis, RabbitMQ)
 **Database Konsistenz:**
 ```
 Merged:
-- add_token_hash (PLANNED — not in actual model)_activation
+- add_token_hash_activation
 - c6d7e8f9a0b1_add_unique_constraint_to_team_members_email
 
 Result: Single HEAD (c3fe9e232652) ✅
@@ -156,7 +156,7 @@ Result: Single HEAD (c3fe9e232652) ✅
 ### D. Documentation
 
 #### 1. `docs/DATABASE_SCHEMA.md`
-- ✅ token_hash (PLANNED — not in actual model) Field dokumentiert
+- ✅ token_hash Field dokumentiert
 - ✅ Auto-Login JWT Security Notes
 - ✅ Validierungs-Info auf 2026-04-24 aktualisiert
 
@@ -185,7 +185,7 @@ Result: Single HEAD (c3fe9e232652) ✅
 
 ### Database
 - ✅ Migration status: `c3fe9e232652 (head)` ✅
-- ✅ token_hash (PLANNED — not in actual model) Column existiert
+- ✅ token_hash Column existiert
 - ✅ Backward compatibility (legacy tokens)
 - ✅ Keine Datenverluste
 

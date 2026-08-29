@@ -25,7 +25,7 @@ spec:
         - sh
         - -c
         - |
-          MODEL=/app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf
+          MODEL=/models/qwen2.5-1.5b-instruct-q4_k_m.gguf
           if [ -f "$MODEL" ]; then
             SIZE=$(wc -c < "$MODEL")
             if [ "$SIZE" -gt 900000000 ] && [ "$SIZE" -lt 1500000000 ]; then
@@ -49,7 +49,7 @@ spec:
           echo "Model downloaded successfully (${SIZE} bytes)."
         volumeMounts:
         - name: sentinel-models
-          mountPath: /app/models
+          mountPath: /models
       containers:
       - name: celery-worker
         image: docker.io/batnini/meeting-automation-backend:latest

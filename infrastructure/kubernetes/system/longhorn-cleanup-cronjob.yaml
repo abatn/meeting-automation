@@ -1,0 +1,30 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: longhorn-pod-cleanup
+  namespace: longhorn-system
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: default
+          containers:
+          - name: cleanup
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "$(date): Cleaning up Longhorn pods..."
+              kubectl delete pods -n longhorn-system --field-selector=status.phase=Succeeded --ignore-not-found 2>&1 || true
+              kubectl delete pods -n longhorn-system --field-selector=status.phase=Failed --ignore-not-found 2>&1 || true
+              # Also clean Error/Evicted/ContainerStatusUnknown
+              for pod in $(kubectl get pods -n longhorn-system --no-headers 2>/dev/null | awk '$4 ~ /^(Error|Evicted|ContainerStatusUnknown|CrashLoopBackOff|ImagePullBackOff|ErrImagePull)$/ {print $2}'); do
+                kubectl delete pod "$pod" -n longhorn-system --grace-period=0 --force 2>/dev/null || true
+              done
+              REMAINING=$(kubectl get pods -n longhorn-system --no-headers 2>&1 | wc -l)
+              echo "$(date): Remaining pods: $REMAINING"
+          restartPolicy: OnFailure

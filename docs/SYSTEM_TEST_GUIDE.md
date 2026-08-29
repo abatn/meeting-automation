@@ -46,7 +46,7 @@ curl -X POST http://localhost:8000/api/v1/auth/login \
 ## 3. Frontend Zugriff & UI
 Prüfung der Benutzeroberfläche und Lokalisierung.
 
-1. **URL:** Öffne [http://localhost:3001](http://localhost:3001)
+1. **URL:** Öffne [http://localhost:3000](http://localhost:3000)
 2. **Login:** Nutze die Credentials (z.B. `admin@example.com`).
 3. **Dashboards:** Navigiere zwischen DG Dashboard, Manager und Participant.
    - *Check:* Werden die Recharts-Grafiken korrekt gerendert?

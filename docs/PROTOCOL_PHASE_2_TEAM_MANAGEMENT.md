@@ -80,11 +80,11 @@ async def register(*, db: AsyncSession = Depends(deps.get_db), user_in: UserCrea
     # Lines 300-313: ActivationToken (48-hour expiry)
     token = secrets.token_urlsafe(32)
     expiration = datetime.now(timezone.utc) + timedelta(hours=48)
-    token_hash (PLANNED — not in actual model) = hash_token(token)  # ← Hash for security
+    token_hash = hash_token(token)  # ← Hash for security
     activation_entry = ActivationToken(
         id=str(uuid.uuid4()),
         user_id=db_obj.id,
-        token_hash (PLANNED — not in actual model)=token_hash (PLANNED — not in actual model),
+        token_hash=token_hash,
         expires_at=expiration
     )
     
@@ -312,7 +312,7 @@ SKIPPED (SQLite limitations):
   ⚠️ test_p25_same_email_different_meetings_allowed (works with SQLite)
 
 Run Command:
-  docker compose exec -T backend bash -c "cd /app && E2E_TEST=true pytest tests/e2e/test_phase2_team_management.py -v"
+  docker compose exec -T backend bash -c "cd /app && E2E_MODE=true pytest tests/e2e/test_phase2_team_management.py -v"
 ```
 
 ---
@@ -323,7 +323,7 @@ Run Command:
 - [ ] Run `alembic upgrade head` (creates constraints in PostgreSQL)
 - [ ] Verify no existing meetings have `end_time ≤ start_time`
 - [ ] Verify no duplicate participants in same meeting
-- [ ] Run E2E tests: `E2E_TEST=true pytest tests/e2e/test_phase2_team_management.py -v`
+- [ ] Run E2E tests: `E2E_MODE=true pytest tests/e2e/test_phase2_team_management.py -v`
 - [ ] Code review: P2-3 authorization changes
 
 ### Deployment
@@ -375,7 +375,7 @@ users:
 activation_tokens:
 ├─ id (PK)
 ├─ user_id (FK)
-├─ token_hash (PLANNED — not in actual model) (hashed, salted)
+├─ token_hash (hashed, salted)
 └─ expires_at (48 hours)
 ```
 

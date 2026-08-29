@@ -117,7 +117,7 @@ Siehe: https://github.com/livekit/client-sdk-js/issues/788 (Signal Reconnect Rac
 - ngrok + Docker-Bridge (`EnableIPv6: false`) verwerfen IPv6 sofort
 - Pion-ICE zeigt **keine** `sendto: network is unreachable` Errors mehr (Fix LIVEKIT_EGRESS_ICE_FIX_2026-06-06 wirkt)
 
-**Produktions-Relevanz:** ✅ **Gering** — Bereits durch `livekit-entrypoint.sh (REMOVED from repo)` (hostname -i → IPv4) behoben.
+**Produktions-Relevanz:** ✅ **Gering** — Bereits durch `livekit-entrypoint.sh` (hostname -i → IPv4) behoben.
 
 ---
 
@@ -238,7 +238,7 @@ LIVEKIT_API_SECRET=production-api-secret-2026
 ```typescript
 connectOptions={{
   peerConnectionTimeout: 45000,  // ÄNDERN: 30000 → 45000 (45s für langsame Netzwerke)
-  maxRetries: 3 (verified in MeetingRoom.tsx:1071),                  // ÄNDERN: 3 → 5 (mehr Retries für Mobile)
+  maxRetries: 5,                  // ÄNDERN: 3 → 5 (mehr Retries für Mobile)
 }}
 ```
 
@@ -293,7 +293,7 @@ turn:
 ### ✅ LiveKit Egress Pipeline
 - **Interner Docker-Netzwerk-Pfad:** Egress → Server via Docker-Bridge (stabil)
 - **S3 Upload:** MinIO-Integration funktioniert zuverlässig
-- **ICE-Fix (2026-06-06):** `livekit-entrypoint.sh (REMOVED from repo)` + Dynamic Node IP → Keine IPv6-Fehler mehr
+- **ICE-Fix (2026-06-06):** `livekit-entrypoint.sh` + Dynamic Node IP → Keine IPv6-Fehler mehr
 
 ### ✅ Gladia Transcription
 - 10 arabische Segmente erfolgreich transkribiert
@@ -320,7 +320,7 @@ turn:
 LIVEKIT_PUBLIC_URL=ws://localhost:7880  # statt ngrok
 
 # Browser
-http://localhost:3001/meetings/{id}
+http://localhost:3000/meetings/{id}
 ```
 
 **Erwartung:** Keine `DUPLICATE_IDENTITY` oder `participant_connection_aborted` mehr.

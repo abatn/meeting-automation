@@ -1,5 +1,4 @@
 # Network Policies for Meeting Automation (ISO 27001 Compliance)
-# Aktualisiert: 2026-08-12 - Helm-Labels (app.kubernetes.io/name) ergänzt
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -73,13 +72,7 @@ spec:
           app: livekit-egress-staging
     - podSelector:
         matchLabels:
-          app.kubernetes.io/name: egress
-    - podSelector:
-        matchLabels:
           app: livekit-server-staging
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: livekit-server-staging
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: monitoring
@@ -159,9 +152,6 @@ spec:
       podSelector:
         matchLabels:
           app.kubernetes.io/name: prometheus
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: velero   # Velero BSL → MinIO Zugriff
     ports:
     - protocol: TCP
       port: 9000
@@ -186,9 +176,6 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-server-staging
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: livekit-server-staging
     - podSelector:
         matchLabels:
           app: onlyoffice-staging
@@ -286,8 +273,7 @@ spec:
     - protocol: TCP
       port: 5678
 ---
-# LiveKit Server: Egress to Redis, Backend, DNS + Ingress from Egress + Frontend (external)
-# FIXED: podSelector auf Helm-Label geaendert (app.kubernetes.io/name)
+# LiveKit Server: Egress to Redis, Backend, DNS + Ingress from Egress
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -296,7 +282,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: livekit-server-staging
+      app: livekit-server-staging
   egress:
   - to:
     - podSelector:
@@ -326,9 +312,6 @@ spec:
           app: livekit-egress-staging
     - podSelector:
         matchLabels:
-          app.kubernetes.io/name: egress
-    - podSelector:
-        matchLabels:
           app: backend
     ports:
     - protocol: TCP
@@ -348,7 +331,6 @@ spec:
   - Egress
 ---
 # LiveKit Egress: Egress to Redis, MinIO, LiveKit, DNS
-# FIXED: podSelector auf Helm-Label geaendert (app.kubernetes.io/name)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -357,7 +339,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: egress
+      app: livekit-egress-staging
   egress:
   - to:
     - podSelector:
@@ -377,9 +359,6 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-server-staging
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/name: livekit-server-staging
     ports:
     - protocol: TCP
       port: 7880
@@ -421,9 +400,6 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-beat-staging
-    - podSelector:
-        matchLabels:
-          app.kubernetes.io/managed-by: cloudnative-pg
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: monitoring
@@ -437,13 +413,6 @@ spec:
       port: 8000
     - protocol: TCP
       port: 9187
-  - from:
-    - podSelector:
-        matchLabels:
-          app: postgres-backup-staging
-    ports:
-    - protocol: TCP
-      port: 5432
 
 # CNPG MinIO Access: CNPG Pods brauchen Zugriff auf MinIO fuer WAL-Archiv
 # (Bereits in minio-policy enthalten via CNPG Label app.kubernetes.io/name=postgresql)

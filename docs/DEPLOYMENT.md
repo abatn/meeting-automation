@@ -58,7 +58,7 @@ This is the recommended setup for development and testing.
 5.  **Access Applications**:
     Once all services are up and healthy, you can access the system components:
     - **Backend API Documentation (Swagger UI)**: `http://localhost:8000/api/docs`
-    - **Frontend Application**: `http://localhost:3001` (temporary port override, normally 3000)
+    - **Frontend Application**: `http://localhost:3000`
     - **n8n Workflow Automation**: `http://localhost:5678` (Login with `admin`/`admin_password` as defined in `docker-compose.yml`)
     - **MinIO Console**: `http://localhost:9001` (Login with `minio_user`/`minio_password` from `.env.example`)
     - **RabbitMQ Management**: `http://localhost:15672` (Login with `rabbit_user`/`rabbit_password` from `docker-compose.yml`)
@@ -109,7 +109,7 @@ CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//" \
 SECRET_KEY="dev-secret-key-meeting-automation-2026" \
 ENCRYPTION_KEY="6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=" \
 TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=" \
-python3 (from virtualenv) -m pytest tests/ -v
+/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/ -v
 ```
 
 #### E2E Smoke Tests ausführen
@@ -123,7 +123,7 @@ CELERY_BROKER_URL="amqp://rabbit_user:rabbit_password@localhost:5672//" \
 SECRET_KEY="dev-secret-key-meeting-automation-2026" \
 ENCRYPTION_KEY="6AfRJonLMRY0ZXZ7W6rmFISWHurdK_AfQ1vjK2WZ3t4=" \
 TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4=" \
-python3 (from virtualenv) -m pytest tests/e2e/test_smoke.py -v
+/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/e2e/test_smoke.py -v
 ```
 
 #### Ergebnis (Stand 2026-06-04)
@@ -201,7 +201,7 @@ For production environments, the system is designed to be deployed on a cloud pr
 
 7.  **Configure Ingress**:
     ```bash
-    kubectl apply -f infrastructure/kubernetes/staging/ingress-staging.yaml  # oder ingress-prod.yaml fuer Production
+    kubectl apply -f infrastructure/kubernetes/ingress.yaml
     ```
 
 8.  **Monitoring and Scaling**:
@@ -217,38 +217,16 @@ For production environments, the system is designed to be deployed on a cloud pr
 
 ## 3. CI/CD Pipelines
 
-> **AKTUELLER PLAN**: Siehe `docs/CICD_RESTRUCTURE_PLAN_2026-08-07.md` für die vollständige 3-Workflow-Umstrukturierung (Staging/Production Trennung).
-
 The `.github/workflows` directory contains GitHub Actions for automated testing, building, and security scanning.
 
-### 3.1 Aktuelle Workflows (Stand 2026-08-10)
+-   **`backend-ci.yml`**: Runs tests, linting, type checks for the backend, builds the Docker image, and performs vulnerability scanning (Trivy).
+-   **`frontend-ci.yml`**: Runs tests, linting, type checks for the frontend, builds the Docker image, and uploads build artifacts.
+-   **`docker-build.yml`**: (Placeholder, typically used for pushing images to a registry for deployment).
 
-| Workflow | Trigger | Aufgabe |
-|----------|---------|---------|
-| **`ci.yml`** | `push` main/develop | Backend-Tests (PostgreSQL + E2E_TEST=true) + Frontend (lint+typecheck+build) + Multi-Arch Docker Images |
-| **`deploy-staging.yml`** | `workflow_dispatch` | Deploy Staging k3s (Helm LiveKit, Backend, Frontend, Celery) |
-| **`deploy-production.yml`** | `workflow_dispatch` | Deploy Production k3s + Smoke Tests |
-
-### 3.2 Deaktivierte Workflows (fuer Rollback)
-
--   **`backend-ci.yml.disabled`**: Alte Backend-Tests (jetzt in ci.yml integriert)
--   **`frontend-ci.yml.disabled`**: Alte Frontend-Tests (jetzt in ci.yml integriert)
--   **`e2e-tests.yml.disabled`**: Alte Komplette Pipeline (aufgeteilt in ci.yml + deploy-*.yml)
-
-| Workflow | Trigger | Aufgabe |
-|----------|---------|---------|
-| **`ci.yml`** | `push` main/develop | Tests + Build + Push Images (KEIN Deploy) |
-| **`deploy-staging.yml`** | `workflow_run` nach CI + `workflow_dispatch` | Deploy Staging + E2E Tests |
-| **`deploy-production.yml`** | `workflow_dispatch` NUR | Deploy Production + Approval + Smoke Tests |
-
-### 3.3 GitHub Environments
-
-| Environment | Approval | Secrets |
-|-------------|----------|---------|
-| `staging` | Keiner (auto) | `KUBE_CONFIG_STAGING`, AI Keys |
-| `production` | `required_reviewers` | `KUBE_CONFIG_PRODUCTION`, Docker Hub |
-
-Siehe `docs/CICD_RESTRUCTURE_PLAN_2026-08-07.md` für vollständige Spezifikation.
+For production CI/CD, these workflows would be extended to include:
+-   Pushing Docker images to a container registry.
+-   Triggering Terraform apply for infrastructure updates.
+-   Triggering Kubernetes deployments for application updates.
 
 ## 4. Backup and Recovery
 

@@ -84,7 +84,7 @@ spec:
         - name: APP_ROLE
           value: "backend"
         - name: E2E_TEST
-          value: "false"
+          value: "true"
 ---
 apiVersion: v1
 kind: Service

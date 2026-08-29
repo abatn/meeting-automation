@@ -26,40 +26,40 @@ Backend (FastAPI) → Webhook → n8n → SMTP/WhatsApp → External
 
 ## Active Workflows (6)
 
-> **Important:** Automation API requires `?client_id=` parameter. n8n only activates 3/9 workflows on startup — others need `POST /api/v1/workflows/{id}/activate`. DB changes don't propagate to n8n in-memory state — DELETE + RE-IMPORT required.
+> **Important:** Automation API requires `?client_id=` parameter. n8n only activates 3/7 workflows on startup — others need `POST /api/v1/workflows/{id}/activate`. DB changes don't propagate to n8n in-memory state — DELETE + RE-IMPORT required.
 
-### 1. User Invited (`user-invited`) — ID: `6`
+### 1. User Invited (`user-invited`) — ID: `CqkpcBkdkXlJtZbo`
 - **Trigger:** Webhook `POST /webhook/user-invited`
 - **Backend Caller:** `email_tasks.py:156` (send_invitation_email)
 - **Payload:** `{email, full_name, company_name, activation_link}`
 - **Actions:** Validate payload → Send HTML invitation email via SMTP
 - **Status:** ✅ Production (fixed 2026-06-24: responseMode=onReceived, credentials fixed)
 
-### 2. Meeting Created (`meeting-created`) — ID: `EbdQNas2d3Q9NzuG`
+### 2. Meeting Created (`meeting-created`) — ID: `uB0bPHLt0FNxsaBe`
 - **Trigger:** Webhook `POST /webhook/meeting-created`
 - **Backend Caller:** `meeting_service.py:194`
 - **Actions:** Store metadata in `n8n_meetings` table → Send invitation email to participants
 - **Status:** ✅ Active (credentials fixed 2026-06-24)
 
-### 3. Meeting Status Changed (`meeting-status-changed`) — ID: `7`
+### 3. Meeting Status Changed (`meeting-status-changed`) — ID: `6jsJVqySI9VpnvoO`
 - **Trigger:** Webhook `POST /webhook/meeting-status-changed`
 - **Backend Caller:** `meeting_service.py:236`
 - **Actions:** Send status notification email (in_progress/completed/cancelled)
 - **Status:** ✅ Active (credentials fixed 2026-06-24)
 
-### 4. Transcription Completed (`transcription-completed`) — ID: `3`
+### 4. Transcription Completed (`transcription-completed`) — ID: `00tDUsvHjpnWD6oG`
 - **Trigger:** Webhook `POST /webhook/transcription-completed`
-- **Backend Caller:** `transcription_tasks.py:1392`
+- **Backend Caller:** `transcription_tasks.py:1147`
 - **Actions:** Fetch meeting details → Download PDF → Send as email attachment
 - **Status:** ✅ Active (credentials fixed 2026-06-24)
 
-### 5. PV Validated (`pv-validated`) — ID: `5_dJFUYSTiynU5Oe0CEBag`
+### 5. PV Validated (`pv-validated`) — ID: `o9NXKZqiDnksQeO3`
 - **Trigger:** Webhook `POST /webhook/pv-validated`
 - **Backend Caller:** `pv_service.py:392`
 - **Actions:** Fetch meeting details → Download final PDF → Send as email attachment
 - **Status:** ✅ Active
 
-### 6. Daily Reminders (`daily-reminders`) — ID: `4`
+### 6. Daily Reminders (`daily-reminders`) — ID: `GpER66AvYwapRNP4`
 - **Trigger:** Cron schedule (08:00 daily)
 - **Backend Caller:** None (n8n self-triggering)
 - **Actions:** Poll `/api/v1/actions/pending` → Send WhatsApp reminders → Escalate overdue tasks via email
@@ -70,14 +70,14 @@ Backend (FastAPI) → Webhook → n8n → SMTP/WhatsApp → External
 ### Audio Uploaded (`audio-uploaded`) — DEPRECATED
 - **Reason:** Redundant with Celery pipeline (`process_recording.delay()`)
 - **Old flow:** n8n webhook → call backend API → start transcription
-- **Current flow:** Backend → Celery task directly (`recording_service.py:131`)
+- **Current flow:** Backend → Celery task directly (`recording_service.py:83`)
 - **Deactivated:** 2026-06-24 (Phase 63)
 
 ## Backend Config Constants
 
 | Constant | Value | Used By |
 |----------|-------|---------|
-| `N8N_WEBHOOK_URL` | `http://n8n-staging:5678/webhook` | Base URL for path construction |
+| `N8N_WEBHOOK_URL` | `http://n8n:5678/webhook` | Base URL for path construction |
 | `N8N_WEBHOOK_USER_INVITED` | `.../webhook/user-invited` | `email_tasks.py`, `webhook_utils.py` |
 | `N8N_WEBHOOK_MEETING_CREATED` | `.../webhook/meeting-created` | `meeting_service.py` |
 | `N8N_WEBHOOK_MEETING_STATUS_CHANGED` | `.../webhook/meeting-status-changed` | `meeting_service.py` |

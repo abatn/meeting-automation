@@ -18,7 +18,7 @@
 | **k3s** | ✅ | v1.36.2+k3s1, single-node, namespace `meeting-automation` |
 | **Docker** | ✅ | Deaktiviert (`systemctl disable docker`) — kein Doppelter Speicherverbrauch |
 | **Deploy-Pipeline** | ✅ | `deploy-production.yml` via SSH → Contabo → k3s (funktioniert) |
-| **E2E Pipeline** | ⚠️ | `deploy-production` Job in `e2e-tests.yml (DEPRECATED)` (DEPRECATED) (DEPRECATED — renamed to `e2e-tests.yml.disabled`, replaced by `ci.yml`) braucht `KUBE_CONFIG_PRODUCTION` Secret-Update |
+| **E2E Pipeline** | ⚠️ | `deploy-production` Job in `e2e-tests.yml` braucht `KUBE_CONFIG_PRODUCTION` Secret-Update |
 
 ### Bekannte Probleme & Fixes
 
@@ -1047,11 +1047,11 @@ kubectl set image deployment/backend backend=batnini/meeting-automation-backend:
 |----------|-----|--------|
 | meeting-created | ergr03uwrFJZJbOT | ✅ Active |
 | audio-uploaded | yUabduHmFMTK11jZ | ✅ Active |
-| daily-reminders | 4 | ✅ Active |
+| daily-reminders | GpER66AvYwapRNP4 | ✅ Active |
 | meeting-status-changed | kf94JbBu2ewnSzS8 | ✅ Active |
 | pv-validated | DAd2jClIdg6wJtfy | ✅ Active |
 | transcription-completed | BOlWu12gdUfABJWW | ✅ Active |
-| user-invited | 6 | ✅ Active |
+| user-invited | CqkpcBkdkXlJtZbo | ✅ Active |
 
 **Lösung Optionen:**
 1. **PVC** für n8n Data (empfohlen):

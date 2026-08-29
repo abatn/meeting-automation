@@ -23,12 +23,11 @@ spec:
         - containerPort: 15672
           name: management
         readinessProbe:
-          tcpSocket:
-            port: 5672
+          exec:
+            command: ["rabbitmq-diagnostics", "check_running"]
           initialDelaySeconds: 10
           periodSeconds: 10
-          timeoutSeconds: 3
-          failureThreshold: 3
+          timeoutSeconds: 10
         envFrom:
         - secretRef:
             name: rabbitmq-secrets

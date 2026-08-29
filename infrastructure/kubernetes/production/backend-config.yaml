@@ -35,5 +35,3 @@ data:
   ONLYOFFICE_BACKEND_URL: "http://backend.meeting-automation.svc.cluster.local:8000"
   FRONTEND_URL: "https://meeting-automation.com"
   CORS_ORIGINS: '["https://meeting-automation.com","http://localhost:3000"]'
-  # Sentinel LLM (Qwen-1.5B GGUF) — used by PRO workers only
-  SENTINEL_MODEL_URL: "http://minio.meeting-automation.svc.cluster.local:9000/sentinel-models/qwen2.5-1.5b-instruct-q4_k_m.gguf"

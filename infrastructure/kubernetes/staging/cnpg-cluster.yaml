@@ -8,8 +8,6 @@ kind: Cluster
 metadata:
   name: meeting-db
   namespace: meeting-automation-staging
-  annotations:
-    backup.velero.io/backup-volumes-excludes: "pgdata"  # Velero Exclusion: DB wird durch barman gesichert
 spec:
   instances: 2
   primaryUpdateStrategy: unsupervised

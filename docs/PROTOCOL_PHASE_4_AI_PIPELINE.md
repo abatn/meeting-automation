@@ -278,13 +278,13 @@ test_p41_n8n_completion_webhook_called_on_success    ✅ PASS
 ### Run Commands
 ```bash
 # Phase 4 Tests nur
-E2E_TEST=true pytest tests/e2e/test_phase4_ai_pipeline.py -v
+E2E_MODE=true pytest tests/e2e/test_phase4_ai_pipeline.py -v
 
 # Mit PostgreSQL (Docker)
-docker compose exec -T backend bash -c "E2E_TEST=true pytest tests/e2e/test_phase4_ai_pipeline.py -v"
+docker compose exec -T backend bash -c "E2E_MODE=true pytest tests/e2e/test_phase4_ai_pipeline.py -v"
 
 # Coverage Report
-E2E_TEST=true pytest tests/e2e/test_phase4_ai_pipeline.py --cov=app.tasks --cov=app.services --cov-report=html
+E2E_MODE=true pytest tests/e2e/test_phase4_ai_pipeline.py --cov=app.tasks --cov=app.services --cov-report=html
 ```
 
 ---

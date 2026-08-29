@@ -43,8 +43,8 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pgrep -f "celery.*beat" || exit 1
+            - celery -A app.tasks.celery_app inspect ping --timeout=5
           initialDelaySeconds: 30
           periodSeconds: 30
-          timeoutSeconds: 5
+          timeoutSeconds: 10
           failureThreshold: 3

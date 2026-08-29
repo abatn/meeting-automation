@@ -124,11 +124,3 @@ git_workflow.txt
 Mailtrap_Credetional.txt
 AGENT_PROMPT.md
 CORRECTION_PROMPT.md
-
-# LiveKit SDK source extraction (analyse artifact, not needed)
-.sdk_src/
-
-# Video recordings (lokal)
-meeting_automation.MP4
-*.MP4
-*.mp4

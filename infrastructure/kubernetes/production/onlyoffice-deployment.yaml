@@ -18,7 +18,7 @@ spec:
     spec:
       initContainers:
       - name: init-oo-config
-        image: onlyoffice/documentserver:9.4.0
+        image: onlyoffice/documentserver:latest
         imagePullPolicy: Always
         command: ['sh', '-c', 'cp /config-source/local.json /emptydir-writable/local.json && cp /config-source/ds-docservice.conf /emptydir-writable/ds-docservice.conf && chmod 644 /emptydir-writable/local.json /emptydir-writable/ds-docservice.conf']
         volumeMounts:
@@ -29,7 +29,7 @@ spec:
           mountPath: /emptydir-writable
       containers:
       - name: onlyoffice
-        image: onlyoffice/documentserver:9.4.0
+        image: onlyoffice/documentserver:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80
@@ -38,42 +38,27 @@ spec:
         - name: JWT_ENABLED
           value: "true"
         - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: onlyoffice-secrets
-              key: jwt-secret
+          value: "tHjRho7Mrgicb9g09trClzCPt9X5OI48ZIfGWILLnkQ"
         - name: JWT_HEADER
           value: "Authorization"
         - name: ALLOW_PRIVATE_IP_ADDRESS
           value: "true"
         - name: SECURE_LINK_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: onlyoffice-secrets
-              key: secure-link-secret
+          value: "prod-onlyoffice-secure-link-2026"
         - name: SERVER_NAME
           value: "meeting-automation.com"
         resources:
           requests:
             memory: "512Mi"
             cpu: "200m"
-            ephemeral-storage: "200Mi"
           limits:
             memory: "2Gi"
             cpu: "1"
-            ephemeral-storage: "1Gi"
-        startupProbe:
-          httpGet:
-            path: /healthcheck
-            port: 80
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 10
-          failureThreshold: 30
         livenessProbe:
           httpGet:
             path: /healthcheck
             port: 80
+          initialDelaySeconds: 60
           periodSeconds: 30
           timeoutSeconds: 10
           failureThreshold: 3

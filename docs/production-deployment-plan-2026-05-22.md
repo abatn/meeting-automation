@@ -31,7 +31,7 @@
 - **Lösung**: `DB_HOST: postgres-staging` explizit setzen
 
 ### 3. SOPS-Secrets werden in CI nicht entschlüsselt
-- **Betroffen**: `.github/workflows/e2e-tests.yml (DEPRECATED):314`
+- **Betroffen**: `.github/workflows/e2e-tests.yml:314`
 - **Problem**: `kubectl apply` wendet verschlüsselte Secrets als Plaintext an
 - **Risiko**: Production-Secrets sind unbrauchbar
 - **Lösung**: SOPS age key als GitHub Secret, vor kubectl apply entschlüsseln
@@ -59,7 +59,7 @@
 | # | Problem | Datei |
 |---|---------|-------|
 | 8 | Frontend-Image hardcoded v1.0.0 + imagePullPolicy: Never | frontend-deployment.yaml |
-| 9 | Kein Frontend-Deploy-Step in CI | e2e-tests.yml (DEPRECATED) |
+| 9 | Kein Frontend-Deploy-Step in CI | e2e-tests.yml |
 | 10 | Keine Health Checks für Celery Worker/Beat | celery-*-deployment.yaml |
 | 11 | Keine Resource Limits für StatefulSets | postgres, redis, rabbitmq, minio |
 | 12 | Staging-Secrets Plaintext im Repo | staging/*-secrets.yaml |

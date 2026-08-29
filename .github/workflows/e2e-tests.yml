@@ -227,30 +227,18 @@ jobs:
           echo "✅ Longhorn v1.12.0 installed on staging"
         fi
 
-    - name: Deploy System CronJobs + Monitoring Stack (kube-system + longhorn-system + monitoring)
+    - name: Deploy System CronJobs (kube-system + longhorn-system)
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        # 1. System CronJobs (kube-system + longhorn-system)
+        # Apply CronJobs that require non-app namespaces (hardcoded in YAML)
+        # These are cluster-level cleanup jobs, moved from staging/ to system/
+        # to avoid namespace conflicts with kubectl apply -f .../staging/ -n meeting-automation-staging
         kubectl apply -f infrastructure/kubernetes/system/ephemeral-storage-cleanup-cronjob.yaml -n kube-system
         kubectl apply -f infrastructure/kubernetes/system/pod-garbage-collector-cronjob.yaml -n kube-system
         kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system
-        # 2. Metrics-server patch (hostNetwork + port 4443 for OCI VNIC workaround)
+        # Metrics-server patch (hostNetwork + port 4443 for OCI VNIC workaround)
         kubectl apply -f infrastructure/kubernetes/system/metrics-server-patch.yaml -n kube-system
-        # 3. Monitoring namespace erstellen
-        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-        # 4. Prometheus hostNetwork (OCI VNIC workaround — same as metrics-server Phase 189)
-        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
-        helm repo update
-        helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-          -n monitoring --reuse-values \
-          --set prometheus.prometheusSpec.hostNetwork=true \
-          --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
-          --set prometheus.service.port=9090 || echo "⚠️ Warning: Prometheus helm upgrade failed, continuing deployment"
-        # 5. Prometheus rollout abwarten (CRDs müssen bereit sein)
-        kubectl rollout status statefulset/prometheus-kube-prometheus-stack-prometheus -n monitoring --timeout=180s || echo "⚠️ Warning: Prometheus rollout timeout"
-        # 6. Monitoring configs deployen (ERST NACH helm upgrade — CRDs vorhanden!)
-        kubectl apply -f infrastructure/kubernetes/staging/monitoring/ -n monitoring || echo "⚠️ Warning: Failed to apply monitoring configs"
-        echo "✅ System CronJobs + metrics-server + Prometheus hostNetwork + monitoring configs applied (kube-system + longhorn-system + monitoring)"
+        echo "✅ System CronJobs + metrics-server applied (kube-system + longhorn-system)"
 
     - name: Deploy Backend to Staging
       run: |
@@ -281,27 +269,6 @@ jobs:
         kubectl rollout status deployment/celery-worker-staging -n meeting-automation-staging --timeout=300s
         kubectl rollout status deployment/celery-worker-pro-staging -n meeting-automation-staging --timeout=300s
         kubectl rollout status deployment/celery-beat-staging -n meeting-automation-staging --timeout=120s
-
-    - name: Import n8n Workflows to Staging (idempotent)
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        echo "=== Import n8n workflows ==="
-        N8N_POD=$(kubectl get pods -n meeting-automation-staging -l app=n8n-staging -o jsonpath='{.items[0].metadata.name}')
-        WORKFLOW_COUNT=$(kubectl exec -n meeting-automation-staging meeting-db-1 -- psql -U postgres -d meeting_db_staging -t -c "SELECT count(*) FROM workflow_entity" 2>/dev/null | tr -d ' ')
-        if [ "$WORKFLOW_COUNT" = "0" ]; then
-          echo "No workflows found — importing from n8n/workflows/*.json"
-          kubectl exec -n meeting-automation-staging $N8N_POD -- mkdir -p /home/node/.n8n/workflows
-          for f in n8n/workflows/*.json; do
-            name=$(basename $f)
-            echo "Importing $name..."
-            cat $f | kubectl exec -i -n meeting-automation-staging $N8N_POD -- tee /home/node/.n8n/workflows/$name > /dev/null
-            kubectl exec -n meeting-automation-staging $N8N_POD -- n8n import:workflow --input=/home/node/.n8n/workflows/$name 2>&1 | tail -1 || true
-          done
-          kubectl rollout restart deployment/n8n-staging -n meeting-automation-staging
-          echo "✅ n8n workflows imported"
-        else
-          echo "✅ n8n workflows already exist ($WORKFLOW_COUNT workflows) — skipping import"
-        fi
 
     - name: Validate required AI API keys
       run: |
@@ -525,53 +492,6 @@ jobs:
         kubectl apply -f infrastructure/kubernetes/system/pod-garbage-collector-cronjob.yaml -n kube-system
         kubectl apply -f infrastructure/kubernetes/system/longhorn-cleanup-cronjob.yaml -n longhorn-system
         echo "✅ Production System CronJobs applied (kube-system + longhorn-system)"
-
-    - name: Deploy Monitoring Namespace + Metrics-Server to Production
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-prod
-        # 1. Monitoring namespace erstellen (idempotent)
-        kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-        # 2. Metrics-server patch (hostNetwork + port 4443 — same as staging Phase 189)
-        kubectl apply -f infrastructure/kubernetes/system/metrics-server-patch.yaml -n kube-system 2>&1 || echo "Warning: metrics-server patch failed"
-        echo "✅ Production monitoring namespace + metrics-server applied"
-
-    - name: Ensure kube-prometheus-stack on Production
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-prod
-        helm repo add prometheus-community https://prometheus-community.github.io/helm-charts 2>/dev/null || true
-        helm repo update
-        # Install falls nicht vorhanden, upgrade falls vorhanden (idempotent)
-        if helm list -n monitoring | grep -q kube-prometheus-stack; then
-          echo "kube-prometheus-stack exists — upgrading with hostNetwork"
-          helm upgrade kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-            -n monitoring --reuse-values \
-            --set prometheus.prometheusSpec.hostNetwork=true \
-            --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
-            --set prometheus.service.port=9090
-        else
-          echo "kube-prometheus-stack NOT found — installing fresh"
-          helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-            -n monitoring --create-namespace \
-            --set prometheus.prometheusSpec.hostNetwork=true \
-            --set prometheus.prometheusSpec.dnsPolicy=ClusterFirstWithHostNet \
-            --set prometheus.service.port=9090 \
-            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.resources.requests.storage=5Gi \
-            --set alertmanager.alertmanagerSpec.storage.volumeClaimTemplate.spec.storageClassName=local-path \
-            --set grafana.persistence.enabled=false \
-            --set prometheus.prometheusSpec.retention=15d \
-            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=10Gi \
-            --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=local-path
-        fi
-        # Prometheus rollout abwarten (CRDs müssen bereit sein)
-        kubectl rollout status statefulset/prometheus-kube-prometheus-stack-prometheus -n monitoring --timeout=300s || echo "⚠️ Warning: Prometheus rollout timeout"
-        echo "✅ kube-prometheus-stack ready on production"
-
-    - name: Deploy Monitoring Configs to Production
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-prod
-        # ERST NACH helm install — CRDs (ServiceMonitor, PrometheusRule) vorhanden!
-        kubectl apply -f infrastructure/kubernetes/production/monitoring/ -n monitoring 2>&1 || echo "Warning: Failed to apply monitoring configs"
-        echo "✅ Production monitoring configs applied (ServiceMonitor, Dashboards, Rules, Ingress)"
 
     - name: Run Production Smoke Tests
       run: |

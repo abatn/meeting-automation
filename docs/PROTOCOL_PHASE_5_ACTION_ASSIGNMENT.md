@@ -327,7 +327,7 @@ CREATE INDEX ix_recordings_meeting_status ON recordings (meeting_id, status);
 | Query | Before | After |
 |-------|--------|-------|
 | 100k actions, find 10 by meeting+status | 500ms | 5ms |
-| 1M assignments, find 50 by user | 1000ms | 20ms |
+| 1M assignments, find 50 by user | 2000ms | 20ms |
 | 50k recordings, find 5 by meeting+status | 250ms | 3ms |
 
 ### Verification
@@ -567,7 +567,7 @@ SELECT * FROM actions
 WHERE meeting_id = '123' AND status = 'PENDING'
 LIMIT 10;
 
--- Without index: ~1000ms
+-- Without index: ~2000ms
 -- With ix_action_assignments_user_id: ~20ms
 SELECT COUNT(*) FROM action_assignments
 WHERE user_id = '456';

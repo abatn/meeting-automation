@@ -66,7 +66,7 @@ Reference: https://docs.livekit.io/transport/self-hosting/kubernetes/
 1. Browser → `ws://158.180.18.110:7880` (LiveKit signaling via hostNetwork)
 2. Browser ← LiveKit returns ICE candidates (UDP ports)
 3. Browser ↔ LiveKit (UDP media stream via hostNetwork)
-4. Backend → `ws://livekit-config-staging:7880` (internal K8s DNS)
+4. Backend → `ws://livekit-server-staging:7880` (internal K8s DNS)
 5. Egress → `minio-staging:9000` (internal K8s DNS)
 
 ### Production (Cloud-VM)
@@ -106,7 +106,7 @@ Reference: https://docs.livekit.io/transport/self-hosting/kubernetes/
 ### 1. Docker Compose for LiveKit on Host
 
 ```yaml
-# docker-compose.livekit.yml (NEVER EXISTED)
+# docker-compose.livekit.yml
 version: '3.8'
 
 services:

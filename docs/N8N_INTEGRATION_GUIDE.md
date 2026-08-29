@@ -13,8 +13,8 @@ The backend uses `HTTP POST` webhooks to trigger n8n workflows. n8n processes th
 | Workflow | Event | Backend Trigger | n8n Webhook URL | Authentication |
 | :--- | :--- | :--- | :--- | :--- |
 | **Meeting Created** | `meeting.created` | `MeetingService.create_meeting` | `/webhook/meeting-created` | None (public) |
-| **Audio Uploaded** | `audio.uploaded` | `RecordingService.upload_recording` | `/webhook/audio-uploaded` | `X-Internal-API-Key` |
-| **Meeting Status Changed**| `meeting.status_changed`| `MeetingService._trigger_n8n_meeting_status_change` | `/webhook/meeting-status-changed` | None (public) |
+| **Audio Uploaded** | `audio.uploaded` | `RecordingService.upload_audio` | `/webhook/audio-uploaded` | `X-Internal-API-Key` |
+| **Meeting Status Changed**| `meeting.status_changed`| `MeetingService.update_status` | `/webhook/meeting-status-changed` | None (public) |
 | **Transcription Completed**| `transcription.completed`| `transcription_tasks._notify_n8n_completion` | `/webhook/transcription-completed` | `X-Internal-API-Key` |
 | **PV Validated**| `pv.validated` | `ReportService.validate_pv` | `/webhook/pv-validated` | `X-Internal-API-Key` |
 | **Daily Reminders**| `daily_reminders` | `daily_reminder_task` (Celery) | `/webhook/daily-reminders` | `X-Internal-API-Key` |

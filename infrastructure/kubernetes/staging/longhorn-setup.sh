@@ -67,7 +67,6 @@ helm install longhorn longhorn/longhorn \
     --create-namespace \
     --version "${LONGHORN_VERSION}" \
     --set defaultSettings.defaultReplicaCount=1 \
-    --set defaultSettings.guaranteedInstanceManagerCPU=200 \
     --set defaultSettings.createDefaultDiskLabeledNodes=true \
     --set defaultSettings.defaultClass=false \
     --wait \

@@ -7,10 +7,6 @@ data:
   livekit.yaml: |
     port: 7880
     log_level: info
-    room:
-      empty_timeout: 600
-      departure_timeout: 60
-      max_participants: 10
     rtc:
       tcp_port: 7881
       port_range_start: 50000
@@ -25,6 +21,9 @@ data:
       db: 0
     keys:
       meeting-api-key: meeting-api-secret-2026-minimum-32-chars!
+    turn:
+      enabled: true
+      udp_port: 3478
     webhook:
       api_key: meeting-api-key
       urls:

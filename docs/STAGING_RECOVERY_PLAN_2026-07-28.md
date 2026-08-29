@@ -109,5 +109,5 @@ git push origin main
 | 4 | Evaluate if argocd/longhorn/velero namespaces are needed | Low |
 
 ## Files Changed
-- `.github/workflows/e2e-tests.yml (DEPRECATED)` (Docker Hub pull secret, timeout 600s, celery rollout waits)
+- `.github/workflows/e2e-tests.yml` (Docker Hub pull secret, timeout 600s, celery rollout waits)
 - `docs/STAGING_RECOVERY_PLAN_2026-07-28.md` (this file)

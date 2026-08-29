@@ -38,42 +38,29 @@ spec:
         - name: JWT_ENABLED
           value: "true"
         - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: onlyoffice-secrets
-              key: jwt-secret
+          value: "staging-onlyoffice-secret-jwt-key-2026"
         - name: JWT_HEADER
           value: "Authorization"
         - name: ALLOW_PRIVATE_IP_ADDRESS
           value: "true"
         - name: SECURE_LINK_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: onlyoffice-secrets
-              key: secure-link-secret
+          value: "gy3MA8R33ojtIGfXYq37"
         - name: SERVER_NAME
           value: "staging.meeting-automation.com"
         resources:
           requests:
             memory: "512Mi"
-            cpu: "100m"
+            cpu: "200m"
             ephemeral-storage: "200Mi"
           limits:
             memory: "2Gi"
             cpu: "1"
             ephemeral-storage: "1Gi"
-        startupProbe:
-          httpGet:
-            path: /healthcheck
-            port: 80
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 10
-          failureThreshold: 30
         livenessProbe:
           httpGet:
             path: /healthcheck
             port: 80
+          initialDelaySeconds: 60
           periodSeconds: 30
           timeoutSeconds: 10
           failureThreshold: 3

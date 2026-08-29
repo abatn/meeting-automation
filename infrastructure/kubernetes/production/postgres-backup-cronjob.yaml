@@ -31,8 +31,7 @@ spec:
           dnsPolicy: ClusterFirstWithHostNet
           containers:
           - name: pg-dump
-            image: postgres:18-alpine
-            imagePullPolicy: Always
+            image: postgres:15-alpine
             command:
             - sh
             - -c
@@ -52,11 +51,6 @@ spec:
                 secretKeyRef:
                   name: postgres-secrets
                   key: POSTGRES_PASSWORD
-            resources:
-              limits:
-                ephemeral-storage: 2Gi
-              requests:
-                ephemeral-storage: 200Mi
             volumeMounts:
             - name: backup-storage
               mountPath: /backup

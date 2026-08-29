@@ -30,7 +30,7 @@ kubectl patch svc kube-prometheus-stack-grafana -n monitoring \
 
 # Oder port-forward
 kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
-# URL: http://localhost:3001
+# URL: http://localhost:3000
 # User: admin
 # Pass: kubectl get secret -n monitoring kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d
 ```

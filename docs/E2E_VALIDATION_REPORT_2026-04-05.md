@@ -30,7 +30,7 @@
 | Run 1 | 13/34 | 38% | Baseline |
 | Run 2 (Phase 1) | 16/34 | 47% | MinIO S3 Bucket angelegt |
 | Run 3 | 13/34 | 38% | conftest Race-Condition entdeckt |
-| Run 4 | 16/34 | 47% | conftest E2E_TEST Fix |
+| Run 4 | 16/34 | 47% | conftest E2E_MODE Fix |
 | **Run 5 (Final)** | **29/34** | **85%** | Alle initialen Fixes kombiniert |
 | **Run 6 (Image-Rebuild + Test-Fixes)** | **33/34** | **97%** | Docker-Image aktualisiert, Test-Assertions angepasst |
 
@@ -51,7 +51,7 @@ Wenn Tabellen existieren: `alembic stamp head` → `alembic upgrade head`. Damit
 `backend/alembic/versions/a1b2c3d4e5f6_add_tags_to_pvs.py` ergänzt die fehlende `tags VARCHAR`-Spalte. `selectinload(MeetingModel.pv)` generierte `SELECT pvs.tags, ...` → Spalte fehlte → 500.
 
 ### Fix 5: conftest.py Race-Condition
-Pod-Image enthielt alte `tests/conftest.py` ohne `if not E2E_TEST:` Schutz. `drop_all` + `create_all` lief für jeden Test und zerstörte DB-State. Fix: Aktuelle Datei per `kubectl cp` in alle Pods kopiert.
+Pod-Image enthielt alte `tests/conftest.py` ohne `if not E2E_MODE:` Schutz. `drop_all` + `create_all` lief für jeden Test und zerstörte DB-State. Fix: Aktuelle Datei per `kubectl cp` in alle Pods kopiert.
 
 ### Fix 6: MinIO S3 Bucket (Phase 1)
 `meeting-recordings-staging` Bucket fehlte → 403 bei Recording-Upload. Manuell angelegt, Credentials korrigiert.
@@ -101,7 +101,7 @@ Alembic-Version: `a1b2c3d4e5f6` (add_tags_to_pvs, neueste Migration)
 
 Das Staging-Cluster ist produktiv bereit. Alle kritischen E2E-Tests bestehen. Der eine SKIPPED Test ist by design (n8n-Mocking über Prozessgrenzen hinweg).
 
-**CI/CD Pipeline:** Das Pass-Gate wurde auf 95% erhöht in `.github/workflows/e2e-tests.yml (DEPRECATED)`.
+**CI/CD Pipeline:** Das Pass-Gate wurde auf 95% erhöht in `.github/workflows/e2e-tests.yml`.
 
 ---
 

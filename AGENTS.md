@@ -29,7 +29,7 @@ Tests are categorized by external dependency — not all "unit tests" run with S
 - **Mixed fixtures** (need `E2E_TEST=true`): `test_branding.py`, `test_pv_versioning.py`, `test_meeting_planner_extension.py`
 
 ### Linting Disabled — DO NOT RE-ENABLE
-- **flake8 + mypy disabled in CI** (were in backend-ci.yml, now in ci.yml — never re-enabled)
+- **flake8 + mypy disabled in CI** (.github/workflows/backend-ci.yml lines 62-74, commented out)
 - 678 issues parked in docs/LINT_ISSUES_2026-04-05.md
 - Running locally is fine; CI will not enforce
 - Frontend linting is **enabled and required** in CI
@@ -136,7 +136,7 @@ cd frontend
 # Install (npm ci in CI, npm install locally)
 npm ci
 
-# Dev server (Vite at localhost:3001 — temporarily 3001 for staging test, normally 3000)
+# Dev server (Vite at localhost:3000, proxies /api to backend:8000)
 npm run dev
 
 # REQUIRED in CI (must pass)
@@ -200,7 +200,7 @@ docker logs meeting-automation-celery-worker-1 | grep TIMING
 - **CRITICAL**: Automation API requires `?client_id=e052b451-0cc3-4932-9c68-7c46240b1936` parameter
 - **CRITICAL**: n8n only activates 3/7 workflows on startup. Must call `POST /api/v1/workflows/{id}/activate` with `X-N8N-API-KEY` header for others
 - **CRITICAL**: DB changes don't propagate to n8n in-memory state. Must DELETE + RE-IMPORT workflow via API
-- **Workflow IDs** (runtime, may change on re-import): meeting-created `EbdQNas2d3Q9NzuG`, pv-validated `5_dJFUYSTiynU5Oe0CEBag`, transcription-completed `3`, meeting-status-changed `7`, daily-reminders `4`, user-invited `6`, admin-new-tenant `admin-new-tenant`, audio-uploaded `1`, customer-activated `customer-activated`
+- **Workflow IDs**: meeting-created `uB0bPHLt0FNxsaBe`, pv-validated `o9NXKZqiDnksQeO3`, transcription-completed `00tDUsvHjpnWD6oG`, meeting-status-changed `6jsJVqySI9VpnvoO`, daily-reminders `GpER66AvYwapRNP4`, user-invited `CqkpcBkdkXlJtZbo`
 
 ### LiveKit Recording Pipeline
 ```
@@ -255,17 +255,16 @@ Meeting Created → LiveKit Room + Egress → MinIO (S3) → Celery Worker
 ## CI/CD Pipeline
 
 ### GitHub Actions Workflows
-- **ci.yml** (single unified pipeline, replaces old backend-ci.yml + frontend-ci.yml + e2e-tests.yml):
-  - **Job 1: backend-test** — PostgreSQL 15 + Redis 7 service containers, `E2E_TEST=true`, runs `pytest tests/ --cov=app --cov-report=xml` (ALL tests, not just E2E)
-  - **Job 2: frontend-test** — lint → type-check → build
-  - **Job 3: build-and-push** — Multi-arch Docker images (amd64+arm64) to Docker Hub (main branch only)
-- **deploy-staging.yml** — Deploys to staging k3s cluster (Helm LiveKit, backend, frontend, Celery)
-- **deploy-production.yml** — Deploys to production k3s cluster (manual trigger via workflow_dispatch)
-- **Disabled** (still exist with .disabled suffix for rollback): backend-ci.yml.disabled, frontend-ci.yml.disabled, e2e-tests.yml.disabled
+- **backend-ci.yml**: Lint disabled (see above), tests + Docker build (uses real PostgreSQL service in CI)
+- **frontend-ci.yml**: Lint + type-check + build (all required)
+- **e2e-tests.yml**: Full deployment pipeline (dev → staging → production)
+  - Job 1: Build + E2E tests in docker-compose.e2e.yml (E2E_TEST=true, pytest-rerunfailures for flaky tests)
+  - Job 2: Deploy to staging + full E2E (≥95% pass rate required, temporarily ≥85% during stabilization)
+  - Job 3: Manual approval + production deploy + smoke tests
 
 ### Test Command Order in CI
 ```bash
-# Backend (in CI — uses PostgreSQL + E2E_TEST=true, NOT SQLite)
+# Backend (in CI — uses PostgreSQL, NOT SQLite)
 pytest tests/ --cov=app --cov-report=xml
 
 # Frontend (in CI, order matters)
@@ -296,22 +295,6 @@ logger.info(f"TIMING: operation_name_duration={time.time()-start:.2f}s")
 ```
 Extract with: `docker logs celery-worker | grep TIMING`
 
-**Pipeline TIMING Stages** (transcription_tasks.py):
-- `s3_download`: Audio download from MinIO
-- `onnx_init`: ONNX Runtime initialization
-- `gladia_transcription`: Gladia V2 diarization
-- `speaker_identification`: Speaker ID (ONNX + heuristic + text)
-- `onnx_segment_reassignment`: Per-segment ONNX reassignment
-- `sentinel_llm`: Qwen-1.5B summarization (or fallback)
-- `mistral_pv`: Mistral PV generation
-- `persistence`: DB save (transcription + PV + actions)
-- `pipeline_total`: Total pipeline with full breakdown
-
-**Example output:**
-```
-TIMING: pipeline_total duration=23.45s (s3=0.1s gladia=13.2s speaker=2.1s sentinel=0.0s mistral=8.4s persist=0.3s)
-```
-
 ## Common Pitfalls
 
 ### 1. Wrong Env Var for E2E Tests
@@ -340,7 +323,7 @@ TIMING: pipeline_total duration=23.45s (s3=0.1s gladia=13.2s speaker=2.1s sentin
 
 ### 7. Wrong Frontend Dev Port
 - Symptom: Can't connect to frontend dev server
-- Fix: Vite runs on **port 3001** (temporary override from 3000 for staging test). Config in `frontend/vite.config.ts`
+- Fix: Vite runs on **port 3000** (not 5173). Config in `frontend/vite.config.ts`
 
 ### 8. Forgetting Alembic Migrations in E2E
 - Symptom: Schema mismatch in E2E tests
@@ -387,18 +370,6 @@ TIMING: pipeline_total duration=23.45s (s3=0.1s gladia=13.2s speaker=2.1s sentin
 - Root Cause: Catch-all `/` in staging-ingress wins over specific paths in monitoring-ingress
 - Fix: Add explicit path to the catch-all ingress too
 
-### 18. n8n liest Nodes aus workflow_history, NICHT workflow_entity (CRITICAL 2026-08-05)
-- Symptom: Credential-ID Update in `workflow_entity` hat keinen Effekt — n8n zeigt weiterhin "Credential does not exist"
-- Root Cause: n8n lädt die aktive Workflow-Version aus `workflow_history`, nicht aus `workflow_entity`
-- Fix: **BEIDE Tabellen** aktualisieren: `workflow_entity` + `workflow_history`
-```sql
-UPDATE workflow_entity SET nodes = replace(nodes::text, 'OLD_ID', 'NEW_ID')::jsonb WHERE nodes::text LIKE '%OLD_ID%';
-UPDATE workflow_history SET nodes = replace(nodes::text, 'OLD_ID', 'NEW_ID')::jsonb WHERE nodes::text LIKE '%OLD_ID%';
--- Dann: kubectl rollout restart deployment/n8n
-```
-- CI/CD Auswirkung: Das Deploy-Script muss BEIDE Tabellen in der Credential-ID-Update-Phase ansprechen
-- Doku: `docs/N8N_CREDENTIAL_FIX_2026-08-05.md`
-
 ## Development Workflow
 
 ### Adding a New API Endpoint
@@ -430,9 +401,6 @@ UPDATE workflow_history SET nodes = replace(nodes::text, 'OLD_ID', 'NEW_ID')::js
 
 - **CLAUDE.md**: Comprehensive project guide (architecture, patterns, conventions)
 - **docs/LIVEKIT_ROUTE_PIPELINE_2026-06-07.md**: Complete LiveKit pipeline flow
-- **docs/LIVEKIT_MIGRATION_RECAP_2026-08-06_TO_2026-08-08.md**: LiveKit Helm migration recap (staging + production)
-- **docs/LIVEKIT_E2E_VALIDATION_2026-08-09.md**: E2E validation results with log evidence
-- **docs/LIVEKIT_INTEGRATION_PLAN.md**: LiveKit integration plan and staging/production comparison
 - **docs/PIPELINE_QUICK_WINS.md**: Performance optimization opportunities
 - **docs/ARCHITECTURE.md**: System design and integration points
 - **docs/DATABASE_SCHEMA.md**: Database schema and relationships

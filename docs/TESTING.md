@@ -20,13 +20,13 @@ export TOTP_ENCRYPTION_KEY="MWF5UYgUBBiaPQB-tRw5hoCA_CGsQxDUnYVYFtiMsK4="
 #### Alle Tests ausführen
 ```bash
 cd backend
-python -m pytest tests/ -v
+/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/ -v
 ```
 
 #### Nur E2E Smoke Tests
 ```bash
 cd backend
-python -m pytest tests/e2e/test_smoke.py -v
+/home/batnini/meeting-automation/backend/venv_test/bin/python -m pytest tests/e2e/test_smoke.py -v
 ```
 
 #### Ergebnis (Stand 2026-06-04)
@@ -38,12 +38,19 @@ python -m pytest tests/e2e/test_smoke.py -v
 ### Frontend Tests
 ```bash
 cd frontend
-# Lint + Type Check + Build (required in CI)
-npm run lint && npm run type-check && npm run build
+# Run component tests
+npm test
+# Run E2E tests (UI mode)
+npm run cypress:open
+# Run E2E tests (Headless mode)
+npm run cypress:run
 ```
 
 ### Performance Tests
-> Performance testing with Locust is planned but not yet implemented.
+```bash
+# Start Locust
+locust -f tests/performance/locustfile.py
+```
 
 ## Test Structure
 
@@ -74,6 +81,6 @@ npm run lint && npm run type-check && npm run build
 
 ## Continuous Integration
 Tests are automatically executed on every Push and Pull Request via GitHub Actions:
-- `ci.yml`: Backend tests (PostgreSQL + E2E_TEST=true) + Frontend (lint+typecheck+build)
-- `deploy-staging.yml`: Deploys to staging k3s cluster
-- `deploy-production.yml`: Deploys to production k3s cluster (manual trigger)
+- `backend-ci.yml`: Runs pytest suite.
+- `frontend-ci.yml`: Runs Jest and Cypress.
+- `security-scan.yml`: Performs OWASP ZAP and Trivy scans.
