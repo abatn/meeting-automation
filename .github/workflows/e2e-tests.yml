@@ -222,7 +222,6 @@ jobs:
           -f infrastructure/kubernetes/staging/livekit-egress-deployment.yaml \
           -f infrastructure/kubernetes/staging/livekit-secrets.yaml \
           -f infrastructure/kubernetes/staging/livekit-server-deployment.yaml \
-          -f infrastructure/kubernetes/staging/longhorn-csi-autoscaler.yaml \
           -f infrastructure/kubernetes/staging/minio-secrets.yaml \
           -f infrastructure/kubernetes/staging/minio-statefulset.yaml \
           -f infrastructure/kubernetes/staging/n8n-deployment.yaml \
@@ -242,8 +241,9 @@ jobs:
           -f infrastructure/kubernetes/staging/redis-deployment.yaml \
           -f infrastructure/kubernetes/staging/redis-secrets.yaml \
           -f infrastructure/kubernetes/staging/sentinel-models-claim.yaml \
-          -f infrastructure/kubernetes/staging/velero-backup-repository.yaml \
           -n meeting-automation-staging
+        # Apply Velero BackupRepository (namespace: velero, NOT meeting-automation-staging)
+        kubectl apply -f infrastructure/kubernetes/staging/velero-backup-repository.yaml -n velero
         # Apply monitoring resources (separate path)
         kubectl apply -f infrastructure/kubernetes/staging/monitoring/grafana-dashboard-intelligence.yaml \
           -f infrastructure/kubernetes/staging/monitoring/grafana-dashboard-pipeline.yaml \
