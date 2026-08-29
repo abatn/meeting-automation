@@ -2,7 +2,7 @@ name: Deploy Production
 
 on:
   workflow_run:
-    workflows: ["Docker Build & Push"]
+    workflows: ["E2E Tests & Deployment Pipeline"]
     types:
       - completed
     branches:

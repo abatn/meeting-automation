@@ -100,6 +100,50 @@ Für zukünftige Reverts:
 2. **Nur Production-YAMLs** auf den Production-Cluster anwenden
 3. Deploy-Script muss production/staging klar trennen
 
+## CI-Workflows: Longhorn-Bereinigung
+
+Entfernt aus `e2e-tests.yml` und `deploy-production.yml`:
+- Longhorn-Installation (`helm install longhorn`)
+- `longhorn-cleanup` CronJob
+
+Beibehalten:
+- `ephemeral-storage-cleanup` CronJob (kube-system)
+- `pod-garbage-collector` CronJob (kube-system)
+- `metrics-server-patch` (kube-system)
+
+## CI-Workflows: Defekter Trigger
+
+### Ursache
+
+`deploy-production.yml` referenziert einen Workflow `Docker Build & Push`, der am 20.08 gelöscht wurde (Commit `102d5910`). Dieser Workflow war zuständig für:
+- Docker-Image-Build (backend + frontend)
+- Push nach Docker Hub
+
+Nach der Löschung übernahm `e2e-tests.yml` (`E2E Tests & Deployment Pipeline`) diese Aufgabe. Der Trigger in `deploy-production.yml` wurde jedoch nicht aktualisiert.
+
+### Fix
+
+```yaml
+# Vorher (kaputt):
+on:
+  workflow_run:
+    workflows: ["Docker Build & Push"]
+
+# Nachher (korrekt):
+on:
+  workflow_run:
+    workflows: ["E2E Tests & Deployment Pipeline"]
+```
+
+### Betroffene Workflows
+
+| Workflow | `name:` | Status |
+|----------|---------|--------|
+| `backend-ci.yml` | `Backend CI` | Tests only, kein Docker Push |
+| `e2e-tests.yml` | `E2E Tests & Deployment Pipeline` | Baut + pushed Docker Images |
+| `deploy-production.yml` | `Deploy Production` | Trigger korrigiert |
+| `frontend-ci.yml` | `Frontend CI` | Lint + Build only |
+
 ## Reversibilität
 
 - Namespace `meeting-automation` kann jederzeit neu erstellt werden
