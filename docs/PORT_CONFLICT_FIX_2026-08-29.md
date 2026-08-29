@@ -149,3 +149,59 @@ on:
 - Namespace `meeting-automation` kann jederzeit neu erstellt werden
 - Alle YAML-Dateien sind im Git unter `infrastructure/kubernetes/production/`
 - Helm-Releases bleiben unberührt
+
+## CI-Workflows: Fehlende Production-Resources
+
+### Ursache
+
+`deploy-production.yml` wendete seit Jul 28 (Commit `b3dfad55`) nur einen Teil der Production-Resources an. Drei Dateien fehlten in den `kubectl apply`-Befehlen:
+
+| Datei | Typ | Funktion |
+|-------|-----|----------|
+| `onlyoffice-secrets.yaml` | Secret | OnlyOffice JWT + API-Key |
+| `onlyoffice-custom-config.yaml` | ConfigMap | OnlyOffice Nginx-Konfiguration |
+| `postgres-backup-cronjob.yaml` | CronJob | PostgreSQL Backup (täglich 02:00) |
+
+### Fix
+
+```yaml
+# Vorher (lückenhaft):
+for secret in backend-secrets postgres-secrets redis-secrets minio-secrets rabbitmq-secrets livekit-secrets n8n-secrets; do
+kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml
+kubectl apply -f cnpg-cluster.yaml
+
+# Nachher (vollständig):
+for secret in backend-secrets postgres-secrets redis-secrets minio-secrets rabbitmq-secrets livekit-secrets n8n-secrets onlyoffice-secrets; do
+kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml -f onlyoffice-custom-config.yaml
+kubectl apply -f cnpg-cluster.yaml
+kubectl apply -f postgres-backup-cronjob.yaml
+```
+
+### Betroffene Ressourcen
+
+| Ressource | Vorher | Nachher |
+|-----------|--------|---------|
+| `onlyoffice-secrets` | Nur manuell | Im Secrets-Loop |
+| `onlyoffice-custom-config` | Fehlte | Nach ConfigMaps |
+| `postgres-backup-cronjob` | Fehlte | Nach CNPG-Cluster |
+
+## CI-Workflows: Explizite Dateiliste (e2e-tests.yml)
+
+### Ursache
+
+`kubectl apply -f infrastructure/kubernetes/staging/` traversiert rekursiv und trifft 5 Helm-Values-Dateien ohne `apiVersion`/`kind`:
+
+```
+error validating data: [apiVersion not set, kind not set]
+```
+
+Betroffene Dateien:
+- `egress-values.yaml` (LiveKit Egress Helm Values)
+- `livekit-server-values.yaml` (LiveKit Server Helm Values)
+- `longhorn-values.yaml` (Longhorn Helm Values)
+- `velero-values.yaml` (Velero Helm Values)
+- `k3s-config.yaml` (k3s Cluster Config)
+
+### Fix
+
+Rekursives `kubectl apply -f staging/` → explizite Dateiliste mit 53 valid K8s-Resources (40 App + 13 Monitoring).

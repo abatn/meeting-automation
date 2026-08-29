@@ -198,11 +198,67 @@ jobs:
     - name: Deploy All Staging Resources (idempotent)
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
-        # Apply ALL staging YAMLs — idempotent (create or update)
-        # Includes: secrets, configmaps, PVCs, deployments, services, network policies
-        # NOTE: Resources with hardcoded namespace: kube-system (CronJobs, metrics-server)
-        # are excluded from staging/ and applied separately in 'Deploy System CronJobs'
-        kubectl apply -f infrastructure/kubernetes/staging/ -n meeting-automation-staging
+        # Apply ALL staging K8s resources — idempotent (create or update)
+        # EXPLICIT file list — excludes Helm values files (egress-values.yaml, livekit-server-values.yaml,
+        # longhorn-values.yaml, velero-values.yaml, k3s-config.yaml) which lack apiVersion/kind
+        # and cause "error validating data: apiVersion not set, kind not set"
+        kubectl apply -f infrastructure/kubernetes/staging/namespace.yaml \
+          -f infrastructure/kubernetes/staging/backend-secrets.yaml \
+          -f infrastructure/kubernetes/staging/backend-config.yaml \
+          -f infrastructure/kubernetes/staging/backend-deployment.yaml \
+          -f infrastructure/kubernetes/staging/celery-beat-deployment.yaml \
+          -f infrastructure/kubernetes/staging/celery-worker-deployment.yaml \
+          -f infrastructure/kubernetes/staging/celery-worker-hpa.yaml \
+          -f infrastructure/kubernetes/staging/celery-worker-pro-deployment.yaml \
+          -f infrastructure/kubernetes/staging/cert-manager-acme-solver-policy.yaml \
+          -f infrastructure/kubernetes/staging/cnpg-cluster.yaml \
+          -f infrastructure/kubernetes/staging/frontend-deployment.yaml \
+          -f infrastructure/kubernetes/staging/frontend-nginx-config.yaml \
+          -f infrastructure/kubernetes/staging/ingress-staging.yaml \
+          -f infrastructure/kubernetes/staging/keda-rabbitmq-networkpolicy.yaml \
+          -f infrastructure/kubernetes/staging/keda-scaledobjects.yaml \
+          -f infrastructure/kubernetes/staging/livekit-configmap.yaml \
+          -f infrastructure/kubernetes/staging/livekit-egress-configmap.yaml \
+          -f infrastructure/kubernetes/staging/livekit-egress-deployment.yaml \
+          -f infrastructure/kubernetes/staging/livekit-secrets.yaml \
+          -f infrastructure/kubernetes/staging/livekit-server-deployment.yaml \
+          -f infrastructure/kubernetes/staging/longhorn-csi-autoscaler.yaml \
+          -f infrastructure/kubernetes/staging/minio-secrets.yaml \
+          -f infrastructure/kubernetes/staging/minio-statefulset.yaml \
+          -f infrastructure/kubernetes/staging/n8n-deployment.yaml \
+          -f infrastructure/kubernetes/staging/n8n-ingress.yaml \
+          -f infrastructure/kubernetes/staging/n8n-nodeport-policy.yaml \
+          -f infrastructure/kubernetes/staging/n8n-secrets.yaml \
+          -f infrastructure/kubernetes/staging/n8n-service-nodeport.yaml \
+          -f infrastructure/kubernetes/staging/network-policies.yaml \
+          -f infrastructure/kubernetes/staging/onlyoffice-custom-config.yaml \
+          -f infrastructure/kubernetes/staging/onlyoffice-deployment.yaml \
+          -f infrastructure/kubernetes/staging/onlyoffice-secrets.yaml \
+          -f infrastructure/kubernetes/staging/postgres-backup-cronjob.yaml \
+          -f infrastructure/kubernetes/staging/postgres-secrets.yaml \
+          -f infrastructure/kubernetes/staging/postgres-statefulset.yaml \
+          -f infrastructure/kubernetes/staging/rabbitmq-secrets.yaml \
+          -f infrastructure/kubernetes/staging/rabbitmq-statefulset.yaml \
+          -f infrastructure/kubernetes/staging/redis-deployment.yaml \
+          -f infrastructure/kubernetes/staging/redis-secrets.yaml \
+          -f infrastructure/kubernetes/staging/sentinel-models-claim.yaml \
+          -f infrastructure/kubernetes/staging/velero-backup-repository.yaml \
+          -n meeting-automation-staging
+        # Apply monitoring resources (separate path)
+        kubectl apply -f infrastructure/kubernetes/staging/monitoring/grafana-dashboard-intelligence.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/grafana-dashboard-pipeline.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/grafana-dashboard-tenants.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/grafana-datasource-loki.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/grafana-external-service.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/monitoring-ingress.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/prometheus-adapter-config.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/prometheus-recording-rules.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/prometheus-rules.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/prometheus-slo-rules.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/service-monitor.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/velero-prometheusrule.yaml \
+          -f infrastructure/kubernetes/staging/monitoring/velero-servicemonitor.yaml \
+          -n meeting-automation-staging
         # Restart OnlyOffice to pick up ConfigMap changes (initContainer copies at pod startup)
         kubectl rollout restart deployment/onlyoffice-staging -n meeting-automation-staging 2>&1 || echo "Warning: OnlyOffice staging rollout restart failed"
         echo "✅ All staging resources applied"

@@ -76,13 +76,14 @@ jobs:
           
           kubectl apply -f namespace.yaml
           # Secrets: Only apply if they don't exist (manual update required for changes)
-          for secret in backend-secrets postgres-secrets redis-secrets minio-secrets rabbitmq-secrets livekit-secrets n8n-secrets; do
+          for secret in backend-secrets postgres-secrets redis-secrets minio-secrets rabbitmq-secrets livekit-secrets n8n-secrets onlyoffice-secrets; do
             kubectl get secret "$secret" -n meeting-automation >/dev/null 2>&1 || \
               kubectl apply -f "${secret}.yaml" -n meeting-automation
           done
-          kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml
+          kubectl apply -f backend-config.yaml -f livekit-configmap.yaml -f livekit-egress-configmap.yaml -f frontend-nginx-config.yaml -f onlyoffice-custom-config.yaml
           kubectl apply -f redis-deployment.yaml -f rabbitmq-statefulset.yaml -f minio-statefulset.yaml
           kubectl apply -f cnpg-cluster.yaml
+          kubectl apply -f postgres-backup-cronjob.yaml
           kubectl apply -f backend-deployment.yaml -f frontend-deployment.yaml -f onlyoffice-deployment.yaml -f n8n-deployment.yaml
           kubectl apply -f celery-worker-deployment.yaml -f celery-worker-pro-deployment.yaml -f celery-beat-deployment.yaml
           kubectl apply -f livekit-server-deployment.yaml -f livekit-egress-deployment.yaml
