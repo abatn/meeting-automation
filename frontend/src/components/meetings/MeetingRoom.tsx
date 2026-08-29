@@ -54,7 +54,7 @@ import {
 import { Theme } from "@mui/material/styles";
 import { LiveKitRoom, RoomAudioRenderer, useParticipants, useRoomInfo, useConnectionState, useLocalParticipant, useDisconnectButton } from "@livekit/components-react";
 import "@livekit/components-styles";
-import { ConnectionState, ConnectionQuality, RoomEvent, LocalParticipant, Track } from "livekit-client";
+import { ConnectionState, ConnectionQuality, RoomEvent } from "livekit-client";
 import { useTranslation } from "react-i18next";
 import { useSelector } from "react-redux";
 import { meetingsApi } from "../../services/meetings";
@@ -263,20 +263,15 @@ function LiveKitDisconnectBridge({ onReady }: { onReady: (fn: () => void) => voi
 function MicToggleBridge({
   onMicState,
 }: {
-  onMicState: (enabled: boolean, toggle: () => void, participant: LocalParticipant) => void;
+  onMicState: (enabled: boolean, toggle: () => void) => void;
 }) {
   const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
   const toggle = useCallback(() => {
     localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
   }, [localParticipant, isMicrophoneEnabled]);
   useEffect(() => {
-    // 100% nach offizieller LiveKit-Doku: Prüfe ob Audio-Track WIRKLICH publiziert ist
-    // NICHT nur isMicrophoneEnabled — sondern ob der Track auch tatsächlich sent
-    const pub = localParticipant.getTrackPublication(Track.Source.Microphone);
-    const isTrackPublished = !!pub && !!pub.track && !!pub.track.sender;
-    // micEnabled = true NUR wenn: Track publiziert UND Mikrofon nicht gemutet
-    onMicState(isTrackPublished && isMicrophoneEnabled, toggle, localParticipant);
-  }, [isMicrophoneEnabled, toggle, localParticipant, onMicState]);
+    onMicState(isMicrophoneEnabled, toggle);
+  }, [isMicrophoneEnabled, toggle, onMicState]);
   return null;
 }
 
@@ -397,9 +392,7 @@ const MeetingRoom: React.FC = () => {
   const [livekitUrl, setLivekitUrl]     = useState<string>("");
   const [livekitConnectionState, setLivekitConnectionState] = useState<ConnectionState>(ConnectionState.Disconnected);
   const [livekitConnected, setLivekitConnected]             = useState(false);
-  const [livekitError, setLivekitError] = useState<string | null>(null);
-  const [isReconnecting, setIsReconnecting] = useState(false);
-  const [reconnectAttempt, setReconnectAttempt] = useState(0);
+const [livekitError, setLivekitError] = useState<string | null>(null);
 
    // Room stabilization (for clean Egress recording start)
    const [roomConnectionReady, setRoomConnectionReady] = useState(false);
@@ -430,16 +423,12 @@ const MeetingRoom: React.FC = () => {
   const [exportLanguage, setExportLanguage]     = useState<string>(i18n.language.split("-")[0] || "fr");
 
   // Mic state (propagated from inside LiveKitRoom via MicToggleBridge)
-  // DEFAULT: false — Button wird erst klickbar WENN Audio-Track WIRKLICH publiziert ist
-  // (100% nach offizieller LiveKit-Doku: "Verify publication before triggering Egress")
-  const [micEnabled, setMicEnabled] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(true);
   const micToggleRef = useRef<(() => void) | null>(null);
-  const localParticipantRef = useRef<LocalParticipant | null>(null);
 
-  const handleMicState = useCallback((enabled: boolean, toggle: () => void, participant: LocalParticipant) => {
+  const handleMicState = useCallback((enabled: boolean, toggle: () => void) => {
     setMicEnabled(enabled);
     micToggleRef.current = toggle;
-    localParticipantRef.current = participant;
   }, []);
 
   const handleMicToggle = useCallback(() => {
@@ -452,26 +441,12 @@ const MeetingRoom: React.FC = () => {
 
   const handleLiveKitConnectionState = useCallback((state: ConnectionState) => {
     const connected = state === ConnectionState.Connected;
-    const reconnecting =
-      state === ConnectionState.Reconnecting ||
-      state === ConnectionState.SignalReconnecting;
 
     setLivekitConnectionState(state);
     setLivekitConnected(connected);
 
     if (connected) {
       setLivekitError(null);
-      // Room (re)established — initial connect OR reconnect completed.
-      // Replaces the removed onReconnecting/onReconnected props (they were
-      // never wired in @livekit/components-react@2.9.21): restore readiness.
-      setRoomConnectionReady(true);
-      setIsReconnecting(false);
-    } else if (reconnecting) {
-      // Do NOT set roomConnectionReady(false) while a recording is active —
-      // that would disable the recording button and stop Egress. Reconnect
-      // timing prevents DUPLICATE_IDENTITY.
-      console.warn("[LiveKit] Reconnecting...");
-      setIsReconnecting(true);
     }
   }, []);
 
@@ -771,36 +746,6 @@ const MeetingRoom: React.FC = () => {
       setRecordingStatus("recording");
       setLivekitError(null);
 
-      // OFFICIAL LiveKit pattern (livekit-client v2.19.1): ensure the microphone
-      // track is actually PUBLISHED before starting egress. RoomCompositeEgress
-      // subscribes only to the tracks it needs — without a published audio track
-      // it aborts after a few seconds (proven in real test "test helm livekit",
-      // meeting 88d7c7a1).
-      //
-      // v2.19.1 has NO TrackPublication.isPublished. The reliable signal that a
-      // local track is live in the peer connection is `pub.track.sender` being
-      // set (RTCRtpSender is only assigned once the track is actually sending).
-      const lp = localParticipantRef.current;
-      if (lp) {
-        const pub = lp.getTrackPublication(Track.Source.Microphone);
-        // isLive requires: publication exists + track attached + RTCRtpSender set
-        // (actually sending) + NOT muted (a muted mic would record silence)
-        const isLive = !!pub && !!pub.track && !!pub.track.sender && !pub.isMuted;
-        if (!isLive) {
-          console.log("[Recording] Microphone not published yet — enabling audio track before egress start...");
-          // Await resolves only after the track is published (official pattern)
-          const result = await lp.setMicrophoneEnabled(true);
-          if (!result || !result.track?.sender) {
-            throw new Error("Microphone could not be enabled. Check your browser permission.");
-          }
-          console.log("[Recording] Microphone enabled, audio track ready.");
-        } else {
-          console.log("[Recording] Audio track already published — proceeding.");
-        }
-      } else {
-        console.warn("[Recording] localParticipant not available — starting egress without audio guard.");
-      }
-
       const res = await meetingsApi.startRecording(id);
       console.log("[Recording] API response:", res);
       setRecordingId(res.recording_id || null);
@@ -1064,18 +1009,13 @@ const handleStopRecording = async () => {
                     connect={true}
                     audio={true}
                     video={false}
-                    options={{ adaptiveStream: true, dynacast: true }}
                     connectOptions={{
-                      peerConnectionTimeout: 60000,
-                      websocketTimeout: 60000,
+                      peerConnectionTimeout: 30000,
                       maxRetries: 3,
                     }}
 onConnected={() => {
-                       console.log("[LiveKit] Connected — setting roomConnectionReady=true");
                        setLivekitError(null);
                        setRoomConnectionReady(true);
-                       setIsReconnecting(false);
-                       setReconnectAttempt(0);
                      }}
 onError={(error) => {
                        console.error("[LiveKit] Connection error:", error, "serverUrl:", livekitUrl);
@@ -1083,17 +1023,15 @@ onError={(error) => {
                          setLivekitError(error.message || String(error));
                        }
                      }}
-onMediaDeviceFailure={(failure, kind) => {
+                    onMediaDeviceFailure={(failure, kind) => {
                       console.error("[LiveKit] Media device failure:", failure, kind);
                       if (recordingStatus === "idle") {
                         setLivekitError(`Media device failure: ${failure} (${kind})`);
                       }
                     }}
-onDisconnected={() => {
-                      console.warn("[LiveKit] Disconnected");
+                    onDisconnected={() => {
                       setLivekitConnected(false);
                       setRoomConnectionReady(false);
-                      setIsReconnecting(false);
                     }}
                    >
                      <LiveKitConnectionBridge onStateChange={handleLiveKitConnectionState} />
@@ -1134,21 +1072,12 @@ onDisconnected={() => {
                {recordingStatus === "idle" && !isSyncing && meetingCreatorId === currentUser?.id && (
                 <>
                 <Button variant="contained" fullWidth disableElevation onClick={handleStartRecording}
-                    disabled={!roomConnectionReady || !micEnabled || isStarting}
+                    disabled={!roomConnectionReady || isStarting}
                    startIcon={<RecordIcon />}
                    sx={{ bgcolor: COLOR.error, color: "#FFF", borderRadius: 2, textTransform: "none", fontSize: 14, fontWeight: 600, py: 1.25, "&:hover": { bgcolor: "#DC2626" } }}
                  >
-                   {!micEnabled
-                     ? t("meeting_assistant.enable_microphone_first", "Enable microphone first")
-                     : roomConnectionReady
-                       ? t("meeting_assistant.start_recording")
-                       : t("meeting_assistant.waiting_connection")}
+                   {roomConnectionReady ? t("meeting_assistant.start_recording") : t("meeting_assistant.waiting_connection")}
                  </Button>
-                 {!micEnabled && (
-                   <Typography sx={{ fontSize: 11, color: COLOR.textMuted, mt: 1, textAlign: "center" }}>
-                     {t("meeting_assistant.enable_mic_hint", "Allow your microphone so the recording can capture audio")}
-                   </Typography>
-                 )}
                  {livekitError && livekitError.startsWith("Recording Error:") && (
                    <Typography sx={{ fontSize: 11, color: COLOR.error, mt: 1, fontFamily: "monospace", wordBreak: "break-all" }}>
                      {livekitError}

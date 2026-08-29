@@ -43,8 +43,8 @@ async def check_rate_limit(
         ):
             ...
     """
-    # Skip rate limiting in E2E tests or staging (without triggering Celery eager mode)
-    if os.getenv("E2E_TEST", "").lower() == "true" or os.getenv("SKIP_RECORDING_RATE_LIMIT", "").lower() == "true":
+    # Skip rate limiting in E2E tests to avoid 429 errors during test runs
+    if os.getenv("E2E_TEST", "").lower() == "true":
         return
 
     # Get client IP

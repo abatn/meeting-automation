@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import json
+import logging
 import os
 import tempfile
 import uuid
@@ -38,9 +39,8 @@ from app.services.audit_service import AuditService
 import difflib
 from difflib import SequenceMatcher
 from app.tasks.celery_app import celery_app
-from celery.utils.log import get_task_logger
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def _run_async(coro):
@@ -180,9 +180,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             # Download audio from S3
             stage_start = time.time()
             temp_path = await _download_audio(str(recording.file_path), str(recording.client_id))
-            s3_duration = time.time() - stage_start
-            PIPELINE_STAGE_DURATION.labels(stage="s3_download").observe(s3_duration)
-            logger.info(f"TIMING: s3_download duration={s3_duration:.2f}s file={recording.file_path}")
+            PIPELINE_STAGE_DURATION.labels(stage="s3_download").observe(time.time() - stage_start)
             if not temp_path:
                 raise Exception("S3 Error: Failed to download audio from MinIO")
 
@@ -203,17 +201,12 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             num_participants = len(recording.room_participants or [])
             publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
             gladia_result = await gladia_service.transcribe_and_diarize(temp_path, num_room_participants=num_participants)
-            gladia_duration = time.time() - stage_start
-            PIPELINE_STAGE_DURATION.labels(stage="transcription_gladia").observe(gladia_duration)
-            num_segments = len(gladia_result.get("segments", []))
-            logger.info(f"TIMING: gladia_transcription duration={gladia_duration:.2f}s segments={num_segments}")
+            PIPELINE_STAGE_DURATION.labels(stage="transcription_gladia").observe(time.time() - stage_start)
 
             # 1.5 SPEAKER IDENTIFICATION PHASE (Audio + Text Fusion)
             stage_start = time.time()
             publish_status(recording_id, "transcribing", 30, "Identifying Speakers...")
             await speaker_embedding_service.initialize()
-            onnx_available = speaker_embedding_service.is_available
-            logger.info(f"TIMING: onnx_init duration={time.time() - stage_start:.2f}s available={onnx_available}")
 
             # Load meeting with participants BEFORE speaker identification
             stmt = select(Meeting).options(selectinload(Meeting.participants)).where(Meeting.id == recording.meeting_id)
@@ -222,7 +215,6 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             participant_names = [p.name for p in meeting.participants if p.name] if meeting else []
             meeting_id = str(recording.meeting_id)
 
-            speaker_start = time.time()
             speaker_mappings = await _identify_speakers(
                 db=db,
                 gladia_result=gladia_result,
@@ -234,15 +226,11 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 meeting=meeting,
                 room_participants=recording.room_participants or [],
             )
-            speaker_duration = time.time() - speaker_start
-            PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(speaker_duration)
-            resolved_count = sum(1 for m in speaker_mappings if m.get("resolved_name"))
-            logger.info(f"TIMING: speaker_identification duration={speaker_duration:.2f}s speakers={len(speaker_mappings)} resolved={resolved_count}")
+            PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(time.time() - stage_start)
 
             # 1.5b ONNX SEGMENT REASSIGNMENT
             # After speaker identification, use ONNX to re-assign individual segments
             # This fixes cases where Gladia's diarization groups all segments under one speaker
-            onnx_reassign_start = time.time()
             await speaker_embedding_service.initialize()
             if speaker_mappings and speaker_embedding_service.is_available:
                 try:
@@ -317,15 +305,10 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                                 logger.debug(f"ONNX per-segment failed: {e}")
                                 continue
                         
-                        onnx_reassign_duration = time.time() - onnx_reassign_start
-                        logger.info(f"TIMING: onnx_segment_reassignment duration={onnx_reassign_duration:.2f}s reassigned={reassigned}/{len(segments_to_check)}")
                         if reassigned > 0:
                             logger.info(f"ONNX reassignment: {reassigned}/{len(segments_to_check)} segments reassigned")
                 except Exception as e:
                     logger.warning(f"ONNX segment reassignment failed: {e}")
-            else:
-                onnx_reassign_duration = time.time() - onnx_reassign_start
-                logger.info(f"TIMING: onnx_segment_reassignment SKIPPED duration={onnx_reassign_duration:.2f}s available={speaker_embedding_service.is_available}")
 
             # 1.6 APPLY SPEAKER NAMES TO TRANSCRIPT (Display-Kopie, Original bleibt erhalten)
             name_map = {
@@ -346,12 +329,10 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             # 2. MAP PHASE (Local SLM Sentinel) — Feature Gate by Subscription Plan
             # GRATUIT: skip Sentinel LLM (no memory overhead, faster pipeline)
             # PRO/ENTREPRISE: full Sentinel summarization
-            sentinel_start = time.time()
-            _plan_t0 = time.time()
+            stage_start = time.time()
             client_result = await db.execute(select(Client).where(Client.id == client_id))
             client = client_result.scalar_one_or_none()
             plan = client.subscription_plan if client else None
-            logger.info(f"TIMING: sentinel_plan_check duration={time.time() - _plan_t0:.2f}s plan={plan}")
 
             if plan == SubscriptionPlan.GRATUIT:
                 logger.info(f"GRATUIT plan detected — skipping Sentinel LLM for recording {recording_id}")
@@ -364,22 +345,16 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
 
                 # Chunking: split by time or length
                 chunks = [display_text[i:i+3000] for i in range(0, len(display_text), 3000)]
-                logger.info(f"TIMING: sentinel_chunks count={len(chunks)} text_len={len(display_text)}")
 
                 # Parallel Map execution
-                _gather_t0 = time.time()
                 map_tasks = [get_sentinel_service().summarize_chunk(chunk) for chunk in chunks]
                 partial_summaries = await asyncio.gather(*map_tasks)
-                _gather_dur = time.time() - _gather_t0
 
                 sentinel_summary = "\n---\n".join(partial_summaries)
-                logger.info(f"TIMING: sentinel_gather duration={_gather_dur:.2f}s chunks={len(chunks)} summaries={len(partial_summaries)}")
-            sentinel_duration = time.time() - sentinel_start
-            PIPELINE_STAGE_DURATION.labels(stage="sentinel_llm").observe(sentinel_duration)
-            logger.info(f"TIMING: sentinel_llm duration={sentinel_duration:.2f}s plan={plan}")
+            PIPELINE_STAGE_DURATION.labels(stage="sentinel_llm").observe(time.time() - stage_start)
 
             # 3. REDUCE PHASE (Mistral) — dual context: Summary + Full Transcript (DISPLAY mit Namen)
-            mistral_start = time.time()
+            stage_start = time.time()
             publish_status(recording_id, "analyzing", 75, "Final Protocol Refinement (Mistral)...")
 
             pv_data = await PVService.generate_pv(
@@ -390,14 +365,10 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 speaker_mappings=speaker_mappings,
                 speaker_segments=display_segments,  # DISPLAY segments mit Namen
             )
-            mistral_duration = time.time() - mistral_start
-            PIPELINE_STAGE_DURATION.labels(stage="pv_generation_mistral").observe(mistral_duration)
-            pv_sections_count = len(pv_data.get("sections", [])) if pv_data else 0
-            actions_count = len(pv_data.get("actions", [])) if pv_data else 0
-            logger.info(f"TIMING: mistral_pv duration={mistral_duration:.2f}s sections={pv_sections_count} actions={actions_count}")
+            PIPELINE_STAGE_DURATION.labels(stage="pv_generation_mistral").observe(time.time() - stage_start)
 
             # 4. Persistence — verwendet DISPLAY-Kopie für Storage
-            persist_start = time.time()
+            stage_start = time.time()
             await _save_transcription(db, recording, {
                 "full_text": display_text,
                 "segments": display_segments,
@@ -406,9 +377,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 db, recording, pv_data, language="fr", speaker_mappings=speaker_mappings,
                 participant_names=participant_names
             )
-            persist_duration = time.time() - persist_start
-            PIPELINE_STAGE_DURATION.labels(stage="persistence").observe(persist_duration)
-            logger.info(f"TIMING: persistence duration={persist_duration:.2f}s")
+            PIPELINE_STAGE_DURATION.labels(stage="persistence").observe(time.time() - stage_start)
 
             recording.status = "completed"
 
@@ -433,7 +402,7 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 user_agent="celery",
             )
 
-            publish_status(recording_id, "completed", 100, "ISS Synthesis Successful.")
+            publish_status(recording_id, "completed", 100, "ISS Synthesis Successful (33.3s target).")
             await _notify_n8n_completion(str(recording.id), str(recording.meeting_id), client_id)
             duration = time.time() - pipeline_start
             PIPELINE_DURATION.labels(stage="pipeline_total").observe(duration)
@@ -442,17 +411,12 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             PIPELINE_TRANSCRIPTIONS.labels(status="completed", language="fr", client_id=client_id).inc()
             if pv_data and pv_data.get("sections"):
                 PIPELINE_PV_SECTIONS.labels(client_id=client_id).inc(len(pv_data["sections"]))
-            logger.info(
-                f"TIMING: pipeline_total duration={duration:.2f}s "
-                f"(s3={s3_duration:.1f}s gladia={gladia_duration:.1f}s speaker={speaker_duration:.1f}s "
-                f"sentinel={sentinel_duration:.1f}s mistral={mistral_duration:.1f}s persist={persist_duration:.1f}s)"
-            )
+            logger.info(f"TIMING: pipeline_total duration={duration:.2f}s")
 
     except Exception as e:
-        duration = time.time() - pipeline_start
         PIPELINE_FAILURES.labels(stage="pipeline", reason=type(e).__name__).inc()
         PIPELINE_RECORDINGS.labels(status="failed", client_id=client_id).inc()
-        logger.error(f"TIMING: pipeline_FAILED duration={duration:.2f}s error={type(e).__name__}: {str(e)}", exc_info=True)
+        logger.error(f"Pipeline failed for recording {recording_id}: {str(e)}", exc_info=True)
         # Rollback: Set recording.status to "failed"
         async with AsyncSessionLocal() as db:
             result = await db.execute(select(Recording).where(Recording.id == recording_id, Recording.client_id == client_id))
@@ -648,17 +612,13 @@ async def _identify_speakers(
         logger.warning("No segments found for speaker identification")
         return []
 
-    import time as _sid_time
-    _sid_t0 = _sid_time.time()
-
     # Build candidate list: participants + enrolled profiles (including text-only)
-    _prof_t0 = _sid_time.time()
     profile_service = SpeakerProfileService(db)
     enrolled_profiles = await profile_service.get_profiles(client_id, include_text_only=True)
     profiles_with_embeddings = [p for p in enrolled_profiles if p.embedding is not None]
     profile_names = [p.resolved_name or p.name for p in enrolled_profiles if p.resolved_name or p.name]
     candidates = list(set(participant_names + profile_names))
-    logger.info(f"TIMING: speaker_id_profile_load duration={_sid_time.time() - _prof_t0:.2f}s profiles={len(enrolled_profiles)} with_embeddings={len(profiles_with_embeddings)} candidates={candidates}")
+    logger.info(f"Speaker ID candidates: {candidates}")
 
     # Group segments by speaker label
     speaker_groups = {}
@@ -678,15 +638,8 @@ async def _identify_speakers(
     # Create tasks for parallel processing
     async def process_single_speaker(speaker_index: int, speaker_label: str, speaker_segments: List[Dict]) -> Dict[str, Any]:
         try:
-            import time as _time
-            _spk_t0 = _time.time()
             text_context = " ".join(seg.get("text", "") for seg in speaker_segments)
-
-            # --- TIMING: Embedding extraction (ffmpeg + librosa + fbank + ONNX) ---
-            _emb_t0 = _time.time()
             embedding = await _extract_speaker_embedding(temp_path, speaker_segments)
-            _emb_dur = _time.time() - _emb_t0
-            logger.info(f"TIMING: speaker_{speaker_label}_embedding duration={_emb_dur:.2f}s")
 
             # Collect ALL signals (no short-circuit)
             signals = []
@@ -778,10 +731,7 @@ async def _identify_speakers(
             # Optimized threshold: skip Mistral if we have good confidence from other sources
             mistral_name = None
             mistral_score = 0.0
-            _mistral_t0 = _time.time()
-            _mistral_triggered = False
             if not signals or all(s["score"] < 0.65 for s in signals):  # Lowered threshold from 0.70 to 0.65
-                _mistral_triggered = True
                 mistral_name, mistral_score, _ = await mistral_fusion_service.fuse_speaker_mapping(
                     speaker_label=speaker_label,
                     text_context=text_context,
@@ -794,8 +744,6 @@ async def _identify_speakers(
                     logger.info(
                         f"Speaker {speaker_label} LLM signal: {mistral_name} (score={mistral_score:.2f})"
                     )
-            _mistral_dur = _time.time() - _mistral_t0
-            logger.info(f"TIMING: speaker_{speaker_label}_signals duration={_time.time() - _spk_t0:.2f}s mistral_triggered={_mistral_triggered} mistral_dur={_mistral_dur:.2f}s")
 
             # AGGREGATE: weighted consensus across sources
             resolved_name = None
@@ -882,7 +830,6 @@ async def _identify_speakers(
     
     total_speakers = len(speaker_list)
     all_mappings = []
-    _process_t0 = _sid_time.time()
     
     if total_speakers >= 5:
         # Large meeting: process sequentially to avoid memory spikes
@@ -900,10 +847,8 @@ async def _identify_speakers(
             all_mappings.extend(batch_results)
             if i + batch_size < total_speakers:
                 await asyncio.sleep(0.1)
-    logger.info(f"TIMING: speaker_id_process_speakers duration={_sid_time.time() - _process_t0:.2f}s speakers={total_speakers}")
 
     # EXCLUSIVITY: each name can only be assigned to ONE speaker (highest confidence wins)
-    _excl_t0 = _sid_time.time()
     assigned_names = {}
     for mapping in all_mappings:
         name = mapping.get("resolved_name")
@@ -921,7 +866,6 @@ async def _identify_speakers(
                     mapping["method"] = "exclusivity_lost"
             else:
                 assigned_names[name] = mapping
-    logger.info(f"TIMING: speaker_id_exclusivity duration={_sid_time.time() - _excl_t0:.2f}s assigned={len(assigned_names)}")
 
     # ENROLLMENT: after exclusivity, only enroll speakers with resolved names
     # Phase 163/185: C2 (VOICE) consent gate — biometric enrollment only if granted
@@ -942,8 +886,6 @@ async def _identify_speakers(
         )
 
     enrollment_service = AutoEnrollmentService(db)
-    _enroll_t0 = _sid_time.time()
-    _enrolled_count = 0
     if voice_consent is not None:
         for mapping in all_mappings:
             if mapping.get("resolved_name"):
@@ -966,7 +908,6 @@ async def _identify_speakers(
                         resolved_name=resolved_name, confidence=confidence,
                         method=method, meeting_id=meeting_id, candidates=candidates,
                     )
-                _enrolled_count += 1
 
                 await AuditService.log_action(
                     db=db, client_id=client_id, action="SPEAKER_IDENTIFIED",
@@ -976,9 +917,7 @@ async def _identify_speakers(
                     ip_address="internal", user_agent="celery",
                 )
                 logger.info(f"Enrolled: {speaker_label} → {resolved_name} (conf={confidence:.2f}, method={method})")
-    logger.info(f"TIMING: speaker_id_enrollment duration={_sid_time.time() - _enroll_t0:.2f}s enrolled={_enrolled_count} consent={'yes' if voice_consent else 'no'}")
 
-    logger.info(f"TIMING: speaker_id_total duration={_sid_time.time() - _sid_t0:.2f}s speakers={total_speakers} resolved={sum(1 for m in all_mappings if m.get('resolved_name'))}")
     return all_mappings
 
 
@@ -994,7 +933,6 @@ async def _extract_speaker_embedding(
         return None
 
     try:
-        import time as _emb_time
         from app.services.audio_segment_service import audio_segment_service
 
         # Convert segments to format expected by AudioSegmentService
@@ -1003,14 +941,10 @@ async def _extract_speaker_embedding(
             for seg in speaker_segments
         ]
 
-        # --- TIMING: ffmpeg extract + concat ---
-        _ffmpeg_t0 = _emb_time.time()
         speaker_files = await audio_segment_service.extract_speaker_segments(
             audio_file_path=audio_path,
             segments=segments_for_service,
         )
-        _ffmpeg_dur = _emb_time.time() - _ffmpeg_t0
-        logger.info(f"TIMING: ffmpeg_extract_concat duration={_ffmpeg_dur:.2f}s segments={len(segments_for_service)}")
 
         if not speaker_files:
             return None
@@ -1020,11 +954,7 @@ async def _extract_speaker_embedding(
         if not target_audio or not os.path.exists(target_audio):
             return None
 
-        # --- TIMING: ONNX embedding (librosa + fbank + session.run) ---
-        _onnx_t0 = _emb_time.time()
         embedding = await speaker_embedding_service.extract_embedding(target_audio)
-        _onnx_dur = _emb_time.time() - _onnx_t0
-        logger.info(f"TIMING: onnx_embed duration={_onnx_dur:.2f}s")
 
         # Cleanup temp file
         if os.path.exists(target_audio):

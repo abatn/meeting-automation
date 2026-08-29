@@ -90,16 +90,13 @@ class SentinelService:
                 return
 
         try:
-            import time as _init_time
-            _init_t0 = _init_time.time()
             self.llm = Llama(
                 model_path=self.model_path,
                 n_ctx=2048,
                 n_threads=2,
                 verbose=False
             )
-            _init_dur = _init_time.time() - _init_t0
-            logger.info(f"TIMING: sentinel_cold_start duration={_init_dur:.2f}s model={self.model_path}")
+            logger.info("Sentinel (Qwen-1.5B) initialized successfully.")
         except Exception as e:
             logger.error(f"Failed to load Sentinel LLM: {e}")
 
@@ -132,19 +129,11 @@ class SentinelService:
             
         prompt = f"<|im_start|>system\nSummarize this meeting segment in 2-3 sentences. CRITICAL: Preserve speaker names exactly as written (e.g. 'Ahmed proposed X', 'Fatima agreed'). Do NOT merge speakers or use generic terms like 'the team'. Language: {lang}<|im_end|>\n<|im_start|>user\n{chunk}<|im_end|>\n<|im_start|>assistant\n"
         
-        import time as _sent_time
-        _prompt_tokens = len(prompt.split())
-        _sent_t0 = _sent_time.time()
         async with self._semaphore:
             loop = asyncio.get_event_loop()
-            _llm_t0 = _sent_time.time()
             response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=256))
-            _llm_dur = _sent_time.time() - _llm_t0
-        _total_dur = _sent_time.time() - _sent_t0
-        _output_text = response["choices"][0]["text"].strip()
-        _output_tokens = len(_output_text.split())
-        logger.info(f"TIMING: sentinel_summarize prompt_tokens={_prompt_tokens} output_tokens={_output_tokens} llm_dur={_llm_dur:.2f}s total_dur={_total_dur:.2f}s tok_per_sec={_output_tokens / max(_llm_dur, 0.01):.1f}")
-        return _output_text
+            
+        return response["choices"][0]["text"].strip()
 
 # Lazy singleton: only loads Qwen-1.5B when first accessed
 _sentinel_instance: SentinelService | None = None
