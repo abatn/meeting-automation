@@ -52,7 +52,7 @@ spec:
           mountPath: /app/models
       containers:
       - name: celery-worker
-        image: docker.io/batnini/meeting-automation-backend:6780e264
+        image: docker.io/batnini/meeting-automation-backend:latest
         imagePullPolicy: Always
         command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_pro,email,maintenance"]
         resources:
