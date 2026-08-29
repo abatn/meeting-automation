@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
       - name: celery-beat
-        image: docker.io/batnini/meeting-automation-backend:latest
+        image: docker.io/batnini/meeting-automation-backend:6780e264
         imagePullPolicy: Always
         command: ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info"]
         env:
