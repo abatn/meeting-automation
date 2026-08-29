@@ -19,8 +19,6 @@ data:
       force_tcp: false
       allow_tcp_fallback: true
       tcp_fallback_rtt_threshold: 0
-      ping_interval: 5
-      ping_timeout: 60
     redis:
       address: redis-staging.meeting-automation-staging.svc.cluster.local:6379
       password: redis_password

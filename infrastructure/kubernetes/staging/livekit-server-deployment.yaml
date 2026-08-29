@@ -12,11 +12,13 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: livekit-server-staging
+      app.kubernetes.io/instance: livekit-server
+      app.kubernetes.io/name: livekit-server-staging
   template:
     metadata:
       labels:
-        app: livekit-server-staging
+        app.kubernetes.io/instance: livekit-server
+        app.kubernetes.io/name: livekit-server-staging
     spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
@@ -88,7 +90,8 @@ metadata:
     app: livekit-server-staging
 spec:
   selector:
-    app: livekit-server-staging
+    app.kubernetes.io/instance: livekit-server
+    app.kubernetes.io/name: livekit-server-staging
   ports:
   - port: 7880
     targetPort: 7880
