@@ -62,10 +62,7 @@ echo ">>> Step 3/7: Deploy LiveKit"
 bash "$SCRIPT_DIR/03-deploy-livekit.sh"
 echo ""
 
-# Step 4: Velero scope check
-echo ">>> Step 4/7: Velero scope check"
-bash "$SCRIPT_DIR/04-velero-scope-check.sh"
-echo ""
+# Step 4: Velero scope check entfernt (Stand 05.08.2026)
 
 # Step 5: Install infra (Longhorn + KEDA)
 echo ">>> Step 5/7: Install infrastructure"

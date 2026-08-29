@@ -106,13 +106,7 @@ jobs:
         export NAMESPACE="meeting-automation-staging"
         bash scripts/deploy-staging/03-deploy-manifests.sh
 
-    - name: Velero scope check + patches
-      run: |
-        export KUBECONFIG=$(pwd)/kubeconfig-staging
-        export NAMESPACE="meeting-automation-staging"
-        bash scripts/deploy-staging/04-velero-scope-check.sh
-
-    - name: Deploy system CronJobs + monitoring
+    - name: Deploy system CronJobs
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
         bash scripts/deploy-staging/05-deploy-system.sh
