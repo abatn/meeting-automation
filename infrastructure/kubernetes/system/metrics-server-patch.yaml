@@ -54,9 +54,9 @@ metadata:
   namespace: kube-system
 spec:
   ports:
-  - name: https
+  - name: https-metrics
     port: 4443
-    targetPort: 4443
+    targetPort: https
     protocol: TCP
 ---
 # APIService: insecureSkipTLSVerify=true (consistent with k3s built-in)

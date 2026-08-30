@@ -266,3 +266,49 @@ Betroffene Dateien (13 Stück):
 ### Fix
 
 Entferne den gesamten monitoring/ Block aus der expliziten Dateiliste in e2e-tests.yml. Der Monitoring-Stack ist auf 0 skaliert — weder CRDs noch ConfigMaps/Service/Ingress werden gebraucht.
+
+## Metrics-Server: Duplicate Port-Name
+
+### Ursache
+
+In `infrastructure/kubernetes/system/metrics-server-patch.yaml` haben Deployment und Service den gleichen Port-Namen "https":
+
+```yaml
+# Deployment (Container):
+ports:
+- name: https        # ← Zeile 31
+  containerPort: 4443
+
+# Service:
+ports:
+- name: https        # ← Zeile 57 (DUPLIKAT!)
+  port: 4443
+  targetPort: 4443   # ← Zahl statt Name
+```
+
+**Probleme:**
+1. Service-Port-Name "https" kollidiert mit Container-Port-Name "https"
+2. `targetPort: 4443` (Zahl) statt `targetPort: https` (Name) — referenziert nicht auf den Container-Port
+
+### Fix
+
+```yaml
+# Vorher (fehlerhaft):
+ports:
+- name: https
+  port: 4443
+  targetPort: 4443
+
+# Nachher (korrekt):
+ports:
+- name: https-metrics    # ← eindeutiger Name
+  port: 4443
+  targetPort: https      # ← referenziert auf Container-Port-Name
+```
+
+### Betroffene Ressourcen
+
+| Ressource | Vorher | Nachher |
+|-----------|--------|---------|
+| Service `metrics-server` | `name: https` | `name: https-metrics` |
+| Service `metrics-server` | `targetPort: 4443` | `targetPort: https` |
