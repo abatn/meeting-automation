@@ -23,7 +23,7 @@ jobs:
     - name: Build backend Docker image
       run: |
         cd backend
-        docker build --build-arg SKIP_SENTINEL=true -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
+        docker build --build-arg SKIP_SENTINEL=false -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
 
     - name: Run E2E tests in DEV (docker-compose.e2e.yml)
       run: |
@@ -70,7 +70,7 @@ jobs:
         context: ./backend
         platforms: linux/amd64,linux/arm64
         push: true
-        build-args: SKIP_SENTINEL=true
+        build-args: SKIP_SENTINEL=false
         tags: |
           ${{ env.IMAGE_NAME }}:${{ github.sha }}
           ${{ env.IMAGE_NAME }}:latest
