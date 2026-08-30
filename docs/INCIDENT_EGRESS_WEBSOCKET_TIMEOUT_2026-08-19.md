@@ -87,8 +87,8 @@ v1.8.4:   Chrome 125 auf AMD64, Chromium 117 auf ARM64 (BUG)
 
 | Zeit | Event |
 |------|-------|
-| 2026-07-27-30 | Recording funktioniert (image: latest = v1.14.x) |
-| 2026-08-06-09 | Helm-Migration: image auf v1.8.4 gepinnt (DOWNGRADE) |
+| 2026-07-27-30 | Recording funktioniert (image: latest = v1.9.0) |
+| 2026-08-06-09 | Helm-Migration: image auf v1.8.4 gepinnt (DOWNGRADE v1.9.0 → v1.8.4) |
 | 2026-08-11 14:34 | Erster Fehler (intermittierend) |
 | 2026-08-14-15 | Meistens funktioniert (intermittierend) |
 | 2026-08-18 11:17 | Ab jetzt 100% fehlgeschlagen |
