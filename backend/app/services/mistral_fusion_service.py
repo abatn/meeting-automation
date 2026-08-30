@@ -20,7 +20,7 @@ class MistralFusionService:
     def __init__(self):
         self.api_key = settings.MISTRAL_API_KEY
         self.base_url = "https://api.mistral.ai/v1"
-        self.model = "mistral-large-latest"
+        self.model = "mistral-medium-latest"
 
     async def fuse_speaker_mapping(
         self,
