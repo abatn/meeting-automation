@@ -111,6 +111,37 @@ Beibehalten:
 - `pod-garbage-collector` CronJob (kube-system)
 - `metrics-server-patch` (kube-system)
 
+## CI-Workflows: Longhorn/Velero Namespace-Konflikte
+
+### Ursache
+
+Zwei Dateien im staging/ Verzeichnis haben hardcoded Namespaces die nicht zu `-n meeting-automation-staging` passen:
+
+| Datei | Hardcoded Namespace | Problem |
+|-------|---------------------|---------|
+| `longhorn-csi-autoscaler.yaml` | `longhorn-system` | Longhorn ist auf 0 skaliert → CronJob sinnlos |
+| `velero-backup-repository.yaml` | `velero` | Velero braucht das Repository für Kopia-Backups |
+
+### Fix
+
+```yaml
+# Vorher (falsch):
+kubectl apply -f infrastructure/kubernetes/staging/longhorn-csi-autoscaler.yaml \
+  -f infrastructure/kubernetes/staging/velero-backup-repository.yaml \
+  -n meeting-automation-staging
+
+# Nachher (korrekt):
+# longhorn-csi-autoscaler.yaml → ENTFERNT (Longhorn auf 0 skaliert)
+kubectl apply -f infrastructure/kubernetes/staging/velero-backup-repository.yaml -n velero
+```
+
+### Betroffene Ressourcen
+
+| Ressource | Vorher | Nachher |
+|-----------|--------|---------|
+| `longhorn-csi-autoscaler` | Im Apply (falscher Namespace) | Entfernt |
+| `velero-backup-repository` | Im Apply (falscher Namespace) | Separater Apply mit `-n velero` |
+
 ## CI-Workflows: Defekter Trigger
 
 ### Ursache
@@ -205,3 +236,33 @@ Betroffene Dateien:
 ### Fix
 
 Rekursives `kubectl apply -f staging/` → explizite Dateiliste mit 53 valid K8s-Resources (40 App + 13 Monitoring).
+
+## CI-Workflows: Fehlende Monitoring-CRDs
+
+### Ursache
+
+Die kube-prometheus-stack CRDs (PrometheusRule, ServiceMonitor) wurden gelöscht als der Monitoring-Stack auf 0 skaliert wurde. Die CI-Dateiliste in e2e-tests.yml applyt diese Dateien trotzdem:
+
+```
+error: the server doesn't have a resource type "PrometheusRule"
+error: the server doesn't have a resource type "ServiceMonitor"
+```
+
+Betroffene Dateien (13 Stück):
+- `grafana-dashboard-intelligence.yaml` → ConfigMap
+- `grafana-dashboard-pipeline.yaml` → ConfigMap
+- `grafana-dashboard-tenants.yaml` → ConfigMap
+- `grafana-datasource-loki.yaml` → ConfigMap
+- `grafana-external-service.yaml` → Service
+- `monitoring-ingress.yaml` → Ingress
+- `prometheus-adapter-config.yaml` → ConfigMap
+- `prometheus-recording-rules.yaml` → PrometheusRule
+- `prometheus-rules.yaml` → PrometheusRule
+- `prometheus-slo-rules.yaml` → PrometheusRule
+- `service-monitor.yaml` → ServiceMonitor
+- `velero-prometheusrule.yaml` → PrometheusRule
+- `velero-servicemonitor.yaml` → ServiceMonitor
+
+### Fix
+
+Entferne den gesamten monitoring/ Block aus der expliziten Dateiliste in e2e-tests.yml. Der Monitoring-Stack ist auf 0 skaliert — weder CRDs noch ConfigMaps/Service/Ingress werden gebraucht.

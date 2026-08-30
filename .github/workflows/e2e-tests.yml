@@ -244,21 +244,6 @@ jobs:
           -n meeting-automation-staging
         # Apply Velero BackupRepository (namespace: velero, NOT meeting-automation-staging)
         kubectl apply -f infrastructure/kubernetes/staging/velero-backup-repository.yaml -n velero
-        # Apply monitoring resources (separate path)
-        kubectl apply -f infrastructure/kubernetes/staging/monitoring/grafana-dashboard-intelligence.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/grafana-dashboard-pipeline.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/grafana-dashboard-tenants.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/grafana-datasource-loki.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/grafana-external-service.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/monitoring-ingress.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/prometheus-adapter-config.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/prometheus-recording-rules.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/prometheus-rules.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/prometheus-slo-rules.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/service-monitor.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/velero-prometheusrule.yaml \
-          -f infrastructure/kubernetes/staging/monitoring/velero-servicemonitor.yaml \
-          -n meeting-automation-staging
         # Restart OnlyOffice to pick up ConfigMap changes (initContainer copies at pod startup)
         kubectl rollout restart deployment/onlyoffice-staging -n meeting-automation-staging 2>&1 || echo "Warning: OnlyOffice staging rollout restart failed"
         echo "✅ All staging resources applied"
