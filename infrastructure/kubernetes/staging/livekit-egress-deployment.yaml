@@ -43,11 +43,11 @@ spec:
         resources:
           requests:
             memory: "512Mi"
-            cpu: "200m"
+            cpu: "500m"
             ephemeral-storage: "200Mi"
           limits:
             memory: "2Gi"
-            cpu: "1"
+            cpu: "2"
             ephemeral-storage: "1Gi"
         livenessProbe:
           httpGet:
