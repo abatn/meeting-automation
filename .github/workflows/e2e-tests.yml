@@ -269,7 +269,7 @@ jobs:
           alembic-migrate=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n meeting-automation-staging --record
         # Wait for rollout to complete
-        kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=600s
+        kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=900s
 
     - name: Deploy Frontend to Staging
       run: |
@@ -497,7 +497,7 @@ jobs:
         kubectl set image deployment/celery-beat \
           celery-beat=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n meeting-automation --record
-        kubectl rollout status deployment/backend -n meeting-automation --timeout=300s
+        kubectl rollout status deployment/backend -n meeting-automation --timeout=600s
         kubectl rollout status deployment/frontend -n meeting-automation --timeout=120s
         kubectl rollout status deployment/celery-worker -n meeting-automation --timeout=300s
         kubectl rollout status deployment/celery-worker-pro -n meeting-automation --timeout=300s
