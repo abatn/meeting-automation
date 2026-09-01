@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
 # Sentinel LLM — skip in CI builds to save ~80min compile time
 RUN if [ "$SKIP_SENTINEL" != "true" ]; then \
-    pip install --no-cache-dir llama-cpp-python>=0.3.0 && \
+    CMAKE_ARGS="-DGGML_NATIVE=OFF" pip install --no-cache-dir llama-cpp-python>=0.3.0 && \
     mkdir -p /app/models && \
     curl -L -o /app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
     "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"; \
