@@ -4,11 +4,11 @@ Runs heavy operations (S3 download, ONNX, Mistral) in background.
 """
 import asyncio
 import concurrent.futures
-import logging
+from celery.utils.log import get_task_logger
 from app.tasks.celery_app import celery_app
 from app.core.database import AsyncSessionLocal
 
-logger = logging.getLogger(__name__)
+logger = get_task_logger(__name__)
 
 
 def _run_async(coro):

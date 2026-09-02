@@ -1,6 +1,6 @@
 import httpx
 import smtplib
-import logging
+from celery.utils.log import get_task_logger
 import asyncio
 import uuid
 from email.mime.text import MIMEText
@@ -12,7 +12,7 @@ from app.core.database import AsyncSessionLocal
 from app.services.action_service import ActionService
 from app.services.audit_service import AuditService
 
-logger = logging.getLogger(__name__)
+logger = get_task_logger(__name__)
 
 
 def _run_async(coro):

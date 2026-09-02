@@ -1,7 +1,7 @@
 import asyncio
 import concurrent.futures
 import json
-import logging
+from celery.utils.log import get_task_logger
 import os
 import tempfile
 import uuid
@@ -40,7 +40,7 @@ import difflib
 from difflib import SequenceMatcher
 from app.tasks.celery_app import celery_app
 
-logger = logging.getLogger(__name__)
+logger = get_task_logger(__name__)
 
 
 def _run_async(coro):
