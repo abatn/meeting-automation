@@ -466,7 +466,11 @@ jobs:
         # Apply ConfigMaps, Services, NetworkPolicies, Ingress, etc.
         # Excludes: Deployments (handled by kubectl set image), PVCs (immutable), Secrets (managed separately)
         # Only applies files that exist in infrastructure/kubernetes/production/
-        for f in infrastructure/kubernetes/production/onlyoffice-custom-config.yaml \
+        for f in infrastructure/kubernetes/production/backend-config.yaml \
+                 infrastructure/kubernetes/production/frontend-nginx-config.yaml \
+                 infrastructure/kubernetes/production/livekit-configmap.yaml \
+                 infrastructure/kubernetes/production/livekit-egress-configmap.yaml \
+                 infrastructure/kubernetes/production/onlyoffice-custom-config.yaml \
                  infrastructure/kubernetes/production/ingress-prod.yaml \
                  infrastructure/kubernetes/production/network-policies.yaml; do
           if [ -f "$f" ]; then
@@ -474,9 +478,14 @@ jobs:
             kubectl apply -f "$f" -n meeting-automation 2>&1 || echo "Warning: Failed to apply $f"
           fi
         done
+        # Secrets: Only apply if they don't exist (manual update required for changes)
+        for secret in backend-secrets postgres-secrets redis-secrets minio-secrets rabbitmq-secrets livekit-secrets n8n-secrets onlyoffice-secrets; do
+          kubectl get secret "$secret" -n meeting-automation >/dev/null 2>&1 || \
+            kubectl apply -f "infrastructure/kubernetes/production/${secret}.yaml" -n meeting-automation
+        done
         # Restart OnlyOffice to pick up ConfigMap changes (initContainer copies at pod startup)
         kubectl rollout restart deployment/onlyoffice -n meeting-automation 2>&1 || echo "Warning: OnlyOffice rollout restart failed"
-        echo "✅ Production ConfigMaps and non-immutable resources applied"
+        echo "✅ Production ConfigMaps, Secrets, and non-immutable resources applied"
 
     - name: Deploy to Production
       run: |
@@ -497,7 +506,7 @@ jobs:
         kubectl set image deployment/celery-beat \
           celery-beat=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           -n meeting-automation --record
-        kubectl rollout status deployment/backend -n meeting-automation --timeout=600s
+        kubectl rollout status deployment/backend -n meeting-automation --timeout=900s
         kubectl rollout status deployment/frontend -n meeting-automation --timeout=120s
         kubectl rollout status deployment/celery-worker -n meeting-automation --timeout=300s
         kubectl rollout status deployment/celery-worker-pro -n meeting-automation --timeout=300s

@@ -1,18 +1,25 @@
 name: Deploy Production
 
+# DEPRECATED: Production deployment is handled by e2e-tests.yml Job 3 (deploy-production).
+# This workflow caused a race condition when both fired simultaneously.
+# Kept for reference and manual workflow_dispatch fallback only.
+
 on:
-  workflow_run:
-    workflows: ["E2E Tests & Deployment Pipeline"]
-    types:
-      - completed
-    branches:
-      - main
+  # workflow_run trigger DISABLED — e2e-tests.yml Job 3 handles production deploys.
+  # To re-enable, uncomment the block below.
+  # workflow_run:
+  #   workflows: ["E2E Tests & Deployment Pipeline"]
+  #   types:
+  #     - completed
+  #   branches:
+  #     - main
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    # Only run on manual dispatch (workflow_run trigger disabled above)
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     
     steps:
     - name: Checkout
