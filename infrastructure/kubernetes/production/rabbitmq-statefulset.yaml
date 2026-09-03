@@ -27,7 +27,7 @@ spec:
             command: ["rabbitmq-diagnostics", "check_running"]
           initialDelaySeconds: 10
           periodSeconds: 10
-          timeoutSeconds: 10
+          timeoutSeconds: 30
         envFrom:
         - secretRef:
             name: rabbitmq-secrets

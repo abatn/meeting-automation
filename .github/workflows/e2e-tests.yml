@@ -531,8 +531,12 @@ jobs:
     - name: Deploy KEDA to Production
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-prod
+        # Read RabbitMQ password from existing K8s secret (not GitHub secret)
+        RABBIT_PASS=$(kubectl get secret rabbitmq-secrets -n meeting-automation -o jsonpath='{.data.RABBITMQ_DEFAULT_PASS}' | base64 -d)
+        echo "RabbitMQ password loaded from cluster secret"
+
         # Deploy KEDA ScaledObjects for event-driven scaling
-        cat <<'KEDA' | kubectl apply -f - -n meeting-automation
+        cat <<KEDA | kubectl apply -f - -n meeting-automation
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -548,19 +552,19 @@ spec:
   triggers:
     - type: rabbitmq
       metadata:
-        host: amqp://rabbit_user:rabbit_password@rabbitmq.meeting-automation.svc.cluster.local:5672//
+        host: amqp://rabbit_user:${RABBIT_PASS}@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: transcription_gratuit
         mode: QueueLength
         value: "5"
     - type: rabbitmq
       metadata:
-        host: amqp://rabbit_user:rabbit_password@rabbitmq.meeting-automation.svc.cluster.local:5672//
+        host: amqp://rabbit_user:${RABBIT_PASS}@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: email
         mode: QueueLength
         value: "1"
     - type: rabbitmq
       metadata:
-        host: amqp://rabbit_user:rabbit_password@rabbitmq.meeting-automation.svc.cluster.local:5672//
+        host: amqp://rabbit_user:${RABBIT_PASS}@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: maintenance
         mode: QueueLength
         value: "1"
@@ -580,7 +584,7 @@ spec:
   triggers:
     - type: rabbitmq
       metadata:
-        host: amqp://rabbit_user:rabbit_password@rabbitmq.meeting-automation.svc.cluster.local:5672//
+        host: amqp://rabbit_user:${RABBIT_PASS}@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: transcription_pro
         mode: QueueLength
         value: "5"
