@@ -6,33 +6,29 @@ metadata:
 spec:
   scaleTargetRef:
     name: celery-worker
-  minReplicaCount: 0        # Scale-to-zero wenn Queue leer
-  maxReplicaCount: 10       # Dynamisch basiert auf Queue-Tiefe
-  pollingInterval: 15       # Alle 15s Queue pruefen
-  cooldownPeriod: 300       # 5min nach letzter Message skaliert runter
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  pollingInterval: 15
+  cooldownPeriod: 300
   triggers:
     - type: rabbitmq
-      authenticationRef:
-        name: rabbitmq-auth
       metadata:
+        host: amqp://rabbit_user:${RABBIT_PASS}@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: transcription_gratuit
         mode: QueueLength
-        value: "5"            # 5 Messages pro Worker
+        value: "5"
     - type: rabbitmq
-      authenticationRef:
-        name: rabbitmq-auth
       metadata:
+        host: amqp://rabbit_user:${RABBIT_PASS}@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: email
         mode: QueueLength
-        value: "1"            # Scale bei 1. Email (kein Stranding)
+        value: "1"
     - type: rabbitmq
-      authenticationRef:
-        name: rabbitmq-auth
       metadata:
+        host: amqp://rabbit_user:${RABBIT_PASS}@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: maintenance
         mode: QueueLength
-        value: "1"            # Scale bei 1. Maintenance-Task
-
+        value: "1"
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -42,19 +38,17 @@ metadata:
 spec:
   scaleTargetRef:
     name: celery-worker-pro
-  minReplicaCount: 1        # Immer 1 Worker bereit (Pro-Kunden = kein Cold-Start)
-  maxReplicaCount: 10       # Dynamisch basiert auf Queue-Tiefe
+  minReplicaCount: 1
+  maxReplicaCount: 10
   pollingInterval: 15
   cooldownPeriod: 300
   triggers:
     - type: rabbitmq
-      authenticationRef:
-        name: rabbitmq-auth
       metadata:
+        host: amqp://rabbit_user:${RABBIT_PASS}@rabbitmq.meeting-automation.svc.cluster.local:5672//
         queueName: transcription_pro
         mode: QueueLength
-        value: "5"            # 5 Messages pro Worker
-
+        value: "5"
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -64,16 +58,15 @@ metadata:
 spec:
   scaleTargetRef:
     name: livekit-egress
-  minReplicaCount: 1        # Mindestens 1 (Recording immer moeglich)
-  maxReplicaCount: 5        # Dynamisch basiert auf CPU
+  minReplicaCount: 1
+  maxReplicaCount: 5
   pollingInterval: 30
   cooldownPeriod: 120
   triggers:
     - type: cpu
       metricType: Utilization
       metadata:
-        value: "80"         # Bei 80% CPU skaliert hoch
-
+        value: "80"
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -83,12 +76,12 @@ metadata:
 spec:
   scaleTargetRef:
     name: backend
-  minReplicaCount: 2        # HA (mindestens 2)
-  maxReplicaCount: 10       # Dynamisch basiert auf CPU
+  minReplicaCount: 2
+  maxReplicaCount: 10
   pollingInterval: 30
   cooldownPeriod: 300
   triggers:
     - type: cpu
       metricType: Utilization
       metadata:
-        value: "70"         # Bei 70% CPU skaliert hoch
+        value: "70"
