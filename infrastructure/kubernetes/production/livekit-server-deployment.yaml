@@ -23,7 +23,12 @@ spec:
       containers:
       - name: livekit
         image: livekit/livekit-server:latest
-        args: ["--config", "/etc/livekit.yaml"]
+        env:
+        - name: LIVEKIT_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              name: livekit-server
+              key: config.yaml
         ports:
         - containerPort: 7880
           name: http
@@ -43,10 +48,6 @@ spec:
           name: udp-end
           hostPort: 60000
           protocol: UDP
-        volumeMounts:
-        - name: livekit-config
-          mountPath: /etc/livekit.yaml
-          subPath: livekit.yaml
         resources:
           requests:
             memory: "256Mi"
@@ -66,10 +67,7 @@ spec:
             port: 7880
           initialDelaySeconds: 5
           periodSeconds: 10
-      volumes:
-      - name: livekit-config
-        configMap:
-          name: livekit-config
+      volumes: []
 ---
 apiVersion: v1
 kind: Service
