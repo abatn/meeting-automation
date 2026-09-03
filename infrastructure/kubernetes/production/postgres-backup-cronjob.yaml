@@ -18,8 +18,8 @@ metadata:
   namespace: meeting-automation
 spec:
   schedule: "0 3 * * *"
-  successfulJobsHistoryLimit: 7
-  failedJobsHistoryLimit: 3
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
   jobTemplate:
     spec:
       template:
@@ -41,8 +41,8 @@ spec:
               pg_dump -h meeting-db-rw.meeting-automation.svc.cluster.local -U meeting_user meeting_db | gzip > /backup/meeting_db_${TIMESTAMP}.sql.gz
               SIZE=$(ls -lh /backup/meeting_db_${TIMESTAMP}.sql.gz | awk '{print $5}')
               echo "[$(date)] Backup complete: ${SIZE}"
-              # Keep only last 7 backups
-              cd /backup && ls -t meeting_db_*.sql.gz 2>/dev/null | tail -n +8 | xargs -r rm --
+              # Keep only last 1 backup
+              cd /backup && ls -t meeting_db_*.sql.gz 2>/dev/null | tail -n +2 | xargs -r rm --
               echo "[$(date)] Cleanup complete. Remaining backups:"
               ls -lh /backup/meeting_db_*.sql.gz
             env:
