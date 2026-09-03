@@ -521,6 +521,132 @@ jobs:
         kubectl apply -f infrastructure/kubernetes/system/pod-garbage-collector-cronjob.yaml -n kube-system
         echo "✅ Production System CronJobs applied (kube-system)"
 
+    - name: Deploy metrics-server to Production (kube-system)
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        # Install metrics-server for HPA CPU-based scaling
+        kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml -n kube-system
+        echo "✅ metrics-server applied to production"
+
+    - name: Deploy KEDA to Production
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-prod
+        # Deploy KEDA ScaledObjects for event-driven scaling
+        cat <<'KEDA' | kubectl apply -f - -n meeting-automation
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: celery-worker-gratuit
+  namespace: meeting-automation
+spec:
+  scaleTargetRef:
+    name: celery-worker
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    - type: rabbitmq
+      metadata:
+        host: amqp://rabbit_user:rabbit_password@rabbitmq.meeting-automation.svc.cluster.local:5672//
+        queueName: transcription_gratuit
+        mode: QueueLength
+        value: "5"
+    - type: rabbitmq
+      metadata:
+        host: amqp://rabbit_user:rabbit_password@rabbitmq.meeting-automation.svc.cluster.local:5672//
+        queueName: email
+        mode: QueueLength
+        value: "1"
+    - type: rabbitmq
+      metadata:
+        host: amqp://rabbit_user:rabbit_password@rabbitmq.meeting-automation.svc.cluster.local:5672//
+        queueName: maintenance
+        mode: QueueLength
+        value: "1"
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: celery-worker-pro
+  namespace: meeting-automation
+spec:
+  scaleTargetRef:
+    name: celery-worker-pro
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 15
+  cooldownPeriod: 300
+  triggers:
+    - type: rabbitmq
+      metadata:
+        host: amqp://rabbit_user:rabbit_password@rabbitmq.meeting-automation.svc.cluster.local:5672//
+        queueName: transcription_pro
+        mode: QueueLength
+        value: "5"
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: livekit-egress
+  namespace: meeting-automation
+spec:
+  scaleTargetRef:
+    name: livekit-egress
+  minReplicaCount: 1
+  maxReplicaCount: 5
+  pollingInterval: 30
+  cooldownPeriod: 120
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "80"
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: backend
+  namespace: meeting-automation
+spec:
+  scaleTargetRef:
+    name: backend
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "70"
+KEDA
+        # Deploy KEDA network policy for RabbitMQ access
+        cat <<'KEDA_NP' | kubectl apply -f - -n meeting-automation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rabbitmq-allow-keda
+  namespace: meeting-automation
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: keda
+    ports:
+    - port: 5672
+      protocol: TCP
+    - port: 15672
+      protocol: TCP
+KEDA_NP
+        echo "✅ KEDA ScaledObjects and network policy applied to production"
+
     - name: Run Production Smoke Tests
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-prod
