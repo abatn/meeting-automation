@@ -90,12 +90,16 @@ class SentinelService:
                 return
 
         try:
+            import time
+            cold_start = time.time()
             self.llm = Llama(
                 model_path=self.model_path,
                 n_ctx=2048,
                 n_threads=2,
                 verbose=False
             )
+            cold_start_duration = time.time() - cold_start
+            logger.info(f"TIMING: sentinel_cold_start duration={cold_start_duration:.2f}s model={self.model_path}")
             logger.info("Sentinel (Qwen-1.5B) initialized successfully.")
         except Exception as e:
             logger.error(f"Failed to load Sentinel LLM: {e}")
@@ -130,9 +134,17 @@ class SentinelService:
         prompt = f"<|im_start|>system\nSummarize this meeting segment in 2-3 sentences. CRITICAL: Preserve speaker names exactly as written (e.g. 'Ahmed proposed X', 'Fatima agreed'). Do NOT merge speakers or use generic terms like 'the team'. Language: {lang}<|im_end|>\n<|im_start|>user\n{chunk}<|im_end|>\n<|im_start|>assistant\n"
         
         async with self._semaphore:
+            import time
+            llm_start = time.time()
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=256))
-            
+            llm_dur = time.time() - llm_start
+            usage = response.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            tok_per_sec = completion_tokens / llm_dur if llm_dur > 0 else 0
+            logger.info(f"TIMING: sentinel_summarize prompt_tokens={prompt_tokens} output_tokens={completion_tokens} llm_dur={llm_dur:.2f}s tok_per_sec={tok_per_sec:.1f}")
+
         return response["choices"][0]["text"].strip()
 
 # Lazy singleton: only loads Qwen-1.5B when first accessed

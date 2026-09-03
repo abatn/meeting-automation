@@ -180,7 +180,9 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             # Download audio from S3
             stage_start = time.time()
             temp_path = await _download_audio(str(recording.file_path), str(recording.client_id))
-            PIPELINE_STAGE_DURATION.labels(stage="s3_download").observe(time.time() - stage_start)
+            s3_duration = time.time() - stage_start
+            PIPELINE_STAGE_DURATION.labels(stage="s3_download").observe(s3_duration)
+            logger.info(f"TIMING: s3_download duration={s3_duration:.2f}s")
             if not temp_path:
                 raise Exception("S3 Error: Failed to download audio from MinIO")
 
@@ -201,7 +203,9 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             num_participants = len(recording.room_participants or [])
             publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
             gladia_result = await gladia_service.transcribe_and_diarize(temp_path, num_room_participants=num_participants)
-            PIPELINE_STAGE_DURATION.labels(stage="transcription_gladia").observe(time.time() - stage_start)
+            gladia_duration = time.time() - stage_start
+            PIPELINE_STAGE_DURATION.labels(stage="transcription_gladia").observe(gladia_duration)
+            logger.info(f"TIMING: gladia_transcription duration={gladia_duration:.2f}s")
 
             # 1.5 SPEAKER IDENTIFICATION PHASE (Audio + Text Fusion)
             stage_start = time.time()
@@ -226,7 +230,9 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 meeting=meeting,
                 room_participants=recording.room_participants or [],
             )
-            PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(time.time() - stage_start)
+            speaker_duration = time.time() - stage_start
+            PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(speaker_duration)
+            logger.info(f"TIMING: speaker_identification duration={speaker_duration:.2f}s speakers={len(speaker_mappings)}")
 
             # 1.5b ONNX SEGMENT REASSIGNMENT
             # After speaker identification, use ONNX to re-assign individual segments
@@ -307,6 +313,8 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                         
                         if reassigned > 0:
                             logger.info(f"ONNX reassignment: {reassigned}/{len(segments_to_check)} segments reassigned")
+                    onnx_reassign_duration = time.time() - stage_start
+                    logger.info(f"TIMING: onnx_segment_reassignment duration={onnx_reassign_duration:.2f}s segments={len(segments_to_check)} reassigned={reassigned}")
                 except Exception as e:
                     logger.warning(f"ONNX segment reassignment failed: {e}")
 
@@ -329,10 +337,11 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             # 2. MAP PHASE (Local SLM Sentinel) — Feature Gate by Subscription Plan
             # GRATUIT: skip Sentinel LLM (no memory overhead, faster pipeline)
             # PRO/ENTREPRISE: full Sentinel summarization
-            stage_start = time.time()
+            sentinel_start = time.time()
             client_result = await db.execute(select(Client).where(Client.id == client_id))
             client = client_result.scalar_one_or_none()
             plan = client.subscription_plan if client else None
+            logger.info(f"TIMING: sentinel_plan_check duration={time.time() - sentinel_start:.2f}s plan={plan}")
 
             if plan == SubscriptionPlan.GRATUIT:
                 logger.info(f"GRATUIT plan detected — skipping Sentinel LLM for recording {recording_id}")
@@ -345,13 +354,18 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
 
                 # Chunking: split by time or length
                 chunks = [display_text[i:i+3000] for i in range(0, len(display_text), 3000)]
+                logger.info(f"TIMING: sentinel_chunks count={len(chunks)} text_len={len(display_text)}")
 
                 # Parallel Map execution
+                gather_start = time.time()
                 map_tasks = [get_sentinel_service().summarize_chunk(chunk) for chunk in chunks]
                 partial_summaries = await asyncio.gather(*map_tasks)
+                logger.info(f"TIMING: sentinel_gather duration={time.time() - gather_start:.2f}s chunks={len(chunks)} summaries={len(partial_summaries)}")
 
                 sentinel_summary = "\n---\n".join(partial_summaries)
-            PIPELINE_STAGE_DURATION.labels(stage="sentinel_llm").observe(time.time() - stage_start)
+            sentinel_duration = time.time() - sentinel_start
+            PIPELINE_STAGE_DURATION.labels(stage="sentinel_llm").observe(sentinel_duration)
+            logger.info(f"TIMING: sentinel_llm duration={sentinel_duration:.2f}s")
 
             # 3. REDUCE PHASE (Mistral) — dual context: Summary + Full Transcript (DISPLAY mit Namen)
             stage_start = time.time()
@@ -365,7 +379,9 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 speaker_mappings=speaker_mappings,
                 speaker_segments=display_segments,  # DISPLAY segments mit Namen
             )
-            PIPELINE_STAGE_DURATION.labels(stage="pv_generation_mistral").observe(time.time() - stage_start)
+            mistral_duration = time.time() - stage_start
+            PIPELINE_STAGE_DURATION.labels(stage="pv_generation_mistral").observe(mistral_duration)
+            logger.info(f"TIMING: mistral_pv duration={mistral_duration:.2f}s")
 
             # 4. Persistence — verwendet DISPLAY-Kopie für Storage
             stage_start = time.time()
@@ -377,7 +393,9 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 db, recording, pv_data, language="fr", speaker_mappings=speaker_mappings,
                 participant_names=participant_names
             )
-            PIPELINE_STAGE_DURATION.labels(stage="persistence").observe(time.time() - stage_start)
+            persist_duration = time.time() - stage_start
+            PIPELINE_STAGE_DURATION.labels(stage="persistence").observe(persist_duration)
+            logger.info(f"TIMING: persistence duration={persist_duration:.2f}s")
 
             recording.status = "completed"
 
@@ -613,12 +631,15 @@ async def _identify_speakers(
         return []
 
     # Build candidate list: participants + enrolled profiles (including text-only)
+    import time as _time
+    _sid_start = _time.time()
     profile_service = SpeakerProfileService(db)
     enrolled_profiles = await profile_service.get_profiles(client_id, include_text_only=True)
     profiles_with_embeddings = [p for p in enrolled_profiles if p.embedding is not None]
     profile_names = [p.resolved_name or p.name for p in enrolled_profiles if p.resolved_name or p.name]
     candidates = list(set(participant_names + profile_names))
     logger.info(f"Speaker ID candidates: {candidates}")
+    logger.info(f"TIMING: speaker_id_profile_load duration={_time.time() - _sid_start:.2f}s profiles={len(enrolled_profiles)} with_embeddings={len(profiles_with_embeddings)} candidates={candidates}")
 
     # Group segments by speaker label
     speaker_groups = {}
@@ -827,7 +848,7 @@ async def _identify_speakers(
 
     # Process speakers: sequential for 5+ speakers (avoids OOM from parallel ONNX),
     # batched for fewer speakers (keeps throughput)
-    
+    _process_start = _time.time()
     total_speakers = len(speaker_list)
     all_mappings = []
     
@@ -847,8 +868,10 @@ async def _identify_speakers(
             all_mappings.extend(batch_results)
             if i + batch_size < total_speakers:
                 await asyncio.sleep(0.1)
+    logger.info(f"TIMING: speaker_id_process_speakers duration={_time.time() - _process_start:.2f}s speakers={total_speakers}")
 
     # EXCLUSIVITY: each name can only be assigned to ONE speaker (highest confidence wins)
+    _excl_start = _time.time()
     assigned_names = {}
     for mapping in all_mappings:
         name = mapping.get("resolved_name")
@@ -866,6 +889,7 @@ async def _identify_speakers(
                     mapping["method"] = "exclusivity_lost"
             else:
                 assigned_names[name] = mapping
+    logger.info(f"TIMING: speaker_id_exclusivity duration={_time.time() - _excl_start:.2f}s assigned={len(assigned_names)}")
 
     # ENROLLMENT: after exclusivity, only enroll speakers with resolved names
     # Phase 163/185: C2 (VOICE) consent gate — biometric enrollment only if granted
@@ -885,6 +909,8 @@ async def _identify_speakers(
             "(biometric enrollment disabled per INPDP Art.5)."
         )
 
+    _enroll_start = _time.time()
+    enrolled_count = 0
     enrollment_service = AutoEnrollmentService(db)
     if voice_consent is not None:
         for mapping in all_mappings:
@@ -916,7 +942,12 @@ async def _identify_speakers(
                                "confidence": confidence, "method": method, "meeting_id": meeting_id},
                     ip_address="internal", user_agent="celery",
                 )
+                enrolled_count += 1
                 logger.info(f"Enrolled: {speaker_label} → {resolved_name} (conf={confidence:.2f}, method={method})")
+    logger.info(f"TIMING: speaker_id_enrollment duration={_time.time() - _enroll_start:.2f}s enrolled={enrolled_count} consent={'yes' if voice_consent is not None else 'no'}")
+
+    resolved_count = sum(1 for m in all_mappings if m.get("resolved_name"))
+    logger.info(f"TIMING: speaker_id_total duration={_time.time() - _sid_start:.2f}s speakers={total_speakers} resolved={resolved_count}")
 
     return all_mappings
 
