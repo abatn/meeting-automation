@@ -115,7 +115,7 @@ class ActionService:
         system_content = f"You are a professional translator. Translate the following list of strings into {target_lang}. Return ONLY a JSON array of strings in the exact same order."
         
         payload = {
-            "model": "mistral-medium-latest",
+            "model": "ministral-8b-latest",
             "messages": [
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": json.dumps(texts)}
@@ -206,7 +206,7 @@ Return ONLY a JSON array of objects with the following structure:
 ]"""
 
         payload = {
-            "model": "mistral-medium-latest",
+            "model": "ministral-8b-latest",
             "messages": [
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": f"Analyze this transcript and extract tasks in {language_name}:\n\n{enriched_text}"}
@@ -937,7 +937,7 @@ Example format:
 }}"""
         
         payload = {
-            "model": "mistral-medium-latest",
+            "model": "ministral-8b-latest",
             "messages": [
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": json.dumps(suggestions_data)}

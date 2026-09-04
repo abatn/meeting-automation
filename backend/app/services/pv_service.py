@@ -191,7 +191,7 @@ Answer only in valid JSON format."""
             schema_assignee_values = allowed_names_list + [None] if allowed_names_list else [None]
 
             payload = {
-                "model": "mistral-medium-latest",
+                "model": "ministral-8b-latest",
                 "messages": [
                     {"role": "system", "content": system_content},
                     {
@@ -304,7 +304,7 @@ DO NOT translate the keys themselves.
 The output MUST be a valid JSON object with the identical structure as the input."""
 
             payload = {
-                "model": "mistral-medium-latest",
+                "model": "ministral-8b-latest",
                 "messages": [
                     {"role": "system", "content": system_content},
                     {
