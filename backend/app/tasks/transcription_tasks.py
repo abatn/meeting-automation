@@ -238,8 +238,6 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             # After speaker identification, use ONNX to re-assign individual segments
             # This fixes cases where Gladia's diarization groups all segments under one speaker
             await speaker_embedding_service.initialize()
-            segments_to_check = []
-            reassigned = 0
             if speaker_mappings and speaker_embedding_service.is_available:
                 try:
                     from app.services.audio_segment_service import audio_segment_service

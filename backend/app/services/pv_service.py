@@ -207,7 +207,6 @@ Use the summary for the PV overview, and the full transcript to determine who is
             async with _mistral_semaphore:
                 async with httpx.AsyncClient() as client:
                     max_retries = 3
-                    result = None
                     for attempt in range(max_retries):
                         try:
                             response = await client.post(
@@ -231,8 +230,6 @@ Use the summary for the PV overview, and the full transcript to determine who is
                                 await asyncio.sleep(retry_after)
                                 continue
                             raise
-                if result is None:
-                    raise RuntimeError("Mistral API returned no result after all retries (possible 429 rate limit)")
                 content_str = result["choices"][0]["message"]["content"]
                 
                 # AUDIT LOGGING: Capture Mistral response for assignee audit
@@ -323,7 +320,6 @@ The output MUST be a valid JSON object with the identical structure as the input
             async with _mistral_semaphore:
                 async with httpx.AsyncClient() as client:
                     max_retries = 3
-                    result = None
                     for attempt in range(max_retries):
                         try:
                             response = await client.post(
@@ -347,8 +343,6 @@ The output MUST be a valid JSON object with the identical structure as the input
                                 await asyncio.sleep(retry_after)
                                 continue
                             raise
-                if result is None:
-                    raise RuntimeError("Mistral API returned no result after all retries (possible 429 rate limit)")
                 content_str = result["choices"][0]["message"]["content"]
                 
                 try:
