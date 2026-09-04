@@ -1010,7 +1010,7 @@ const handleStopRecording = async () => {
                     audio={true}
                     video={false}
                     connectOptions={{
-                      peerConnectionTimeout: 30000,
+                      peerConnectionTimeout: 60000,
                       maxRetries: 3,
                     }}
 onConnected={() => {

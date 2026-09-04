@@ -30,9 +30,6 @@ data:
       tcp_fallback_rtt_threshold: 0
       tcp_port: 7881
       use_external_ip: true
-    turn:
-      enabled: true
-      udp_port: 3478
     webhook:
       api_key: prod-9a4ac9f989143b65
       secret: prod-8f8b7b429f01180c89e03a1b30eeec4be871c0fa184c823a
