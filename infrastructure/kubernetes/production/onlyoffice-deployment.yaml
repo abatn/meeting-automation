@@ -18,7 +18,7 @@ spec:
     spec:
       initContainers:
       - name: init-oo-config
-        image: onlyoffice/documentserver:latest
+        image: onlyoffice/documentserver:9.4.0
         imagePullPolicy: Always
         command: ['sh', '-c', 'cp /config-source/local.json /emptydir-writable/local.json && cp /config-source/ds-docservice.conf /emptydir-writable/ds-docservice.conf && chmod 644 /emptydir-writable/local.json /emptydir-writable/ds-docservice.conf']
         volumeMounts:
@@ -29,7 +29,7 @@ spec:
           mountPath: /emptydir-writable
       containers:
       - name: onlyoffice
-        image: onlyoffice/documentserver:latest
+        image: onlyoffice/documentserver:9.4.0
         imagePullPolicy: Always
         ports:
         - containerPort: 80
@@ -51,9 +51,11 @@ spec:
           requests:
             memory: "512Mi"
             cpu: "200m"
+            ephemeral-storage: "200Mi"
           limits:
             memory: "2Gi"
             cpu: "1"
+            ephemeral-storage: "1Gi"
         livenessProbe:
           httpGet:
             path: /healthcheck

@@ -128,10 +128,10 @@ data:
             "outbox": { "header": "Authorization", "inBody": false }
           },
           "secret": {
-            "browser": { "string": "production-onlyoffice-secret-jwt-key-2026" },
-            "inbox": { "string": "production-onlyoffice-secret-jwt-key-2026" },
-            "outbox": { "string": "production-onlyoffice-secret-jwt-key-2026" },
-            "session": { "string": "production-onlyoffice-secret-jwt-key-2026" }
+            "browser": { "string": "tHjRho7Mrgicb9g09trClzCPt9X5OI48ZIfGWILLnkQ" },
+            "inbox": { "string": "tHjRho7Mrgicb9g09trClzCPt9X5OI48ZIfGWILLnkQ" },
+            "outbox": { "string": "tHjRho7Mrgicb9g09trClzCPt9X5OI48ZIfGWILLnkQ" },
+            "session": { "string": "tHjRho7Mrgicb9g09trClzCPt9X5OI48ZIfGWILLnkQ" }
           },
           "request-filtering-agent": {
             "allowPrivateIPAddress": true,
@@ -141,7 +141,7 @@ data:
       },
       "storage": {
         "fs": {
-          "secretString": "production-fs-secret-key-2026"
+          "secretString": "prod-onlyoffice-secure-link-2026"
         },
         "externalHost": "https://meeting-automation.com"
       }
