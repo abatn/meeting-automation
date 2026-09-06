@@ -21,8 +21,8 @@ celery_app.conf.update(
     # Production reliability settings
     task_acks_late=True,                    # Ack AFTER completion, not receipt
     worker_prefetch_multiplier=1,           # Don't prefetch long tasks
-    task_time_limit=600,                    # 10min hard kill
-    task_soft_time_limit=540,               # 9min soft warning
+    task_time_limit=1200,                   # 20min hard kill
+    task_soft_time_limit=900,               # 15min soft warning
     result_expires=3600,                    # Clean up results after 1h
     # Queue isolation
     task_default_queue="maintenance",          # Unrouted tasks → maintenance (both workers listen)

@@ -95,7 +95,7 @@ class SentinelService:
             self.llm = Llama(
                 model_path=self.model_path,
                 n_ctx=2048,
-                n_threads=2,
+                n_threads=1,
                 verbose=False
             )
             cold_start_duration = time.time() - cold_start
