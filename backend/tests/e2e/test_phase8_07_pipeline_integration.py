@@ -63,7 +63,7 @@ async def test_phase8_32_identify_speakers_full_pipeline(mock_db, mock_gladia_re
         with patch("app.tasks.transcription_tasks.SpeakerProfileService") as mock_profile_cls:
             mock_profile_instance = AsyncMock()
             # Return different names for different speakers
-            mock_profile_instance.match_speaker = AsyncMock(side_effect=[
+            mock_profile_instance.match_speaker_from_list = MagicMock(side_effect=[
                 ("Ahmed", 0.15, "high"),
                 ("Sarah", 0.18, "high"),
             ])
