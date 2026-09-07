@@ -51,6 +51,12 @@ async def test_phase8_32_identify_speakers_full_pipeline(mock_db, mock_gladia_re
     embedding = np.random.randn(192).astype(np.float32)
     embedding = embedding / np.linalg.norm(embedding)
 
+    # Mock a profile with embedding so ONNX extraction is NOT skipped
+    mock_profile_with_emb = MagicMock()
+    mock_profile_with_emb.embedding = embedding
+    mock_profile_with_emb.resolved_name = "Ahmed"
+    mock_profile_with_emb.name = "Speaker 0"
+
     with patch("app.tasks.transcription_tasks._extract_speaker_embedding", new_callable=AsyncMock) as mock_extract:
         mock_extract.return_value = embedding
 
@@ -61,7 +67,7 @@ async def test_phase8_32_identify_speakers_full_pipeline(mock_db, mock_gladia_re
                 ("Ahmed", 0.15, "high"),
                 ("Sarah", 0.18, "high"),
             ])
-            mock_profile_instance.get_profiles = AsyncMock(return_value=[])
+            mock_profile_instance.get_profiles = AsyncMock(return_value=[mock_profile_with_emb])
             mock_profile_cls.return_value = mock_profile_instance
 
             with patch("app.tasks.transcription_tasks.AutoEnrollmentService") as mock_enrollment_cls:
@@ -125,12 +131,18 @@ async def test_phase8_34_identify_speakers_embedding_unavailable(mock_db, mock_g
     - Regex self-introduction detects names from text
     - Returns correct mappings with method=text
     """
+    # Mock a profile WITH embedding (but extraction returns None — simulating failure)
+    mock_profile_with_emb = MagicMock()
+    mock_profile_with_emb.embedding = "fake-embedding"  # non-None to pass the guard
+    mock_profile_with_emb.resolved_name = "Ahmed"
+    mock_profile_with_emb.name = "Speaker 0"
+
     with patch("app.tasks.transcription_tasks._extract_speaker_embedding", new_callable=AsyncMock) as mock_extract:
         mock_extract.return_value = None
 
         with patch("app.tasks.transcription_tasks.SpeakerProfileService") as mock_profile_cls:
             mock_profile_instance = AsyncMock()
-            mock_profile_instance.get_profiles = AsyncMock(return_value=[])
+            mock_profile_instance.get_profiles = AsyncMock(return_value=[mock_profile_with_emb])
             mock_profile_cls.return_value = mock_profile_instance
 
             with patch("app.tasks.transcription_tasks.AutoEnrollmentService") as mock_enrollment_cls:
