@@ -336,6 +336,10 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                         enrolled = await profile_service.get_profiles(client_id)
                         profiles_with_emb = [p for p in enrolled if p.embedding is not None]
 
+                        # Initialize defaults — referenced by TIMING log after the if block
+                        segments_to_check = []
+                        reassigned = 0
+
                         if profiles_with_emb:
                             segments_to_check = gladia_result.get("segments", [])
                             reassigned = 0
@@ -769,14 +773,37 @@ async def _identify_speakers(
                 # If only 1 room participant and this is the first speaker → high confidence match
                 if len(room_participants) == 1 and speaker_index == 0:
                     rp = room_participants[0]
+
+                    # DB-Lookup: user_id → echter Name (statt Role/Title)
+                    livekit_name = rp["name"]  # Fallback: Anzeigename
+                    rp_uid = rp.get("user_id")
+                    if rp_uid:
+                        try:
+                            user_result = await db.execute(
+                                select(User.full_name).where(
+                                    User.id == rp_uid,
+                                    User.client_id == client_id,
+                                    User.deleted_at.is_(None),
+                                )
+                            )
+                            db_name = user_result.scalar_one_or_none()
+                            if db_name:
+                                livekit_name = db_name
+                        except Exception as e:
+                            logger.debug(f"LiveKit identity DB lookup failed: {e}")
+
+                    # Candidates erweitern (Fallback für Validation)
+                    if rp["name"] and rp["name"] not in candidates:
+                        candidates.append(rp["name"])
+
                     signals.append({
                         "source": "livekit_identity",
-                        "name": rp["name"],
+                        "name": livekit_name,
                         "score": 0.95,
-                        "user_id": rp.get("user_id"),
+                        "user_id": rp_uid,
                     })
                     logger.info(
-                        f"LiveKit Identity: {speaker_label} → {rp['name']} "
+                        f"LiveKit Identity: {speaker_label} → {livekit_name} "
                         f"(single room participant, score=0.95)"
                     )
 
@@ -784,14 +811,35 @@ async def _identify_speakers(
                 for rp in room_participants:
                     rp_name = rp.get("name", "")
                     if rp_name and rp_name.lower() in text_context.lower():
+                        # DB-Lookup: user_id → echter Name
+                        resolved_name = rp_name
+                        rp_uid = rp.get("user_id")
+                        if rp_uid:
+                            try:
+                                user_result = await db.execute(
+                                    select(User.full_name).where(
+                                        User.id == rp_uid,
+                                        User.client_id == client_id,
+                                        User.deleted_at.is_(None),
+                                    )
+                                )
+                                db_name = user_result.scalar_one_or_none()
+                                if db_name:
+                                    resolved_name = db_name
+                            except Exception:
+                                pass
+
+                        if resolved_name not in candidates:
+                            candidates.append(resolved_name)
+
                         signals.append({
                             "source": "livekit_identity",
-                            "name": rp_name,
+                            "name": resolved_name,
                             "score": 0.90,
-                            "user_id": rp.get("user_id"),
+                            "user_id": rp_uid,
                         })
                         logger.info(
-                            f"LiveKit Identity: {speaker_label} mentions {rp_name} in speech (score=0.90)"
+                            f"LiveKit Identity: {speaker_label} mentions {resolved_name} in speech (score=0.90)"
                         )
                         break
 
