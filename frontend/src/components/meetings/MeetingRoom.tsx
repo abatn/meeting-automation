@@ -52,7 +52,7 @@ import {
   Assignment as AssignmentIcon,
 } from "@mui/icons-material";
 import { Theme } from "@mui/material/styles";
-import { LiveKitRoom, RoomAudioRenderer, useParticipants, useRoomInfo, useConnectionState, useLocalParticipant, useDisconnectButton } from "@livekit/components-react";
+import { LiveKitRoom, RoomAudioRenderer, useParticipants, useRoomInfo, useConnectionState, useLocalParticipant, useDisconnectButton, useRoomContext } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { ConnectionState, ConnectionQuality, RoomEvent } from "livekit-client";
 import { useTranslation } from "react-i18next";
@@ -275,6 +275,50 @@ function MicToggleBridge({
   return null;
 }
 
+// ─── Speaking Timeline Bridge ──────────────────────────────────────────────
+// Captures ActiveSpeakersChanged events and sends timeline data to backend
+// for server-side speaker identification (replaces ONNX when identity is known)
+function SpeakingTimelineBridge({
+  meetingId,
+  wsRef,
+}: {
+  meetingId: string;
+  wsRef: React.MutableRefObject<WebSocket | null>;
+}) {
+  const room = useRoomContext();
+
+  useEffect(() => {
+    if (!room) return;
+
+    const handleActiveSpeakersChanged = (speakers: any[]) => {
+      const now = Date.now();
+      const timeline = speakers.map((s: any) => ({
+        participant_id: s.identity,
+        participant_name: s.name || s.identity,
+        started_speaking_at: now,
+      }));
+
+      // Send to backend via WebSocket if connected
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "speaker_timeline",
+            meeting_id: meetingId,
+            data: timeline,
+          })
+        );
+      }
+    };
+
+    room.on(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakersChanged);
+    return () => {
+      room.off(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakersChanged);
+    };
+  }, [room, meetingId, wsRef]);
+
+  return null;
+}
+
 
 // ─── Pipeline Progress Indicator ─────────────────────────────────────────────
 function PipelineProgressIndicator({ status }: { status: string }) {
@@ -438,6 +482,7 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
   // Refs
   const transcriptionEndRef = useRef<HTMLDivElement>(null);
   const pollingRef          = useRef<NodeJS.Timeout | null>(null);
+  const speakingTimelineWsRef = useRef<WebSocket | null>(null);
 
   const handleLiveKitConnectionState = useCallback((state: ConnectionState) => {
     const connected = state === ConnectionState.Connected;
@@ -454,6 +499,48 @@ const [livekitError, setLivekitError] = useState<string | null>(null);
   useEffect(() => {
     console.log("[State] recordingStatus changed to:", recordingStatus, "\nstack:", new Error().stack?.split('\n').slice(1, 4).join(' <- '));
   }, [recordingStatus]);
+
+  // ── Speaking Timeline WebSocket ───────────────────────────────────────────
+  // Connects to backend WebSocket for sending active speaker data
+  useEffect(() => {
+    if (!id) return;
+
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsHost = window.location.host;
+    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/websockets/speaking-timeline/${id}`;
+
+    const connectWs = () => {
+      try {
+        const ws = new WebSocket(wsUrl);
+        ws.onopen = () => {
+          console.log("[SpeakingTimeline] WebSocket connected");
+          speakingTimelineWsRef.current = ws;
+        };
+        ws.onclose = () => {
+          console.log("[SpeakingTimeline] WebSocket closed");
+          speakingTimelineWsRef.current = null;
+          // Reconnect after 5s if meeting is still active
+          if (recordingStatus !== "completed" && recordingStatus !== "failed") {
+            setTimeout(connectWs, 5000);
+          }
+        };
+        ws.onerror = (err) => {
+          console.error("[SpeakingTimeline] WebSocket error:", err);
+        };
+      } catch (err) {
+        console.error("[SpeakingTimeline] WebSocket connect failed:", err);
+      }
+    };
+
+    connectWs();
+
+    return () => {
+      if (speakingTimelineWsRef.current) {
+        speakingTimelineWsRef.current.close();
+        speakingTimelineWsRef.current = null;
+      }
+    };
+  }, [id, recordingStatus]);
 
   // ── State Reset bei Meeting-Wechsel ─────────────────────────────────────
   useEffect(() => {
@@ -1037,6 +1124,7 @@ onError={(error) => {
                      <LiveKitConnectionBridge onStateChange={handleLiveKitConnectionState} />
                      <LiveKitDisconnectBridge onReady={handleDisconnectReady} />
                      <MicToggleBridge onMicState={handleMicState} />
+                     <SpeakingTimelineBridge meetingId={id || ""} wsRef={speakingTimelineWsRef} />
                      <RoomAudioRenderer />
                      <Box sx={{ px: 2, pb: 1, minHeight: 80 }}>
                        <ParticipantsList />

@@ -1,10 +1,19 @@
 import logging
+from typing import Dict, List, Optional
 
 from livekit.api import AccessToken, LiveKitAPI, VideoGrants
 from livekit.protocol.egress import (
     EncodedFileOutput,
     EncodingOptionsPreset,
     RoomCompositeEgressRequest,
+    StartEgressRequest,
+    MediaSource,
+    AudioConfig,
+    AudioRoute,
+    Output,
+    FileOutput,
+    S3Upload,
+    StorageConfig,
     StopEgressRequest,
     ListEgressRequest,
 )
@@ -90,6 +99,85 @@ class LiveKitService:
         info = await self.api.egress.start_room_composite_egress(req)
         logger.info(f"Egress started for {meeting_id}: egress_id={info.egress_id}")
         return info.egress_id
+
+    async def start_track_egress(
+        self, meeting_id: str, base_file_key: str
+    ) -> Dict[str, str]:
+        """Start per-participant track recording using StartEgress with MediaSource.
+
+        Each participant's audio is recorded as a separate file with their identity
+        embedded in the filename. This eliminates the need for ONNX speaker
+        identification because the participant identity is known from the track
+        metadata.
+
+        Args:
+            meeting_id: LiveKit room name (= meeting ID).
+            base_file_key: S3 key prefix, e.g. ``{client_id}/recordings/{meeting_id}/``.
+
+        Returns:
+            Dict mapping participant identity to egress ID, e.g.:
+            ``{"user1_abc1": "EG_XXX", "user2_def2": "EG_YYY"}``
+        """
+        participants = await self.get_room_participants(meeting_id)
+        if not participants:
+            logger.warning(f"No participants found for track egress in {meeting_id}")
+            return {}
+
+        egress_map: Dict[str, str] = {}
+
+        for p in participants:
+            identity = p["identity"]
+            # Sanitize identity for S3 key (replace special chars)
+            safe_identity = identity.replace("/", "_").replace(":", "_")
+            file_key = f"{base_file_key}track_{safe_identity}.ogg"
+
+            # Build S3 upload config
+            s3_upload = S3Upload(
+                access_key=settings.S3_ACCESS_KEY,
+                secret=settings.S3_SECRET_KEY,
+                bucket=settings.LIVEKIT_EGRESS_BUCKET,
+                region="us-east-1",
+                force_path_style=True,
+            )
+            if settings.LIVEKIT_EGRESS_S3_ENDPOINT:
+                s3_upload.endpoint = settings.LIVEKIT_EGRESS_S3_ENDPOINT
+
+            # MediaSource with AudioRoute matching this participant only
+            req = StartEgressRequest(
+                room_name=meeting_id,
+                media=MediaSource(
+                    audio=AudioConfig(
+                        routes=[
+                            AudioRoute(
+                                participant_identity=identity,
+                                channel=0,
+                            ),
+                        ],
+                    ),
+                ),
+                outputs=[
+                    Output(
+                        file=FileOutput(
+                            filepath=file_key,
+                        ),
+                    ),
+                ],
+                storage=StorageConfig(s3=s3_upload),
+            )
+
+            try:
+                info = await self.api.egress.start_egress(req)
+                egress_map[identity] = info.egress_id
+                logger.info(
+                    f"Track egress started: meeting={meeting_id} "
+                    f"participant={identity} egress_id={info.egress_id}"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to start track egress for {identity}: {e}"
+                )
+
+        return egress_map
 
     async def stop_egress(self, egress_id: str) -> None:
         """Stop an active egress recording."""

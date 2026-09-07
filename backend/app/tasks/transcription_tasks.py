@@ -179,144 +179,235 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
 
             # Download audio from S3
             stage_start = time.time()
-            temp_path = await _download_audio(str(recording.file_path), str(recording.client_id))
-            s3_duration = time.time() - stage_start
-            PIPELINE_STAGE_DURATION.labels(stage="s3_download").observe(s3_duration)
-            logger.info(f"TIMING: s3_download duration={s3_duration:.2f}s")
-            if not temp_path:
-                raise Exception("S3 Error: Failed to download audio from MinIO")
+            file_path_str = str(recording.file_path)
 
-            # Tier 2.3: Populate file_size and duration from S3 HEAD + audio probe
-            await _populate_recording_metadata(db, recording, str(recording.file_path), temp_path)
+            # Detect multi-track recording (per-participant files from start_track_egress)
+            is_multi_track = "/track_" in file_path_str or file_path_str.endswith("/track_")
 
-            # Duration-Validierung: Prüfe auf mögliche Packet-Verlust (LiveKit Egress)
-            # Erwartete Mindestdauer = 10s für sinnvolle Aufnahmen
-            # Weniger = Warnsignal für Packet-Dropping wegen oldPacketThreshold=2s
-            if recording.duration and recording.duration < 10.0:
-                logger.warning(
-                    f"TIMING: recording_short_duration duration={recording.duration:.2f}s "
-                    f"(possible packet dropping due to LiveKit oldPacketThreshold=2s)"
+            if is_multi_track:
+                # Multi-track: download all participant files
+                track_files = await _download_track_files(
+                    file_path_str.rsplit("track_", 1)[0],  # base prefix
+                    str(recording.client_id),
                 )
+                if not track_files:
+                    raise Exception("S3 Error: No track files found for multi-track recording")
+                s3_duration = time.time() - stage_start
+                PIPELINE_STAGE_DURATION.labels(stage="s3_download").observe(s3_duration)
+                logger.info(f"TIMING: s3_download duration={s3_duration:.2f}s tracks={len(track_files)}")
 
-            # 1. GLADIA PHASE (Diarization)
-            stage_start = time.time()
-            num_participants = len(recording.room_participants or [])
-            publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
-            gladia_result = await gladia_service.transcribe_and_diarize(temp_path, num_room_participants=num_participants)
-            gladia_duration = time.time() - stage_start
-            PIPELINE_STAGE_DURATION.labels(stage="transcription_gladia").observe(gladia_duration)
-            logger.info(f"TIMING: gladia_transcription duration={gladia_duration:.2f}s")
+                # 1. GLADIA PHASE — per-track transcription (NO diarization)
+                stage_start = time.time()
+                publish_status(recording_id, "transcribing", 20, "Transcribing Tracks (Gladia V2)...")
 
-            # 1.5 SPEAKER IDENTIFICATION PHASE (Audio + Text Fusion)
-            stage_start = time.time()
-            publish_status(recording_id, "transcribing", 30, "Identifying Speakers...")
-            await speaker_embedding_service.initialize()
+                # Build participant identity → name map from room_participants
+                rp_list = recording.room_participants or []
+                identity_to_name = {}
+                for rp in rp_list:
+                    identity_to_name[rp.get("identity", "")] = rp.get("name", rp.get("user_id", ""))
 
-            # Load meeting with participants BEFORE speaker identification
-            stmt = select(Meeting).options(selectinload(Meeting.participants)).where(Meeting.id == recording.meeting_id)
-            meeting_res = await db.execute(stmt)
-            meeting = meeting_res.scalar_one_or_none()
-            participant_names = [p.name for p in meeting.participants if p.name] if meeting else []
-            meeting_id = str(recording.meeting_id)
+                # Transcribe each track in parallel (no diarization needed)
+                all_segments = []
+                track_tasks = []
+                track_identities = []
+                for identity, track_path in track_files.items():
+                    track_tasks.append(
+                        gladia_service.transcribe_and_diarize(
+                            track_path, num_room_participants=1
+                        )
+                    )
+                    track_identities.append(identity)
 
-            speaker_mappings = await _identify_speakers(
-                db=db,
-                gladia_result=gladia_result,
-                client_id=str(recording.client_id),
-                recording_id=recording_id,
-                temp_path=temp_path,
-                meeting_id=meeting_id,
-                participant_names=participant_names,
-                meeting=meeting,
-                room_participants=recording.room_participants or [],
-            )
-            speaker_duration = time.time() - stage_start
-            PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(speaker_duration)
-            logger.info(f"TIMING: speaker_identification duration={speaker_duration:.2f}s speakers={len(speaker_mappings)}")
+                track_results = await asyncio.gather(*track_tasks, return_exceptions=True)
 
-            # 1.5b ONNX SEGMENT REASSIGNMENT
-            # After speaker identification, use ONNX to re-assign individual segments
-            # This fixes cases where Gladia's diarization groups all segments under one speaker
-            await speaker_embedding_service.initialize()
-            if speaker_mappings and speaker_embedding_service.is_available:
-                try:
-                    from app.services.audio_segment_service import audio_segment_service
-                    profile_service = SpeakerProfileService(db)
-                    enrolled = await profile_service.get_profiles(client_id)
-                    profiles_with_emb = [p for p in enrolled if p.embedding is not None]
-                    
-                    if profiles_with_emb:
-                        segments_to_check = gladia_result.get("segments", [])
-                        reassigned = 0
-                        
-                        # Build name map: speaker_label -> resolved_name
-                        name_map = {m["speaker_label"]: m["resolved_name"] for m in speaker_mappings if m.get("resolved_name")}
-                        # Build reverse map: resolved_name -> speaker_label
-                        reverse_map = {v: k for k, v in name_map.items()}
-                        # Get all resolved names
-                        all_names = list(name_map.values())
-                        
-                        for seg in segments_to_check:
-                            current_label = seg.get("speaker")
-                            current_name = name_map.get(current_label, current_label)
-                            
-                            try:
-                                seg_audio = await audio_segment_service._extract_single_segment(temp_path, seg)
-                                if not seg_audio or not os.path.exists(seg_audio):
+                for identity, result in zip(track_identities, track_results):
+                    if isinstance(result, Exception):
+                        logger.error(f"Gladia failed for track {identity}: {result}")
+                        continue
+                    participant_name = identity_to_name.get(identity, identity)
+                    for seg in result.get("segments", []):
+                        seg["speaker"] = participant_name  # Override speaker with known identity
+                        all_segments.append(seg)
+
+                # Build gladia_result with merged segments
+                gladia_result = {
+                    "segments": all_segments,
+                    "full_text": "\n".join(
+                        f"{seg.get('speaker', 'Unknown')}: {seg.get('text', '')}"
+                        for seg in all_segments
+                    ),
+                }
+
+                gladia_duration = time.time() - stage_start
+                PIPELINE_STAGE_DURATION.labels(stage="transcription_gladia").observe(gladia_duration)
+                logger.info(f"TIMING: gladia_transcription duration={gladia_duration:.2f}s tracks={len(track_files)} segments={len(all_segments)}")
+
+                # 1.5 SPEAKER IDENTIFICATION — SKIP (identity known from track metadata)
+                stage_start = time.time()
+                publish_status(recording_id, "transcribing", 30, "Mapping Speakers...")
+                meeting_id = str(recording.meeting_id)
+
+                # Build speaker mappings directly from track metadata (no ONNX needed)
+                speaker_mappings = []
+                seen_names = set()
+                for identity in track_identities:
+                    name = identity_to_name.get(identity, identity)
+                    if name and name not in seen_names:
+                        speaker_mappings.append({
+                            "speaker_label": name,
+                            "resolved_name": name,
+                            "confidence": 1.0,
+                            "method": "track_identity",
+                        })
+                        seen_names.add(name)
+
+                speaker_duration = time.time() - stage_start
+                PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(speaker_duration)
+                logger.info(f"TIMING: speaker_identification duration={speaker_duration:.2f}s speakers={len(speaker_mappings)} method=track_identity")
+
+                # Skip ONNX segment reassignment (not needed for track-based recording)
+                onnx_reassign_duration = 0
+
+            else:
+                # Single file: original pipeline with diarization + ONNX
+                temp_path = await _download_audio(file_path_str, str(recording.client_id))
+                s3_duration = time.time() - stage_start
+                PIPELINE_STAGE_DURATION.labels(stage="s3_download").observe(s3_duration)
+                logger.info(f"TIMING: s3_download duration={s3_duration:.2f}s")
+                if not temp_path:
+                    raise Exception("S3 Error: Failed to download audio from MinIO")
+
+                # Tier 2.3: Populate file_size and duration from S3 HEAD + audio probe
+                await _populate_recording_metadata(db, recording, str(recording.file_path), temp_path)
+
+                # Duration-Validierung: Prüfe auf mögliche Packet-Verlust (LiveKit Egress)
+                # Erwartete Mindestdauer = 10s für sinnvolle Aufnahmen
+                # Weniger = Warnsignal für Packet-Dropping wegen oldPacketThreshold=2s
+                if recording.duration and recording.duration < 10.0:
+                    logger.warning(
+                        f"TIMING: recording_short_duration duration={recording.duration:.2f}s "
+                        f"(possible packet dropping due to LiveKit oldPacketThreshold=2s)"
+                    )
+
+                # 1. GLADIA PHASE (Diarization)
+                stage_start = time.time()
+                num_participants = len(recording.room_participants or [])
+                publish_status(recording_id, "transcribing", 20, "Extracting Voices (Gladia V2)...")
+                gladia_result = await gladia_service.transcribe_and_diarize(temp_path, num_room_participants=num_participants)
+                gladia_duration = time.time() - stage_start
+                PIPELINE_STAGE_DURATION.labels(stage="transcription_gladia").observe(gladia_duration)
+                logger.info(f"TIMING: gladia_transcription duration={gladia_duration:.2f}s")
+
+                # 1.5 SPEAKER IDENTIFICATION PHASE (Audio + Text Fusion)
+                stage_start = time.time()
+                publish_status(recording_id, "transcribing", 30, "Identifying Speakers...")
+                await speaker_embedding_service.initialize()
+
+                # Load meeting with participants BEFORE speaker identification
+                stmt = select(Meeting).options(selectinload(Meeting.participants)).where(Meeting.id == recording.meeting_id)
+                meeting_res = await db.execute(stmt)
+                meeting = meeting_res.scalar_one_or_none()
+                participant_names = [p.name for p in meeting.participants if p.name] if meeting else []
+                meeting_id = str(recording.meeting_id)
+
+                speaker_mappings = await _identify_speakers(
+                    db=db,
+                    gladia_result=gladia_result,
+                    client_id=str(recording.client_id),
+                    recording_id=recording_id,
+                    temp_path=temp_path,
+                    meeting_id=meeting_id,
+                    participant_names=participant_names,
+                    meeting=meeting,
+                    room_participants=recording.room_participants or [],
+                )
+                speaker_duration = time.time() - stage_start
+                PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(speaker_duration)
+                logger.info(f"TIMING: speaker_identification duration={speaker_duration:.2f}s speakers={len(speaker_mappings)}")
+
+                # 1.5b ONNX SEGMENT REASSIGNMENT
+                # After speaker identification, use ONNX to re-assign individual segments
+                # This fixes cases where Gladia's diarization groups all segments under one speaker
+                await speaker_embedding_service.initialize()
+                if speaker_mappings and speaker_embedding_service.is_available:
+                    try:
+                        from app.services.audio_segment_service import audio_segment_service
+                        profile_service = SpeakerProfileService(db)
+                        enrolled = await profile_service.get_profiles(client_id)
+                        profiles_with_emb = [p for p in enrolled if p.embedding is not None]
+
+                        if profiles_with_emb:
+                            segments_to_check = gladia_result.get("segments", [])
+                            reassigned = 0
+
+                            # Build name map: speaker_label -> resolved_name
+                            name_map = {m["speaker_label"]: m["resolved_name"] for m in speaker_mappings if m.get("resolved_name")}
+                            # Build reverse map: resolved_name -> speaker_label
+                            reverse_map = {v: k for k, v in name_map.items()}
+                            # Get all resolved names
+                            all_names = list(name_map.values())
+
+                            for seg in segments_to_check:
+                                current_label = seg.get("speaker")
+                                current_name = name_map.get(current_label, current_label)
+
+                                try:
+                                    seg_audio = await audio_segment_service._extract_single_segment(temp_path, seg)
+                                    if not seg_audio or not os.path.exists(seg_audio):
+                                        continue
+                                    seg_embedding = await speaker_embedding_service.extract_embedding(seg_audio)
+                                    if os.path.exists(seg_audio):
+                                        os.remove(seg_audio)
+                                    if seg_embedding is None:
+                                        continue
+
+                                    # Match against enrolled profiles
+                                    best_name, best_distance, best_conf = profile_service.match_speaker_from_list(
+                                        profiles=profiles_with_emb,
+                                        embedding=seg_embedding,
+                                    )
+
+                                    if best_name and best_conf in ("high", "medium"):
+                                        if best_name != current_name:
+                                            # ONNX says this segment belongs to a different speaker
+                                            new_label = reverse_map.get(best_name, current_label)
+                                            seg["speaker"] = new_label
+                                            reassigned += 1
+                                            logger.info(
+                                                f"ONNX reassignment: '{seg.get('text', '')[:30]}...' "
+                                                f"{current_name} -> {best_name} (conf={best_conf})"
+                                            )
+                                    elif not best_name or best_conf == "low":
+                                        # ONNX doesn't match any enrolled profile
+                                        # If there are other speakers, this might be one of them
+                                        if len(all_names) > 1:
+                                            other_names = [n for n in all_names if n != current_name]
+                                            if other_names:
+                                                # Use text patterns as fallback
+                                                text = seg.get("text", "")
+                                                text_latin = transliterate_arabic(text.lower())
+                                                for other in other_names:
+                                                    other_lower = other.lower()
+                                                    # Check if the segment mentions the other speaker (Latin or transliterated)
+                                                    if other_lower in text.lower() or other_lower in text_latin:
+                                                        new_label = reverse_map.get(other, current_label)
+                                                        seg["speaker"] = new_label
+                                                        reassigned += 1
+                                                        logger.info(
+                                                            f"Text fallback: '{seg.get('text', '')[:30]}...' "
+                                                            f"{current_name} -> {other} (mentions name)"
+                                                        )
+                                                        break
+                                except Exception as e:
+                                    logger.debug(f"ONNX per-segment failed: {e}")
                                     continue
-                                seg_embedding = await speaker_embedding_service.extract_embedding(seg_audio)
-                                if os.path.exists(seg_audio):
-                                    os.remove(seg_audio)
-                                if seg_embedding is None:
-                                    continue
-                                
-                                # Match against enrolled profiles
-                                best_name, best_distance, best_conf = profile_service.match_speaker_from_list(
-                                    profiles=profiles_with_emb,
-                                    embedding=seg_embedding,
-                                )
-                                
-                                if best_name and best_conf in ("high", "medium"):
-                                    if best_name != current_name:
-                                        # ONNX says this segment belongs to a different speaker
-                                        new_label = reverse_map.get(best_name, current_label)
-                                        seg["speaker"] = new_label
-                                        reassigned += 1
-                                        logger.info(
-                                            f"ONNX reassignment: '{seg.get('text', '')[:30]}...' "
-                                            f"{current_name} -> {best_name} (conf={best_conf})"
-                                        )
-                                elif not best_name or best_conf == "low":
-                                    # ONNX doesn't match any enrolled profile
-                                    # If there are other speakers, this might be one of them
-                                    if len(all_names) > 1:
-                                        other_names = [n for n in all_names if n != current_name]
-                                        if other_names:
-                                            # Use text patterns as fallback
-                                            text = seg.get("text", "")
-                                            text_latin = transliterate_arabic(text.lower())
-                                            for other in other_names:
-                                                other_lower = other.lower()
-                                                # Check if the segment mentions the other speaker (Latin or transliterated)
-                                                if other_lower in text.lower() or other_lower in text_latin:
-                                                    new_label = reverse_map.get(other, current_label)
-                                                    seg["speaker"] = new_label
-                                                    reassigned += 1
-                                                    logger.info(
-                                                        f"Text fallback: '{seg.get('text', '')[:30]}...' "
-                                                        f"{current_name} -> {other} (mentions name)"
-                                                    )
-                                                    break
-                            except Exception as e:
-                                logger.debug(f"ONNX per-segment failed: {e}")
-                                continue
-                        
-                        if reassigned > 0:
-                            logger.info(f"ONNX reassignment: {reassigned}/{len(segments_to_check)} segments reassigned")
-                    onnx_reassign_duration = time.time() - stage_start
-                    logger.info(f"TIMING: onnx_segment_reassignment duration={onnx_reassign_duration:.2f}s segments={len(segments_to_check)} reassigned={reassigned}")
-                except Exception as e:
-                    logger.warning(f"ONNX segment reassignment failed: {e}")
+
+                            if reassigned > 0:
+                                logger.info(f"ONNX reassignment: {reassigned}/{len(segments_to_check)} segments reassigned")
+                        onnx_reassign_duration = time.time() - stage_start
+                        logger.info(f"TIMING: onnx_segment_reassignment duration={onnx_reassign_duration:.2f}s segments={len(segments_to_check)} reassigned={reassigned}")
+                    except Exception as e:
+                        logger.warning(f"ONNX segment reassignment failed: {e}")
 
             # 1.6 APPLY SPEAKER NAMES TO TRANSCRIPT (Display-Kopie, Original bleibt erhalten)
             name_map = {
@@ -660,7 +751,12 @@ async def _identify_speakers(
     async def process_single_speaker(speaker_index: int, speaker_label: str, speaker_segments: List[Dict]) -> Dict[str, Any]:
         try:
             text_context = " ".join(seg.get("text", "") for seg in speaker_segments)
-            embedding = await _extract_speaker_embedding(temp_path, speaker_segments)
+            # Skip ONNX extraction if no enrolled profiles to match against
+            if not profiles_with_embeddings:
+                logger.info(f"Skipping ONNX: 0 enrolled profiles for speaker {speaker_label}")
+                embedding = None
+            else:
+                embedding = await _extract_speaker_embedding(temp_path, speaker_segments)
 
             # Collect ALL signals (no short-circuit)
             signals = []
@@ -1069,6 +1165,61 @@ async def _download_audio(file_key: str, client_id: str = None) -> Optional[str]
     except Exception as e:
         logger.error(f"S3 download failed from bucket={bucket}: {e}")
         return None
+
+
+async def _download_track_files(
+    base_file_key: str, client_id: str
+) -> Dict[str, str]:
+    """Download all per-participant track files from S3.
+
+    Args:
+        base_file_key: S3 key prefix (e.g. ``{client_id}/recordings/{meeting_id}/``).
+        client_id: Tenant ID for bucket resolution.
+
+    Returns:
+        Dict mapping participant identity to local temp file path.
+        E.g. ``{"user1_abc1": "/tmp/xxx.ogg", "user2_def2": "/tmp/yyy.ogg"}``
+    """
+    loop = asyncio.get_event_loop()
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url=settings.S3_ENDPOINT,
+        aws_access_key_id=settings.S3_ACCESS_KEY,
+        aws_secret_access_key=settings.S3_SECRET_KEY,
+    )
+    bucket = get_bucket_name(client_id)
+
+    # List all objects with the track prefix
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: s3_client.list_objects_v2(
+                Bucket=bucket, Prefix=base_file_key
+            ),
+        )
+    except Exception as e:
+        logger.error(f"S3 list failed for prefix={base_file_key}: {e}")
+        return {}
+
+    track_files: Dict[str, str] = {}
+    for obj in response.get("Contents", []):
+        key = obj["Key"]
+        # Track files follow pattern: track_{identity}.ogg
+        if "/track_" not in key:
+            continue
+        # Extract identity from filename
+        filename = key.split("/")[-1]  # track_user1_abc1.ogg
+        identity = filename.replace("track_", "").replace(".ogg", "")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".ogg") as tmp:
+            await loop.run_in_executor(
+                None,
+                lambda k=key, t=tmp: s3_client.download_fileobj(bucket, k, t),
+            )
+            track_files[identity] = tmp.name
+            logger.info(f"Downloaded track: identity={identity} path={tmp.name}")
+
+    return track_files
 
 
 async def _populate_recording_metadata(db, recording, file_key: str, temp_path: str) -> None:
