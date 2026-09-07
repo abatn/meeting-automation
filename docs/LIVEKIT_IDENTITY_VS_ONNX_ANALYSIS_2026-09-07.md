@@ -38,24 +38,68 @@ for rp in room_participants:
 
 ---
 
-## What We Actually Need: "Who was speaking when?"
+## ⚠️ CORRECTION: LiveKit Active Speaker Detection is CLIENT-SIDE ONLY
 
-LiveKit provides `active_speaker` events during the meeting. If we log these:
+From official LiveKit documentation (https://docs.livekit.io/intro/basics/rooms-participants-tracks/webhooks-events/):
+
+### Available LiveKit Webhook Events (COMPLETE LIST)
 
 ```
-00:00-00:05 → Participant A (identity: 38f342a5_5aa85801)
-00:05-00:12 → Participant B (identity: 38f342a5_f9f806ce)
+room_started
+room_finished
+participant_joined
+participant_left
+participant_connection_aborted
+track_published
+track_unpublished
+egress_started
+egress_updated
+egress_ended
+ingress_started
+ingress_ended
 ```
 
-Gladia provides:
-```
-00:00-00:05 → Speaker 0
-00:05-00:12 → Speaker 1
-```
+**There is NO `active_speaker` webhook event.**
 
-**Match them → Speaker 0 = Participant A, Speaker 1 = Participant B**
+### What LiveKit Actually Provides
 
-This replaces ONNX entirely for meetings with known participants.
+| Feature | Availability | How to Access |
+|---------|-------------|---------------|
+| Active Speaker Detection | **Client-side ONLY** | `RoomEvent.ActiveSpeakersChanged` in JS/Swift/Kotlin SDKs |
+| Speaking Status Changed | **Client-side ONLY** | `RoomEvent.ParticipantSpeakingChanged` |
+| Webhook Events | **Server-side** | But NO `active_speaker` event |
+
+### Implication for Option B
+
+My original proposal (LiveKit active_speaker → Gladia matching) requires:
+
+1. **Frontend changes**: Capture `RoomEvent.ActiveSpeakersChanged` events
+2. **Frontend → Backend**: Send speaking timeline via WebSocket or HTTP
+3. **Backend**: Store in `meeting_speaker_timeline` table
+4. **Pipeline**: Match to Gladia segments
+
+This is **~100+ lines of code** (not ~50), not a quick fix.
+
+### What We Actually Need: "Who was speaking when?"
+
+To implement this on the server, we would need the CLIENT to report speaking status:
+
+```
+Frontend captures:
+  00:00-00:05 → Participant A (identity: 38f342a5_5aa85801)
+  00:05-00:12 → Participant B (identity: 38f342a5_f9f806ce)
+
+Frontend sends to backend via WebSocket:
+  POST /api/v1/meetings/{id}/speaker-timeline
+  [{"participant_id": "A", "start": 0, "end": 5}, ...]
+
+Backend stores in DB:
+  meeting_speaker_timeline table
+
+Pipeline loads and matches to Gladia segments:
+  Speaker 0 = Participant A
+  Speaker 1 = Participant B
+```
 
 ---
 
@@ -90,13 +134,13 @@ ONNX already skips matching when 0 profiles exist. But it still runs the embeddi
 
 ---
 
-## Recommendation
+## Recommendation (CORRECTED)
 
 | Option | Impact | Effort | Priority |
 |--------|--------|--------|----------|
 | **A: Skip ONNX when 0 profiles** | Saves 260-638s | ~5 lines | 🔴 P0 |
-| **B: LiveKit active_speaker → Gladia matching** | Eliminates ONNX for known participants | ~50 lines + DB schema | 🟡 P1 |
-| **C: Both** | Maximum improvement | ~55 lines | 🔴 P0 |
+| **B: LiveKit active_speaker → Gladia matching** | Eliminates ONNX for known participants | ~100+ lines + DB + Frontend | 🟡 P1 |
+| **C: Both** | Maximum improvement | ~105+ lines | 🟡 P1 |
 
 ---
 
