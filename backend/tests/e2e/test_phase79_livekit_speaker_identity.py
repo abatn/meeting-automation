@@ -17,9 +17,9 @@ from app.tasks.transcription_tasks import _identify_speakers
 
 def _mock_db():
     db = AsyncMock()
-    db.execute = AsyncMock(return_value=MagicMock(
-        scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
-    ))
+    execute_result = MagicMock()
+    execute_result.scalar_one_or_none.return_value = None
+    db.execute = AsyncMock(return_value=execute_result)
     db.flush = AsyncMock()
     db.commit = AsyncMock()
     return db
