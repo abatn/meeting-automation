@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [ main ]
 
+# Prevent race conditions: if a new push arrives while a workflow is running,
+# cancel the in-progress run. Only the latest commit deploys.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: docker.io
   IMAGE_NAME: docker.io/batnini/meeting-automation-backend
