@@ -163,30 +163,62 @@ The benchmark tested with 300 fixed-size frames on ARM64. Production audio has:
 
 ---
 
-## Option A: Skip ONNX when 0 profiles (Quick Win)
+## Option A: Skip ONNX when 0 profiles (Quick Win) — CORRECTED
 
-### Current behavior
-```
-0 enrolled profiles → ONNX extracts embedding → finds nothing → wastes 435-638s
-```
+### ⚠️ Critical Bug in Original Proposal
 
-### Proposed behavior
-```
-0 enrolled profiles → skip ONNX entirely → go directly to heuristic/Mistral
-```
+My original proposal placed the guard at line 718 (after the expensive extraction). This is WRONG.
 
-### Code change location
-`backend/app/tasks/transcription_tasks.py`, line ~241:
+| What I proposed | What's actually needed |
+|----------------|----------------------|
+| Guard at line 718 (after extraction) | Guard before line 663 (before extraction) |
+| Would save: ~0s (matching already guarded) | Will save: 260-638s (skip extraction + ONNX) |
+
+### The actual bottleneck
 
 ```python
-# Current:
-if speaker_mappings and speaker_embedding_service.is_available:
-    # ONNX segment reassignment runs even with 0 profiles
+# Line 663 — THIS is the expensive call (260-638s):
+embedding = await _extract_speaker_embedding(temp_path, speaker_segments)
 
-# Proposed:
-if speaker_mappings and speaker_embedding_service.is_available and profiles_with_emb:
-    # Only run ONNX if there are enrolled profiles to match against
+# Line 719 — This is already guarded (fast, ~seconds):
+if embedding is not None and profiles_with_embeddings:
+    # ONNX matching
 ```
+
+`_extract_speaker_embedding` does:
+1. `audio_segment_service.extract_speaker_segments()` — ffmpeg extraction
+2. `speaker_embedding_service.extract_embedding()` — ONNX inference
+
+**The 260-638s is spent at extraction + inference, not at matching.**
+
+### Correct fix location
+`backend/app/tasks/transcription_tasks.py`, line 662-663:
+
+```python
+# BEFORE line 663 — CORRECT fix location
+if not profiles_with_embeddings:
+    logger.info(f"Skipping ONNX: 0 enrolled profiles for {speaker_label}")
+    embedding = None
+else:
+    embedding = await _extract_speaker_embedding(temp_path, speaker_segments)
+```
+
+### What this saves
+
+| Metric | Current | With Fix |
+|--------|---------|----------|
+| ONNX speaker_id_process_speakers | 435-638s | ~0s (skip extraction) |
+| Pipeline total (3-min audio) | 660-1090s+ | ~230-350s |
+| Time under 900s limit | ❌ Often killed | ✅ Always under |
+
+### Note on ONNX segment reassignment (lines 235-284)
+
+The segment reassignment block at line 243 is ALREADY guarded:
+```python
+if profiles_with_emb:  # Already skips when 0 profiles
+    segments_to_check = ...
+```
+No change needed there.
 
 **Impact:** Saves 435-638s for every meeting with 0 enrolled profiles (most meetings)
 
