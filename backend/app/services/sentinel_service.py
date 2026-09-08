@@ -94,7 +94,7 @@ class SentinelService:
             cold_start = time.time()
             self.llm = Llama(
                 model_path=self.model_path,
-                n_ctx=2048,
+                n_ctx=1024,
                 n_threads=2,
                 verbose=False
             )
@@ -137,7 +137,7 @@ class SentinelService:
             import time
             llm_start = time.time()
             loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=256))
+            response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=128))
             llm_dur = time.time() - llm_start
             usage = response.get("usage", {})
             prompt_tokens = usage.get("prompt_tokens", 0)
@@ -147,19 +147,29 @@ class SentinelService:
 
         return response["choices"][0]["text"].strip()
 
-# Lazy singleton: only loads Qwen-1.5B when first accessed
+# Eager singleton: load Qwen-1.5B at first access to avoid cold-start latency
 _sentinel_instance: SentinelService | None = None
+_sentinel_loaded: bool = False
 
 
 def get_sentinel_service() -> SentinelService:
     """Return the singleton SentinelService, creating it on first call.
 
-    Workers 2-4 avoid importing the ~1.5 GB Qwen model at startup.
     The model is loaded once on first ``summarize_chunk`` call and reused.
+    Cold-start is logged explicitly for observability.
     """
-    global _sentinel_instance
+    global _sentinel_instance, _sentinel_loaded
     if _sentinel_instance is None:
+        import time
+        load_start = time.time()
+        logger.info("Sentinel: loading Qwen-1.5B model (cold start)...")
         _sentinel_instance = SentinelService()
+        load_dur = time.time() - load_start
+        _sentinel_loaded = True
+        if _sentinel_instance.llm is not None:
+            logger.info(f"TIMING: sentinel_preload duration={load_dur:.2f}s status=loaded")
+        else:
+            logger.warning(f"TIMING: sentinel_preload duration={load_dur:.2f}s status=fallback")
     return _sentinel_instance
 
 
