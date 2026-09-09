@@ -54,7 +54,7 @@ spec:
       - name: celery-worker
         image: docker.io/batnini/meeting-automation-backend:latest
         imagePullPolicy: Always
-        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_pro,email,maintenance"]
+        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_pro,email,maintenance --concurrency=1"]
         resources:
           requests:
             memory: "2Gi"
@@ -62,7 +62,7 @@ spec:
             ephemeral-storage: "500Mi"
           limits:
             memory: "6Gi"
-            cpu: "1"
+            cpu: "2"
             ephemeral-storage: "2Gi"
         livenessProbe:
           exec:
