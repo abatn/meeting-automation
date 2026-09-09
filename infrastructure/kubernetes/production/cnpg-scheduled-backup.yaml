@@ -6,7 +6,7 @@ metadata:
   name: daily-backup
   namespace: meeting-automation
 spec:
-  schedule: "0 3 * * * *"        # 6 Felder (CNPG robfig/cron)
+  schedule: "0 0 3 * * *"         # 6 Felder (täglich 03:00 UTC)
   immediate: true                 # Erstes Backup sofort
   backupOwnerReference: self
   cluster:
