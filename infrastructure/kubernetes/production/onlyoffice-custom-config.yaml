@@ -17,13 +17,13 @@ data:
     location ~ ^(\([\d]+\.[\d]+\.[\d]+[\.|-][\w]+)?\/(web-apps\/apps\/api\/documents\/api\.js)$ {
       expires off;
       add_header Cache-Control "no-store, no-cache, must-revalidate";
-      # gzip_static on;
+      gzip_static on;
       alias  /var/www/onlyoffice/documentserver/$2;
     }
 
     location ~ ^(\([\d]+\.[\d]+\.[\d]+[\.|-][\w]+)?\/(document_editor_service_worker.js)$ {
       add_header Cache-Control "public, max-age=31536000, immutable" always;
-      # gzip_static on;
+      gzip_static on;
       alias  /var/www/onlyoffice/documentserver/sdkjs/common/serviceworker/$2;
     }
 
@@ -31,7 +31,7 @@ data:
     location ~ ^(\([\d]+\.[\d]+\.[\d]+[\.|-][\w]+)?\/(web-apps)(\/.*\.json)$ {
       add_header Cache-Control "public, max-age=31536000, immutable" always;
       error_log /dev/null crit;
-      # gzip_static on;
+      gzip_static on;
       alias /var/www/onlyoffice/documentserver/$2$3;
     }
 
@@ -39,13 +39,13 @@ data:
     location ~ ^(\([\d]+\.[\d]+\.[\d]+[\.|-][\w]+)?\/(sdkjs-plugins)(\/.*\.json)$ {
       add_header Cache-Control "public, max-age=31536000, immutable" always;
       error_log /dev/null crit;
-      # gzip_static on;
+      gzip_static on;
       alias /var/www/onlyoffice/documentserver/$2$3;
     }
 
     location ~ ^(\([\d]+\.[\d]+\.[\d]+[\.|-][\w]+)?\/(web-apps|sdkjs|sdkjs-plugins|fonts|dictionaries)(\/.*)$ {
       add_header Cache-Control "public, max-age=31536000, immutable" always;
-      # gzip_static on;
+      gzip_static on;
       alias /var/www/onlyoffice/documentserver/$2$3;
     }
 
@@ -83,7 +83,7 @@ data:
     location ~ ^(\([\d]+\.[\d]+\.[\d]+[\.|-][\w]+)?\/(meta\/formats)$ {
       add_header Cache-Control "public, max-age=31536000, immutable" always;
       default_type application/json;
-      # gzip_static on;
+      gzip_static on;
       alias /var/www/onlyoffice/documentserver/document-formats/onlyoffice-docs-formats.json;
     }
 
