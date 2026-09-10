@@ -100,13 +100,20 @@ async def run_pdf_conversion(pv_id: str, docx_key: str, pdf_key: str):
                 if conv_data.get("error") == 0 or "fileUrl" in conv_data:
                     pdf_url = conv_data.get("fileUrl")
                     if pdf_url:
-                        # Internal network fix: Converter returns https:// but only http:// works internally
-                        if pdf_url.startswith("https://onlyoffice-staging"):
+                        # Internal network fix: external HTTPS URLs must map to internal HTTP
+                        # From inside the cluster, externalHost resolves to self-signed cert
+                        if "staging.meeting-automation.com" in pdf_url:
+                            pdf_url = pdf_url.replace("https://staging.meeting-automation.com", "http://onlyoffice-staging:80")
+                            pdf_url = pdf_url.replace("http://staging.meeting-automation.com", "http://onlyoffice-staging:80")
+                        elif "meeting-automation.com" in pdf_url:
+                            pdf_url = pdf_url.replace("https://meeting-automation.com", "http://onlyoffice:80")
+                            pdf_url = pdf_url.replace("http://meeting-automation.com", "http://onlyoffice:80")
+                        elif pdf_url.startswith("https://onlyoffice-staging"):
                             pdf_url = pdf_url.replace("https://onlyoffice-staging", "http://onlyoffice-staging:80")
                         elif pdf_url.startswith(settings.ONLYOFFICE_URL):
-                            pass  # Already correct
+                            pass  # Already correct internal URL
                         elif "localhost:8080" in pdf_url:
-                            pdf_url = pdf_url.replace("localhost:8080", "http://onlyoffice-staging:80")
+                            pdf_url = pdf_url.replace("localhost:8080", settings.ONLYOFFICE_URL)
 
                         pdf_resp = await client.get(pdf_url)
                         if pdf_resp.status_code == 200:
@@ -486,8 +493,15 @@ async def onlyoffice_callback(pv_id: str, data: dict, request: Request, backgrou
         download_url = data.get("url")
         if not download_url: return {"error": 0}
         
-        # Internal network mapping for Docker
-        if download_url.startswith(settings.ONLYOFFICE_URL): 
+        # Internal network mapping: external HTTPS URLs must map to internal HTTP
+        # From inside the cluster, externalHost resolves to self-signed cert
+        if "staging.meeting-automation.com" in download_url:
+            download_url = download_url.replace("https://staging.meeting-automation.com", "http://onlyoffice-staging:80")
+            download_url = download_url.replace("http://staging.meeting-automation.com", "http://onlyoffice-staging:80")
+        elif "meeting-automation.com" in download_url:
+            download_url = download_url.replace("https://meeting-automation.com", "http://onlyoffice:80")
+            download_url = download_url.replace("http://meeting-automation.com", "http://onlyoffice:80")
+        elif download_url.startswith(settings.ONLYOFFICE_URL): 
             pass  # Already correct internal URL
         elif "localhost:8080" in download_url: 
             download_url = download_url.replace("localhost:8080", settings.ONLYOFFICE_URL)
