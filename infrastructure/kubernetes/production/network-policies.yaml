@@ -151,6 +151,9 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-worker-pro
+    - podSelector:
+        matchLabels:
+          app: onlyoffice
     ports:
     - protocol: TCP
       port: 9000
@@ -246,6 +249,15 @@ spec:
     ports:
     - protocol: TCP
       port: 8000
+  - to:
+    - podSelector:
+        matchLabels:
+          app: minio
+    ports:
+    - protocol: TCP
+      port: 9000
+    - protocol: TCP
+      port: 9001
 ---
 # n8n: Allow Backend
 apiVersion: networking.k8s.io/v1
