@@ -137,7 +137,7 @@ kubectl patch networkpolicy livekit-egress-policy -n meeting-automation-staging 
        {"ipBlock":{"cidr":"10.0.0.191/32"}}]}
 ```
 
-### Root Cause 5 (PROD, ungeklärt — Hauptverdacht: endPort-Regel bricht Netpol-Sync)
+### Root Cause 5 (PROD — ✅ GELÖST): Label-Schema-Mismatch — Policies erlaubten einen Pod, der nicht existiert
 
 **Beobachtung (Phase 2.3, 20:14–20:20 UTC):** Nach hostNetwork-Entfernung
 CrashLoopBackOff: `unable to connect to redis: dial tcp 10.43.129.110:6379:
@@ -160,30 +160,46 @@ dokumentierte am 05.08. defekte kube-router iptables-nft-Chains auf **Staging**
 (OCI UEK-Kernel 6.12.0) und Prod (Contabo, Ubuntu 6.8) als unauffällig — das war
 der Snapshot von damals, nicht der heutige Zustand.
 
-**Neuer Hauptverdacht — die einzige Delta-Variable zum funktionierenden
-Staging-Setup:** Die gepatchte `egress[2]`-Regel mit `endPort: 60000` + 4 ipBlocks.
-Hypothese: Der k3s-Netpol-Renderer auf Prod bricht bei dieser Regel die
-Policy-Programmierung für den Pod ab → der Pod endet mit **keinen** Allow-Regeln →
-alles denied → Redis (erste Verbindung beim Boot) ist der einzige sichtbare Fehler.
-Das erklärt alle Beobachtungen: Kontroll-Test OK (backend ohne Policy), Staging OK
-(Renderer akzeptiert die Regeln dort), Prod rejected trotz korrekter redis-policy.
-`endPort` ist seit K8s v1.25 gültige API — ob der k3s-Renderer es sauber handhabt,
-ist genau die Art versionsspezifischer Lücke, die der Aug-05-Doc schon einmal
-dokumentiert hat.
+**Bisect (21:08–21:23 UTC) — jede Hypothese einzeln widerlegt/bewiesen:**
 
-**Bisect-Plan (nächster Schritt):**
-1. **Retry A:** `egress[2]` ohne die endPort-Regel (nur 7880/7881 TCP + ipBlocks)
-   → Pod neu → verbindet Redis? Dann ist die endPort/UDP-Regel der Täter.
-2. **Retry B (falls A scheitert):** `livekit-egress-policy` temporär löschen beim
-   Pod-Start (unbeschränktes Fenster) → beweist Engine-vs-Regeln zu 100%.
-3. Alternativ-Renderung der UDP-Range: einzelne Port-Chunks (z. B. 50000-51999
-   via mehrere Regeln) oder Filter-Ansatz prüfen.
+| Test | Setup | Ergebnis | Schlussfolgerung |
+|---|---|---|---|
+| **Retry A** | `egress[2]` OHNE endPort-Regel (7880/7881 TCP, 3478 UDP, ipBlocks), Pod neu | ❌ `redis connection refused` — CrashLoop wie vorher | **endPort unschuldig** |
+| **Retry B (Lookalike-Pod)** | Debug-Pod (curl-Image) mit Labels `app=livekit-egress` **UND** `app.kubernetes.io/name=egress` → Redis mit aktiver Policy | ✅ exit 28 = **verbunden** | Policy-Content + Renderer einwandfrei |
+| **Label-Abgleich** | Labels des echten Helm-Pods lesen | `app.kubernetes.io/name: egress`, `app.kubernetes.io/instance: livekit-egress` — **KEIN `app:`-Label** | 🔴 **Wurzelursache gefunden** |
 
-**Risikofenster:** 20:14–20:20 UTC (~6 Min) — Recreate-Strategie ersetzte den
-alten Pod sofort; die 2.3-Gate-Tests liefen nie. Rollback bei 20:20.
+**Wurzelursache (endgültig):** `redis-policy` enthielt den Quelleintrag
+`podSelector: {app: livekit-egress}` — der **keinen einzigen Pod im Namespace
+matcht** (das Helm-Chart setzt nur `app.kubernetes.io/name`-Labels). Der echte
+Egress-Pod wurde deshalb von Redis' Ingress-Allow-Liste abgelehnt. Derselbe
+tote Eintrag war auch in `minio-policy` (teils von mir in Phase 2.1 nachgezogen)
+und der `livekit-egress-policy`-Selektor verlangte beide Labels (`app` +
+`app.kubernetes.io/name`) → selektierte den echten Pod nicht.
 
-**Ergebnis:** Rollback auf hostNetwork=true/max=1 erfolgreich (20:20):
-`{"CpuLoad":2}` ✅, ScaledObject ready=True ✅, ws_url restored ✅
+**Warum Staging funktionierte:** Das Raw-Manifest dort setzt dem Pod das Label
+`app: livekit-egress-staging` — die Staging-Policies matchen. **Kein
+CNI-Unterschied, kein Renderer-Bug — nur zwei verschiedene Label-Schemata.**
+
+**Fix (21:20, verifiziert):**
+```bash
+# redis-policy: toter Eintrag (from[3]) → echtes Helm-Label
+kubectl -n meeting-automation patch networkpolicy redis-policy --type='json' \
+  -p='[{"op":"replace","path":"/spec/ingress/0/from/3",
+        "value":{"podSelector":{"matchLabels":{"app.kubernetes.io/name":"egress"}}}}]'
+# minio-policy: toter Eintrag (letzter from-Index) → echtes Helm-Label  (analog)
+# livekit-egress-policy: podSelector.matchLabels → {app.kubernetes.io/name: egress}
+```
+Danach UDP-Media-Regel (endPort 50000–60000) wieder hergestellt, Pod gelöscht:
+
+**Ergebnis (21:23):** Neuer Pod `livekit-egress-...-zkbmz` (10.42.0.128):
+`1/1 Running`, `service ready`, Redis verbunden — **Prod-Egress läuft im
+Pod-Netzwerk.** Konnektivitätstests aus dem Pod: Redis exit 28 ✅, MinIO `200` ✅,
+LiveKit Node-IP `200` ✅, endPort-UDP-Regel aktiv ohne Nebeneffekte ✅
+
+**Risikofenster Phase 2.3 (erster Versuch):** 20:14–20:20 UTC (~6 Min) —
+Recreate ersetzte den alten Pod sofort; Rollback auf hostNetwork erfolgreich
+(`{"CpuLoad":2}`). **Risikofenster Retry A+B:** 21:08–21:23 UTC — derselbe
+CrashLoop-Zustand; nach Fix sofortiger grüner Zustand, kein Rollback nötig.
 
 ### Root Cause 4: minio-policy erlaubt Egress-Pods nicht als Ingress-Quelle
 
@@ -324,24 +340,24 @@ Manifeste neu angewendet werden.
 
 | # | Schritt | Verifikation vor dem nächsten |
 |---|---------|------------------------------|
-| 2.1 | minio-policy: Egress-Quelle patchen | ✅ angewendet + verifiziert (bleibt — harmlos für hostNetwork-Betrieb) |
-| 2.2 | Egress-Policy: ipBlocks + Medien-Ports patchen | ✅ angewendet + verifiziert (bleibt — inaktiv solange hostNetwork) |
-| 2.3 | Deployment: hostNetwork=false + ws_url Node-IP | 🔴 gescheitert — Pod→Redis rejected (Root Cause 5); Rollback erfolgreich |
-| 2.4 | **Bei 1 Replica bleiben** → 1 Test-Meeting | ⏸ blockiert durch 2.3 |
-| 2.5 | Erst dann auf 2 skalieren → 2 parallele Meetings | ⏸ blockiert durch 2.3 |
+| 2.1 | minio-policy: Egress-Quelle patchen | ✅ angewendet; 21:20 auf echtes Helm-Label korrigiert |
+| 2.2 | Egress-Policy: ipBlocks + Medien-Ports patchen | ✅ angewendet; 21:20 Selektor auf echtes Helm-Label korrigiert |
+| 2.3 | Deployment: hostNetwork=false + ws_url Node-IP | ✅ **21:23 erfolgreich** — nach Label-Fix (RC5); Pod Running, Redis/MinIO/LiveKit erreichbar |
+| 2.4 | **Bei 1 Replica bleiben** → 1 Test-Meeting | ⏳ bereit — User startet Test-Meeting |
+| 2.5 | Erst dann auf 2 skalieren → 2 parallele Meetings | ⏳ nach 2.4 |
 
-**Restrisiko:** k3s-Netpol-Renderer auf Prod verträgt die endPort/ipBlock-Regel
-möglicherweise nicht (Root Cause 5, Bisect steht aus).
-Schlägt 2.3s curl-Test fehl → sofort Rollback (`/tmp`-Backups + hostNetwork zurück),
-null Nutzer-Impact. Phase 2 startet nicht vor Commit der Phase-1-Manifeste.
+**Restrisiko (entkräftet):** endPort/ipBlock-Regeln und Netpol-Renderer waren
+unschuldig (Bisect 21:08–21:23). Rollback-Pfad bleibt (`/tmp`-Backups +
+hostNetwork zurück), null Nutzer-Impact.
 
-**Ergebnis des Canary (20:10–20:20 UTC):** 2.1 ✅ und 2.2 ✅ angewendet und
-verifiziert. 2.3 scheiterte: der neue Pod (pod network) kam nicht über
-`unable to connect to redis ... connection refused` hinaus → CrashLoopBackOff.
-`kubectl apply` des Manifests war zusätzlich unmöglich (Helm-Selector ist
-immutable) — der Versuch hat den Cluster nicht verändert. **Rollback erfolgreich**
-(hostNetwork/max=1/ws_url Service-DNS, `{"CpuLoad":2}`). Ausführliche Analyse:
-§ Root Cause 5 oben. Prod bleibt bis zur Klärung auf hostNetwork=true/max=1.
+**Ergebnis des Canary (20:10–21:23 UTC):** 2.1 ✅ und 2.2 ✅ angewendet und
+verifiziert. 2.3 scheiterte zunächst (20:14): der neue Pod (pod network) kam nicht
+über `unable to connect to redis ... connection refused` hinaus → CrashLoopBackOff;
+Rollback auf hostNetwork (20:20). **Bisect 21:08–21:23** (Retry A ohne endPort,
+Lookalike-Pod, Label-Abgleich) fand die wahre Ursache: Label-Mismatch (RC5).
+Nach Label-Fix läuft der Egress-Pod **erfolgreich im Pod-Netzwerk** (21:23) —
+Redis/MinIO/LiveKit-Konnektivität grün. `kubectl apply` des Deployment-Manifests
+bleibt unmöglich (Helm-Selector immutable) → Patch-Strategie verwenden.
 
 ---
 
@@ -364,7 +380,8 @@ immutable) — der Versuch hat den Cluster nicht verändert. **Rollback erfolgre
 |---|-------|--------|
 | 1 | Live-Test Staging: 2 parallele Recordings | ✅ 11.09. 19:24–19:32 — 2 Pods, ~8 Min, null Fehler; ICE/UDP ✅ |
 | 2 | Git-Commit der Manifeste (Staging + Prod, Phase 1) | ✅ 11.09. erledigt |
-| 3 | Production-Rollout (Phase 2, Canary 2.1–2.5) | 🔴 2.3 gescheitert (kube-router Pod→Redis, RC5); Prod läuft stabil auf hostNetwork/max=1; Prod-Git-Manifeste auf realen Helm-Stand korrigiert |
+| 3 | Production-Rollout (Phase 2, Canary 2.1–2.5) | 🟢 2.3 gelöst (RC5 = Label-Mismatch, 21:23); Prod-Egress im Pod-Netzwerk aktiv; 2.4/2.5 = Meeting-Test offen |
+| 7 | Prod KEDA max wieder auf 5 setzen (nach 2.4-Bestätigung) | ⏳ Aktuell noch max=1 im Cluster |
 | 4 | Egress Resources auf LiveKit-Empfehlung (4 CPU / 4 GB) prüfen | ⏳ Aktuell 2 CPU / 2 Gi (getesteter Stand) |
 | 5 | KEDA Custom Metric `livekit_egress_available` statt CPU (präziser) | ⏳ Optional |
 | 6 | Stop-Button-Fix (Backend 404 → `already_stopped`; Frontend 404-Catch → `processing`) | ⏳ Separater Code-Fix, beide Umgebungen |

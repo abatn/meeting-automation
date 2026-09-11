@@ -81,9 +81,11 @@ spec:
     - podSelector:
         matchLabels:
           app: celery-beat
+    # NOTE (2026-09-11): Helm egress pods carry app.kubernetes.io/name=egress,
+    # NOT app=livekit-egress. The old label matched zero pods (RC5).
     - podSelector:
         matchLabels:
-          app: livekit-egress
+          app.kubernetes.io/name: egress
     - podSelector:
         matchLabels:
           app: livekit-server
@@ -154,9 +156,10 @@ spec:
     - podSelector:
         matchLabels:
           app: onlyoffice
+    # NOTE (2026-09-11): Helm egress pods carry app.kubernetes.io/name=egress (RC5)
     - podSelector:
         matchLabels:
-          app: livekit-egress
+          app.kubernetes.io/name: egress
     ports:
     - protocol: TCP
       port: 9000
@@ -315,9 +318,10 @@ spec:
     - namespaceSelector: {}
   ingress:
   - from:
+    # NOTE (2026-09-11): Helm egress pods carry app.kubernetes.io/name=egress (RC5)
     - podSelector:
         matchLabels:
-          app: livekit-egress
+          app.kubernetes.io/name: egress
     - podSelector:
         matchLabels:
           app: backend
@@ -347,7 +351,8 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: livekit-egress
+      # NOTE (2026-09-11): must match the Helm pod labels (RC5)
+      app.kubernetes.io/name: egress
   egress:
   - to:
     - podSelector:
