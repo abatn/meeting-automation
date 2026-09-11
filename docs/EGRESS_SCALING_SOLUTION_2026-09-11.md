@@ -137,6 +137,34 @@ kubectl patch networkpolicy livekit-egress-policy -n meeting-automation-staging 
        {"ipBlock":{"cidr":"10.0.0.191/32"}}]}
 ```
 
+### Root Cause 5 (PROD-spezifisch, ungeklärt): kube-router + ufw rejected Pod→Redis
+
+**Beobachtung (Phase 2.3, 20:14–20:20 UTC):** Nach hostNetwork-Entfernung
+CrashLoopBackOff: `unable to connect to redis: dial tcp 10.43.129.110:6379:
+connect: connection refused` — obwohl
+
+- `redis-policy` Egress als Quelle enthält (vorher verifiziert)
+- ClusterIP-DNAT identisch zum Staging-Aufbau ist
+- Backend (ohne Egress-Policy) → Redis ClusterIP: exit 28 = **verbunden** ✅
+
+**Unterschied zu Staging:** Prod hat **kube-router** als NetworkPolicy-Engine
+(Staging: vanilla k3s/flannel). kube-router akzeptiert den Netzverkehr vom
+neuen Pod scheinbar nur, wenn er in kube-routers ipsets registriert ist —
+und die Registrierung eines neuen Pod-IPs in die Policy-ipsets ist mit
+kube-router unzuverlässig/schlicht nicht gelaufen.
+
+**Unterschied zum GATE-Test (0.5):** backend → `169.58.83.32:7880` (Node-IP)
+funktionierte, aber backend hat **keine Egress-Policy** — kube-router enforced
+Policies nur bei Pods MIT Egress-Policy. Der neue Egress-Pod (HAT Egress-Policy)
+wurde rejected; ob die ipset-Registrierung der neuen Pod-IP nachzog, muss bei
+einem erneuten Versuch mit längerem Wartefenster geprüft werden.
+
+**Risikofenster:** 20:14–20:20 UTC (~6 Min) — Recreate-Strategie ersetzte den
+alten Pod sofort; die 2.3-Gate-Tests liefen nie. Rollback bei 20:20.
+
+**Ergebnis:** Rollback auf hostNetwork=true/max=1 erfolgreich (20:20):
+`{"CpuLoad":2}` ✅, ScaledObject ready=True ✅, ws_url restored ✅
+
 ### Root Cause 4: minio-policy erlaubt Egress-Pods nicht als Ingress-Quelle
 
 **Erst im 2. Testlauf entdeckt (19:53):** ICE/Media funktionierte, beide Egresses
@@ -276,15 +304,23 @@ Manifeste neu angewendet werden.
 
 | # | Schritt | Verifikation vor dem nächsten |
 |---|---------|------------------------------|
-| 2.1 | minio-policy: Egress-Quelle patchen | unsafe — sofort möglich (hostNetwork-Pods umgehen sie ohnehin) |
-| 2.2 | Egress-Policy: ipBlocks + Medien-Ports patchen | kubectl get networkpolicy — Struktur prüfen |
-| 2.3 | Deployment: hostNetwork=false + ws_url Node-IP (Manifest anwenden, deckelt auch KEDA wieder auf max=5) | Pod Running; `curl 169.58.83.32:7880` aus dem Pod → OK |
-| 2.4 | **Bei 1 Replica bleiben** → 1 Test-Meeting | ICE `connectionType: "udp"`, Stop → `EGRESS_COMPLETE`, Datei in MinIO |
-| 2.5 | Erst dann auf 2 skalieren → 2 parallele Meetings | 2× EGRESS_COMPLETE, kein Port-Konflikt, KEDA READY=True |
+| 2.1 | minio-policy: Egress-Quelle patchen | ✅ angewendet + verifiziert (bleibt — harmlos für hostNetwork-Betrieb) |
+| 2.2 | Egress-Policy: ipBlocks + Medien-Ports patchen | ✅ angewendet + verifiziert (bleibt — inaktiv solange hostNetwork) |
+| 2.3 | Deployment: hostNetwork=false + ws_url Node-IP | 🔴 gescheitert — Pod→Redis rejected (Root Cause 5); Rollback erfolgreich |
+| 2.4 | **Bei 1 Replica bleiben** → 1 Test-Meeting | ⏸ blockiert durch 2.3 |
+| 2.5 | Erst dann auf 2 skalieren → 2 parallele Meetings | ⏸ blockiert durch 2.3 |
 
 **Restrisiko:** kube-router enforcing der ipBlock-Regeln (Staging-CNI ≠ kube-router).
 Schlägt 2.3s curl-Test fehl → sofort Rollback (`/tmp`-Backups + hostNetwork zurück),
 null Nutzer-Impact. Phase 2 startet nicht vor Commit der Phase-1-Manifeste.
+
+**Ergebnis des Canary (20:10–20:20 UTC):** 2.1 ✅ und 2.2 ✅ angewendet und
+verifiziert. 2.3 scheiterte: der neue Pod (pod network) kam nicht über
+`unable to connect to redis ... connection refused` hinaus → CrashLoopBackOff.
+`kubectl apply` des Manifests war zusätzlich unmöglich (Helm-Selector ist
+immutable) — der Versuch hat den Cluster nicht verändert. **Rollback erfolgreich**
+(hostNetwork/max=1/ws_url Service-DNS, `{"CpuLoad":2}`). Ausführliche Analyse:
+§ Root Cause 5 oben. Prod bleibt bis zur Klärung auf hostNetwork=true/max=1.
 
 ---
 
@@ -307,7 +343,7 @@ null Nutzer-Impact. Phase 2 startet nicht vor Commit der Phase-1-Manifeste.
 |---|-------|--------|
 | 1 | Live-Test Staging: 2 parallele Recordings | ✅ 11.09. 19:24–19:32 — 2 Pods, ~8 Min, null Fehler; ICE/UDP ✅ |
 | 2 | Git-Commit der Manifeste (Staging + Prod, Phase 1) | ✅ 11.09. erledigt |
-| 3 | Production-Rollout (Phase 2, Canary 2.1–2.5) | ⏳ Phase 0 ✅, wartet auf Freigabe |
+| 3 | Production-Rollout (Phase 2, Canary 2.1–2.5) | 🔴 2.3 gescheitert (kube-router Pod→Redis, RC5); Prod läuft stabil auf hostNetwork/max=1; Prod-Git-Manifeste auf realen Helm-Stand korrigiert |
 | 4 | Egress Resources auf LiveKit-Empfehlung (4 CPU / 4 GB) prüfen | ⏳ Aktuell 2 CPU / 2 Gi (getesteter Stand) |
 | 5 | KEDA Custom Metric `livekit_egress_available` statt CPU (präziser) | ⏳ Optional |
 | 6 | Stop-Button-Fix (Backend 404 → `already_stopped`; Frontend 404-Catch → `processing`) | ⏳ Separater Code-Fix, beide Umgebungen |

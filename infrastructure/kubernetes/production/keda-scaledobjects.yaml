@@ -59,7 +59,10 @@ spec:
   scaleTargetRef:
     name: livekit-egress
   minReplicaCount: 1
-  maxReplicaCount: 5
+  maxReplicaCount: 1        # hostNetwork: 1 pod/node. Raise to 5 ONLY together with the
+                            # scaling activation (hostNetwork=false) once the prod
+                            # kube-router pod->redis rejection for new pods is solved
+                            # (see docs/EGRESS_SCALING_SOLUTION_2026-09-11.md §7)
   pollingInterval: 30
   cooldownPeriod: 120
   triggers:

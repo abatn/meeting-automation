@@ -1,3 +1,9 @@
+# NOTE (2026-09-11): This ConfigMap is NOT used by the running deployment.
+# The livekit-egress deployment is Helm-managed and reads its config from the
+# Helm-created ConfigMap "livekit-egress" (env EGRESS_CONFIG_BODY -> configMapKeyRef).
+# That CM holds ws_url, api keys, redis and s3 settings.
+# ws_url change for scaling: ws_url: ws://169.58.83.32:7880 (node IP, see
+# docs/EGRESS_SCALING_SOLUTION_2026-09-11.md) - only together with hostNetwork=false.
 apiVersion: v1
 kind: ConfigMap
 metadata:
