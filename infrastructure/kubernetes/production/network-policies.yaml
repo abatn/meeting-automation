@@ -124,7 +124,7 @@ spec:
     - protocol: TCP
       port: 15672
 ---
-# MinIO: Allow Backend, Celery, Celery-Pro, Frontend, CNPG (WAL-Archiv)
+# MinIO: Allow Backend, Celery, Celery-Pro, Frontend, CNPG (WAL-Archiv), OnlyOffice, LiveKit Egress
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -154,6 +154,9 @@ spec:
     - podSelector:
         matchLabels:
           app: onlyoffice
+    - podSelector:
+        matchLabels:
+          app: livekit-egress
     ports:
     - protocol: TCP
       port: 9000
@@ -335,7 +338,7 @@ spec:
   - Ingress
   - Egress
 ---
-# LiveKit Egress: Egress to Redis, MinIO, LiveKit, DNS
+# LiveKit Egress: Egress to Redis, MinIO, LiveKit (signaling + ICE media), DNS
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -361,12 +364,30 @@ spec:
     - protocol: TCP
       port: 9000
   - to:
-    - podSelector:
-        matchLabels:
-          app: livekit-server
+    # LiveKit Server (hostNetwork: true) advertises ICE candidates on node IP,
+    # flannel.1/cni0 and docker0. Service DNS + DNAT breaks NetworkPolicy matching
+    # for hostNetwork pods, so the server is allowed via ipBlock entries.
+    # FIX 2026-09-11 (tested on staging): media ports were missing -> egress aborted
+    # after ~15s with "Start signal not received" because ICE connectivity checks
+    # (UDP) never reached the server.
+    - ipBlock:
+        cidr: 169.58.83.32/32    # node IP (ws_url signaling + ICE)
+    - ipBlock:
+        cidr: 10.42.0.0/32       # flannel.1 ICE candidate
+    - ipBlock:
+        cidr: 10.42.0.1/32       # cni0 ICE candidate
+    - ipBlock:
+        cidr: 172.17.0.1/32      # docker0 ICE candidate
     ports:
     - protocol: TCP
-      port: 7880
+      port: 7880                 # signaling (ws_url)
+    - protocol: TCP
+      port: 7881                 # ICE/TCP fallback
+    - protocol: UDP
+      port: 50000
+      endPort: 60000             # RTP media (rtc.port_range_start/end)
+    - protocol: UDP
+      port: 3478                 # TURN
   - ports:
     - protocol: UDP
       port: 53

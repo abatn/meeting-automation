@@ -59,7 +59,7 @@ metadata:
   namespace: meeting-automation-staging
 spec:
   scaleTargetRef:
-    name: livekit-egress
+    name: livekit-egress-staging  # FIX 2026-09-11: was "livekit-egress" (nonexistent) - ScaledObject was READY=False for 28 days
   minReplicaCount: 1        # Mindestens 1 (Recording immer moeglich)
   maxReplicaCount: 5        # Dynamisch basiert auf CPU
   pollingInterval: 30

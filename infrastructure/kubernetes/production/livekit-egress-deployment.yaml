@@ -8,7 +8,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate  # hostNetwork requires Recreate (no two pods can bind same ports)
+    type: Recreate  # No rolling overlap: egress jobs must drain cleanly
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -18,8 +18,13 @@ spec:
       labels:
         app: livekit-egress
     spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      # EGRESS SCALING (2026-09-11, tested on staging): hostNetwork removed for
+      # multi-pod scaling. Signaling goes directly to the node IP (bypasses
+      # Service DNAT, which kube-proxy cannot combine with NetworkPolicy
+      # matching for hostNetwork server pods). Media (ICE UDP 50000-60000)
+      # allowed via livekit-egress-policy ipBlocks.
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
       containers:
       - name: egress
         image: livekit/egress:v1.9.0
@@ -31,7 +36,7 @@ spec:
         - name: LIVEKIT_API_SECRET
           value: "prod-8f8b7b429f01180c89e03a1b30eeec4be871c0fa184c823a"
         - name: LIVEKIT_WS_URL
-          value: "ws://livekit-server:7880"
+          value: "ws://169.58.83.32:7880"  # Node IP directly - Service DNS + DNAT breaks NetworkPolicy matching for hostNetwork server
         ports:
         - containerPort: 7000
           name: health
@@ -41,10 +46,13 @@ spec:
         resources:
           requests:
             memory: "512Mi"
-            cpu: "200m"
+            cpu: "500m"
           limits:
             memory: "2Gi"
-            cpu: "1"
+            cpu: "2"
+          # NOTE: LiveKit docs recommend 4 CPU / 4 Gi per egress instance for
+          # RoomComposite. Current values mirror the tested staging config;
+          # scale up per observed load.
         livenessProbe:
           httpGet:
             path: /health

@@ -8,7 +8,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate  # hostNetwork requires Recreate (no two pods can bind same ports)
+    type: Recreate  # No rolling overlap: egress jobs must drain cleanly
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -18,8 +18,12 @@ spec:
       labels:
         app: livekit-egress-staging
     spec:
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
+      # EGRESS SCALING (2026-09-11, tested): hostNetwork removed for multi-pod
+      # scaling. Signaling goes directly to the node IP (bypasses Service DNAT,
+      # which kube-proxy cannot combine with NetworkPolicy for hostNetwork pods).
+      # Media (ICE UDP 50000-60000) allowed via livekit-egress-policy ipBlocks.
+      hostNetwork: false
+      dnsPolicy: ClusterFirst
       nodeSelector:
         kubernetes.io/hostname: instance-20260329-0846
       containers:
@@ -33,7 +37,7 @@ spec:
         - name: LIVEKIT_API_SECRET
           value: "meeting-api-secret-2026-minimum-32-chars!"
         - name: LIVEKIT_WS_URL
-          value: "ws://livekit-server-staging:7880"
+          value: "ws://10.0.0.191:7880"  # Node IP directly - Service DNS + DNAT breaks NetworkPolicy matching for hostNetwork server
         ports:
         - containerPort: 7000
           name: health
