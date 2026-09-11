@@ -18,7 +18,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.first().json.body;\nif (!body || !body.email || !body.full_name) {\n  throw new Error('Missing required fields: email and full_name are required');\n}\nreturn {\n  json: {\n    event: body.event || 'customer_activated',\n    email: body.email,\n    full_name: body.full_name,\n    company_name: body.company_name || 'Meeting Automation',\n    login_url: 'https://staging.meeting-automation.com/login'\n  }\n};"
+        "jsCode": "const body = $input.first().json.body;\nif (!body || !body.email || !body.full_name) {\n  throw new Error('Missing required fields: email and full_name are required');\n}\nreturn {\n  json: {\n    event: body.event || 'customer_activated',\n    email: body.email,\n    full_name: body.full_name,\n    company_name: body.company_name || 'Meeting Automation',\n    login_url: 'https://meeting-automation.com/login'\n  }\n};"
       },
       "id": "validate-payload",
       "name": "Validate Payload",
