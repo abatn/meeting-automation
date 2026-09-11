@@ -137,7 +137,7 @@ kubectl patch networkpolicy livekit-egress-policy -n meeting-automation-staging 
        {"ipBlock":{"cidr":"10.0.0.191/32"}}]}
 ```
 
-### Root Cause 5 (PROD-spezifisch, ungeklärt): kube-router + ufw rejected Pod→Redis
+### Root Cause 5 (PROD, ungeklärt — Hauptverdacht: endPort-Regel bricht Netpol-Sync)
 
 **Beobachtung (Phase 2.3, 20:14–20:20 UTC):** Nach hostNetwork-Entfernung
 CrashLoopBackOff: `unable to connect to redis: dial tcp 10.43.129.110:6379:
@@ -147,17 +147,37 @@ connect: connection refused` — obwohl
 - ClusterIP-DNAT identisch zum Staging-Aufbau ist
 - Backend (ohne Egress-Policy) → Redis ClusterIP: exit 28 = **verbunden** ✅
 
-**Unterschied zu Staging:** Prod hat **kube-router** als NetworkPolicy-Engine
-(Staging: vanilla k3s/flannel). kube-router akzeptiert den Netzverkehr vom
-neuen Pod scheinbar nur, wenn er in kube-routers ipsets registriert ist —
-und die Registrierung eines neuen Pod-IPs in die Policy-ipsets ist mit
-kube-router unzuverlässig/schlicht nicht gelaufen.
+**KORREKTUR der ersten Analyse (12.09., nach Docs-Prüfung):**
 
-**Unterschied zum GATE-Test (0.5):** backend → `169.58.83.32:7880` (Node-IP)
-funktionierte, aber backend hat **keine Egress-Policy** — kube-router enforced
-Policies nur bei Pods MIT Egress-Policy. Der neue Egress-Pod (HAT Egress-Policy)
-wurde rejected; ob die ipset-Registrierung der neuen Pod-IP nachzog, muss bei
-einem erneuten Versuch mit längerem Wartefenster geprüft werden.
+| Erste Annahme | Verifizierter Fakt |
+|---|---|
+| "Prod hat kube-router, Staging nicht" | ❌ FALSCH — kein eigenständiger kube-router-Prozess auf BEIDEN Nodes; beide nutzen k3s-embedded NetworkPolicy-Controller (k3s v1.36.2) |
+| "kube-router-ipset-Registrierung verspätet" | ⚠️ Unbewiesen — nur eine Hypothese; kein ipset-Check wurde während des 6-Min-Fensters gemacht |
+| "Prod-spezifisches Problem" | ⚠️ Ungeklärt — Staging funktioniert mit IDENTISCHEN Regeln (inkl. endPort) seit 11.09. 19:24 einwandfrei |
+
+**Historischer Kontext:** `docs/MONITORING_FIX_PROMETHEUS_HOSTNETWORK_2026-08-05.md`
+dokumentierte am 05.08. defekte kube-router iptables-nft-Chains auf **Staging**
+(OCI UEK-Kernel 6.12.0) und Prod (Contabo, Ubuntu 6.8) als unauffällig — das war
+der Snapshot von damals, nicht der heutige Zustand.
+
+**Neuer Hauptverdacht — die einzige Delta-Variable zum funktionierenden
+Staging-Setup:** Die gepatchte `egress[2]`-Regel mit `endPort: 60000` + 4 ipBlocks.
+Hypothese: Der k3s-Netpol-Renderer auf Prod bricht bei dieser Regel die
+Policy-Programmierung für den Pod ab → der Pod endet mit **keinen** Allow-Regeln →
+alles denied → Redis (erste Verbindung beim Boot) ist der einzige sichtbare Fehler.
+Das erklärt alle Beobachtungen: Kontroll-Test OK (backend ohne Policy), Staging OK
+(Renderer akzeptiert die Regeln dort), Prod rejected trotz korrekter redis-policy.
+`endPort` ist seit K8s v1.25 gültige API — ob der k3s-Renderer es sauber handhabt,
+ist genau die Art versionsspezifischer Lücke, die der Aug-05-Doc schon einmal
+dokumentiert hat.
+
+**Bisect-Plan (nächster Schritt):**
+1. **Retry A:** `egress[2]` ohne die endPort-Regel (nur 7880/7881 TCP + ipBlocks)
+   → Pod neu → verbindet Redis? Dann ist die endPort/UDP-Regel der Täter.
+2. **Retry B (falls A scheitert):** `livekit-egress-policy` temporär löschen beim
+   Pod-Start (unbeschränktes Fenster) → beweist Engine-vs-Regeln zu 100%.
+3. Alternativ-Renderung der UDP-Range: einzelne Port-Chunks (z. B. 50000-51999
+   via mehrere Regeln) oder Filter-Ansatz prüfen.
 
 **Risikofenster:** 20:14–20:20 UTC (~6 Min) — Recreate-Strategie ersetzte den
 alten Pod sofort; die 2.3-Gate-Tests liefen nie. Rollback bei 20:20.
@@ -310,7 +330,8 @@ Manifeste neu angewendet werden.
 | 2.4 | **Bei 1 Replica bleiben** → 1 Test-Meeting | ⏸ blockiert durch 2.3 |
 | 2.5 | Erst dann auf 2 skalieren → 2 parallele Meetings | ⏸ blockiert durch 2.3 |
 
-**Restrisiko:** kube-router enforcing der ipBlock-Regeln (Staging-CNI ≠ kube-router).
+**Restrisiko:** k3s-Netpol-Renderer auf Prod verträgt die endPort/ipBlock-Regel
+möglicherweise nicht (Root Cause 5, Bisect steht aus).
 Schlägt 2.3s curl-Test fehl → sofort Rollback (`/tmp`-Backups + hostNetwork zurück),
 null Nutzer-Impact. Phase 2 startet nicht vor Commit der Phase-1-Manifeste.
 
