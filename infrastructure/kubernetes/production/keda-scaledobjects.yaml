@@ -59,10 +59,12 @@ spec:
   scaleTargetRef:
     name: livekit-egress
   minReplicaCount: 1
-  maxReplicaCount: 1        # hostNetwork: 1 pod/node. Raise to 5 ONLY together with the
-                            # scaling activation (hostNetwork=false) once the prod
-                            # kube-router pod->redis rejection for new pods is solved
-                            # (see docs/EGRESS_SCALING_SOLUTION_2026-09-11.md §7)
+  maxReplicaCount: 5        # Raised 2026-09-12 after canary 2.4 passed: egress runs on
+                            # pod-network (hostNetwork=false), NetworkPolicies fixed,
+                            # full pipeline green (pipeline_total=85.26s). Next step:
+                            # trigger upgrade to livekit_egress_available (CPU trigger is
+                            # blind for audio-only recordings — see
+                            # docs/EGRESS_SCALING_VICTORIAMETRICS_KEDA_2026-09-12.md)
   pollingInterval: 30
   cooldownPeriod: 120
   triggers:
