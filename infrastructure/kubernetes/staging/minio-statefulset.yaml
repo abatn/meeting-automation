@@ -16,7 +16,8 @@ spec:
     spec:
       containers:
       - name: minio
-        image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        # MinIO removed its images from Docker Hub (2026-09) — official registry is now quay.io
+        image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
         command: ["minio", "server", "/data", "--address", ":9000", "--console-address", ":9001"]
         ports:
         - containerPort: 9000

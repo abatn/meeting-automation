@@ -71,7 +71,8 @@ services:
       - e2e-network
 
   minio-test:
-    image: minio/minio:latest
+    # MinIO removed its images from Docker Hub (2026-09) — official registry is now quay.io
+    image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
