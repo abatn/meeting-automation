@@ -2,10 +2,17 @@
 # Phase 189: OCI VNIC blocks pod→node traffic on port 10250
 # Fix: hostNetwork=true + secure-port=4443 + EndpointSlice
 #
-# Usage: kubectl apply -f infrastructure/kubernetes/staging/metrics-server-patch.yaml -n kube-system
+# FIX 2026-09-12 (root cause of "KEDA never scales"): the Service targetPort
+# below pointed at the stale port name "https" (=10250, kubelet) instead of
+# "https-metrics" (=4443, metrics-server itself). Endpoints resolved to
+# nodeIP:10250 → metrics API 404 → APIService Available=False →
+# HPA FailedGetResourceMetric → no CPU metrics → KEDA could never scale out.
+# Live fix verified 2026-09-12: targetPort https-metrics → Endpoints 4443 →
+# APIService Available=True, kubectl top works, HPA cpu: 0%/80% real value.
 #
-# NOTE: EndpointSlice is NOT in this file — it must be created dynamically
-# because the node IP can change. Use apply-metrics-endpointslice.sh.
+# Usage: kubectl apply -f infrastructure/kubernetes/system/metrics-server-patch.yaml
+# (EndpointSlice workaround NOT needed anymore — see
+#  infrastructure/kubernetes/staging/apply-metrics-endpointslice.sh header)
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -47,6 +54,10 @@ spec:
           periodSeconds: 10
 ---
 # Service: port 4443 (matches --secure-port)
+# FIX 2026-09-12: targetPort was "https" (leftover port name -> 10250/kubelet).
+# Endpoints pointed at 10.0.0.191:10250 (kubelet) -> aggregator got 404 ->
+# APIService Available=False -> HPA FailedGetResourceMetric -> KEDA never scaled.
+# Correct targetPort is the named container port "https-metrics" (4443).
 apiVersion: v1
 kind: Service
 metadata:
@@ -56,7 +67,7 @@ spec:
   ports:
   - name: https-metrics
     port: 4443
-    targetPort: https
+    targetPort: https-metrics
     protocol: TCP
 ---
 # APIService: insecureSkipTLSVerify=true (consistent with k3s built-in)

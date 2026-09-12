@@ -385,3 +385,4 @@ bleibt unmöglich (Helm-Selector immutable) → Patch-Strategie verwenden.
 | 4 | Egress Resources auf LiveKit-Empfehlung (4 CPU / 4 GB) prüfen | ⏳ Aktuell 2 CPU / 2 Gi (getesteter Stand) |
 | 5 | KEDA Custom Metric `livekit_egress_available` statt CPU (präziser) | ⏳ Optional |
 | 6 | Stop-Button-Fix (Backend 404 → `already_stopped`; Frontend 404-Catch → `processing`) | ⏳ Separater Code-Fix, beide Umgebungen |
+| 8 | **Korrektur 12.09.:** §3.3 wies `cpu: <unknown>/80%` als Erfolg aus — das war KEIN echter KEDA-Scale-out (2. Pod war manuell via `kubectl scale`). Echte Ursache: metrics-server Service `targetPort: https` → Endpoints `nodeIP:10250` (kubelet, 404) → APIService down → HPA ohne CPU-Metriken. **Gelöst 12.09.:** `targetPort: https-metrics` (4443) → `Available=True`, `kubectl top` OK, HPA `cpu: 0%/80%` (echter Wert). Siehe `infrastructure/kubernetes/system/metrics-server-patch.yaml`. | ✅ 12.09. behoben + verifiziert |

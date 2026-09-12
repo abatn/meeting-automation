@@ -2,6 +2,13 @@
 # =============================================================================
 # Dynamic Metrics-Server EndpointSlice Creator
 # =============================================================================
+# ⚠️ SUPERSEDED 2026-09-12: The root cause was the Service targetPort name.
+#   metrics-server-patch.yaml now uses targetPort: https-metrics (4443), so the
+#   selector-based Endpoints resolve correctly and KEDA/HPA get CPU metrics.
+#   Verified 2026-09-12: APIService Available=True, HPA cpu 0%/80% (real value).
+#   This script is kept for history/emergency fallback (Löschen ist verboten).
+#   Do NOT run it unless the selector-based endpoints fail again.
+# =============================================================================
 # Phase 189: OCI VNIC blocks pod→node traffic on port 10250
 # Fix: hostNetwork=true + secure-port=4443 + EndpointSlice with DYNAMIC node IP
 #
