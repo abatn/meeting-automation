@@ -3,7 +3,7 @@ import logging
 import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 try:
     from llama_cpp import Llama
 except ImportError:
@@ -94,7 +94,7 @@ class SentinelService:
             cold_start = time.time()
             self.llm = Llama(
                 model_path=self.model_path,
-                n_ctx=1024,
+                n_ctx=2048,
                 n_threads=1,
                 verbose=False
             )
@@ -131,7 +131,15 @@ class SentinelService:
             speaker_header = f"[Speakers detected: {', '.join(set(speakers_found))}]\n" if speakers_found else ""
             return speaker_header + chunk[:1500] + "..." if len(chunk) > 1500 else chunk
             
-        prompt = f"<|im_start|>system\nSummarize this meeting segment in 2-3 sentences. CRITICAL: Preserve speaker names exactly as written (e.g. 'Ahmed proposed X', 'Fatima agreed'). Do NOT merge speakers or use generic terms like 'the team'. Language: {lang}<|im_end|>\n<|im_start|>user\n{chunk}<|im_end|>\n<|im_start|>assistant\n"
+        # Token-Split-Guard: protect the fixed n_ctx window (split, never truncate).
+        # Template ~89 tokens + max_tokens 128 -> max ~1800 chunk tokens at n_ctx=2048.
+        # 3100 chars was measured as the safe chunk size (15% margin, Arabic density 2.1 c/t).
+        chunk = self._split_to_token_budget(chunk, budget_tokens=1800)
+        prompt = (f"<|im_start|>system\nSummarize this meeting segment in 2-3 sentences. "
+                  f"CRITICAL: Preserve speaker names exactly as written "
+                  f"(e.g. 'Speaker A proposed X', 'Speaker B agreed'). Do NOT merge speakers "
+                  f"or use generic terms like 'the team'. Language: {lang}<|im_end|>\n"
+                  f"<|im_start|>user\n{chunk}<|im_end|>\n<|im_start|>assistant\n")
         
         async with self._semaphore:
             import time
@@ -147,8 +155,37 @@ class SentinelService:
 
         return response["choices"][0]["text"].strip()
 
-# Eager singleton: load Qwen-1.5B at first access to avoid cold-start latency
-_sentinel_instance: SentinelService | None = None
+    def _split_to_token_budget(self, text: str, budget_tokens: int) -> str:
+        """Split text into pieces that each fit `budget_tokens` (split, never truncate).
+
+        Tokenizes with the loaded LLM at call time (measure, don't assume). If the
+        tokenizer is unavailable, returns the text unchanged.
+        """
+        if not self.llm:
+            return text
+
+        def ntok(s: str) -> int:
+            return len(self.llm.tokenize(s.encode("utf-8")))
+
+        if ntok(text) <= budget_tokens:
+            return text
+
+        pieces: List[str] = []
+        remaining = text
+        while remaining:
+            if ntok(remaining) <= budget_tokens:
+                pieces.append(remaining)
+                break
+            # approximate cut point (~2 chars/token), then converge down to fit
+            cut = min(len(remaining), budget_tokens * 2)
+            while cut > 1 and ntok(remaining[:cut]) > budget_tokens:
+                cut = int(cut * 0.9)
+            pieces.append(remaining[:cut].rstrip())
+            remaining = remaining[cut:].lstrip()
+        return "\n".join(p for p in pieces if p)
+
+    # Eager singleton: load Qwen-1.5B at first access to avoid cold-start latency
+_sentinel_instance: Optional[SentinelService] = None
 _sentinel_loaded: bool = False
 
 

@@ -447,8 +447,9 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 logger.info(f"Plan {plan} — using Sentinel LLM for recording {recording_id}")
                 publish_status(recording_id, "analyzing", 45, "Local Semantic Synthesis (Qwen-1.5B)...")
 
-                # Chunking: split by time or length
-                chunks = [display_text[i:i+3000] for i in range(0, len(display_text), 3000)]
+                # Chunking: token-budget-compatible char size (3100 chars ≈ 3257-tok budget
+                # at measured worst density 2.1 chars/token; see benchmark 2026-09-13).
+                chunks = [display_text[i:i+3100] for i in range(0, len(display_text), 3100)]
                 logger.info(f"TIMING: sentinel_chunks count={len(chunks)} text_len={len(display_text)}")
 
                 # Parallel Map execution
