@@ -59,16 +59,11 @@ api.interceptors.response.use(
     // Handle 401 Unauthorized - token expired or invalid
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      // With httpOnly cookies, token refresh happens automatically
-      // Backend should handle refresh token in cookie
       try {
-        // Logic for refreshing token would go here
-        // const response = await axios.post('/auth/refresh');
-        // Backend sets new token in httpOnly cookie
-        // return api(originalRequest);
-      } catch (refreshError) {
-        // On auth failure, redirect to login
-        window.location.href = "/login";
+        await axios.post("/api/v1/auth/refresh", null, { withCredentials: true });
+        return api(originalRequest);
+      } catch {
+        window.location.href = `/login?return=${encodeURIComponent(window.location.pathname + window.location.search)}`;
       }
     }
     return Promise.reject(error);
