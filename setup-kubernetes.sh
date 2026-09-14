@@ -197,7 +197,12 @@ done
 # 6. Apply ConfigMaps, PVCs, Services, and Network Policies
 # ============================================================
 echo -e "${YELLOW}Applying Configurations, Networking and Security Policies...${NC}"
-kubectl apply -f infrastructure/kubernetes/traefik-tls-secret.yaml 2>/dev/null || true
+# traefik-tls-secret.yaml is SOPS-encrypted in git (contains TLS key material)
+if grep -q "ENC\[" infrastructure/kubernetes/traefik-tls-secret.yaml 2>/dev/null && command -v sops >/dev/null 2>&1; then
+  sops -d infrastructure/kubernetes/traefik-tls-secret.yaml | kubectl apply -f - 2>/dev/null || true
+else
+  kubectl apply -f infrastructure/kubernetes/traefik-tls-secret.yaml 2>/dev/null || true
+fi
 kubectl apply -f infrastructure/kubernetes/traefik-tls.yaml 2>/dev/null || true
 kubectl apply -f infrastructure/kubernetes/backend-config.yaml 2>/dev/null || true
 kubectl apply -f infrastructure/kubernetes/frontend-nginx-config.yaml 2>/dev/null || true
