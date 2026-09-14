@@ -77,6 +77,8 @@ spec:
         env:
         - name: PYTHONPATH
           value: "/app"
+        - name: OMP_NUM_THREADS
+          value: "1"
         envFrom:
         - secretRef:
             name: backend-secrets

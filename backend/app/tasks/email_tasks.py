@@ -16,8 +16,16 @@ logger = get_task_logger(__name__)
 
 
 def _run_async(coro):
-    """Run async coroutine from sync context (Celery worker)."""
-    loop = asyncio.get_event_loop()
+    """Run async coroutine from sync context (Celery worker).
+
+    Thread-safe: get_event_loop() raises in non-main threads (threads pool),
+    so always create an explicit loop when none is bound to this thread.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     if not loop.is_running():
         loop.run_until_complete(coro)
     else:
