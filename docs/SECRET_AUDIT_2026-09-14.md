@@ -60,7 +60,7 @@ Verified **not** valid against prod hashes (bcrypt check: no match) — likely s
 
 - `backend/app/core/config.py:13,81` — `meeting_user:meeting_password`, `rabbit_user:rabbit_password` defaults.
 - `AGENTS.md`, `docker-compose*.yml` (+ `.bak`/`.backup-*` variants) — same dev creds.
-- `backend/tests/**` — test passwords (`Password123!`, `Test123!` etc.) in test fixtures: acceptable, but note the **same literal as the live prod seed password** — the fixture password should be changed too to avoid future confusion.
+- `backend/tests/**` — test passwords in test fixtures: acceptable, but note that one fixture literal **is identical to the live prod seed password** (see finding 1; value intentionally not reproduced here — it is committed in `backend/scripts/seed_users.py` and `backend/scripts/seed_plans.py`). The fixture password should be changed too to avoid future confusion.
 - Staging DB/Redis/MinIO passwords (now SOPS-encrypted at HEAD): weak but cluster-internal.
 
 ## 6. 🟢 Low — local files not gitignored
