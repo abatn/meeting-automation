@@ -49,7 +49,7 @@ const LoginForm: React.FC = () => {
       // Backend now sets httpOnly cookie automatically
       // Only extract user from response
       dispatch(setCredentials({ user: data.user }));
-      navigate(new URLSearchParams(window.location.search).get("return") || "/meetings");
+      navigate("/");
     } catch (err: any) {
       setError(err.response?.data?.detail || t('auth.login.invalid_credentials'));
     } finally {

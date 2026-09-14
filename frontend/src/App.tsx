@@ -21,7 +21,6 @@ import OnlyOfficePage from "./pages/OnlyOfficePage";
 import MFASetup from "./components/auth/MFASetup";
 import ErrorBoundary from "./components/ErrorBoundary";
 import AutoLogout from "./components/auth/AutoLogout";
-import "./services/sessionKeepalive";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ClientList from "./pages/admin/ClientList";
 import ClientDetails from "./pages/admin/ClientDetails";
