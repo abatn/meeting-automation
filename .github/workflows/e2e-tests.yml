@@ -201,6 +201,26 @@ jobs:
         fi
         echo "✅ Immutable PVC check complete"
 
+    - name: Install SOPS + age and decrypt staging secrets
+      env:
+        SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+      run: |
+        # sops binary (Go release artifact, not a pip package)
+        SOPS_VER=v3.9.4
+        curl -fsSL -o /tmp/sops "https://github.com/getsops/sops/releases/download/${SOPS_VER}/sops-${SOPS_VER}.linux.amd64"
+        sudo install -m 0755 /tmp/sops /usr/local/bin/sops
+        sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq age >/dev/null
+        if [ -z "$SOPS_AGE_KEY" ]; then
+          echo "❌ SOPS_AGE_KEY secret not configured (age private key, same keypair as prod SOPS files)"
+          exit 1
+        fi
+        # Decrypt in place so the bulk apply step below works unchanged.
+        # Files are SOPS-encrypted in git; plaintext exists only on this ephemeral runner.
+        for f in backend livekit minio n8n onlyoffice postgres rabbitmq redis; do
+          sops -d -i "infrastructure/kubernetes/staging/${f}-secrets.yaml"
+        done
+        echo "✅ Staging secrets decrypted in-place"
+
     - name: Deploy All Staging Resources (idempotent)
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-staging
