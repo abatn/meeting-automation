@@ -208,13 +208,16 @@ jobs:
         # EXPLICIT file list — excludes Helm values files (egress-values.yaml, livekit-server-values.yaml,
         # longhorn-values.yaml, velero-values.yaml, k3s-config.yaml) which lack apiVersion/kind
         # and cause "error validating data: apiVersion not set, kind not set"
+        # FIX 2026-09-15: HPA celery-worker-hpa entfernt — KEDA celery-worker-gratuit ist alleiniger
+        # Autoscaler (inkl. CPU-Trigger als HPA-Ersatz). Alter HPA muss weg, sonst blockt
+        # vscaledobject.kb.io mit "already managed by hpa".
+        kubectl delete hpa celery-worker-hpa -n meeting-automation-staging --ignore-not-found
         kubectl apply -f infrastructure/kubernetes/staging/namespace.yaml \
           -f infrastructure/kubernetes/staging/backend-secrets.yaml \
           -f infrastructure/kubernetes/staging/backend-config.yaml \
           -f infrastructure/kubernetes/staging/backend-deployment.yaml \
           -f infrastructure/kubernetes/staging/celery-beat-deployment.yaml \
           -f infrastructure/kubernetes/staging/celery-worker-deployment.yaml \
-          -f infrastructure/kubernetes/staging/celery-worker-hpa.yaml \
           -f infrastructure/kubernetes/staging/celery-worker-pro-deployment.yaml \
           -f infrastructure/kubernetes/staging/cert-manager-acme-solver-policy.yaml \
           -f infrastructure/kubernetes/staging/cnpg-cluster.yaml \

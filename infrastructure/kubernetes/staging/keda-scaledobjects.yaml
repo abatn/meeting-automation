@@ -29,6 +29,10 @@ spec:
         queueName: maintenance
         mode: QueueLength
         value: "1"            # Scale bei 1. Maintenance-Task
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: "80"           # HPA-Ersatz (ex celery-worker-hpa CPU 80%) — einziger Autoscaler = KEDA
 
 ---
 apiVersion: keda.sh/v1alpha1
