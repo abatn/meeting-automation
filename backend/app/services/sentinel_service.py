@@ -5,9 +5,11 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from typing import List, Dict, Any, Optional
 try:
-    from llama_cpp import Llama
+    from llama_cpp import Llama, llama_get_memory, llama_memory_clear
 except ImportError:
     Llama = None
+    llama_get_memory = None
+    llama_memory_clear = None
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +106,17 @@ class SentinelService:
         except Exception as e:
             logger.error(f"Failed to load Sentinel LLM: {e}")
 
+    def _clear_kv_cache(self):
+        """Clear KV cache before each LLM call to prevent ARM64 SIGABRT."""
+        try:
+            if self.llm and hasattr(self.llm, '_ctx') and hasattr(self.llm._ctx, 'ctx'):
+                mem = llama_get_memory(self.llm._ctx.ctx)
+                if mem is not None:
+                    llama_memory_clear(mem, True)
+                    logger.debug("KV cache cleared before LLM call")
+        except Exception as e:
+            logger.warning(f"KV cache clear failed (non-fatal): {e}")
+
     async def detect_boundaries(self, text: str) -> List[str]:
         """Splits a long transcript into semantic chapters."""
         if not self.llm:
@@ -113,6 +126,7 @@ class SentinelService:
         prompt = f"<|im_start|>system\nYou are a semantic segmenter. Split the following meeting transcript into logical chapters. Return each chapter separated by '---'.<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n"
         
         async with self._semaphore:
+            self._clear_kv_cache()
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=512, stop=["<|im_end|>"]))
             
@@ -142,6 +156,7 @@ class SentinelService:
                   f"<|im_start|>user\n{chunk}<|im_end|>\n<|im_start|>assistant\n")
         
         async with self._semaphore:
+            self._clear_kv_cache()
             import time
             llm_start = time.time()
             loop = asyncio.get_event_loop()
