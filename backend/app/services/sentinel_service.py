@@ -94,7 +94,7 @@ class SentinelService:
             cold_start = time.time()
             self.llm = Llama(
                 model_path=self.model_path,
-                n_ctx=1024,  # Reduced from 2048 to prevent ARM64 SIGABRT (ggml_compute_forward_set_rows)
+                n_ctx=2048,  # SIGABRT fixed by llama-cpp-python 0.3.35 (PR #22327), not by n_ctx reduction
                 n_threads=1,
                 verbose=False
             )
