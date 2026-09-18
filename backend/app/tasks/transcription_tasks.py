@@ -1,5 +1,6 @@
 import asyncio
 import concurrent.futures
+import gc
 import json
 from celery.utils.log import get_task_logger
 import os
@@ -436,6 +437,24 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                         if seg.get("speaker") == label:
                             seg["speaker"] = name
                 logger.info(f"Speaker names applied to display transcript: {name_map}")
+
+            # FIX: Release ONNX session before Sentinel load to prevent OOM on ARM64
+            # ONNX Arena can hold ~3.5 GB residual memory on ARM64
+            try:
+                if hasattr(speaker_embedding_service, '_session') and speaker_embedding_service._session:
+                    del speaker_embedding_service._session
+                    speaker_embedding_service._session = None
+                    speaker_embedding_service._initialized = False
+                    speaker_embedding_service._available = False
+                    gc.collect()
+                    try:
+                        import ctypes
+                        ctypes.CDLL("libc.so.6").malloc_trim(0)
+                    except Exception:
+                        pass
+                    logger.info("ONNX session released before Sentinel load")
+            except Exception as e:
+                logger.warning(f"ONNX session release failed: {e}")
 
             # 2. MAP PHASE (Local SLM Sentinel) — Feature Gate by Subscription Plan
             # GRATUIT: skip Sentinel LLM (no memory overhead, faster pipeline)

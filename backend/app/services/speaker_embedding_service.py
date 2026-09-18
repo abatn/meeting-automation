@@ -60,7 +60,13 @@ class SpeakerEmbeddingService:
                 return False
 
             providers = ["CPUExecutionProvider"]
-            self._session = ort.InferenceSession(ONNX_MODEL_PATH, providers=providers)
+            # FIX: Disable CPU memory arena to prevent ~3.5 GB memory growth on ARM64
+            # See: https://github.com/microsoft/onnxruntime/issues/11627
+            so = ort.SessionOptions()
+            so.enable_cpu_mem_arena = False
+            so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            so.intra_op_num_threads = 1
+            self._session = ort.InferenceSession(ONNX_MODEL_PATH, sess_options=so, providers=providers)
             logger.info(f"ONNX model loaded: {self._session.get_inputs()[0].name} -> {self._session.get_outputs()[0].name}")
 
             self._fbank_filters = self._load_fbank_filters()

@@ -11,11 +11,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
 # Sentinel LLM — skip in CI builds to save ~80min compile time
-# llama-cpp-python PINNED: 0.3.35 segfaults in libggml-base.so on AMD Zen 1 (prod) during
-# inference (SIGABRT in libgomp from prefork workers, dmesg: "segfault ... libggml-base.so").
-# 0.3.16 is the last version verified stable on prod CPU. Re-test before bumping.
+# llama-cpp-python: 0.3.35 includes set_rows fix (PR #22327) for ARM64 SIGABRT.
+# 0.3.16 was pinned for AMD Zen 1 stability — use 0.3.35 for ARM64 staging.
+# GGML_NATIVE=OFF prevents ARM64 SIMD crashes in Docker/QEMU.
 RUN if [ "$SKIP_SENTINEL" != "true" ]; then \
-    CMAKE_ARGS="-DGGML_NATIVE=OFF" pip install --no-cache-dir "llama-cpp-python==0.3.16" && \
+    CMAKE_ARGS="-DGGML_NATIVE=OFF" pip install --no-cache-dir "llama-cpp-python==0.3.35" && \
     mkdir -p /app/models && \
     curl -L -o /app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
     "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf"; \
