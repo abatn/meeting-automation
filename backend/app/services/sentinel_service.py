@@ -60,7 +60,7 @@ class SentinelService:
     def __init__(self, model_path: str = "/app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"):
         self.model_path = model_path
         self.llm = None
-        self._semaphore = asyncio.Semaphore(2)
+        self._semaphore = asyncio.Semaphore(1)  # 1 = serialized (llama_context not thread-safe per ggml-org/llama.cpp#11804)
 
         if Llama is None:
             logger.warning("llama-cpp-python not installed. SentinelService will operate in fallback mode.")
