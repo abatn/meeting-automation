@@ -1,0 +1,26 @@
+AGENT TASK: Implement Option A — Semaphore(2) → Semaphore(1)
+
+WHAT: Change one number in one file to fix a SIGABRT crash.
+
+WHY: Sentinel LLM crashes on ARM64 when processing 2+ chunks simultaneously. Official docs (llama.cpp#11804) say "llama_context objects are not thread safe". Our Semaphore(2) allows 2 concurrent calls to the same Llama instance via run_in_executor. This causes index tensor collision in ggml_compute_forward_set_rows.
+
+FILE: backend/app/services/sentinel_service.py
+LINE: Around line 95 (inside __init__)
+CHANGE: self._semaphore = asyncio.Semaphore(2) → self._semaphore = asyncio.Semaphore(1)
+
+THAT'S IT. One number. 2 → 1.
+
+WHEN DONE:
+1. Commit: git add backend/app/services/sentinel_service.py && git commit -m "fix(sentinel): serialize chunk processing to prevent ARM64 SIGABRT"
+2. Push: git push origin main
+3. CI/CD will build and deploy to staging automatically
+
+TEST: After deployment on staging, start a recording >5 minutes. Stop it. Monitor logs for SIGABRT. If no SIGABRT and pipeline completes → success.
+
+CONTEXT:
+- Staging cluster: kubectl access from this machine
+- DB: meeting_db_staging (kubectl exec into meeting-db-1)
+- Worker: celery-worker-pro-staging
+- Current crash: GGML_ASSERT(i1 >= 0 && i1 < ne1) → signal 6 (SIGABRT)
+- Crash happens when 2 chunks run concurrently on same Llama singleton
+- 1 chunk works fine (100% success rate)

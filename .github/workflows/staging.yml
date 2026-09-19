@@ -1,0 +1,140 @@
+name: Deploy Staging (Fast)
+
+# Separate staging workflow — runs PARALLEL to e2e-tests.yml
+# Purpose: Staging gets deployed in ~10 min instead of ~30+ min
+# e2e-tests.yml still handles full pipeline (E2E + Production)
+
+on:
+  push:
+    branches: [ main ]
+
+# Prevent race conditions: cancel in-progress run for same ref
+concurrency:
+  group: staging-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: docker.io/batnini/meeting-automation-backend
+
+jobs:
+  build-and-deploy-staging:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build backend Docker image
+      run: |
+        cd backend
+        docker build --build-arg SKIP_SENTINEL=false -t ${{ env.IMAGE_NAME }}:${{ github.sha }} .
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: batnini
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Push Docker image (amd64+arm64)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        platforms: linux/amd64,linux/arm64
+        push: true
+        build-args: SKIP_SENTINEL=false
+        tags: |
+          ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          ${{ env.IMAGE_NAME }}:latest
+
+    - name: Build + Push Frontend (amd64+arm64)
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: |
+          batnini/meeting-automation-frontend:${{ github.sha }}
+          batnini/meeting-automation-frontend:latest
+
+    - name: Check Staging Secrets
+      run: |
+        if [ -z "${{ secrets.KUBE_CONFIG_STAGING }}" ]; then
+          echo "❌ KUBE_CONFIG_STAGING secret not configured."
+          exit 1
+        fi
+
+    - name: Configure K8s context for staging
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_STAGING }}" > kubeconfig-staging
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        CONTEXT=$(kubectl config get-contexts -o name | head -1)
+        if [ -z "$CONTEXT" ]; then
+          echo "❌ No contexts found in kubeconfig"
+          exit 1
+        fi
+        echo "Using context: $CONTEXT"
+        kubectl config use-context "$CONTEXT"
+
+    - name: Ensure Docker Hub Pull Secret
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        kubectl create secret docker-registry dockerhub-pull-secret \
+          --namespace meeting-automation-staging \
+          --docker-server=https://index.docker.io/v1/ \
+          --docker-username=batnini \
+          --docker-password="${{ secrets.DOCKERHUB_TOKEN }}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+        for deploy in $(kubectl get deploy -n meeting-automation-staging -o name 2>/dev/null); do
+          HAS_SECRET=$(kubectl get "$deploy" -n meeting-automation-staging -o jsonpath='{.spec.template.spec.imagePullSecrets[?(@.name=="dockerhub-pull-secret")].name}' 2>/dev/null)
+          if [ -z "$HAS_SECRET" ]; then
+            kubectl patch "$deploy" -n meeting-automation-staging --type=json \
+              -p='[{"op":"add","path":"/spec/template/spec/imagePullSecrets","value":[{"name":"dockerhub-pull-secret"}]}]' 2>&1 || true
+          fi
+        done
+        echo "✅ Docker Hub pull secret ready"
+
+    - name: Deploy Backend to Staging
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        kubectl set image deployment/backend \
+          backend=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          alembic-migrate=${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          -n meeting-automation-staging --record
+        kubectl rollout status deployment/backend -n meeting-automation-staging --timeout=900s
+
+    - name: Deploy Frontend to Staging
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        kubectl set image deployment/frontend \
+          frontend=batnini/meeting-automation-frontend:${{ github.sha }} \
+          -n meeting-automation-staging --record
+        kubectl rollout status deployment/frontend -n meeting-automation-staging --timeout=120s
+
+    - name: Deploy Celery Workers to Staging
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        BACKEND_IMAGE="${{ env.IMAGE_NAME }}:${{ github.sha }}"
+        kubectl set image deployment/celery-worker-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
+        kubectl set image deployment/celery-worker-pro-staging celery-worker="$BACKEND_IMAGE" -n meeting-automation-staging --record
+        kubectl set image deployment/celery-beat-staging celery-beat="$BACKEND_IMAGE" -n meeting-automation-staging --record
+        kubectl rollout status deployment/celery-worker-staging -n meeting-automation-staging --timeout=300s
+        kubectl rollout status deployment/celery-worker-pro-staging -n meeting-automation-staging --timeout=300s
+        kubectl rollout status deployment/celery-beat-staging -n meeting-automation-staging --timeout=120s
+
+    - name: Staging Health Check
+      run: |
+        export KUBECONFIG=$(pwd)/kubeconfig-staging
+        STAGING_URL="https://staging.meeting-automation.com"
+        echo "Waiting for $STAGING_URL/health to return 200..."
+        for i in {1..60}; do
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL/health 2>/dev/null || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Staging is healthy"
+            break
+          fi
+          echo "Health check returned $STATUS, waiting... (attempt $i)"
+          sleep 5
+        done
+        curl -f $STAGING_URL/health || (echo "❌ Staging health check failed" && exit 1)
