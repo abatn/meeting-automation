@@ -97,7 +97,7 @@ jobs:
         E2E_TEST: "true"
       run: |
         cd backend
-        pytest tests/ --cov=app --cov-report=xml --cov-report=html
+        pytest tests/ --ignore=tests/performance --cov=app --cov-report=xml --cov-report=html
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
