@@ -65,7 +65,7 @@ class SpeakerEmbeddingService:
             so = ort.SessionOptions()
             so.enable_cpu_mem_arena = False
             so.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-            so.intra_op_num_threads = 1
+            so.intra_op_num_threads = 4  # Benchmark: 1.97x speedup (64.10s → 32.57s)
             self._session = ort.InferenceSession(ONNX_MODEL_PATH, sess_options=so, providers=providers)
             logger.info(f"ONNX model loaded: {self._session.get_inputs()[0].name} -> {self._session.get_outputs()[0].name}")
 

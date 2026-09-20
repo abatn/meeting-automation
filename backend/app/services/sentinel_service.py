@@ -57,7 +57,12 @@ class SentinelService:
     Purpose: Semantic boundary detection and low-latency chunk summarization.
     """
 
-    def __init__(self, model_path: str = "/app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"):
+    def __init__(self, model_path: str = None):
+        if model_path is None:
+            model_path = os.environ.get(
+                "SENTINEL_MODEL_PATH",
+                "/app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+            )
         self.model_path = model_path
         self.llm = None
         self._semaphore = asyncio.Semaphore(1)  # 1 = serialized (llama_context not thread-safe per ggml-org/llama.cpp#11804)
@@ -97,7 +102,7 @@ class SentinelService:
             self.llm = Llama(
                 model_path=self.model_path,
                 n_ctx=2048,  # SIGABRT fixed by llama-cpp-python 0.3.35 (PR #22327), not by n_ctx reduction
-                n_threads=1,
+                n_threads=2,  # Benchmark: 1.25x speedup (17.24s → 13.81s)
                 verbose=False
             )
             cold_start_duration = time.time() - cold_start
