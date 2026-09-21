@@ -35,6 +35,7 @@ celery_app.conf.update(
         'send_invitation_email': {'queue': 'email'},
         'cleanup_old_data_task': {'queue': 'maintenance'},
         'check_storage_quotas': {'queue': 'maintenance'},
+        'reassign_speaker_segments': {'queue': 'onnx'},
     },
     task_queues=(
         Queue('transcription', routing_key='transcription'),
@@ -42,6 +43,7 @@ celery_app.conf.update(
         Queue('transcription_pro', routing_key='transcription_pro'),
         Queue('email', routing_key='email'),
         Queue('maintenance', routing_key='maintenance'),
+        Queue('onnx', routing_key='onnx'),
     ),
 )
 

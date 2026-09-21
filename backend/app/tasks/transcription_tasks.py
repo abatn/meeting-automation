@@ -147,6 +147,155 @@ def match_timestamps(words: List[Dict], segments: List[Dict]) -> List[Dict]:
 
     return result
 
+async def _reassign_segments_onnx(
+    gladia_segments: list,
+    speaker_mappings: list,
+    audio_path: str,
+    client_id: str,
+) -> list:
+    """ONNX segment reassignment — extracts the core logic from the pipeline.
+    DB-unabhängig: erstellt eigene Session für Profile-Load.
+    Returns updated segments list (mutated in place + returned).
+    """
+    from app.services.audio_segment_service import audio_segment_service
+
+    if not speaker_mappings or not speaker_embedding_service.is_available:
+        return gladia_segments
+
+    async with AsyncSessionLocal() as db:
+        profile_service = SpeakerProfileService(db)
+        enrolled = await profile_service.get_profiles(client_id)
+        profiles_with_emb = [p for p in enrolled if p.embedding is not None]
+
+    if not profiles_with_emb:
+        return gladia_segments
+
+    name_map = {m["speaker_label"]: m["resolved_name"] for m in speaker_mappings if m.get("resolved_name")}
+    reverse_map = {v: k for k, v in name_map.items()}
+    all_names = list(name_map.values())
+    reassigned = 0
+    match_svc = SpeakerProfileService(None)
+
+    for seg in gladia_segments:
+        current_label = seg.get("speaker")
+        current_name = name_map.get(current_label, current_label)
+
+        try:
+            seg_audio = await audio_segment_service._extract_single_segment(audio_path, seg)
+            if not seg_audio or not os.path.exists(seg_audio):
+                continue
+            seg_embedding = await speaker_embedding_service.extract_embedding(seg_audio)
+            if os.path.exists(seg_audio):
+                os.remove(seg_audio)
+            if seg_embedding is None:
+                continue
+
+            best_name, best_distance, best_conf = match_svc.match_speaker_from_list(
+                profiles=profiles_with_emb,
+                embedding=seg_embedding,
+            )
+
+            if best_name and best_conf in ("high", "medium"):
+                if best_name != current_name:
+                    new_label = reverse_map.get(best_name, current_label)
+                    seg["speaker"] = new_label
+                    reassigned += 1
+                    logger.info(
+                        f"ONNX reassignment: '{seg.get('text', '')[:30]}...' "
+                        f"{current_name} -> {best_name} (conf={best_conf})"
+                    )
+            elif not best_name or best_conf == "low":
+                if len(all_names) > 1:
+                    other_names = [n for n in all_names if n != current_name]
+                    if other_names:
+                        text = seg.get("text", "")
+                        text_latin = transliterate_arabic(text.lower())
+                        for other in other_names:
+                            other_lower = other.lower()
+                            if other_lower in text.lower() or other_lower in text_latin:
+                                new_label = reverse_map.get(other, current_label)
+                                seg["speaker"] = new_label
+                                reassigned += 1
+                                logger.info(
+                                    f"Text fallback: '{seg.get('text', '')[:30]}...' "
+                                    f"{current_name} -> {other} (mentions name)"
+                                )
+                                break
+        except Exception as e:
+            logger.debug(f"ONNX per-segment failed: {e}")
+            continue
+
+    if reassigned > 0:
+        logger.info(f"ONNX reassignment: {reassigned}/{len(gladia_segments)} segments reassigned")
+    return gladia_segments
+
+async def _run_onnx_reassignment(recording_id: str, client_id: str) -> None:
+    """Async ONNX reassignment — called by Celery task."""
+    temp_path = None
+    try:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(Recording).where(Recording.id == recording_id))
+            recording = result.scalar_one_or_none()
+            if not recording:
+                logger.error(f"ONNX reassignment: Recording {recording_id} not found")
+                return
+
+            if not recording.speaker_mappings:
+                logger.info(f"ONNX reassignment: No speaker_mappings for {recording_id}, skipping")
+                recording.onnx_status = "skipped"
+                await db.commit()
+                return
+
+            result = await db.execute(
+                select(Transcription).where(Transcription.recording_id == recording_id)
+            )
+            transcription = result.scalar_one_or_none()
+            if not transcription or not transcription.segments:
+                logger.warning(f"ONNX reassignment: No transcription segments for {recording_id}")
+                recording.onnx_status = "failed"
+                await db.commit()
+                return
+
+            segments = list(transcription.segments)
+            speaker_mappings = recording.speaker_mappings
+
+            temp_path = await _download_audio(str(recording.file_path), client_id)
+            if not temp_path:
+                logger.error(f"ONNX reassignment: S3 download failed for {recording_id}")
+                recording.onnx_status = "failed"
+                await db.commit()
+                return
+
+            updated_segments = await _reassign_segments_onnx(
+                gladia_segments=segments,
+                speaker_mappings=speaker_mappings,
+                audio_path=temp_path,
+                client_id=client_id,
+            )
+
+            transcription.segments = updated_segments
+            recording.onnx_status = "completed"
+            await db.commit()
+            logger.info(f"ONNX reassignment completed for {recording_id}")
+    except Exception as e:
+        logger.error(f"ONNX reassignment failed for {recording_id}: {e}")
+        try:
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(Recording).where(Recording.id == recording_id))
+                recording = result.scalar_one_or_none()
+                if recording:
+                    recording.onnx_status = "failed"
+                    await db.commit()
+        except Exception:
+            pass
+        raise
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+
 async def _process_recording_pipeline(recording_id: str, client_id: str) -> None:
     from app.main import (
         PIPELINE_STAGE_DURATION, PIPELINE_DURATION, PIPELINE_RECORDINGS, PIPELINE_TRANSCRIPTIONS,
@@ -334,93 +483,10 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 PIPELINE_STAGE_DURATION.labels(stage="speaker_identification").observe(speaker_duration)
                 logger.info(f"TIMING: speaker_identification duration={speaker_duration:.2f}s speakers={len(speaker_mappings)}")
 
-                # 1.5b ONNX SEGMENT REASSIGNMENT
-                # After speaker identification, use ONNX to re-assign individual segments
-                # This fixes cases where Gladia's diarization groups all segments under one speaker
-                await speaker_embedding_service.initialize()
-                if speaker_mappings and speaker_embedding_service.is_available:
-                    try:
-                        from app.services.audio_segment_service import audio_segment_service
-                        profile_service = SpeakerProfileService(db)
-                        enrolled = await profile_service.get_profiles(client_id)
-                        profiles_with_emb = [p for p in enrolled if p.embedding is not None]
-
-                        # Initialize defaults — referenced by TIMING log after the if block
-                        segments_to_check = []
-                        reassigned = 0
-
-                        if profiles_with_emb:
-                            segments_to_check = gladia_result.get("segments", [])
-                            reassigned = 0
-
-                            # Build name map: speaker_label -> resolved_name
-                            name_map = {m["speaker_label"]: m["resolved_name"] for m in speaker_mappings if m.get("resolved_name")}
-                            # Build reverse map: resolved_name -> speaker_label
-                            reverse_map = {v: k for k, v in name_map.items()}
-                            # Get all resolved names
-                            all_names = list(name_map.values())
-
-                            for seg in segments_to_check:
-                                current_label = seg.get("speaker")
-                                current_name = name_map.get(current_label, current_label)
-
-                                try:
-                                    seg_audio = await audio_segment_service._extract_single_segment(temp_path, seg)
-                                    if not seg_audio or not os.path.exists(seg_audio):
-                                        continue
-                                    seg_embedding = await speaker_embedding_service.extract_embedding(seg_audio)
-                                    if os.path.exists(seg_audio):
-                                        os.remove(seg_audio)
-                                    if seg_embedding is None:
-                                        continue
-
-                                    # Match against enrolled profiles
-                                    best_name, best_distance, best_conf = profile_service.match_speaker_from_list(
-                                        profiles=profiles_with_emb,
-                                        embedding=seg_embedding,
-                                    )
-
-                                    if best_name and best_conf in ("high", "medium"):
-                                        if best_name != current_name:
-                                            # ONNX says this segment belongs to a different speaker
-                                            new_label = reverse_map.get(best_name, current_label)
-                                            seg["speaker"] = new_label
-                                            reassigned += 1
-                                            logger.info(
-                                                f"ONNX reassignment: '{seg.get('text', '')[:30]}...' "
-                                                f"{current_name} -> {best_name} (conf={best_conf})"
-                                            )
-                                    elif not best_name or best_conf == "low":
-                                        # ONNX doesn't match any enrolled profile
-                                        # If there are other speakers, this might be one of them
-                                        if len(all_names) > 1:
-                                            other_names = [n for n in all_names if n != current_name]
-                                            if other_names:
-                                                # Use text patterns as fallback
-                                                text = seg.get("text", "")
-                                                text_latin = transliterate_arabic(text.lower())
-                                                for other in other_names:
-                                                    other_lower = other.lower()
-                                                    # Check if the segment mentions the other speaker (Latin or transliterated)
-                                                    if other_lower in text.lower() or other_lower in text_latin:
-                                                        new_label = reverse_map.get(other, current_label)
-                                                        seg["speaker"] = new_label
-                                                        reassigned += 1
-                                                        logger.info(
-                                                            f"Text fallback: '{seg.get('text', '')[:30]}...' "
-                                                            f"{current_name} -> {other} (mentions name)"
-                                                        )
-                                                        break
-                                except Exception as e:
-                                    logger.debug(f"ONNX per-segment failed: {e}")
-                                    continue
-
-                            if reassigned > 0:
-                                logger.info(f"ONNX reassignment: {reassigned}/{len(segments_to_check)} segments reassigned")
-                        onnx_reassign_duration = time.time() - stage_start
-                        logger.info(f"TIMING: onnx_segment_reassignment duration={onnx_reassign_duration:.2f}s segments={len(segments_to_check)} reassigned={reassigned}")
-                    except Exception as e:
-                        logger.warning(f"ONNX segment reassignment failed: {e}")
+                # Store speaker_mappings for async ONNX reassignment
+                recording.speaker_mappings = speaker_mappings
+                recording.onnx_status = "pending"
+                await db.flush()
 
             # 1.6 APPLY SPEAKER NAMES TO TRANSCRIPT (Display-Kopie, Original bleibt erhalten)
             name_map = {
@@ -519,6 +585,13 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             persist_duration = time.time() - stage_start
             PIPELINE_STAGE_DURATION.labels(stage="persistence").observe(persist_duration)
             logger.info(f"TIMING: persistence duration={persist_duration:.2f}s")
+
+            # Trigger async ONNX reassignment (improves speaker labels in background)
+            reassign_speaker_segments.apply_async(
+                args=[str(recording.id), str(recording.client_id)],
+                queue="onnx",
+            )
+            logger.info(f"Async ONNX reassignment triggered for {recording_id}")
 
             recording.status = "completed"
 
@@ -1664,6 +1737,25 @@ async def _notify_n8n_completion(recording_id, meeting_id, client_id):
 )
 def process_recording(self, recording_id: str, client_id: str) -> None:
     _run_async(_process_recording_pipeline(recording_id, client_id))
+
+
+@celery_app.task(
+    name="reassign_speaker_segments",
+    queue="onnx",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=120,
+    retry_jitter=True,
+    max_retries=2,
+    default_retry_delay=60,
+    time_limit=900,
+    soft_time_limit=840,
+    acks_late=True,
+)
+def reassign_speaker_segments(self, recording_id: str, client_id: str) -> None:
+    """Async ONNX reassignment — runs after main pipeline completes."""
+    _run_async(_run_onnx_reassignment(recording_id, client_id))
 
 
 # Expose DiarizationService for backward compatibility with tests

@@ -38,6 +38,8 @@ class Recording(Base):
     error_message: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     egress_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     room_participants: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    speaker_mappings: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    onnx_status: Mapped[str] = mapped_column(String, default="pending")
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
