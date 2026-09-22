@@ -11,7 +11,7 @@ except ImportError:
     llama_get_memory = None
     llama_memory_clear = None
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
 
 MIN_MODEL_SIZE = 900 * 1024 * 1024   # 900 MB
 MAX_MODEL_SIZE = 1500 * 1024 * 1024   # 1.5 GB
@@ -130,11 +130,19 @@ class SentinelService:
             
         prompt = f"<|im_start|>system\nYou are a semantic segmenter. Split the following meeting transcript into logical chapters. Return each chapter separated by '---'.<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n"
         
+        import time
+        t_semaphore = time.time()
         async with self._semaphore:
+            logger.info(f"TIMING: sentinel_detect_semaphore_wait duration={time.time() - t_semaphore:.3f}s")
+            t_kv = time.time()
             self._clear_kv_cache()
+            logger.info(f"TIMING: sentinel_detect_kv_clear duration={time.time() - t_kv:.3f}s")
             loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=512, stop=["<|im_end|>"]))
-            
+            llm_start = time.time()
+            response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=512, stop=["---"]))
+            llm_dur = time.time() - llm_start
+            logger.info(f"TIMING: sentinel_detect_llm duration={llm_dur:.3f}s")
+
         output = response["choices"][0]["text"]
         return [s.strip() for s in output.split("---") if s.strip()]
 
@@ -160,9 +168,13 @@ class SentinelService:
                   f"or use generic terms like 'the team'. Language: {lang}<|im_end|>\n"
                   f"<|im_start|>user\n{chunk}<|im_end|>\n<|im_start|>assistant\n")
         
+        import time
+        t_semaphore = time.time()
         async with self._semaphore:
+            logger.info(f"TIMING: sentinel_semaphore_wait duration={time.time() - t_semaphore:.3f}s")
+            t_kv = time.time()
             self._clear_kv_cache()
-            import time
+            logger.info(f"TIMING: sentinel_kv_clear duration={time.time() - t_kv:.3f}s")
             llm_start = time.time()
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(None, lambda: self.llm(prompt, max_tokens=128))
@@ -172,6 +184,7 @@ class SentinelService:
             completion_tokens = usage.get("completion_tokens", 0)
             tok_per_sec = completion_tokens / llm_dur if llm_dur > 0 else 0
             logger.info(f"TIMING: sentinel_summarize prompt_tokens={prompt_tokens} output_tokens={completion_tokens} llm_dur={llm_dur:.2f}s tok_per_sec={tok_per_sec:.1f}")
+            logger.info(f"TIMING: sentinel_llm duration={llm_dur:.3f}s prompt_tokens={prompt_tokens} output_tokens={completion_tokens} tok_per_sec={tok_per_sec:.1f}")
 
         return response["choices"][0]["text"].strip()
 
