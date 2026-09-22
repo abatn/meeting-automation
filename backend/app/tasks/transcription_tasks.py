@@ -484,7 +484,12 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 logger.info(f"TIMING: speaker_identification duration={speaker_duration:.2f}s speakers={len(speaker_mappings)}")
 
                 # Store speaker_mappings for async ONNX reassignment
-                recording.speaker_mappings = speaker_mappings
+                # Strip embedding (numpy ndarray) — not JSON-serializable, not needed for async task
+                clean_mappings = [
+                    {k: v for k, v in m.items() if k != "embedding"}
+                    for m in speaker_mappings
+                ]
+                recording.speaker_mappings = clean_mappings
                 recording.onnx_status = "pending"
                 await db.flush()
 
