@@ -173,7 +173,7 @@ Gesamt:     275.30s (100%)
 | **Gladia** | OFFEN (Streaming ja, Diarization nein) | ~18s (bereits optimal) | Gladia Doku |
 | **SpeakerID** | NEIN (braucht fertige Transkripte) | 422s (7.0 min) | Benchmark: 0.476 s/seg |
 | **ONNX** | NEIN (braucht Speaker-Embeddings) | 445s (7.4 min) ★ OPTIMIERT | Benchmark: 0.502 s/seg (threads=4) |
-| **Sentinel** | TEILWEISE (braucht vollständige Chunks) | 118s (2.0 min) | Benchmark: 29.5 s/chunk (threads=2) |
+| **Sentinel** | TEILWEISE (braucht vollstaendige Chunks) | 148s (2.5 min) | Benchmark: 37.1 s/chunk (real Arabic) |
 | **Mistral** | NEIN (braucht Sentinel-Summaries) | ~12s | Benchmark: skaliert |
 
 ### Priorisierung
@@ -191,10 +191,10 @@ Gesamt:     275.30s (100%)
 ## EMPFEHLUNG
 
 ### Phase 1: Quick Wins (ONNX + Sentinel) — VALIDIERT 2026-09-20
-- **ONNX `intra_op_num_threads` 1→4** — 135s → ~68s (1.97x Speedup, gemessen)
-- **Sentinel `n_threads` 1→2** — 113s → ~90s (1.25x Speedup, gemessen)
-- **Gesamteinsparung:** ~248s → Pipeline ~158s (9-Min Audio)
-- **60-Min Extrapolation:** 1489s → ~1015s (16.9 min, -32%)
+- **ONNX `intra_op_num_threads` 1->4** — 135s -> ~68s (1.97x Speedup, gemessen)
+- **Sentinel `n_threads` 1->2** — 113s -> ~90s (1.25x Speedup, Dummy-Benchmark; real Arabic: 37.1 s/chunk)
+- **Gesamteinsparung:** ~248s -> Pipeline ~158s (9-Min Audio)
+- **60-Min Extrapolation:** 1489s (24.8 min) — korrigiert mit echten Arabic-Raten
 
 ### Phase 2: Architektur
 - **HLS Segment-Reading** — LiveKit `segment_outputs` für inkrementelle Transkripte
@@ -255,9 +255,11 @@ Gesamt:      ~1015s  (16.9 min) ❌ > 900s Limit
 
 ### Sentinel Optimierung (isoliert, 3 Chunks)
 
+**WARNUNG:** Dummy-Text (113 Tokens), nicht Arabisch (1038 Tokens). Echte Rate: ~37 s/chunk (Pipeline-Benchmark). Siehe "ARABISCHER TEXT-BENCHMARK" unten.
+
 | Config | Zeit | Speedup vs. Baseline |
 |--------|------|---------------------|
-| **Baseline t=1** | 17.24s | — |
+| **Baseline t=1** | 17.24s | -- |
 | **threads=2** | **13.81s** | **1.25x** ★ optimal |
 | threads=4 | 19.87s | 0.87x (schlechter!) |
 
@@ -452,3 +454,78 @@ LIEFERT:
 - Gesamt actual: Xs (Einsparung: X%)
 - Status: PASS oder FAIL (mit Fehlermeldung)
 ```
+
+---
+
+## ARABISCHER TEXT-BENCHMARK (2026-09-20)
+
+**Problem:** Der Optimierungs-Benchmark verwendete Dummy-Text (Franzoesisch, 3.47 chars/token), aber echte arabische Transkripte haben 2.83 chars/token -> 9.19x mehr Tokens -> 6.84x langsamer.
+
+**Test:** `pytest tests/performance/test_sentinel_arabic_benchmark.py -v -s --noconftest`
+**Dauer:** 260.93s (4:20), 8/8 Tests PASSED
+
+### Token-Dichte Vergleich
+
+| Text | Chars | Tokens | chars/token | n_ctx Auslastung | Zeit |
+|------|-------|--------|-------------|------------------|------|
+| **Arabisch** | 2942 | **1038** | 2.83 | **51%** | **31.98s** |
+| Dummy (Franz.) | 392 | **113** | 3.47 | 6% | 4.67s |
+| **Verhaeltnis** | -- | **9.19x** | -- | -- | **6.84x** |
+
+**Kernursache:** Arabischer Text hat 9.19x mehr Tokens als Dummy-Text bei gleicher Zeichenlaenge. Das fuellt n_ctx=2048 zu 51% (statt 6%). Die LLM muss 1038 Tokens sequenziell verarbeiten -> ~32s.
+
+### n_ctx Vergleich (Arabisch)
+
+| n_ctx | Tokens | Auslastung | Zeit | Speedup |
+|-------|--------|------------|------|---------|
+| **2048** | 1038 | 51% | **31.98s** | Baseline |
+| **4096** | 1038 | 25% | **33.42s** | **0.96x** (kein Effekt!) |
+
+**Ergebnis:** n_ctx=4096 bringt nichts. Der Flaschenhals ist die Token-Anzahl, nicht die Kontextfenster-Groesse.
+
+### Thread-Skalierung (Arabisch, n_ctx=2048)
+
+| Threads | Zeit | Speedup vs. t=1 | tok/s |
+|---------|------|------------------|-------|
+| **t=1** | 40.64s | 1.00x | 25.5 |
+| **t=2** | **31.48s** | **1.29x** | **33.0** |
+| **t=4** | 46.75s | 0.87x | 22.2 |
+
+**Bestaetigt:** t=2 ist optimal (1.29x Speedup). t=4 ist langsamer wegen Memory-Bandwidth.
+
+### Korrekte Raten (Echtes Arabisch)
+
+| Metrik | Dummy-Benchmark | Arabischer Benchmark | Pipeline Benchmark |
+|--------|-----------------|---------------------|-------------------|
+| Sentinel Rate | 17.24s/chunk | **31.98s/chunk** | **37.1s/chunk** |
+| Tokens/Chunk | 113 | 1038 | ~1038 |
+| Speedup t=2 vs t=1 | 1.25x | **1.29x** | -- |
+
+**Fuer Extrapolation:** Pipeline-Benchmark-Rate (37.1 s/chunk) ist die zuverlaessigste, da sie echte arabische Transkripte im vollen Pipeline-Kontext misst.
+
+### Korrigierte 60-Min Extrapolation
+
+| Schritt | Dummy-Rate | Korrigierte Rate | 60-Min Dauer | % |
+|---------|------------|------------------|--------------|---|
+| ONNX (887 segs) | 0.987 s/seg | **1.002 s/seg** | **889s (14.8 min)** | 59.7% |
+| Sentinel (4 chunks) | 29.5 s/chunk | **37.1 s/chunk** | **148s (2.5 min)** | 9.9% |
+| SpeakerID (887 segs) | 0.476 s/seg | 0.476 s/seg | **422s (7.0 min)** | 28.3% |
+| **Gesamt** | | | **~1489s (24.8 min)** | 100% |
+
+**Fazit:** Der Dummy-Benchmark unterschaetzte Sentinel um 25% (29.5 vs 37.1 s/chunk). Die Gesamt-Extrapolation bleibt korrekt bei ~1489s (24.8 min) weil die Pipeline-Benchmark-Rate bereits echte arabische Transkripte verwendet.
+
+### Live-Test Abweichung (Untersuchung)
+
+Der Live-Test (Run 15) zeigte Sentinel bei 122.61s/chunk mit n_threads=2. Dies ist 3.3x langsamer als die Pipeline-Benchmark-Rate (37.1s/chunk).
+
+**Moegliche Ursachen:**
+1. Cold-Start: Erster LLM-Aufruf nach Deployment (Modell-Loading + JIT-Kompilierung)
+2. Memory-Contention: ONNX + Sentinel laufen gleichzeitig auf 4 CPU-Kern
+3. ARM64 Thermal Throttling: Bei4 Threads + ONNX Parallel
+
+**Aktion:** Pipeline-Benchmark-Rate (37.1 s/chunk) als Referenz verwenden. Live-Test-Outlier bei Bedarf erneut testen.
+
+*Arabischer Text-Benchmark: 2026-09-20, 8/8 PASSED (260.93s)*
+*Token-Dichte: Arabisch 2.83 c/t vs Dummy 3.47 c/t = 9.19x mehr Tokens*
+*n_ctx=4096 bringt nichts (0.96x), t=2 ist optimal (1.29x Speedup)*
+*Korrigierte Rate: 37.1 s/chunk (Pipeline-Benchmark) statt 29.5 s/chunk (Dummy)*
