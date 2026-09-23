@@ -45,9 +45,6 @@ credentials:
       aws_access_key_id = minio_user
       aws_secret_access_key = minio_password
 
-# FSB braucht node-agent (ohne das: PartiallyFailed, daemonset pod not found)
-deployNodeAgent: true
-
 # Velero Server
 image:
   repository: velero/velero
