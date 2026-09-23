@@ -153,8 +153,10 @@ Erst **A messen**, dann **B fixen**, dann **gemeinsam verifizieren** — nicht u
 - [x] **B1** `logging_config.py`: Handler an `__stdout__`/`__stderr__`, TextFormatter `formatTime`  
 - [x] B1 lokaler Smoke: `_real_stream`, TextFormatter, `setup_logging` OK (Python 3.11, py_compile + Snippet OK; `black` 24.1.1 + `isort` 5.13.2 via `.venv311` lief auf `logging_config.py`)  
 - [x] A-Mess-Grid `/tmp/measure_grid_abc.py` in Staging-Pod  
-- [ ] Staging-Deploy + Verify: `TIMING: sentinel_summarize` in Worker-Logs  
-- [ ] Bestes A-Profil → separate Freigabe für `n_threads`/`n_batch` im Code  
+- [x] A-Ergebnisse: Baseline beibehalten (kein `n_threads`/`n_batch`-Patch)  
+- [x] **Staging-Deploy** von B1: Image `ba0b3168` enthält `750816fd` (`logging_config.py` auf `__stdout__`)  
+- [ ] **Verify** `TIMING: sentinel_summarize` / `"logger": "root"` in Worker-Logs — **blockiert auf Pipeline-Lauf** (kein Recording seit Deploy; Task-TIMING ebenfalls 0 in 10k Zeilen → kein Regress, nur leer)  
+- [x] Bestes A-Profil → separate Freigabe entfällt (Baseline)  
 
 **Rollback B1:** `git checkout -- backend/app/core/logging_config.py` + Staging-Deploy — siehe Rollback B oben.
 

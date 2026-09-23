@@ -3,6 +3,9 @@ kind: StatefulSet
 metadata:
   name: minio-staging
   namespace: meeting-automation-staging
+  annotations:
+    # Self-Ref guard: never FSB-backup MinIO's own volume (F2 incident 2026-08-15)
+    backup.velero.io/backup-volumes-excludes: minio-data
 spec:
   serviceName: "minio-staging"
   replicas: 1

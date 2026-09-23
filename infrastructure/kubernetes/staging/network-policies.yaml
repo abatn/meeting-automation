@@ -120,7 +120,8 @@ spec:
       port: 15672
 ---
 # MinIO: Allow Backend, Celery, Celery-Pro, Frontend, CNPG (WAL-Archiv), Prometheus,
-# LiveKit Egress (S3 upload of recordings - required since egress runs on pod network)
+# LiveKit Egress (S3 upload of recordings - required since egress runs on pod network),
+# Velero NS (BSL/Kopia → velero-backups bucket; without this BSL goes Unavailable)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -156,6 +157,9 @@ spec:
     - podSelector:
         matchLabels:
           app: livekit-egress-staging
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: velero
     ports:
     - protocol: TCP
       port: 9000
