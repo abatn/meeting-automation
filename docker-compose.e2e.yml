@@ -71,8 +71,10 @@ services:
       - e2e-network
 
   minio-test:
-    # MinIO removed its images from Docker Hub (2026-09) — official registry is now quay.io
-    image: quay.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+    # INCIDENT_MINIO_QUAY_PULL_2026-09-24: quay.io/minio/* blocks anonymous pull since 2026-09-24;
+    # Docker Hub minio/minio deleted (404). Third-party mirror (Elestio), pinned by index digest.
+    # amd64 binary verified (CI runner); arm64 variant BROKEN — do NOT use for staging/prod.
+    image: elestio/minio@sha256:25348a257f1ece1b192f25f6cd9854618fa86422ac87b494b5d4e629c556d4bd
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
