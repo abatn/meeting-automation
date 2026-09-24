@@ -45,7 +45,19 @@ class JSONFormatter(logging.Formatter):
 class TextFormatter(logging.Formatter):
     """Human-readable formatter for local development."""
     def format(self, record: logging.LogRecord) -> str:
-        return f"{recordasctime} - {record.name} - {record.levelname} - {record.getMessage()}"
+        ts = self.formatTime(record, "%Y-%m-%d %H:%M:%S,%03d")
+        return f"{ts} - {record.name} - {record.levelname} - {record.getMessage()}"
+
+
+def _real_stream():
+    """Return the process's original stdout.
+
+    Celery workers may replace sys.stdout with their LoggingProxy
+    (worker_redirect_stdouts default True); a handler bound to it can lose
+    records. sys.__stdout__ is never proxied, so root/TIMING logs reach
+    kubectl logs. Falls back to sys.stdout (e.g. if __stdout__ is gone).
+    """
+    return getattr(sys, "__stdout__", None) or sys.stdout
 
 
 def setup_logging(json_format: bool = True) -> None:
@@ -62,8 +74,8 @@ def setup_logging(json_format: bool = True) -> None:
     # Remove existing handlers
     root_logger.handlers.clear()
 
-    # Create handler
-    handler = logging.StreamHandler(sys.stdout)
+    # Create handler on the real process stream (not a Celery LoggingProxy)
+    handler = logging.StreamHandler(_real_stream())
 
     if json_format:
         handler.setFormatter(JSONFormatter())
