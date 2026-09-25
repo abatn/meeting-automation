@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import gc
+import inspect
 import json
 from celery.utils.log import get_task_logger
 import os
@@ -47,26 +48,38 @@ logger = get_task_logger(__name__)
 SENTINEL_CHUNK_TOKEN_BUDGET = 1800
 
 
-def split_text_by_token_budget(text: str, tokenize, budget_tokens: int = SENTINEL_CHUNK_TOKEN_BUDGET) -> List[str]:
+async def split_text_by_token_budget(
+    text: str, tokenize, budget_tokens: int = SENTINEL_CHUNK_TOKEN_BUDGET
+) -> List[str]:
     """Split ``text`` into pieces of at most ``budget_tokens`` tokens (P3).
 
-    ``tokenize(str) -> int`` is supplied by the caller (the loaded Sentinel LLM),
-    so this helper stays testable without a model. Never truncates: the full text
-    is always covered, in order.
+    ``tokenize(str) -> int`` is supplied by the caller (the loaded Sentinel LLM).
+    The tokenizer may be synchronous (llama_cpp) or return an awaitable (async
+    mocks in the E2E fixtures) — awaitables are awaited here, so neither
+    environment crashes. Never truncates: the full text is always covered.
     """
     if tokenize is None:
         return [text]
-    if tokenize(text) <= budget_tokens:
+
+    async def ntok(s: str) -> int:
+        n = tokenize(s)
+        if inspect.isawaitable(n):
+            n = await n
+        if isinstance(n, int):
+            return n
+        return len(n)
+
+    if await ntok(text) <= budget_tokens:
         return [text]
 
     pieces: List[str] = []
     remaining = text
     while remaining:
-        if tokenize(remaining) <= budget_tokens:
+        if await ntok(remaining) <= budget_tokens:
             pieces.append(remaining)
             break
         cut = min(len(remaining), budget_tokens * 2)
-        while cut > 1 and tokenize(remaining[:cut]) > budget_tokens:
+        while cut > 1 and await ntok(remaining[:cut]) > budget_tokens:
             cut = int(cut * 0.9)
         pieces.append(remaining[:cut])
         remaining = remaining[cut:]
@@ -577,12 +590,19 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 # Chunking: token budget (P3) — one chunk whenever the text fits
                 # SENTINEL_CHUNK_TOKEN_BUDGET tokens; char-slice only as fallback.
                 _sentinel_llm = getattr(get_sentinel_service(), "llm", None)
+                chunks = None
                 if _sentinel_llm is not None:
-                    chunks = split_text_by_token_budget(
-                        display_text,
-                        lambda s: len(_sentinel_llm.tokenize(s.encode("utf-8"))),
-                    )
-                else:
+                    try:
+                        chunks = await split_text_by_token_budget(
+                            display_text,
+                            lambda s: _sentinel_llm.tokenize(s.encode("utf-8")),
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            f"Token chunking unavailable ({type(exc).__name__}: {exc}) "
+                            f"— falling back to 3100-char slices"
+                        )
+                if chunks is None:
                     chunks = [display_text[i:i+3100] for i in range(0, len(display_text), 3100)]
                 logger.info(f"TIMING: sentinel_chunks count={len(chunks)} text_len={len(display_text)}")
 
