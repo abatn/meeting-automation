@@ -7,7 +7,7 @@ spec:
   scaleTargetRef:
     name: celery-worker-staging
   minReplicaCount: 0        # Scale-to-zero wenn Queue leer
-  maxReplicaCount: 10       # Dynamisch basiert auf Queue-Tiefe
+  maxReplicaCount: 5       # INCIDENT 2026-09-25: 10 x 1500Mi > 23.5Gi node -> OOM kill wave       # Dynamisch basiert auf Queue-Tiefe
   pollingInterval: 15       # Alle 15s Queue pruefen
   cooldownPeriod: 300       # 5min nach letzter Message skaliert runter
   triggers:
@@ -44,7 +44,7 @@ spec:
   scaleTargetRef:
     name: celery-worker-pro-staging
   minReplicaCount: 1        # Immer 1 Worker bereit (Pro-Kunden = kein Cold-Start)
-  maxReplicaCount: 10       # Dynamisch basiert auf Queue-Tiefe
+  maxReplicaCount: 3       # INCIDENT 2026-09-25: cap to keep headroom on 23.5Gi node       # Dynamisch basiert auf Queue-Tiefe
   pollingInterval: 15
   cooldownPeriod: 300
   triggers:

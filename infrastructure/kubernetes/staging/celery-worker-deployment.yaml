@@ -37,12 +37,26 @@ spec:
             command:
             - /bin/sh
             - -c
-            - celery -A app.tasks.celery_app inspect ping --timeout=20
+            # INCIDENT 2026-09-25: self-targeted only. The fleet-wide ping as a
+            # KILL switch killed healthy pods whenever a neighbour died (OOM),
+            # producing the ~6-min mass kill-reload wave. Fleet check kept below
+            # as readinessProbe (visibility, no kill).
+            - celery -A app.tasks.celery_app inspect ping -d celery@$(hostname) --timeout=10
           initialDelaySeconds: 90
           periodSeconds: 60
-          # A1: 30s was too tight — live event showed "timed out after 30s" -> Killing
-          timeoutSeconds: 60
+          timeoutSeconds: 30
           failureThreshold: 5
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            # fleet-wide rendezvous kept for cluster visibility (events only)
+            - celery -A app.tasks.celery_app inspect ping --timeout=20
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 60
+          failureThreshold: 3
         env:
         - name: PYTHONPATH
           value: "/app"

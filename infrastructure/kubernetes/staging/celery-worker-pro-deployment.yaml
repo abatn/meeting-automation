@@ -69,11 +69,24 @@ spec:
             command:
             - /bin/sh
             - -c
-            - celery -A app.tasks.celery_app inspect ping --timeout=10
+            # INCIDENT 2026-09-25: self-targeted only (same fleet-ping flaw as
+            # the gratuit worker — see docs/INCIDENT_CELERY_KILL_RELOAD_LOOP_2026-09-25.md)
+            - celery -A app.tasks.celery_app inspect ping -d celery@$(hostname) --timeout=10
           initialDelaySeconds: 60
           periodSeconds: 60
           timeoutSeconds: 30
           failureThreshold: 5
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            # fleet-wide rendezvous kept for cluster visibility (events only)
+            - celery -A app.tasks.celery_app inspect ping --timeout=20
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 60
+          failureThreshold: 3
         env:
         - name: PYTHONPATH
           value: "/app"
