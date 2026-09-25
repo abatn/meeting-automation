@@ -37,10 +37,11 @@ spec:
             command:
             - /bin/sh
             - -c
-            - celery -A app.tasks.celery_app inspect ping --timeout=10
-          initialDelaySeconds: 60
+            - celery -A app.tasks.celery_app inspect ping --timeout=20
+          initialDelaySeconds: 90
           periodSeconds: 60
-          timeoutSeconds: 30
+          # A1: 30s was too tight — live event showed "timed out after 30s" -> Killing
+          timeoutSeconds: 60
           failureThreshold: 5
         env:
         - name: PYTHONPATH

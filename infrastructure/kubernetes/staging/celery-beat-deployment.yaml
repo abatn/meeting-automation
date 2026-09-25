@@ -46,5 +46,6 @@ spec:
             - celery -A app.tasks.celery_app inspect ping --timeout=5
           initialDelaySeconds: 30
           periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
+          # P1: 10s was too tight for a broker round-trip (131 Unhealthy events)
+          timeoutSeconds: 30
+          failureThreshold: 5

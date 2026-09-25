@@ -54,7 +54,7 @@ spec:
       - name: celery-worker
         image: docker.io/batnini/meeting-automation-backend:latest
         imagePullPolicy: Always
-        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_pro,onnx,email,maintenance"]
+        command: ["bash", "-c", "until timeout 2 bash -c '</dev/tcp/rabbitmq-staging/5672'; do echo 'Waiting for RabbitMQ...'; sleep 2; done; celery -A app.tasks.celery_app worker --loglevel=info -Q transcription_pro,onnx,email,maintenance --concurrency=1"]
         resources:
           requests:
             memory: "2Gi"
@@ -77,6 +77,9 @@ spec:
         env:
         - name: PYTHONPATH
           value: "/app"
+        # P2: match production (production/celery-worker-pro-deployment.yaml:80)
+        - name: OMP_NUM_THREADS
+          value: "1"
         envFrom:
         - secretRef:
             name: backend-secrets-staging

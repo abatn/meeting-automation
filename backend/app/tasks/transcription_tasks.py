@@ -43,6 +43,35 @@ from app.tasks.celery_app import celery_app
 
 logger = get_task_logger(__name__)
 
+# P3: every Sentinel chunk must fit template (89 tok) + max_tokens (128) into n_ctx=2048.
+SENTINEL_CHUNK_TOKEN_BUDGET = 1800
+
+
+def split_text_by_token_budget(text: str, tokenize, budget_tokens: int = SENTINEL_CHUNK_TOKEN_BUDGET) -> List[str]:
+    """Split ``text`` into pieces of at most ``budget_tokens`` tokens (P3).
+
+    ``tokenize(str) -> int`` is supplied by the caller (the loaded Sentinel LLM),
+    so this helper stays testable without a model. Never truncates: the full text
+    is always covered, in order.
+    """
+    if tokenize is None:
+        return [text]
+    if tokenize(text) <= budget_tokens:
+        return [text]
+
+    pieces: List[str] = []
+    remaining = text
+    while remaining:
+        if tokenize(remaining) <= budget_tokens:
+            pieces.append(remaining)
+            break
+        cut = min(len(remaining), budget_tokens * 2)
+        while cut > 1 and tokenize(remaining[:cut]) > budget_tokens:
+            cut = int(cut * 0.9)
+        pieces.append(remaining[:cut])
+        remaining = remaining[cut:]
+    return [p for p in pieces if p]
+
 
 def _run_async(coro):
     """Run async coroutine from sync context (Celery worker).
@@ -545,9 +574,16 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
                 logger.info(f"Plan {plan} — using Sentinel LLM for recording {recording_id}")
                 publish_status(recording_id, "analyzing", 45, "Local Semantic Synthesis (Qwen-1.5B)...")
 
-                # Chunking: token-budget-compatible char size (3100 chars ≈ 3257-tok budget
-                # at measured worst density 2.1 chars/token; see benchmark 2026-09-13).
-                chunks = [display_text[i:i+3100] for i in range(0, len(display_text), 3100)]
+                # Chunking: token budget (P3) — one chunk whenever the text fits
+                # SENTINEL_CHUNK_TOKEN_BUDGET tokens; char-slice only as fallback.
+                _sentinel_llm = getattr(get_sentinel_service(), "llm", None)
+                if _sentinel_llm is not None:
+                    chunks = split_text_by_token_budget(
+                        display_text,
+                        lambda s: len(_sentinel_llm.tokenize(s.encode("utf-8"))),
+                    )
+                else:
+                    chunks = [display_text[i:i+3100] for i in range(0, len(display_text), 3100)]
                 logger.info(f"TIMING: sentinel_chunks count={len(chunks)} text_len={len(display_text)}")
 
                 # Parallel Map execution
@@ -592,11 +628,19 @@ async def _process_recording_pipeline(recording_id: str, client_id: str) -> None
             logger.info(f"TIMING: persistence duration={persist_duration:.2f}s")
 
             # Trigger async ONNX reassignment (improves speaker labels in background)
-            reassign_speaker_segments.apply_async(
-                args=[str(recording.id), str(recording.client_id)],
-                queue="onnx",
-            )
-            logger.info(f"Async ONNX reassignment triggered for {recording_id}")
+            # P1 fail-open: the recording is already persisted (see TIMING persistence
+            # above), so a broker error here must not flip status to "failed".
+            try:
+                reassign_speaker_segments.apply_async(
+                    args=[str(recording.id), str(recording.client_id)],
+                    queue="onnx",
+                )
+                logger.info(f"Async ONNX reassignment triggered for {recording_id}")
+            except Exception as exc:
+                logger.warning(
+                    f"ONNX reassignment not queued for {recording_id} "
+                    f"({type(exc).__name__}: {exc}) — recording stays completed"
+                )
 
             recording.status = "completed"
 
