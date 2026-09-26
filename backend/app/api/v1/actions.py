@@ -134,12 +134,21 @@ async def learn_action_suggestion_feedback(
 
     # Background path: Celery task for full resolution (S3, ONNX, Mistral)
     if feedback.action == "accept":
+        from app.tasks.celery_app import get_transcription_queue
         from app.tasks.feedback_tasks import process_feedback_resolution
-        process_feedback_resolution.delay(
-            suggestion_id=feedback.suggestion_id,
-            client_id=str(current_user.client_id),
-            action=feedback.action,
-            user_id=str(current_user.id),
+
+        # Plan B: planbewusstes Routing beim Dispatcher. PRO/ENTREPRISE ->
+        # transcription_pro, alle anderen Plaene -> transcription_gratuit.
+        queue = await get_transcription_queue(str(current_user.client_id), db)
+
+        process_feedback_resolution.apply_async(
+            kwargs={
+                "suggestion_id": feedback.suggestion_id,
+                "client_id": str(current_user.client_id),
+                "action": feedback.action,
+                "user_id": str(current_user.id),
+            },
+            queue=queue,
         )
 
     return {"status": "accepted", "suggestion_id": feedback.suggestion_id}

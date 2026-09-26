@@ -29,7 +29,11 @@ celery_app.conf.update(
     task_create_missing_queues=False,          # Don't auto-create queues without consumers
     task_routes={
         'process_recording': {'queue': 'transcription'},
-        'process_feedback_resolution': {'queue': 'transcription'},
+        # 'process_feedback_resolution' ist bewusst NICHT mehr geroutet (2026-09-26).
+        # Der Dispatcher setzt queue= explizit via get_transcription_queue() (Plan B).
+        # Ohne queue= greift task_default_queue="maintenance" (beide Worker hören
+        # sie), damit die Queue "transcription" nie wieder unkonsumenten
+        # Feedback-Rest bekommt (Altlast aus 19 Poison-Messages).
         'send_reminder_via_n8n': {'queue': 'email'},
         'daily_reminder_task': {'queue': 'email'},
         'send_invitation_email': {'queue': 'email'},

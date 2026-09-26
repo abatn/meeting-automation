@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 MIN_SEGMENT_DURATION = 3.0  # Minimum seconds for reliable embedding
 MIN_AUDIO_DURATION = 5.0    # Minimum total seconds per speaker
 
+# OOM-Schutz: Deckel fuer gleichzeitig laufende ffmpeg-Prozesse pro Extraktion.
+# Staging-Incident 2026-09-26: gratuit-Worker (Limit 3 GiB) OOM 137 durch
+# unkapped Fan-out (14 parallel gestartete ffmpeg-Prozesse). Der Semaphor wird
+# BEIDEN gather-Stufen (Speaker-Ebene und Segment-Ebene) gemeinsam uebergeben,
+# damit der Deckel pro Extraktion gilt und nicht je gather-Stufe (sonst
+# Speaker-Anzahl x 4 gleichzeitige Prozesse).
+MAX_FFMPEG_CONCURRENT = max(1, int(os.getenv("FFMPEG_MAX_CONCURRENCY", "4")))
+
 
 class AudioSegmentService:
     """
@@ -39,15 +47,20 @@ class AudioSegmentService:
         """
         speaker_segments = self._group_by_speaker(segments)
         result = {}
+        ffmpeg_sem = asyncio.Semaphore(MAX_FFMPEG_CONCURRENT)
 
         async def extract_single(speaker_label: str, segs: List[Dict]) -> tuple:
             total_duration = sum(s["end"] - s["start"] for s in segs)
             if total_duration < MIN_AUDIO_DURATION:
                 return speaker_label, None
             if len(segs) == 1:
-                segment_path = await self._extract_single_segment(audio_file_path, segs[0])
+                segment_path = await self._extract_single_segment(
+                    audio_file_path, segs[0], sem=ffmpeg_sem
+                )
             else:
-                segment_path = await self._concatenate_segments(audio_file_path, segs)
+                segment_path = await self._concatenate_segments(
+                    audio_file_path, segs, sem=ffmpeg_sem
+                )
             return speaker_label, segment_path
 
         tasks = [extract_single(label, segs) for label, segs in speaker_segments.items()]
@@ -76,9 +89,19 @@ class AudioSegmentService:
         return grouped
 
     async def _extract_single_segment(
-        self, audio_file_path: str, segment: Dict
+        self,
+        audio_file_path: str,
+        segment: Dict,
+        sem: Optional[asyncio.Semaphore] = None,
     ) -> Optional[str]:
-        """Extract a single audio segment using ffmpeg."""
+        """Extract a single audio segment using ffmpeg.
+
+        sem: geteilter ffmpeg-Deckel; ohne Angabe gilt ein eigener mit
+        MAX_FFMPEG_CONCURRENT (Rueckwaertskompatibilitaet fuer den direkten
+        Aufruf aus transcription_tasks).
+        """
+        if sem is None:
+            sem = asyncio.Semaphore(MAX_FFMPEG_CONCURRENT)
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         tmp.close()
 
@@ -96,12 +119,13 @@ class AudioSegmentService:
         ]
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await proc.communicate()
+            async with sem:
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await proc.communicate()
 
             if proc.returncode != 0:
                 logger.error(f"ffmpeg failed: {stderr.decode()}")
@@ -118,10 +142,18 @@ class AudioSegmentService:
             return None
 
     async def _concatenate_segments(
-        self, audio_file_path: str, segments: List[Dict]
+        self,
+        audio_file_path: str,
+        segments: List[Dict],
+        sem: Optional[asyncio.Semaphore] = None,
     ) -> Optional[str]:
-        """Extract and concatenate multiple segments for a speaker."""
+        """Extract and concatenate multiple segments for a speaker.
+
+        sem: geteilter ffmpeg-Deckel (siehe _extract_single_segment).
+        """
         import shutil
+        if sem is None:
+            sem = asyncio.Semaphore(MAX_FFMPEG_CONCURRENT)
         tmp_dir = tempfile.mkdtemp()
         result_path = None
 
@@ -140,12 +172,13 @@ class AudioSegmentService:
                     "-acodec", "pcm_s16le",
                     part_path,
                 ]
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                await proc.communicate()
+                async with sem:
+                    proc = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    await proc.communicate()
                 if proc.returncode == 0 and os.path.exists(part_path):
                     return part_path
                 return None
@@ -177,12 +210,13 @@ class AudioSegmentService:
                     final_output,
                 ]
 
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                await proc.communicate()
+                async with sem:
+                    proc = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    await proc.communicate()
 
                 result_path = final_output if (proc.returncode == 0 and os.path.exists(final_output)) else None
 
