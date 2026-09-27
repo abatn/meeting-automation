@@ -258,7 +258,15 @@ async def test_second_run_is_idempotent(db_session: AsyncSession):
         .all()
     )
     assert len(actions) == 1
-    assignments = (await db_session.execute(select(Assignment))).scalars().all()
+    assignments = (
+        (
+            await db_session.execute(
+                select(Assignment).where(Assignment.action_id == actions[0].id)
+            )
+        )
+        .scalars()
+        .all()
+    )
     assert len(assignments) == 1
 
 
