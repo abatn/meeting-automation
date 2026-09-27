@@ -1,26 +1,62 @@
 import asyncio
-import httpx
-import logging
-import uuid
-import os
-import tempfile
-import boto3
-from typing import List, Optional, Dict, Any
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, desc, or_
-from sqlalchemy.future import select
-from datetime import datetime, timedelta, timezone
-
-from app.models.action import Action, Assignment, ActionSuggestion, SuggestionStatus, ActionStatus
-from app.models.pv import PV
-from app.models.transcription import Transcription, Speaker
-from app.models.recording import Recording
-from app.models.user import User
-from app.models.meeting import Meeting
 import json
+import logging
+import os
+import re
+import tempfile
+import unicodedata
+import uuid
+from datetime import datetime, timedelta, timezone
+from difflib import SequenceMatcher
+from typing import Any, Dict, List, Optional
+
+import boto3
+import httpx
+from sqlalchemy import desc, func, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+
 from app.core.config import settings
+from app.models.action import (
+    Action,
+    ActionStatus,
+    ActionSuggestion,
+    Assignment,
+    SuggestionStatus,
+)
+from app.models.meeting import Meeting
+from app.models.pv import PV
+from app.models.recording import Recording
+from app.models.transcription import Speaker, Transcription
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
+
+# Duplikat-Erkennung in learn_from_feedback (Option b): Titel-Ähnlichkeitsschwelle
+# Belegt: PV-Actions (FR) und Suggestion-Titel (EN) stammen aus zwei unabhängigen
+# Mistral-Läufen -> normalisierter direkter Vergleich plus Übersetzungsfallback.
+DUP_MATCH_THRESHOLD = 0.75
+
+
+def _normalize_title(text: Optional[str]) -> str:
+    """Lowercase, diacritics entfernen, Nicht-Alphanumerik ersetzen."""
+    if not text:
+        return ""
+    text = unicodedata.normalize("NFKD", str(text))
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = re.sub(r"[^a-z0-9]+", " ", text.lower())
+    return " ".join(text.split())
+
+
+def _title_similarity(a: str, b: str) -> float:
+    """max(SequenceMatcher-Ratio, Token-Jaccard) auf normalisierten Titeln."""
+    if not a or not b:
+        return 0.0
+    ratio = SequenceMatcher(None, a, b).ratio()
+    ta, tb = set(a.split()), set(b.split())
+    jaccard = (len(ta & tb) / len(ta | tb)) if ta and tb else 0.0
+    return max(ratio, jaccard)
+
 
 class ActionService:
     def __init__(self, db: AsyncSession):
@@ -45,6 +81,63 @@ class ActionService:
 
         suggestion.status = SuggestionStatus.ACCEPTED if action == "accept" else SuggestionStatus.REJECTED
         await self.db.commit()
+
+    async def _find_duplicate_action(self, suggestion: ActionSuggestion) -> Optional[Action]:
+        """
+        Option (b): Prüft OB ein Gegenstück zur Suggestion im selben Meeting existiert.
+
+        Strategie (Reihenfolge, Abbruch bei Treffer):
+        1. Normalisierter direkter Titelvergleich gegen ALLE Actions des Meetings.
+        2. Falls kein Treffer UND Suggestion nicht französisch: Titel via Mistral
+           nach "fr" übersetzen (Aktionssprache des Systems) und erneut vergleichen.
+        3. Kein Treffer -> None (fail-open: Action wird angelegt wie bisher).
+
+        Bei Übersetzungsfehlern: fail-open + Warnung (kein stiller Funktionsverlust).
+        Idempotenz: ein zweiter Lauf findet die selbst erzeugte Action exakt
+        über den normalisierten Titel wieder.
+        """
+        if not suggestion.meeting_id:
+            return None
+
+        res = await self.db.execute(
+            select(Action)
+            .where(Action.meeting_id == suggestion.meeting_id)
+            .where(Action.client_id == suggestion.client_id)
+        )
+        existing = list(res.scalars().all())
+        if not existing:
+            return None
+
+        sugg_norm = _normalize_title(suggestion.title)
+        for act in existing:
+            score = _title_similarity(sugg_norm, _normalize_title(act.title))
+            if score >= DUP_MATCH_THRESHOLD:
+                logger.info(
+                    f"[DUP-CHECK] suggestion {suggestion.id} matches existing action "
+                    f"{act.id} directly (score={score:.2f}) — skipping action creation"
+                )
+                return act
+
+        if suggestion.language and suggestion.language.split("-")[0] != "fr":
+            try:
+                translated = await self.translate_texts([suggestion.title], "fr")
+                t_norm = _normalize_title(translated[0] if translated else "")
+                for act in existing:
+                    score = _title_similarity(t_norm, _normalize_title(act.title))
+                    if score >= DUP_MATCH_THRESHOLD:
+                        logger.info(
+                            f"[DUP-CHECK] suggestion {suggestion.id} matches existing action "
+                            f"{act.id} after EN->FR translation (score={score:.2f}) — "
+                            f"skipping action creation"
+                        )
+                        return act
+            except Exception as e:
+                logger.warning(
+                    f"[DUP-CHECK] translation failed for suggestion {suggestion.id}: {e} "
+                    f"— fail-open, action will be created"
+                )
+
+        return None
 
     async def get_action_patterns(self, client_id: str, limit: int = 5, target_language: Optional[str] = None) -> List[Dict[str, Any]]:
         """Aggregates pending actions by title to identify patterns, with optional translation."""
@@ -138,6 +231,7 @@ class ActionService:
     async def generate_suggestions_from_transcription(self, meeting_id: str, client_id: str, target_language: str = "fr") -> List[ActionSuggestion]:
         """Analyzes transcription to suggest new actions in the specified language."""
         from sqlalchemy.orm import selectinload
+
         from app.models.meeting import Meeting
         from app.models.transcription import Speaker
 
@@ -504,11 +598,11 @@ Return ONLY a JSON array of objects with the following structure:
 
         Returns: {assignee_name, confidence, source, method}
         """
-        from app.services.speaker_profile_service import SpeakerProfileService
-        from app.services.speaker_name_detector import detect_self_introduction
+        from app.services.audio_segment_service import audio_segment_service
         from app.services.mistral_fusion_service import mistral_fusion_service
         from app.services.speaker_embedding_service import speaker_embedding_service
-        from app.services.audio_segment_service import audio_segment_service
+        from app.services.speaker_name_detector import detect_self_introduction
+        from app.services.speaker_profile_service import SpeakerProfileService
 
         INVALID_ASSIGNEES = {"", "null", "n/a", "non défini", "none", "undefined", "tbd", "tba"}
 
@@ -674,7 +768,8 @@ Return ONLY a JSON array of objects with the following structure:
     async def _download_recording_audio(self, meeting_id: str) -> Optional[str]:
         """Download recording audio from S3 for embedding extraction."""
         try:
-            from app.core.config import settings as app_settings, get_bucket_name
+            from app.core.config import get_bucket_name
+            from app.core.config import settings as app_settings
             result = await self.db.execute(
                 select(Recording).where(Recording.meeting_id == meeting_id).order_by(Recording.created_at.desc()).limit(1)
             )
@@ -702,11 +797,12 @@ Return ONLY a JSON array of objects with the following structure:
     async def learn_from_feedback(self, suggestion_id: str, client_id: str, action: str, user_id: Optional[str] = None) -> None:
         """Records feedback and creates a real Action if accepted."""
         from sqlalchemy.orm import selectinload
+
         from app.models.meeting import Meeting
-        from app.tasks.transcription_tasks import _save_pv_and_actions
+        from app.models.transcription import Speaker, Transcription
         from app.services.assignee_resolver import AssigneeResolver
         from app.services.audit_service import AuditService
-        from app.models.transcription import Speaker, Transcription
+        from app.tasks.transcription_tasks import _save_pv_and_actions
         stmt = (
             select(ActionSuggestion)
             .options(selectinload(ActionSuggestion.meeting).selectinload(Meeting.participants))
@@ -731,17 +827,38 @@ Return ONLY a JSON array of objects with the following structure:
                 await self.db.commit()
                 return
 
-            new_action_id = str(uuid.uuid4())
-            new_action = Action(
-                id=new_action_id,
-                client_id=client_id,
-                meeting_id=str(suggestion.meeting_id),
-                title=suggestion.title,
-                description=suggestion.description,
-                status=ActionStatus.PENDING,
-                priority="medium"
-            )
-            self.db.add(new_action)
+            # Dubletten-Check VOR der Anlage (PV hat die Action evtl. schon erzeugt)
+            duplicate = await self._find_duplicate_action(suggestion)
+            if duplicate:
+                target_action_id = str(duplicate.id)
+                logger.info(
+                    f"[DUP-CHECK] skipped duplicate for suggestion {suggestion_id}: "
+                    f"existing action {target_action_id} in meeting {suggestion.meeting_id}"
+                )
+                assigned_res = await self.db.execute(
+                    select(Assignment).where(Assignment.action_id == duplicate.id).limit(1)
+                )
+                if assigned_res.scalar_one_or_none() is not None:
+                    logger.info(
+                        f"[DUP-CHECK] action {target_action_id} already has an assignment — "
+                        f"nothing to fill for suggestion {suggestion_id}"
+                    )
+                    await self.db.commit()
+                    return
+                new_action = None
+            else:
+                new_action_id = str(uuid.uuid4())
+                new_action = Action(
+                    id=new_action_id,
+                    client_id=client_id,
+                    meeting_id=str(suggestion.meeting_id),
+                    title=suggestion.title,
+                    description=suggestion.description,
+                    status=ActionStatus.PENDING,
+                    priority="medium"
+                )
+                self.db.add(new_action)
+                target_action_id = new_action_id
             
             # CRITICAL RULE: NULL/EMPTY ASSIGNEES ARE FORBIDDEN
             # Every action MUST have an assignee. Resolution is MANDATORY.
@@ -849,7 +966,7 @@ Return ONLY a JSON array of objects with the following structure:
             if resolution.user_id:
                 assignment = Assignment(
                     id=str(uuid.uuid4()),
-                    action_id=new_action_id,
+                    action_id=target_action_id,
                     user_id=resolution.user_id
                 )
                 logger.info(
@@ -863,7 +980,7 @@ Return ONLY a JSON array of objects with the following structure:
                     table_name="assignments",
                     record_id=assignment.id,
                     new_values={
-                        "action_id": new_action_id,
+                        "action_id": target_action_id,
                         "user_id": resolution.user_id,
                         "assignee_name": assignee_name,
                         "matched_via": resolution.matched_via,
@@ -878,7 +995,7 @@ Return ONLY a JSON array of objects with the following structure:
                 # External assignment
                 assignment = Assignment(
                     id=str(uuid.uuid4()),
-                    action_id=new_action_id,
+                    action_id=target_action_id,
                     external_name=resolution.external_name or assignee_name,
                     external_email=resolution.external_email,
                 )
@@ -893,7 +1010,7 @@ Return ONLY a JSON array of objects with the following structure:
                     table_name="assignments",
                     record_id=assignment.id,
                     new_values={
-                        "action_id": new_action_id,
+                        "action_id": target_action_id,
                         "external_name": resolution.external_name or assignee_name,
                         "external_email": resolution.external_email,
                         "matched_via": resolution.matched_via,
@@ -907,7 +1024,7 @@ Return ONLY a JSON array of objects with the following structure:
                 )
             self.db.add(assignment)
             
-            logger.info(f"Suggestion {suggestion_id} accepted and converted to Action {new_action.id}")
+            logger.info(f"Suggestion {suggestion_id} accepted and converted to Action {target_action_id}")
         elif action == "reject":
             suggestion.status = SuggestionStatus.REJECTED
         
