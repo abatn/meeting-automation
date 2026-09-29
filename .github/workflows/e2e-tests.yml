@@ -501,6 +501,19 @@ jobs:
     - name: Deploy to Production
       run: |
         export KUBECONFIG=$(pwd)/kubeconfig-prod
+        # Sync celery deployments from GitHub manifests (command, resources, probes)
+        # so manual cluster patches are reverted on every deploy.
+        # Guards: pin the image tag (manifests carry :latest) and keep KEDA-managed
+        # replicas at their live value (KEDA owns the replica count of the workers).
+        for f in celery-worker-deployment celery-worker-pro-deployment; do
+          name="${f%-deployment}"
+          live_replicas=$(kubectl get deployment "$name" -n meeting-automation -o jsonpath='{.spec.replicas}' 2>/dev/null || echo 0)
+          sed -e "s|image: docker.io/batnini/meeting-automation-backend:.*|image: ${{ env.IMAGE_NAME }}:${{ github.sha }}|" \
+              -e "s/^  replicas:.*/  replicas: ${live_replicas}/" \
+              "infrastructure/kubernetes/production/${f}.yaml" | kubectl apply -f - -n meeting-automation
+        done
+        sed -e "s|image: docker.io/batnini/meeting-automation-backend:.*|image: ${{ env.IMAGE_NAME }}:${{ github.sha }}|" \
+            "infrastructure/kubernetes/production/celery-beat-deployment.yaml" | kubectl apply -f - -n meeting-automation
         kubectl set image deployment/backend \
           backend=${{ env.IMAGE_NAME }}:${{ github.sha }} \
           alembic-migrate=${{ env.IMAGE_NAME }}:${{ github.sha }} \
