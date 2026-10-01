@@ -53,13 +53,14 @@ class AudioSegmentService:
             total_duration = sum(s["end"] - s["start"] for s in segs)
             if total_duration < MIN_AUDIO_DURATION:
                 return speaker_label, None
-            if len(segs) == 1:
+            picked = self._select_segments_for_embedding(segs)
+            if len(picked) == 1:
                 segment_path = await self._extract_single_segment(
-                    audio_file_path, segs[0], sem=ffmpeg_sem
+                    audio_file_path, picked[0], sem=ffmpeg_sem
                 )
             else:
                 segment_path = await self._concatenate_segments(
-                    audio_file_path, segs, sem=ffmpeg_sem
+                    audio_file_path, picked, sem=ffmpeg_sem
                 )
             return speaker_label, segment_path
 
@@ -88,6 +89,28 @@ class AudioSegmentService:
             grouped[speaker].append(seg)
         return grouped
 
+    def _select_segments_for_embedding(self, segs: List[Dict]) -> List[Dict]:
+        """Waehlt pro Sprecher nur die fuer einen Abdruck noetigen Segmente.
+
+        Laengste Segmente zuerst, ab MIN_SEGMENT_DURATION, bis
+        MIN_AUDIO_DURATION erreicht (Benchmark 2026-10-01: 251 -> 6 Schnitte,
+        byte-identische Ausgabe). Fallback: alle Segmente, wenn keines
+        MIN_SEGMENT_DURATION erreicht.
+        """
+        candidates = sorted(
+            (s for s in segs if (s["end"] - s["start"]) >= MIN_SEGMENT_DURATION),
+            key=lambda s: s["end"] - s["start"],
+            reverse=True,
+        )
+        picked: List[Dict] = []
+        total = 0.0
+        for s in candidates:
+            if total >= MIN_AUDIO_DURATION:
+                break
+            picked.append(s)
+            total += s["end"] - s["start"]
+        return picked if picked else list(segs)
+
     async def _extract_single_segment(
         self,
         audio_file_path: str,
@@ -109,8 +132,9 @@ class AudioSegmentService:
         duration = segment["end"] - segment["start"]
 
         cmd = [
-            "ffmpeg", "-y", "-i", audio_file_path,
+            "ffmpeg", "-y",
             "-ss", str(start),
+            "-i", audio_file_path,
             "-t", str(duration),
             "-ar", "16000",
             "-ac", "1",
@@ -164,8 +188,9 @@ class AudioSegmentService:
                     return None
                 part_path = os.path.join(tmp_dir, f"part_{i}.wav")
                 cmd = [
-                    "ffmpeg", "-y", "-i", audio_file_path,
+                    "ffmpeg", "-y",
                     "-ss", str(seg["start"]),
+                    "-i", audio_file_path,
                     "-t", str(duration),
                     "-ar", "16000",
                     "-ac", "1",

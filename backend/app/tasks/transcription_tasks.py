@@ -199,7 +199,7 @@ async def _reassign_segments_onnx(
     DB-unabhängig: erstellt eigene Session für Profile-Load.
     Returns updated segments list (mutated in place + returned).
     """
-    from app.services.audio_segment_service import audio_segment_service
+    from app.services.audio_segment_service import MIN_SEGMENT_DURATION, audio_segment_service
 
     if not speaker_mappings or not speaker_embedding_service.is_available:
         return gladia_segments
@@ -221,21 +221,25 @@ async def _reassign_segments_onnx(
     for seg in gladia_segments:
         current_label = seg.get("speaker")
         current_name = name_map.get(current_label, current_label)
+        seg_duration = (seg.get("end") or 0) - (seg.get("start") or 0)
 
         try:
-            seg_audio = await audio_segment_service._extract_single_segment(audio_path, seg)
-            if not seg_audio or not os.path.exists(seg_audio):
-                continue
-            seg_embedding = await speaker_embedding_service.extract_embedding(seg_audio)
-            if os.path.exists(seg_audio):
-                os.remove(seg_audio)
-            if seg_embedding is None:
-                continue
+            seg_audio = None
+            if seg_duration >= MIN_SEGMENT_DURATION:
+                seg_audio = await audio_segment_service._extract_single_segment(audio_path, seg)
+            seg_embedding = None
+            if seg_audio and os.path.exists(seg_audio):
+                seg_embedding = await speaker_embedding_service.extract_embedding(seg_audio)
+                if os.path.exists(seg_audio):
+                    os.remove(seg_audio)
 
-            best_name, best_distance, best_conf = match_svc.match_speaker_from_list(
-                profiles=profiles_with_emb,
-                embedding=seg_embedding,
-            )
+            if seg_embedding is None:
+                best_name, best_distance, best_conf = None, None, None
+            else:
+                best_name, best_distance, best_conf = match_svc.match_speaker_from_list(
+                    profiles=profiles_with_emb,
+                    embedding=seg_embedding,
+                )
 
             if best_name and best_conf in ("high", "medium"):
                 if best_name != current_name:

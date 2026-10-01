@@ -616,8 +616,14 @@ Return ONLY a JSON array of objects with the following structure:
         signals = []
 
         # SIGNAL 1: ONNX Audio Matching — extract embedding per speaker, match profiles
-        await speaker_embedding_service.initialize()
-        if speaker_embedding_service.is_available and transcription and transcription.segments:
+        if enrolled_profiles:
+            await speaker_embedding_service.initialize()
+        if (
+            speaker_embedding_service.is_available
+            and transcription
+            and transcription.segments
+            and enrolled_profiles
+        ):
             # Group segments by speaker
             speaker_groups: Dict[str, List[Dict]] = {}
             for seg in transcription.segments:
